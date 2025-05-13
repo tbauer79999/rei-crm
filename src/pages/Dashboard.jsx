@@ -16,6 +16,9 @@ export default function Dashboard() {
   const [uploadError, setUploadError] = useState(false);
   const navigate = useNavigate();
 
+  const goToAnalytics = () => navigate('/analytics');
+  const goToSettings = () => navigate('/settings');
+
   useEffect(() => {
     fetchLeads();
   }, []);
@@ -128,12 +131,26 @@ export default function Dashboard() {
     <div className="p-6">
       <div className="flex justify-between items-center mb-4">
         <h1 className="text-2xl font-bold">Lead Dashboard</h1>
-        <button
-          onClick={() => setShowForm(!showForm)}
-          className="bg-green-600 text-white px-4 py-2 rounded"
-        >
-          {showForm ? 'Close Form' : 'Add Lead'}
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={goToAnalytics}
+            className="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700"
+          >
+            Analytics
+          </button>
+          <button
+            onClick={goToSettings}
+            className="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700"
+          >
+            Settings
+          </button>
+          <button
+            onClick={() => setShowForm(!showForm)}
+            className="bg-green-600 text-white px-4 py-2 rounded"
+          >
+            {showForm ? 'Close Form' : 'Add Lead'}
+          </button>
+        </div>
       </div>
 
       {showForm && (

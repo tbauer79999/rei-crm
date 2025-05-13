@@ -274,6 +274,86 @@ app.get('/', (req, res) => {
   res.send('REI-CRM server running.');
 });
 
+// [ALL YOUR ORIGINAL WORKING CODE GOES HERE — OMITTED FOR SPACE]
+
+// -----------------------------
+// Settings Routes
+// -----------------------------
+
+app.get('/api/settings', async (req, res) => {
+  try {
+    const records = await fetchAllRecords('PlatformSettings', 'Grid view');
+    const settings = {};
+
+    records.forEach(record => {
+      const key = record.fields.Key;
+      const value = record.fields.Value;
+      settings[key] = { value, id: record.id };
+    });
+
+    res.json(settings);
+  } catch (err) {
+    console.error('Error fetching settings:', err.response?.data || err.message);
+    res.status(500).json({ error: 'Failed to fetch settings' });
+  }
+});
+
+app.put('/api/settings/:key', async (req, res) => {
+  const { key } = req.params;
+  const { value } = req.body;
+
+  try {
+    const searchUrl = `${AIRTABLE_BASE_URL}/PlatformSettings?filterByFormula={Key}='${key}'`;
+    const searchRes = await axios.get(searchUrl, {
+      headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` },
+    });
+
+    const existing = searchRes.data.records[0];
+
+    if (existing) {
+      const updateUrl = `${AIRTABLE_BASE_URL}/PlatformSettings`;
+      await axios.patch(updateUrl,
+        {
+          records: [
+            {
+              id: existing.id,
+              fields: { Value: value },
+            },
+          ],
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${AIRTABLE_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+    } else {
+      const createUrl = `${AIRTABLE_BASE_URL}/PlatformSettings`;
+      await axios.post(createUrl,
+        {
+          fields: {
+            Key: key,
+            Value: value,
+          },
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${AIRTABLE_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+    }
+
+    res.status(200).json({ message: 'Setting saved.' });
+  } catch (err) {
+    console.error('Error saving setting:', err.response?.data || err.message);
+    res.status(500).json({ error: 'Failed to save setting' });
+  }
+});
+
+// ✅ Your app.listen must remain the final line:
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);

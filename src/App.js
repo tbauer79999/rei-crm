@@ -4,6 +4,8 @@ import Dashboard from './pages/Dashboard';
 import LeadDetail from './pages/LeadDetail';
 import AddLead from './pages/AddLead';
 import Analytics from './pages/Analytics';
+import Settings from './pages/Settings';
+
 
 function App() {
   return (
@@ -24,6 +26,7 @@ function App() {
             <Route path="/lead/:id" element={<LeadDetail />} />
             <Route path="/add" element={<AddLead />} />
             <Route path="/analytics" element={<Analytics />} />
+            <Route path="/settings" element={<Settings />} /> {/* ✅ Add this */}
           </Routes>
         </div>
       </div>
