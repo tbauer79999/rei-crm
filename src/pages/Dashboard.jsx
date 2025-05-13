@@ -14,6 +14,7 @@ export default function Dashboard() {
   const [parsedRecords, setParsedRecords] = useState([]);
   const [uploadMessage, setUploadMessage] = useState('');
   const [uploadError, setUploadError] = useState(false);
+  const [statusOptions, setStatusOptions] = useState([]);
   const navigate = useNavigate();
 
   const goToAnalytics = () => navigate('/analytics');
@@ -21,6 +22,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     fetchLeads();
+    fetchStatuses();
   }, []);
 
   const fetchLeads = async () => {
@@ -30,6 +32,17 @@ export default function Dashboard() {
       setFilteredLeads(res.data);
     } catch (err) {
       console.error('Error fetching leads:', err);
+    }
+  };
+
+  const fetchStatuses = async () => {
+    try {
+      const res = await axios.get('/api/settings');
+      const raw = res.data?.['Statuses']?.value || '';
+      const split = raw.split('\n').map(s => s.trim()).filter(Boolean);
+      setStatusOptions(split);
+    } catch (err) {
+      console.error('Failed to load statuses:', err);
     }
   };
 
@@ -202,13 +215,10 @@ export default function Dashboard() {
               <input type="text" placeholder="Owner Name" className="p-2 border rounded" />
               <input type="text" placeholder="Property Address" className="p-2 border rounded" />
               <select className="p-2 border rounded">
-                <option>Status</option>
-                <option>New Lead</option>
-                <option>Hot Lead</option>
-                <option>Warm Lead</option>
-                <option>Cold Lead</option>
-                <option>Nurtured</option>
-                <option>Unsubscribed</option>
+                <option disabled selected>Select Status</option>
+                {statusOptions.map((status, i) => (
+                  <option key={i}>{status}</option>
+                ))}
               </select>
               <button className="bg-blue-600 text-white rounded px-4 py-2 mt-2 md:mt-0">
                 Submit
