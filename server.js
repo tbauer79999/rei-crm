@@ -38,6 +38,15 @@ const fetchRecordById = async (table, id) => {
   return res.data;
 };
 
+const fetchSettingValue = async (key) => {
+  const url = `${AIRTABLE_BASE_URL}/PlatformSettings?filterByFormula={Key}='${key}'`;
+  const res = await axios.get(url, {
+    headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` },
+  });
+  const record = res.data.records[0];
+  return record?.fields?.Value || '';
+};
+
 app.get('/api/properties', async (req, res) => {
   try {
     const records = await fetchAllRecords('Properties', 'Grid view');
@@ -146,7 +155,6 @@ app.get('/api/analytics', async (req, res) => {
         }
       }
 
-      // ✅ NEW: Expand message IDs manually
       const messageRecords = [];
       const messageIds = r.fields?.Messages || [];
 
@@ -193,11 +201,12 @@ app.get('/api/analytics', async (req, res) => {
   }
 });
 
-
-
 app.post('/api/properties/bulk', async (req, res) => {
   try {
     const records = req.body.records;
+
+    const rawCampaigns = await fetchSettingValue('Campaigns');
+    const allowedCampaigns = rawCampaigns.split('\n').map(s => s.trim()).filter(Boolean);
 
     const validRecords = records.filter(r =>
       r.fields["Owner Name"] &&
@@ -208,6 +217,20 @@ app.post('/api/properties/bulk', async (req, res) => {
     if (validRecords.length === 0) {
       return res.status(400).json({
         error: 'No valid records with Campaign provided.',
+        uploaded: records.length,
+        skipped: records.length,
+        added: 0
+      });
+    }
+
+    const invalidCampaigns = validRecords.filter(r =>
+      !allowedCampaigns.includes(r.fields["Campaign"])
+    );
+
+    if (invalidCampaigns.length > 0) {
+      return res.status(422).json({
+        error: 'One or more records use invalid Campaign values.',
+        allowedCampaigns,
         uploaded: records.length,
         skipped: records.length,
         added: 0
@@ -269,16 +292,6 @@ app.post('/api/properties/bulk', async (req, res) => {
     res.status(500).json({ error: 'Bulk upload failed' });
   }
 });
-
-app.get('/', (req, res) => {
-  res.send('REI-CRM server running.');
-});
-
-// [ALL YOUR ORIGINAL WORKING CODE GOES HERE — OMITTED FOR SPACE]
-
-// -----------------------------
-// Settings Routes
-// -----------------------------
 
 app.get('/api/settings', async (req, res) => {
   try {
@@ -353,7 +366,10 @@ app.put('/api/settings/:key', async (req, res) => {
   }
 });
 
-// ✅ Your app.listen must remain the final line:
+app.get('/', (req, res) => {
+  res.send('REI-CRM server running.');
+});
+
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
