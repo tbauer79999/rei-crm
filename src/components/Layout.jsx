@@ -20,11 +20,29 @@ export default function Layout({ children }) {
   const [showRecents, setShowRecents] = useState(true);
 
   useEffect(() => {
-    const stored = localStorage.getItem('recentLeads');
-    if (stored) {
-      setRecentLeads(JSON.parse(stored));
-    }
-  }, []);
+  const stored = localStorage.getItem('recentLeads');
+  if (stored) {
+    const parsed = JSON.parse(stored);
+    // Validate each record by pinging the backend
+    Promise.all(
+      parsed.map(async (r) => {
+        try {
+          const res = await axios.get(`/api/properties/${r.id}`);
+          return {
+            id: r.id,
+            name: res.data.fields?.['Owner Name'] || 'Unnamed',
+          };
+        } catch {
+          return null; // deleted or invalid
+        }
+      })
+    ).then((validated) => {
+      const filtered = validated.filter(Boolean);
+      setRecentLeads(filtered);
+      localStorage.setItem('recentLeads', JSON.stringify(filtered));
+    });
+  }
+}, []);
 
   useEffect(() => {
     const match = location.pathname.match(/^\/lead\/(.+)$/);

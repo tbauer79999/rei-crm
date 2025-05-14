@@ -71,20 +71,21 @@ export default function LeadDetail() {
             <p className="text-sm text-gray-500">No messages yet.</p>
           )}
           {messages.map((msg) => (
-            <div
-              key={msg.id}
-              className={`max-w-xl px-4 py-2 rounded-lg text-sm shadow ${
-                msg.fields.Direction === 'inbound'
-                  ? 'bg-blue-100 text-blue-900 self-start'
-                  : 'bg-gray-200 text-gray-800 self-end ml-auto'
-              }`}
-            >
-              <div className="text-xs text-gray-500 mb-1">
-                {new Date(msg.fields.Timestamp).toLocaleString()}
-              </div>
-              <div>{msg.fields.Body || '[Empty Message]'}</div>
-            </div>
-          ))}
+  <div
+    key={msg.id}
+    className={`max-w-xl px-4 py-2 rounded-lg text-sm shadow ${
+      msg.fields.Direction === 'Inbound'
+        ? 'bg-blue-100 text-blue-900 self-start'
+        : 'bg-gray-200 text-gray-800 self-end ml-auto'
+    }`}
+  >
+    <div className="text-xs text-gray-500 mb-1">
+      {new Date(msg.fields.Timestamp).toLocaleString()}
+    </div>
+    <div>{msg.fields["Message Body"]?.trim() || '[Empty Message]'}</div>
+  </div>
+))}
+
         </div>
       </div>
     </div>

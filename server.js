@@ -117,16 +117,23 @@ app.get('/api/messages', async (req, res) => {
 app.get('/api/messages/:id', async (req, res) => {
   try {
     const id = req.params.id;
-    const url = `${AIRTABLE_BASE_URL}/Messages?filterByFormula=${encodeURIComponent(`{Property} = '${id}'`)}`;
+    const formula = `{Property ID} = '${id}'`;
+
+    const url = `${AIRTABLE_BASE_URL}/Messages?filterByFormula=${encodeURIComponent(formula)}`;
     const resAirtable = await axios.get(url, {
       headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` },
     });
+
     res.json(resAirtable.data.records);
   } catch (err) {
     console.error('Error fetching messages:', err.response?.data || err.message);
     res.status(500).json({ error: 'Failed to fetch messages' });
   }
 });
+
+
+
+
 
 app.get('/api/analytics', async (req, res) => {
   try {
