@@ -14,7 +14,6 @@ export default function Dashboard() {
   const [parsedRecords, setParsedRecords] = useState([]);
   const [uploadMessage, setUploadMessage] = useState('');
   const [uploadError, setUploadError] = useState(false);
-  const [statusOptions, setStatusOptions] = useState([]);
   const navigate = useNavigate();
 
   const goToAnalytics = () => navigate('/analytics');
@@ -22,7 +21,6 @@ export default function Dashboard() {
 
   useEffect(() => {
     fetchLeads();
-    fetchStatuses();
   }, []);
 
   const fetchLeads = async () => {
@@ -32,17 +30,6 @@ export default function Dashboard() {
       setFilteredLeads(res.data);
     } catch (err) {
       console.error('Error fetching leads:', err);
-    }
-  };
-
-  const fetchStatuses = async () => {
-    try {
-      const res = await axios.get('/api/settings');
-      const raw = res.data?.['Statuses']?.value || '';
-      const split = raw.split('\n').map(s => s.trim()).filter(Boolean);
-      setStatusOptions(split);
-    } catch (err) {
-      console.error('Failed to load statuses:', err);
     }
   };
 
@@ -141,33 +128,20 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="p-6">
-      <div className="flex justify-between items-center mb-4">
-        <h1 className="text-2xl font-bold">Lead Dashboard</h1>
-        <div className="flex gap-2">
-          <button
-            onClick={goToAnalytics}
-            className="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700"
-          >
-            Analytics
-          </button>
-          <button
-            onClick={goToSettings}
-            className="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700"
-          >
-            Settings
-          </button>
-          <button
-            onClick={() => setShowForm(!showForm)}
-            className="bg-green-600 text-white px-4 py-2 rounded"
-          >
+    <div className="p-6 bg-gray-100 min-h-screen">
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-3xl font-semibold text-gray-800">Lead Dashboard</h1>
+        <div className="flex gap-3">
+          <button onClick={goToAnalytics} className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md text-sm">Analytics</button>
+          <button onClick={goToSettings} className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-md text-sm">Settings</button>
+          <button onClick={() => setShowForm(!showForm)} className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm">
             {showForm ? 'Close Form' : 'Add Lead'}
           </button>
         </div>
       </div>
 
       {showForm && (
-        <div className="bg-gray-100 p-4 rounded shadow mb-6">
+        <div className="bg-white p-4 rounded-md shadow-md mb-6">
           <div className="flex space-x-4 mb-4">
             <button
               onClick={() => setTab('single')}
@@ -195,10 +169,7 @@ export default function Dashboard() {
                 <input type="file" accept=".csv" onChange={handleFileChange} />
               </div>
               {fileReady && (
-                <button
-                  onClick={handleBulkSubmit}
-                  className="bg-blue-600 text-white px-4 py-2 rounded"
-                >
+                <button onClick={handleBulkSubmit} className="bg-blue-600 text-white px-4 py-2 rounded">
                   Submit Bulk Upload
                 </button>
               )}
@@ -215,10 +186,13 @@ export default function Dashboard() {
               <input type="text" placeholder="Owner Name" className="p-2 border rounded" />
               <input type="text" placeholder="Property Address" className="p-2 border rounded" />
               <select className="p-2 border rounded">
-                <option disabled selected>Select Status</option>
-                {statusOptions.map((status, i) => (
-                  <option key={i}>{status}</option>
-                ))}
+                <option>Status</option>
+                <option>New Lead</option>
+                <option>Hot Lead</option>
+                <option>Warm Lead</option>
+                <option>Cold Lead</option>
+                <option>Nurtured</option>
+                <option>Unsubscribed</option>
               </select>
               <button className="bg-blue-600 text-white rounded px-4 py-2 mt-2 md:mt-0">
                 Submit
@@ -228,7 +202,7 @@ export default function Dashboard() {
         </div>
       )}
 
-      <div className="grid grid-cols-3 sm:grid-cols-6 gap-4 mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-4 mb-6">
         {[
           'All',
           'Hot Lead',
@@ -247,12 +221,12 @@ export default function Dashboard() {
             <div
               key={status}
               onClick={() => handleCardClick(status)}
-              className={`p-4 rounded shadow cursor-pointer border text-center ${
-                filterStatus === status ? 'bg-blue-100' : 'bg-white'
+              className={`bg-white p-4 rounded-md shadow text-center cursor-pointer ${
+                filterStatus === status ? 'border-blue-600 border-2' : 'border'
               }`}
             >
-              <div className="text-sm font-medium">{status}</div>
-              <div className="text-xl font-bold">{count}</div>
+              <div className="text-sm text-gray-600">{status}</div>
+              <div className="text-2xl font-bold text-gray-800">{count}</div>
             </div>
           );
         })}
@@ -266,28 +240,33 @@ export default function Dashboard() {
         className="mb-4 p-2 w-full border rounded"
       />
 
-      <div className="overflow-x-auto">
-        <table className="min-w-full bg-white shadow rounded">
-          <thead>
-            <tr className="bg-gray-50">
-              <th className="px-4 py-2 text-left">Owner Name</th>
-              <th className="px-4 py-2 text-left">Property Address</th>
-              <th className="px-4 py-2 text-left">Status</th>
+      <div className="overflow-x-auto bg-white rounded-md shadow">
+        <table className="min-w-full">
+          <thead className="bg-gray-50">
+            <tr>
+              <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Owner Name</th>
+              <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Property Address</th>
+              <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Status</th>
             </tr>
           </thead>
           <tbody>
-            {filteredLeads.map((lead) => (
-              <tr
-                key={lead.id}
-                onClick={() => handleRowClick(lead.id)}
-                className="cursor-pointer hover:bg-gray-100"
-              >
-                <td className="border px-4 py-2">{lead.fields?.["Owner Name"] || '—'}</td>
-                <td className="border px-4 py-2">{lead.fields?.["Property Address"] || '—'}</td>
-                <td className="border px-4 py-2">{lead.fields?.Status || '—'}</td>
-              </tr>
-            ))}
-          </tbody>
+              {filteredLeads.length === 0 ? (
+                <tr>
+                  <td colSpan="3" className="text-center text-sm text-gray-500 py-6">
+                    No leads found for this view.
+                  </td>
+                </tr>
+              ) : (
+                filteredLeads.map((lead) => (
+                  <tr key={lead.id} onClick={() => handleRowClick(lead.id)} className="cursor-pointer hover:bg-gray-100">
+                    <td className="border px-4 py-2">{lead.fields?.["Owner Name"] || '—'}</td>
+                    <td className="border px-4 py-2">{lead.fields?.["Property Address"] || '—'}</td>
+                    <td className="border px-4 py-2">{lead.fields?.Status || '—'}</td>
+                  </tr>
+                ))
+              )}
+</tbody>
+
         </table>
       </div>
     </div>

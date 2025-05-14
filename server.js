@@ -104,6 +104,15 @@ app.patch('/api/properties/:id/status', async (req, res) => {
     res.status(500).json({ error: 'Failed to update status' });
   }
 });
+app.get('/api/messages', async (req, res) => {
+  try {
+    const records = await fetchAllRecords('Messages', 'Grid view');
+    res.json(records);
+  } catch (err) {
+    console.error('Error fetching all messages:', err.response?.data || err.message);
+    res.status(500).json({ error: 'Failed to fetch messages' });
+  }
+});
 
 app.get('/api/messages/:id', async (req, res) => {
   try {

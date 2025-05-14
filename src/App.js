@@ -1,37 +1,24 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+
+import Layout from './components/Layout';
 import Dashboard from './pages/Dashboard';
-import LeadDetail from './pages/LeadDetail';
-import AddLead from './pages/AddLead';
 import Analytics from './pages/Analytics';
 import Settings from './pages/Settings';
+import LeadDetail from './pages/LeadDetail';
 
-
-function App() {
+export default function App() {
   return (
     <Router>
-      <div className="min-h-screen bg-white">
-        <nav className="bg-white shadow mb-4 px-6 py-4 flex justify-between items-center">
-          <div className="text-xl font-bold">Lead Dashboard</div>
-          <div className="space-x-4">
-            <a href="/" className="text-blue-600 hover:underline">
-              Dashboard
-            </a>
-          </div>
-        </nav>
-
-        <div className="px-6">
-          <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/lead/:id" element={<LeadDetail />} />
-            <Route path="/add" element={<AddLead />} />
-            <Route path="/analytics" element={<Analytics />} />
-            <Route path="/settings" element={<Settings />} /> {/* ✅ Add this */}
-          </Routes>
-        </div>
-      </div>
+      <Layout>
+        <Routes>
+          <Route path="/" element={<Navigate to="/dashboard" />} />
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/analytics" element={<Analytics />} />
+          <Route path="/settings" element={<Settings />} />
+          <Route path="/lead/:id" element={<LeadDetail />} />
+        </Routes>
+      </Layout>
     </Router>
   );
 }
-
-export default App;

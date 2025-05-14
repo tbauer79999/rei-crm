@@ -1,102 +1,91 @@
 import React, { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import axios from 'axios';
-import { MapPin, User, Phone } from 'lucide-react';
 
 export default function LeadDetail() {
   const { id } = useParams();
-  const [lead, setLead] = useState(null);
+  const [property, setProperty] = useState(null);
   const [messages, setMessages] = useState([]);
 
   useEffect(() => {
-    axios.get(`/api/properties/${id}`).then((res) => setLead(res.data));
+    axios.get(`/api/properties/${id}`).then((res) => setProperty(res.data));
     axios.get(`/api/messages/${id}`).then((res) => setMessages(res.data));
   }, [id]);
 
-  if (!lead) return <div className="p-6">Loading...</div>;
+  if (!property) return <div className="p-6">Loading lead details...</div>;
 
-  const f = lead.fields || {};
+  const fields = property.fields || {};
+  const address = `${fields["Property Address"] || ''}, ${fields.City || ''}, ${fields.State || ''} ${fields["Zip Code"] || ''}`;
+  const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
+  const zillowUrl = `https://www.zillow.com/homes/${encodeURIComponent(address)}`;
 
   return (
-    <div className="p-6 space-y-6">
-      <h1 className="text-2xl font-bold">Lead Overview</h1>
+    <div
+      className="p-6 space-y-6 bg-gray-100 min-h-screen"
+      data-lead-name={fields["Owner Name"] || 'Unnamed'}
+    >
+      <div className="flex justify-between items-center">
+        <h1 className="text-2xl font-bold">Lead Detail</h1>
+        <Link to="/dashboard" className="text-blue-600 underline text-sm hover:text-blue-800">
+          ← Back to Dashboard
+        </Link>
+      </div>
 
-      <div className="grid md:grid-cols-2 gap-6">
-        {/* Property Info */}
-        <div className="bg-white p-4 rounded shadow">
-          <h2 className="font-semibold text-lg mb-2">Property Info</h2>
-          <p className="flex items-center gap-2 text-gray-600 mb-1">
-            <MapPin size={16} />
-            {f["Property Address"] || 'N/A'}
-          </p>
-          <p><strong>Bedrooms:</strong> {f.Bedrooms || 'N/A'}</p>
-          <p><strong>Bathrooms:</strong> {f.Bathrooms || 'N/A'}</p>
-          <p><strong>Square Feet:</strong> {f["Square Feet"] || 'N/A'}</p>
-          {f["Property Address"] && (
-            <>
-              <a
-                href={`https://www.google.com/maps/search/${encodeURIComponent(f["Property Address"])}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-blue-600 text-sm underline mt-2 block"
-              >
-                View on Google Maps
-              </a>
-              <a
-                href={`https://www.zillow.com/homes/${encodeURIComponent(f["Property Address"])}_rb/`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-blue-600 text-sm underline mt-1 block"
-              >
-                View on Zillow
-              </a>
-            </>
-          )}
+      {/* Property + Owner Info */}
+      <div className="bg-white rounded shadow p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div>
+          <h2 className="text-lg font-semibold mb-2">Property Info</h2>
+          <div className="text-sm space-y-1">
+            <p><strong>Address:</strong> {fields["Property Address"] || '—'}</p>
+            <p><strong>City:</strong> {fields.City || '—'}</p>
+            <p><strong>State:</strong> {fields.State || '—'}</p>
+            <p><strong>Zip Code:</strong> {fields["Zip Code"] || '—'}</p>
+            <p><strong>Bedrooms:</strong> {fields.Bedrooms || '—'}</p>
+            <p><strong>Bathrooms:</strong> {fields.Bathrooms || '—'}</p>
+            <p><strong>Square Footage:</strong> {fields["Square Footage"] || '—'}</p>
+            <p className="pt-2 space-x-3">
+              <a href={mapsUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">Google Maps</a>
+              <a href={zillowUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">Zillow</a>
+            </p>
+          </div>
         </div>
 
-        {/* Lead Info */}
-        <div className="bg-white p-4 rounded shadow">
-          <h2 className="font-semibold text-lg mb-2">Lead Info</h2>
-          <p className="flex items-center gap-2 text-gray-600 mb-1">
-            <User size={16} />
-            {f["Owner Name"] || 'No Name'}
-          </p>
-          <p className="flex items-center gap-2 text-gray-600 mb-1">
-            <Phone size={16} />
-            {f.Phone || 'No phone'}
-          </p>
-          <p><strong>Status:</strong> {f.Status || 'New Lead'}</p>
-          <p><strong>Motivation Score:</strong> {f["Motivation Score"] || 'N/A'}</p>
-          <p><strong>Campaign:</strong> {f["Campaign"] || 'N/A'}</p>
+        <div>
+          <h2 className="text-lg font-semibold mb-2">Owner Info</h2>
+          <div className="text-sm space-y-1">
+            <p><strong>Name:</strong> {fields["Owner Name"] || '—'}</p>
+            <p><strong>Phone:</strong> {fields.Phone || '—'}</p>
+            <p><strong>Email:</strong> {fields.Email || '—'}</p>
+            <p><strong>Campaign:</strong> {fields.Campaign || '—'}</p>
+            <p><strong>Status:</strong> {fields.Status || '—'}</p>
+            <p><strong>Notes:</strong> {fields.Notes || '—'}</p>
+          </div>
         </div>
       </div>
 
-      {/* Messages */}
-      <div className="bg-white p-4 rounded shadow">
-        <h2 className="text-lg font-semibold mb-4">Customer Messages</h2>
-        {messages.length === 0 ? (
-          <p className="text-gray-500">No messages yet.</p>
-        ) : (
-          <div className="space-y-3">
-            {messages.map((msg) => {
-              const isInbound = msg.fields?.Direction === 'inbound';
-              const timestamp = msg.fields?.Timestamp
-                ? new Date(msg.fields.Timestamp).toLocaleString()
-                : '';
-              return (
-                <div
-                  key={msg.id}
-                  className={`p-3 rounded ${
-                    isInbound ? 'bg-gray-100 text-left' : 'bg-blue-100 text-right'
-                  }`}
-                >
-                  <p className="text-sm">{msg.fields?.Text || '—'}</p>
-                  <p className="text-xs text-gray-500 mt-1">{timestamp}</p>
-                </div>
-              );
-            })}
-          </div>
-        )}
+      {/* Message History */}
+      <div className="bg-white rounded shadow p-6">
+        <h2 className="text-lg font-semibold mb-4">Message History</h2>
+        <div className="space-y-4 max-h-[400px] overflow-y-auto">
+          {messages.length === 0 && (
+            <p className="text-sm text-gray-500">No messages yet.</p>
+          )}
+          {messages.map((msg) => (
+            <div
+              key={msg.id}
+              className={`max-w-xl px-4 py-2 rounded-lg text-sm shadow ${
+                msg.fields.Direction === 'inbound'
+                  ? 'bg-blue-100 text-blue-900 self-start'
+                  : 'bg-gray-200 text-gray-800 self-end ml-auto'
+              }`}
+            >
+              <div className="text-xs text-gray-500 mb-1">
+                {new Date(msg.fields.Timestamp).toLocaleString()}
+              </div>
+              <div>{msg.fields.Body || '[Empty Message]'}</div>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
