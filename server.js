@@ -5,11 +5,13 @@ const cors = require('cors');
 
 dotenv.config();
 const app = express();
+
 app.use(cors());
 app.use(express.json());
 
-const AIRTABLE_BASE_URL = `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}`;
-const AIRTABLE_API_KEY = process.env.AIRTABLE_API_KEY;
+const AIRTABLE_API_TOKEN = process.env.AIRTABLE_API_TOKEN;
+const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID;
+const AIRTABLE_BASE_URL = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}`;
 
 const fetchAllRecords = async (table, view = 'Grid view') => {
   let records = [];
@@ -20,7 +22,7 @@ const fetchAllRecords = async (table, view = 'Grid view') => {
     if (offset) url += `&offset=${offset}`;
 
     const res = await axios.get(url, {
-      headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` },
+      headers: { Authorization: `Bearer ${AIRTABLE_API_TOKEN}` },
     });
 
     records = records.concat(res.data.records);
@@ -33,7 +35,7 @@ const fetchAllRecords = async (table, view = 'Grid view') => {
 const fetchRecordById = async (table, id) => {
   const url = `${AIRTABLE_BASE_URL}/${table}/${id}`;
   const res = await axios.get(url, {
-    headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` },
+    headers: { Authorization: `Bearer ${AIRTABLE_API_TOKEN}` },
   });
   return res.data;
 };
@@ -41,15 +43,17 @@ const fetchRecordById = async (table, id) => {
 const fetchSettingValue = async (key) => {
   const url = `${AIRTABLE_BASE_URL}/PlatformSettings?filterByFormula={Key}='${key}'`;
   const res = await axios.get(url, {
-    headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` },
+    headers: { Authorization: `Bearer ${AIRTABLE_API_TOKEN}` },
   });
   const record = res.data.records[0];
   return record?.fields?.Value || '';
 };
 
+// API ROUTES
+
 app.get('/api/properties', async (req, res) => {
   try {
-    const records = await fetchAllRecords('Properties', 'Grid view');
+    const records = await fetchAllRecords('Properties');
     res.json(records);
   } catch (err) {
     console.error('Error fetching properties:', err.response?.data || err.message);
@@ -78,7 +82,6 @@ app.patch('/api/properties/:id/status', async (req, res) => {
     const history = existing.fields?.['Status History'] || '';
 
     let updatedHistory = history;
-
     if (status && status !== oldStatus) {
       const newLine = `${today}: ${status}`;
       updatedHistory = history ? `${history}\n${newLine}` : newLine;
@@ -94,7 +97,7 @@ app.patch('/api/properties/:id/status', async (req, res) => {
         },
       },
       {
-        headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` },
+        headers: { Authorization: `Bearer ${AIRTABLE_API_TOKEN}` },
       }
     );
 
@@ -104,12 +107,13 @@ app.patch('/api/properties/:id/status', async (req, res) => {
     res.status(500).json({ error: 'Failed to update status' });
   }
 });
+
 app.get('/api/messages', async (req, res) => {
   try {
-    const records = await fetchAllRecords('Messages', 'Grid view');
+    const records = await fetchAllRecords('Messages');
     res.json(records);
   } catch (err) {
-    console.error('Error fetching all messages:', err.response?.data || err.message);
+    console.error('Error fetching messages:', err.response?.data || err.message);
     res.status(500).json({ error: 'Failed to fetch messages' });
   }
 });
@@ -121,7 +125,7 @@ app.get('/api/messages/:id', async (req, res) => {
 
     const url = `${AIRTABLE_BASE_URL}/Messages?filterByFormula=${encodeURIComponent(formula)}`;
     const resAirtable = await axios.get(url, {
-      headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` },
+      headers: { Authorization: `Bearer ${AIRTABLE_API_TOKEN}` },
     });
 
     res.json(resAirtable.data.records);
@@ -131,13 +135,9 @@ app.get('/api/messages/:id', async (req, res) => {
   }
 });
 
-
-
-
-
 app.get('/api/analytics', async (req, res) => {
   try {
-    const leads = await fetchAllRecords('Properties', 'Grid view');
+    const leads = await fetchAllRecords('Properties');
 
     const byCampaign = {};
     const byStatus = {};
@@ -178,7 +178,7 @@ app.get('/api/analytics', async (req, res) => {
         try {
           const url = `${AIRTABLE_BASE_URL}/Messages/${id}`;
           const resMsg = await axios.get(url, {
-            headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` }
+            headers: { Authorization: `Bearer ${AIRTABLE_API_TOKEN}` }
           });
 
           const msg = resMsg.data?.fields;
@@ -253,7 +253,7 @@ app.post('/api/properties/bulk', async (req, res) => {
       });
     }
 
-    const existing = await fetchAllRecords('Properties', 'Grid view');
+    const existing = await fetchAllRecords('Properties');
     const existingSet = new Set(
       existing.map(e =>
         `${e.fields["Owner Name"]?.toLowerCase().trim()}|${e.fields["Property Address"]?.toLowerCase().trim()}`
@@ -292,7 +292,7 @@ app.post('/api/properties/bulk', async (req, res) => {
 
     const url = `${AIRTABLE_BASE_URL}/Properties`;
     const response = await axios.post(url, { records: enrichedRecords }, {
-      headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` }
+      headers: { Authorization: `Bearer ${AIRTABLE_API_TOKEN}` }
     });
 
     const added = response.data.records?.length || 0;
@@ -311,7 +311,7 @@ app.post('/api/properties/bulk', async (req, res) => {
 
 app.get('/api/settings', async (req, res) => {
   try {
-    const records = await fetchAllRecords('PlatformSettings', 'Grid view');
+    const records = await fetchAllRecords('PlatformSettings');
     const settings = {};
 
     records.forEach(record => {
@@ -327,58 +327,45 @@ app.get('/api/settings', async (req, res) => {
   }
 });
 
-app.put('/api/settings/:key', async (req, res) => {
-  const { key } = req.params;
-  const { value } = req.body;
+// BULK PUT /api/settings
+app.put('/api/settings', async (req, res) => {
+  const settings = req.body;
+  const headers = {
+    Authorization: `Bearer ${AIRTABLE_API_TOKEN}`,
+    'Content-Type': 'application/json',
+  };
 
   try {
-    const searchUrl = `${AIRTABLE_BASE_URL}/PlatformSettings?filterByFormula={Key}='${key}'`;
-    const searchRes = await axios.get(searchUrl, {
-      headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` },
-    });
-
-    const existing = searchRes.data.records[0];
-
-    if (existing) {
-      const updateUrl = `${AIRTABLE_BASE_URL}/PlatformSettings`;
-      await axios.patch(updateUrl,
-        {
-          records: [
-            {
-              id: existing.id,
-              fields: { Value: value },
-            },
-          ],
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${AIRTABLE_API_KEY}`,
-            'Content-Type': 'application/json',
-          },
+    for (const [key, setting] of Object.entries(settings)) {
+      const { id, value } = setting;
+      const payload = {
+        fields: {
+          Key: key,
+          Value: typeof value === 'boolean' ? String(value) : value,
         }
-      );
-    } else {
-      const createUrl = `${AIRTABLE_BASE_URL}/PlatformSettings`;
-      await axios.post(createUrl,
-        {
-          fields: {
-            Key: key,
-            Value: value,
-          },
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${AIRTABLE_API_KEY}`,
-            'Content-Type': 'application/json',
-          },
+      };
+
+      const url = `${AIRTABLE_BASE_URL}/PlatformSettings${id ? `/${id}` : ''}`;
+
+      if (id) {
+        await axios.patch(url, payload, { headers });
+      } else {
+        // Lookup the record to prevent duplicate
+        const lookupUrl = `${AIRTABLE_BASE_URL}/PlatformSettings?filterByFormula=${encodeURIComponent(`{Key}="${key}"`)}`;
+        const existing = await axios.get(lookupUrl, { headers });
+        if (existing.data.records.length > 0) {
+          const existingId = existing.data.records[0].id;
+          await axios.patch(`${AIRTABLE_BASE_URL}/PlatformSettings/${existingId}`, payload, { headers });
+        } else {
+          await axios.post(`${AIRTABLE_BASE_URL}/PlatformSettings`, payload, { headers });
         }
-      );
+      }
     }
 
-    res.status(200).json({ message: 'Setting saved.' });
+    res.status(200).json({ message: 'All settings saved.' });
   } catch (err) {
     console.error('Error saving setting:', err.response?.data || err.message);
-    res.status(500).json({ error: 'Failed to save setting' });
+    res.status(500).json({ error: 'Failed to save one or more settings' });
   }
 });
 

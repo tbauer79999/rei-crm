@@ -1,17 +1,45 @@
-import axios from 'axios';
+// airtable.js
+const axios = require('axios');
+require('dotenv').config();
 
-const AIRTABLE_BASE_ID = 'appAfzlWKGj7n5GQq';
-const AIRTABLE_TABLE_NAME = 'Properties';
-const AIRTABLE_TOKEN = 'patPCJM4dODcNTfHo.bd282027696b77f5280682e4df8f223c94de8dfaf4a014bf83e683f8df93ea67'; // <-- replace this
+const AIRTABLE_API_KEY = process.env.AIRTABLE_API_KEY;
+const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID;
+const AIRTABLE_PLATFORM_SETTINGS_TABLE = 'PlatformSettings';
 
 const airtable = axios.create({
   baseURL: `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}`,
   headers: {
-    Authorization: `Bearer ${AIRTABLE_TOKEN}`,
+    Authorization: `Bearer ${AIRTABLE_API_KEY}`,
+    'Content-Type': 'application/json',
   },
 });
 
-export const fetchProperties = async () => {
-  const res = await airtable.get(`/${AIRTABLE_TABLE_NAME}`);
-  return res.data.records;
+const fetchPlatformSettings = async () => {
+  const res = await airtable.get(`/${AIRTABLE_PLATFORM_SETTINGS_TABLE}`);
+  const settings = {};
+
+  res.data.records.forEach((record) => {
+    const key = record.fields.Key;
+    const value = record.fields.Value;
+    settings[key] = { value, id: record.id };
+  });
+
+  return settings;
+};
+
+const updatePlatformSetting = async (id, value) => {
+  const res = await airtable.patch(`/${AIRTABLE_PLATFORM_SETTINGS_TABLE}`, {
+    records: [
+      {
+        id,
+        fields: { Value: value },
+      },
+    ],
+  });
+  return res.data.records[0];
+};
+
+module.exports = {
+  fetchPlatformSettings,
+  updatePlatformSetting,
 };
