@@ -49,8 +49,6 @@ const fetchSettingValue = async (key) => {
   return record?.fields?.Value || '';
 };
 
-// API ROUTES
-
 app.get('/api/properties', async (req, res) => {
   try {
     const records = await fetchAllRecords('Properties');
@@ -327,7 +325,35 @@ app.get('/api/settings', async (req, res) => {
   }
 });
 
-// BULK PUT /api/settings
+app.post('/api/settings', async (req, res) => {
+  const { key, value } = req.body;
+  const headers = {
+    Authorization: `Bearer ${AIRTABLE_API_TOKEN}`,
+    'Content-Type': 'application/json'
+  };
+
+  try {
+    const formula = `LOWER(TRIM({Key})) = "${key.toLowerCase().trim()}"`;
+    const lookupUrl = `${AIRTABLE_BASE_URL}/PlatformSettings?filterByFormula=${encodeURIComponent(formula)}`;
+    const existing = await axios.get(lookupUrl, { headers });
+
+    const payload = { fields: { Key: key, Value: value } };
+
+    if (existing.data.records.length > 0) {
+      const existingId = existing.data.records[0].id;
+      await axios.patch(`${AIRTABLE_BASE_URL}/PlatformSettings/${existingId}`, payload, { headers });
+    } else {
+      await axios.post(`${AIRTABLE_BASE_URL}/PlatformSettings`, payload, { headers });
+    }
+
+    res.status(200).json({ success: true });
+  } catch (err) {
+    console.error('Error saving setting:', err.response?.data || err.message);
+    res.status(500).json({ error: 'Failed to save setting' });
+  }
+});
+
+
 app.put('/api/settings', async (req, res) => {
   const settings = req.body;
   const headers = {
@@ -337,28 +363,20 @@ app.put('/api/settings', async (req, res) => {
 
   try {
     for (const [key, setting] of Object.entries(settings)) {
-      const { id, value } = setting;
-      const payload = {
-        fields: {
-          Key: key,
-          Value: typeof value === 'boolean' ? String(value) : value,
-        }
-      };
+      const value = typeof setting.value === 'boolean' ? String(setting.value) : setting.value;
 
-      const url = `${AIRTABLE_BASE_URL}/PlatformSettings${id ? `/${id}` : ''}`;
+      const escapedKey = key.replace(/"/g, '\\"');
+      const formula = `LOWER(TRIM({Key})) = "${escapedKey.toLowerCase().trim()}"`;
+      const lookupUrl = `${AIRTABLE_BASE_URL}/PlatformSettings?filterByFormula=${encodeURIComponent(formula)}`;
+      const existing = await axios.get(lookupUrl, { headers });
 
-      if (id) {
-        await axios.patch(url, payload, { headers });
+      const payload = { fields: { Key: key, Value: value } };
+
+      if (existing.data.records.length > 0) {
+        const existingId = existing.data.records[0].id;
+        await axios.patch(`${AIRTABLE_BASE_URL}/PlatformSettings/${existingId}`, payload, { headers });
       } else {
-        // Lookup the record to prevent duplicate
-        const lookupUrl = `${AIRTABLE_BASE_URL}/PlatformSettings?filterByFormula=${encodeURIComponent(`{Key}="${key}"`)}`;
-        const existing = await axios.get(lookupUrl, { headers });
-        if (existing.data.records.length > 0) {
-          const existingId = existing.data.records[0].id;
-          await axios.patch(`${AIRTABLE_BASE_URL}/PlatformSettings/${existingId}`, payload, { headers });
-        } else {
-          await axios.post(`${AIRTABLE_BASE_URL}/PlatformSettings`, payload, { headers });
-        }
+        await axios.post(`${AIRTABLE_BASE_URL}/PlatformSettings`, payload, { headers });
       }
     }
 

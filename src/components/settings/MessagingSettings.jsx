@@ -1,87 +1,120 @@
-import React, { useState } from "react";
-import { Input } from "../ui/input";
-import { Label } from "../ui/label";
-import { Textarea } from "../ui/textarea";
-import { Switch } from "../ui/switch";
-import { Card, CardContent } from "../ui/card";
+import React, { useEffect, useState } from 'react';
+import axios from 'axios';
+import Button from '../ui/button';
+import { Label } from '../ui/label';
+import { Textarea } from '../ui/textarea';
 
 export default function MessagingSettings() {
-  const [enableTextReplies, setEnableTextReplies] = useState(true);
-  const [enableAutoFollowups, setEnableAutoFollowups] = useState(true);
-  const [showCustomReplies, setShowCustomReplies] = useState(false);
+  const [settings, setSettings] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    axios.get('/api/settings').then((res) => {
+      const data = {};
+      const records = res?.data?.records;
+
+      if (Array.isArray(records)) {
+        records.forEach((record) => {
+          if (record.fields?.key && record.fields?.value !== undefined) {
+            data[record.fields.key] = record.fields.value;
+          }
+        });
+      } else {
+        console.error('Unexpected settings API response:', res.data);
+      }
+
+      setSettings(data);
+      setLoading(false);
+    });
+  }, []);
+
+  const handleChange = (e) => {
+    setSettings({ ...settings, [e.target.name]: e.target.value });
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    const updates = [
+      { key: 'messaging_tone_guidance', value: settings.messaging_tone_guidance || '' },
+      { key: 'opening_message_prompt', value: settings.opening_message_prompt || '' },
+      { key: 'response_style_preferences', value: settings.response_style_preferences || '' },
+      { key: 'sms_opt_in_language', value: settings.sms_opt_in_language || '' },
+      { key: 'unsubscribe_keywords', value: settings.unsubscribe_keywords || '' },
+    ];
+    for (const setting of updates) {
+      await axios.post('/api/settings', setting);
+    }
+    setSaving(false);
+  };
+
+  if (loading) return <div>Loading...</div>;
 
   return (
     <div className="space-y-6">
-      <Card>
-        <CardContent className="p-6 space-y-4">
-          <h2 className="text-xl font-bold">Messaging Preferences</h2>
+      <div>
+        <Label htmlFor="messaging_tone_guidance">Messaging Tone Guidance (Optional)</Label>
+        <Textarea
+          id="messaging_tone_guidance"
+          name="messaging_tone_guidance"
+          value={settings.messaging_tone_guidance || ''}
+          onChange={handleChange}
+          placeholder="e.g. Friendly, professional, empathetic"
+          className="mt-1"
+        />
+      </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="replyNumber">Default Reply Phone Number</Label>
-              <Input id="replyNumber" placeholder="e.g. (555) 123-4567" />
-            </div>
-            <div>
-              <Label htmlFor="replyDelay">Default Response Delay (seconds)</Label>
-              <Input id="replyDelay" type="number" placeholder="3" />
-            </div>
-          </div>
+      <div>
+        <Label htmlFor="opening_message_prompt">Opening Message Prompt (Optional)</Label>
+        <Textarea
+          id="opening_message_prompt"
+          name="opening_message_prompt"
+          value={settings.opening_message_prompt || ''}
+          onChange={handleChange}
+          placeholder="e.g. Use a soft intro asking if they’re the property owner"
+          className="mt-1"
+        />
+      </div>
 
-          <div className="flex items-center justify-between pt-2">
-            <Label htmlFor="enableTextReplies">Enable Text Replies</Label>
-            <Switch
-              checked={enableTextReplies}
-              onCheckedChange={setEnableTextReplies}
-            />
-          </div>
+      <div>
+        <Label htmlFor="response_style_preferences">Response Style Preferences (Optional)</Label>
+        <Textarea
+          id="response_style_preferences"
+          name="response_style_preferences"
+          value={settings.response_style_preferences || ''}
+          onChange={handleChange}
+          placeholder="e.g. Keep replies under 2 sentences. Avoid sounding robotic."
+          className="mt-1"
+        />
+      </div>
 
-          <div className="flex items-center justify-between">
-            <Label htmlFor="enableAutoFollowups">Enable Auto-Followups</Label>
-            <Switch
-              checked={enableAutoFollowups}
-              onCheckedChange={setEnableAutoFollowups}
-            />
-          </div>
-        </CardContent>
-      </Card>
+      <div>
+        <Label htmlFor="sms_opt_in_language">SMS Opt-In Language (Optional)</Label>
+        <Textarea
+          id="sms_opt_in_language"
+          name="sms_opt_in_language"
+          value={settings.sms_opt_in_language || ''}
+          onChange={handleChange}
+          placeholder="Enter the default opt-in message for compliance"
+          className="mt-1"
+        />
+      </div>
 
-      <Card>
-        <CardContent className="p-6 space-y-4">
-          <div className="flex justify-between items-center">
-            <h2 className="text-xl font-bold">Custom AI Message Templates</h2>
-            <Switch
-              checked={showCustomReplies}
-              onCheckedChange={setShowCustomReplies}
-            />
-          </div>
+      <div>
+        <Label htmlFor="unsubscribe_keywords">Unsubscribe Keywords (Optional, comma-separated)</Label>
+        <Textarea
+          id="unsubscribe_keywords"
+          name="unsubscribe_keywords"
+          value={settings.unsubscribe_keywords || ''}
+          onChange={handleChange}
+          placeholder="STOP, unsubscribe, cancel"
+          className="mt-1"
+        />
+      </div>
 
-          {showCustomReplies && (
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="initialMessage">Initial Contact Message</Label>
-                <Textarea
-                  id="initialMessage"
-                  placeholder="Hi {{firstName}}, I saw your property at {{address}}. Would you consider selling?"
-                />
-              </div>
-              <div>
-                <Label htmlFor="followupMessage">Follow-Up Message</Label>
-                <Textarea
-                  id="followupMessage"
-                  placeholder="Just following up to see if you're still interested in selling. Let me know either way."
-                />
-              </div>
-              <div>
-                <Label htmlFor="optOutMessage">Opt-Out Message</Label>
-                <Textarea
-                  id="optOutMessage"
-                  placeholder="No problem. You’ve been removed from our list. Best of luck with everything!"
-                />
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      <Button onClick={handleSave} disabled={saving}>
+        {saving ? 'Saving...' : 'Save Changes'}
+      </Button>
     </div>
   );
 }

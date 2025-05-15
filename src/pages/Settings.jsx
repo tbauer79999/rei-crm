@@ -2,13 +2,13 @@ import React, { useState } from 'react';
 import CompanySettings from '../components/settings/CompanySettings';
 import MessagingSettings from '../components/settings/MessagingSettings';
 import AISettings from '../components/settings/AISettings';
-import DataSettings from '../components/settings/DataSettings';
+import SystemTools from '../components/settings/SystemTools';
 
 const tabs = [
   { key: 'company', label: 'Company Info' },
   { key: 'messaging', label: 'Messaging' },
   { key: 'ai', label: 'AI & Automation' },
-  { key: 'data', label: 'Data & Backup' }
+  { key: 'systemtools', label: 'System Tools' }
 ];
 
 export default function Settings() {
@@ -40,7 +40,7 @@ export default function Settings() {
         {activeTab === 'company' && <CompanySettings />}
         {activeTab === 'messaging' && <MessagingSettings />}
         {activeTab === 'ai' && <AISettings />}
-        {activeTab === 'data' && <DataSettings />}
+        {activeTab === 'systemtools' && <SystemTools />}
       </div>
     </div>
   );
