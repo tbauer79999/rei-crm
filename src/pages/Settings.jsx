@@ -3,11 +3,13 @@ import CompanySettings from '../components/settings/CompanySettings';
 import MessagingSettings from '../components/settings/MessagingSettings';
 import AISettings from '../components/settings/AISettings';
 import SystemTools from '../components/settings/SystemTools';
+import AIInstructionSettings from '../components/settings/AIInstructionSettings';
 
 const tabs = [
   { key: 'company', label: 'Company Info' },
   { key: 'messaging', label: 'Messaging' },
   { key: 'ai', label: 'AI & Automation' },
+  { key: 'instruction', label: 'AI Instruction Hub' },
   { key: 'systemtools', label: 'System Tools' }
 ];
 
@@ -40,6 +42,7 @@ export default function Settings() {
         {activeTab === 'company' && <CompanySettings />}
         {activeTab === 'messaging' && <MessagingSettings />}
         {activeTab === 'ai' && <AISettings />}
+        {activeTab === 'instruction' && <AIInstructionSettings />}
         {activeTab === 'systemtools' && <SystemTools />}
       </div>
     </div>

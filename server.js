@@ -2,6 +2,8 @@ const express = require('express');
 const axios = require('axios');
 const dotenv = require('dotenv');
 const cors = require('cors');
+const { buildInstructionBundle } = require('./src/lib/instructionBuilder');
+
 
 dotenv.config();
 const app = express();
@@ -354,6 +356,45 @@ app.post('/api/settings', async (req, res) => {
 });
 
 
+app.post('/api/settings/instructions', async (req, res) => {
+  const { tone, persona, industry } = req.body;
+  const headers = {
+    Authorization: `Bearer ${AIRTABLE_API_TOKEN}`,
+    'Content-Type': 'application/json'
+  };
+
+  try {
+    // ✅ THIS is where you use it:
+    const bundle = buildInstructionBundle({ tone, persona, industry });
+
+    const payload = {
+      fields: {
+        Key: 'AIInstructionBundle',
+        Value: bundle
+      }
+    };
+
+    const formula = `LOWER(TRIM({Key})) = "aiinstructionbundle"`;
+    const lookupUrl = `${AIRTABLE_BASE_URL}/PlatformSettings?filterByFormula=${encodeURIComponent(formula)}`;
+    const existing = await axios.get(lookupUrl, { headers });
+
+    if (existing.data.records.length > 0) {
+      const existingId = existing.data.records[0].id;
+      await axios.patch(`${AIRTABLE_BASE_URL}/PlatformSettings/${existingId}`, payload, { headers });
+    } else {
+      await axios.post(`${AIRTABLE_BASE_URL}/PlatformSettings`, payload, { headers });
+    }
+
+    res.status(200).json({ success: true });
+  } catch (err) {
+    console.error('Error saving AIInstructionBundle:', err.response?.data || err.message);
+    res.status(500).json({ error: 'Failed to save AIInstructionBundle' });
+  }
+});
+
+
+
+
 app.put('/api/settings', async (req, res) => {
   const settings = req.body;
   const headers = {
@@ -361,10 +402,16 @@ app.put('/api/settings', async (req, res) => {
     'Content-Type': 'application/json',
   };
 
+  const deprecatedKeys = ['AIInstructions', 'IndustryDetails', 'AISampleDialog', 'AIPersona'];
+
   try {
     for (const [key, setting] of Object.entries(settings)) {
-      const value = typeof setting.value === 'boolean' ? String(setting.value) : setting.value;
+      if (deprecatedKeys.includes(key)) {
+        console.log(`⏩ Skipping deprecated key: ${key}`);
+        continue;
+      }
 
+      const value = typeof setting.value === 'boolean' ? String(setting.value) : setting.value;
       const escapedKey = key.replace(/"/g, '\\"');
       const formula = `LOWER(TRIM({Key})) = "${escapedKey.toLowerCase().trim()}"`;
       const lookupUrl = `${AIRTABLE_BASE_URL}/PlatformSettings?filterByFormula=${encodeURIComponent(formula)}`;
@@ -386,6 +433,7 @@ app.put('/api/settings', async (req, res) => {
     res.status(500).json({ error: 'Failed to save one or more settings' });
   }
 });
+
 
 app.get('/', (req, res) => {
   res.send('REI-CRM server running.');

@@ -1,169 +1,100 @@
-import React, { useState, useEffect } from "react";
-import { Input } from "../ui/input";
-import { Label } from "../ui/label";
-import { Textarea } from "../ui/textarea";
-import { Switch } from "../ui/switch";
-import { Card, CardContent } from "../ui/card";
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
+import { Label } from '../ui/label';
+import Button from '../ui/button';
 
 export default function AISettings() {
-  const [data, setData] = useState({});
-  const [loading, setLoading] = useState(true);
+  const [autoReplies, setAutoReplies] = useState(false);
+  const [scoring, setScoring] = useState(false);
+  const [escalation, setEscalation] = useState(false);
+  const [delay, setDelay] = useState('3');
+  const [statusField, setStatusField] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [saveSuccess, setSaveSuccess] = useState(false);
 
   useEffect(() => {
-    const loadSettings = async () => {
-      try {
-        const res = await fetch("/api/settings");
-        const json = await res.json();
-        setData(json);
-      } catch (err) {
-        console.error("Failed to load settings", err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    loadSettings();
+    axios.get('/api/settings').then((res) => {
+      const data = res.data;
+      setAutoReplies(data.EnableAIAutoReplies?.value === 'true');
+      setScoring(data.EnableMotivationScoring?.value === 'true');
+      setEscalation(data.EscalateHotLeadImmediately?.value === 'true');
+      setDelay(data.AIResponseDelay?.value || '3');
+      setStatusField(data.AIStatusFieldEnabled?.value === 'true');
+    });
   }, []);
 
-  const handleChange = (key, value) => {
-    setData((prev) => ({
-      ...prev,
-      [key]: {
-        ...prev[key],
-        value: typeof value === "boolean" ? String(value) : value,
-      },
-    }));
-  };
-
   const handleSave = async () => {
+    setSaving(true);
     try {
-      setSaving(true);
-      const flattened = {};
-      for (const key in data) {
-        flattened[key] = {
-          id: data[key].id,
-          value: data[key].value,
-        };
-      }
-      const res = await fetch("/api/settings", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(flattened),
+      await axios.put('/api/settings', {
+        EnableAIAutoReplies: { value: String(autoReplies) },
+        EnableMotivationScoring: { value: String(scoring) },
+        EscalateHotLeadImmediately: { value: String(escalation) },
+        AIResponseDelay: { value: delay },
+        AIStatusFieldEnabled: { value: String(statusField) },
       });
-      if (!res.ok) throw new Error("Failed to save settings");
-      setSaveSuccess(true);
-      setTimeout(() => setSaveSuccess(false), 2000);
     } catch (err) {
-      console.error("Save failed", err);
+      console.error('Failed to save AI automation settings:', err);
     } finally {
       setSaving(false);
     }
   };
 
-  if (loading) return <p>Loading settings...</p>;
-
   return (
     <div className="space-y-6">
-      <Card>
-        <CardContent className="p-6 space-y-4">
-          <h2 className="text-xl font-bold">AI Workflow Settings</h2>
-          <div className="space-y-3">
-            <div className="flex items-center space-x-3">
-              <Switch
-                id="AI Conversations Enabled"
-                checked={data["AI Conversations Enabled"]?.value === "true"}
-                onCheckedChange={(val) =>
-                  handleChange("AI Conversations Enabled", val)
-                }
-              />
-              <Label htmlFor="AI Conversations Enabled">
-                Enable AI Conversations
-              </Label>
-            </div>
-
-            <div>
-              <Label htmlFor="AI Response Delay">AI Response Delay (seconds)</Label>
-              <Input
-                id="AI Response Delay"
-                value={data["AI Response Delay"]?.value || ""}
-                onChange={(e) => handleChange("AI Response Delay", e.target.value)}
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="Handoff Keywords">Handoff Trigger Keyword(s)</Label>
-              <Input
-                id="Handoff Keywords"
-                value={data["Handoff Keywords"]?.value || ""}
-                onChange={(e) => handleChange("Handoff Keywords", e.target.value)}
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="Hot Lead Confidence">Hot Lead Confidence Score (%)</Label>
-              <Input
-                id="Hot Lead Confidence"
-                value={data["Hot Lead Confidence"]?.value || ""}
-                onChange={(e) => handleChange("Hot Lead Confidence", e.target.value)}
-              />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardContent className="p-6 space-y-4">
-          <h2 className="text-xl font-bold">AI & Automation Settings</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="AI Greeting Message">AI Greeting Message</Label>
-              <Textarea
-                id="AI Greeting Message"
-                value={data["AI Greeting Message"]?.value || ""}
-                onChange={(e) => handleChange("AI Greeting Message", e.target.value)}
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="AI Tone of Voice">AI Tone of Voice</Label>
-              <Input
-                id="AI Tone of Voice"
-                value={data["AI Tone of Voice"]?.value || ""}
-                onChange={(e) => handleChange("AI Tone of Voice", e.target.value)}
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="AI Response Delay">AI Reply Delay (seconds)</Label>
-              <Input
-                id="AI Response Delay"
-                value={data["AI Response Delay"]?.value || ""}
-                onChange={(e) => handleChange("AI Response Delay", e.target.value)}
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="Handoff Message">Handoff Message</Label>
-              <Textarea
-                id="Handoff Message"
-                value={data["Handoff Message"]?.value || ""}
-                onChange={(e) => handleChange("Handoff Message", e.target.value)}
-              />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <div className="flex justify-end pt-2">
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          className="bg-black text-white px-4 py-2 rounded-md shadow hover:bg-gray-800 transition"
-        >
-          {saving ? "Saving..." : saveSuccess ? "Saved ✅" : "Save Settings"}
-        </button>
+      <div>
+        <Label>Enable AI Auto-Replies</Label>
+        <input
+          type="checkbox"
+          checked={autoReplies}
+          onChange={(e) => setAutoReplies(e.target.checked)}
+          className="ml-2"
+        />
       </div>
+
+      <div>
+        <Label>Enable Motivation Scoring</Label>
+        <input
+          type="checkbox"
+          checked={scoring}
+          onChange={(e) => setScoring(e.target.checked)}
+          className="ml-2"
+        />
+      </div>
+
+      <div>
+        <Label>Escalate HOT Leads Immediately</Label>
+        <input
+          type="checkbox"
+          checked={escalation}
+          onChange={(e) => setEscalation(e.target.checked)}
+          className="ml-2"
+        />
+      </div>
+
+      <div>
+        <Label>AI Response Delay (seconds)</Label>
+        <input
+          type="number"
+          min="0"
+          value={delay}
+          onChange={(e) => setDelay(e.target.value)}
+          className="border border-gray-300 px-3 py-1 rounded w-20 ml-2"
+        />
+      </div>
+
+      <div>
+        <Label>Write AI Status Back to Airtable</Label>
+        <input
+          type="checkbox"
+          checked={statusField}
+          onChange={(e) => setStatusField(e.target.checked)}
+          className="ml-2"
+        />
+      </div>
+
+      <Button onClick={handleSave} disabled={saving} className="mt-4">
+        {saving ? 'Saving...' : 'Save Settings'}
+      </Button>
     </div>
   );
 }
