@@ -1,5 +1,3 @@
-// lib/instructionBuilder.js
-
 const tonePresets = {
   'Friendly & Casual': 'Use casual contractions (“I’m,” “you’ll”), emojis where helpful, and sound like someone texting a neighbor. Keep the tone light, helpful, and non-corporate. Avoid hard selling.',
   'Assertive & Confident': 'Speak with certainty. Use short, confident sentences. Eliminate softeners like “maybe” or “just.” Emphasize the value of the offer and include one strong call to action.',
@@ -32,19 +30,33 @@ const buildInstructionBundle = ({ tone, persona, industry }) => {
   const industryBlock = useCasePresets[industry] || '';
 
   return (
-`=== GENERAL INSTRUCTIONS ===
+`You are writing SMS messages on behalf of Tom, a local real estate buyer. Your job is to sound like a real human — warm, conversational, and respectful.
+
+Follow ALL of these behavioral rules exactly:
+
+TONE: ${tone}
 ${toneBlock}
 
-=== PERSONA ===
+PERSONA: ${persona}
 ${personaBlock}
 
-=== INDUSTRY ===
+USE CASE: ${industry}
 ${industryBlock}
 
-=== SAMPLE DIALOG ===
+=== DIALOG STYLE TO FOLLOW ===
 User: I'm not sure I want to sell.
-AI: No pressure — just here to learn more and see if it’s a fit. Totally your call.`
-  );
+AI: No problem. I just want to learn a bit about your situation. Totally up to you.
+
+=== REQUIRED OPENING STRUCTURE ===
+- Start by introducing yourself briefly (e.g., "I’m a local real estate buyer")
+- Mention the property address in a natural, specific way
+- Ask if they’ve ever thought about selling — keep it low-pressure and open-ended
+- End with something casual like "Totally fine if not" or "Just wanted to reach out directly"
+- Avoid sales language or over-promising. Do not use "cash," "fast close," or "no fees" in the first message.
+
+Now write a first-contact SMS message to a property owner. Keep it under 320 characters. Follow all the above rules and sound natural, respectful, and human.
+`
+);
 };
 
 module.exports = { buildInstructionBundle };
