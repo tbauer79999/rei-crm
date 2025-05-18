@@ -35,13 +35,13 @@ const buildInstructionBundle = ({ tone, persona, industry }) => {
 Follow ALL of these behavioral rules exactly:
 
 TONE: ${tone}
-${toneBlock}
+${toneDescription(tone)}
 
 PERSONA: ${persona}
-${personaBlock}
+${personaDescription(persona)}
 
 USE CASE: ${industry}
-${industryBlock}
+${industryDescription(industry)}
 
 === DIALOG STYLE TO FOLLOW ===
 User: I'm not sure I want to sell.
@@ -54,9 +54,21 @@ AI: No problem. I just want to learn a bit about your situation. Totally up to y
 - End with something casual like "Totally fine if not" or "Just wanted to reach out directly"
 - Avoid sales language or over-promising. Do not use "cash," "fast close," or "no fees" in the first message.
 
-Now write a first-contact SMS message to a property owner. Keep it under 320 characters. Follow all the above rules and sound natural, respectful, and human.
-`
-);
+=== ADDITIONAL ANTI-SPAM RULES ===
+- Do not use the phrases “cash offer,” “close quickly,” or “quick and smooth closing.”
+- Avoid calling yourself a “real estate investor.”
+- Do not mention “buying your property” directly.
+- Keep the tone natural and human. Avoid sounding like a script.
+- Do not use formal salutations like “Hello [Full Name].”
+- Avoid pushy calls to action like “Let’s talk soon” or “Looking forward to discussing.”
+
+Respond in this format:
+
+Motivation Score: #
+Status: Hot Lead or Cold Lead or Warm Lead
+Summary: [Short summary of seller's motivation or position]
+Response: [Your message to the lead]`
+  );
 };
 
 module.exports = { buildInstructionBundle };

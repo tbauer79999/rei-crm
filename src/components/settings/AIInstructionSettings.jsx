@@ -1,16 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Label } from '../ui/label';
-import { Textarea } from '../ui/textarea';
 import Button from '../ui/button';
 
 export default function AllinstructionsSettings() {
   const [tone, setTone] = useState('');
   const [persona, setPersona] = useState('');
   const [industry, setIndustry] = useState('');
-  const [savedTone, setSavedTone] = useState('');
-  const [savedPersona, setSavedPersona] = useState('');
-  const [savedIndustry, setSavedIndustry] = useState('');
   const [saving, setSaving] = useState(false);
 
   const toneOptions = [
@@ -43,24 +39,15 @@ export default function AllinstructionsSettings() {
     axios.get('/api/settings')
       .then(res => {
         const bundle = res.data.AIInstructionBundle?.value || '';
-        const parsedTone = extractLine(bundle, 'TONE');
-        const parsedPersona = extractLine(bundle, 'PERSONA');
-        const parsedIndustry = extractLine(bundle, 'USE CASE');
-        setTone(parsedTone);
-        setPersona(parsedPersona);
-        setIndustry(parsedIndustry);
-        setSavedTone(parsedTone);
-        setSavedPersona(parsedPersona);
-        setSavedIndustry(parsedIndustry);
+        setTone(extractLine(bundle, 'TONE'));
+        setPersona(extractLine(bundle, 'PERSONA'));
+        setIndustry(extractLine(bundle, 'USE CASE'));
       })
-      .catch(err => {
-        console.error('Failed to load instructions:', err);
-      });
+      .catch(err => console.error('Failed to load instructions:', err));
   }, []);
 
   const extractLine = (bundle, label) => {
-    const regex = new RegExp(`${label}:\\s*(.+)`);
-    const match = bundle.match(regex);
+    const match = bundle.match(new RegExp(`${label}:\\s*(.+)`));
     return match ? match[1].trim() : '';
   };
 
@@ -90,7 +77,20 @@ AI: No problem. I just want to learn a bit about your situation. Totally up to y
 - End with something casual like "Totally fine if not" or "Just wanted to reach out directly"
 - Avoid sales language or over-promising. Do not use "cash," "fast close," or "no fees" in the first message.
 
-Now write a first-contact SMS message to a property owner. Keep it under 320 characters. Follow all the above rules and sound natural, respectful, and human.`
+=== ADDITIONAL ANTI-SPAM RULES ===
+- Do not use the phrases “cash offer,” “close quickly,” or “quick and smooth closing.”
+- Avoid calling yourself a “real estate investor.”
+- Do not mention “buying your property” directly.
+- Keep the tone natural and human. Avoid sounding like a script.
+- Do not use formal salutations like “Hello [Full Name].”
+- Avoid pushy calls to action like “Let’s talk soon” or “Looking forward to discussing.”
+
+Respond in this format:
+
+Motivation Score: #
+Status: Hot Lead or Cold Lead or Warm Lead
+Summary: [Short summary of seller's motivation or position]
+Response: [Your message to the lead]`
     );
   };
 
@@ -133,12 +133,10 @@ Now write a first-contact SMS message to a property owner. Keep it under 320 cha
     setSaving(true);
     try {
       const fullInstructions = buildBundle();
+      console.log('[Saving fullInstructions]', fullInstructions); // Confirming in console
       await axios.put('/api/settings', {
         AIInstructionBundle: { value: fullInstructions }
       });
-      setSavedTone(tone);
-      setSavedPersona(persona);
-      setSavedIndustry(industry);
     } catch (err) {
       console.error('Failed to save instructions:', err);
     } finally {
@@ -148,7 +146,7 @@ Now write a first-contact SMS message to a property owner. Keep it under 320 cha
 
   return (
     <div className="space-y-6">
-           <div>
+      <div>
         <Label>Tone / Style</Label>
         <select
           className="w-full border rounded px-3 py-2"
@@ -189,7 +187,6 @@ Now write a first-contact SMS message to a property owner. Keep it under 320 cha
           ))}
         </select>
       </div>
-
 
       <Button onClick={handleSave} disabled={saving} className="mt-4">
         {saving ? 'Saving...' : 'Save Instructions'}
