@@ -11,8 +11,9 @@ export default function CompanySettings() {
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
-  const [showAdvanced, setShowAdvanced] = useState(false);
-  const [showOptionalDefaults, setShowOptionalDefaults] = useState(false);
+  const [startHour, setStartHour] = useState("");
+  const [endHour, setEndHour] = useState("");
+  const [days, setDays] = useState("");
 
   useEffect(() => {
     const loadSettings = async () => {
@@ -20,8 +21,17 @@ export default function CompanySettings() {
         const res = await fetch("/api/settings");
         const json = await res.json();
         setData(json);
-        setShowAdvanced(!!json.voice || !!json.tone);
-        setShowOptionalDefaults(!!json.services || !!json.roles);
+
+        const rawHours = json.hours?.value || "";
+        const parts = rawHours.split("|");
+        if (parts.length === 2) {
+          setDays(parts[0]);
+          const hourParts = parts[1].split("-");
+          if (hourParts.length === 2) {
+            setStartHour(hourParts[0]);
+            setEndHour(hourParts[1]);
+          }
+        }
       } catch (err) {
         console.error("Failed to load settings", err);
       } finally {
@@ -42,34 +52,60 @@ export default function CompanySettings() {
     }));
   };
 
-  const handleSave = async () => {
-    try {
-      setSaving(true);
-      const flattened = {};
-      for (const key in data) {
-        const entry = data[key];
-        flattened[key] = {
-          id: entry.id,
-          value: typeof entry.value === "boolean" ? String(entry.value) : entry.value,
-        };
-      }
+const handleSave = async () => {
+  try {
+    setSaving(true);
 
-      const res = await fetch("/api/settings", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(flattened),
-      });
+    // ✅ Push separate values into Airtable-backed state
+    handleChange("officeOpenHour", startHour);
+    handleChange("officeCloseHour", endHour);
+    handleChange("officeDays", days);
 
-      if (!res.ok) throw new Error("Failed to save settings");
-
-      setSaveSuccess(true);
-      setTimeout(() => setSaveSuccess(false), 2000);
-    } catch (err) {
-      console.error("Save failed", err);
-    } finally {
-      setSaving(false);
+    const flattened = {};
+    for (const key in data) {
+      const entry = data[key];
+      flattened[key] = {
+        id: entry.id,
+        value: typeof entry.value === "boolean" ? String(entry.value) : entry.value,
+      };
     }
-  };
+
+    const res = await fetch("/api/settings", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(flattened),
+    });
+
+    if (!res.ok) throw new Error("Failed to save settings");
+
+    setSaveSuccess(true);
+    setTimeout(() => setSaveSuccess(false), 2000);
+  } catch (err) {
+    console.error("Save failed", err);
+  } finally {
+    setSaving(false);
+  }
+};
+
+
+
+
+  const hourOptions = [
+    { label: "8:00 AM", value: "8" },
+    { label: "9:00 AM", value: "9" },
+    { label: "10:00 AM", value: "10" },
+    { label: "11:00 AM", value: "11" },
+  ];
+
+  const closingHourOptions = [
+    { label: "4:00 PM", value: "16" },
+    { label: "5:00 PM", value: "17" },
+    { label: "6:00 PM", value: "18" },
+    { label: "7:00 PM", value: "19" },
+    { label: "8:00 PM", value: "20" },
+  ];
+
+  const dayOptions = ["M–F", "M–Sat", "Everyday"];
 
   if (loading) return <p>Loading settings...</p>;
 
@@ -165,14 +201,55 @@ export default function CompanySettings() {
                 onChange={(e) => handleChange("timezone", e.target.value)}
               />
             </div>
+
             <div>
-              <Label htmlFor="hours">Office Hours</Label>
-              <Input
-                id="hours"
-                value={data.hours?.value || ""}
-                onChange={(e) => handleChange("hours", e.target.value)}
-              />
+              <Label>Opening Time</Label>
+              <select
+                className="w-full border rounded px-3 py-2"
+                value={startHour}
+                onChange={(e) => setStartHour(e.target.value)}
+              >
+                <option value="">Select</option>
+                {hourOptions.map((hr) => (
+                  <option key={hr.value} value={hr.value}>
+                    {hr.label}
+                  </option>
+                ))}
+              </select>
             </div>
+
+            <div>
+              <Label>Closing Time</Label>
+              <select
+                className="w-full border rounded px-3 py-2"
+                value={endHour}
+                onChange={(e) => setEndHour(e.target.value)}
+              >
+                <option value="">Select</option>
+                {closingHourOptions.map((hr) => (
+                  <option key={hr.value} value={hr.value}>
+                    {hr.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="col-span-2">
+              <Label>Active Days</Label>
+              <select
+                className="w-full border rounded px-3 py-2"
+                value={days}
+                onChange={(e) => setDays(e.target.value)}
+              >
+                <option value="">Select</option>
+                {dayOptions.map((opt) => (
+                  <option key={opt} value={opt}>
+                    {opt}
+                  </option>
+                ))}
+              </select>
+            </div>
+
             <div className="col-span-2">
               <Label htmlFor="address">Business Address</Label>
               <Textarea
@@ -188,62 +265,6 @@ export default function CompanySettings() {
                 value={data.regions?.value || ""}
                 onChange={(e) => handleChange("regions", e.target.value)}
               />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardContent className="p-6 space-y-4">
-          <h2 className="text-xl font-bold">Platform Settings</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="campaigns">Campaigns (one per line)</Label>
-              <Textarea
-                id="campaigns"
-                value={data["Campaigns"]?.value || ""}
-                onChange={(e) =>
-                  handleChange("Campaigns", e.target.value)
-                }
-              />
-            </div>
-            <div>
-              <Label htmlFor="statuses">Statuses (one per line)</Label>
-              <Textarea
-                id="statuses"
-                value={data["Statuses"]?.value || ""}
-                onChange={(e) =>
-                  handleChange("Statuses", e.target.value)
-                }
-              />
-            </div>
-            <div className="flex items-center space-x-2 mt-2">
-              <input
-                id="aiEnabled"
-                type="checkbox"
-                className="h-4 w-4 text-black border-gray-300 rounded focus:ring-black"
-                checked={data["AI Enabled"]?.value === "true"}
-                onChange={(e) =>
-                  handleChange("AI Enabled", e.target.checked.toString())
-                }
-              />
-              <Label htmlFor="aiEnabled" className="text-sm font-medium">
-                AI Enabled
-              </Label>
-            </div>
-            <div className="flex items-center space-x-2 mt-2">
-              <input
-                id="followUpEnabled"
-                type="checkbox"
-                className="h-4 w-4 text-black border-gray-300 rounded focus:ring-black"
-                checked={data["Follow-Up Enabled"]?.value === "true"}
-                onChange={(e) =>
-                  handleChange("Follow-Up Enabled", e.target.checked.toString())
-                }
-              />
-              <Label htmlFor="followUpEnabled" className="text-sm font-medium">
-                Follow-Up Enabled
-              </Label>
             </div>
           </div>
         </CardContent>

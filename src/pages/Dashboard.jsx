@@ -1,3 +1,4 @@
+// ... all imports remain unchanged
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
@@ -47,10 +48,6 @@ export default function Dashboard() {
     }
     setFilteredLeads(updated);
   }, [search, filterStatus, leads]);
-
-  const handleCardClick = (status) => {
-    setFilterStatus(status === 'All' ? null : status);
-  };
 
   const handleRowClick = (id) => {
     navigate(`/lead/${id}`);
@@ -127,18 +124,30 @@ export default function Dashboard() {
     URL.revokeObjectURL(url);
   };
 
+  const statuses = [
+    'All',
+    'Hot Lead',
+    'Warm Lead',
+    'Cold Lead',
+    'New Lead',
+    'Nurtured',
+    'Unsubscribed',
+  ];
+
   return (
     <div className="p-6 bg-gray-100 min-h-screen">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-semibold text-gray-800">Lead Dashboard</h1>
-        <div className="flex gap-3">
-          <button onClick={goToAnalytics} className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md text-sm">Analytics</button>
-          <button onClick={goToSettings} className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-md text-sm">Settings</button>
-          <button onClick={() => setShowForm(!showForm)} className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm">
-            {showForm ? 'Close Form' : 'Add Lead'}
-          </button>
-        </div>
-      </div>
+      <div className="flex justify-between items-center mb-4">
+  <h1 className="text-2xl font-semibold text-gray-800">Lead Dashboard</h1>
+  <button
+  onClick={() => setShowForm(!showForm)}
+  className="bg-white text-blue-600 border border-blue-600 hover:bg-blue-50 px-4 py-2 rounded text-sm shadow-sm transition"
+>
+  + Add Lead
+</button>
+
+
+</div>
+
 
       {showForm && (
         <div className="bg-white p-4 rounded-md shadow-md mb-6">
@@ -202,35 +211,23 @@ export default function Dashboard() {
         </div>
       )}
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-4 mb-6">
-        {[
-          'All',
-          'Hot Lead',
-          'Warm Lead',
-          'Cold Lead',
-          'New Lead',
-          'Nurtured',
-          'Unsubscribed',
-        ].map((status) => {
-          const count =
-            status === 'All'
-              ? leads.length
-              : leads.filter((l) => l.fields?.Status === status).length;
+      {/* New Tabbed Status Filter */}
+      <div className="flex space-x-2 mb-6">
+  {statuses.map((status) => (
+    <button
+      key={status}
+      onClick={() => setFilterStatus(status === 'All' ? null : status)}
+      className={`px-4 py-2 rounded-t-md border border-b-0 ${
+        (filterStatus === status || (status === 'All' && filterStatus === null))
+          ? 'bg-white border-gray-300 text-blue-600 font-semibold'
+          : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
+      }`}
+    >
+      {status}
+    </button>
+  ))}
+</div>
 
-          return (
-            <div
-              key={status}
-              onClick={() => handleCardClick(status)}
-              className={`bg-white p-4 rounded-md shadow text-center cursor-pointer ${
-                filterStatus === status ? 'border-blue-600 border-2' : 'border'
-              }`}
-            >
-              <div className="text-sm text-gray-600">{status}</div>
-              <div className="text-2xl font-bold text-gray-800">{count}</div>
-            </div>
-          );
-        })}
-      </div>
 
       <input
         type="text"
@@ -250,23 +247,25 @@ export default function Dashboard() {
             </tr>
           </thead>
           <tbody>
-              {filteredLeads.length === 0 ? (
-                <tr>
-                  <td colSpan="3" className="text-center text-sm text-gray-500 py-6">
-                    No leads found for this view.
-                  </td>
+            {filteredLeads.length === 0 ? (
+              <tr>
+                <td colSpan="3" className="text-center text-sm text-gray-500 py-6">
+                  No leads found for this view.
+                </td>
+              </tr>
+            ) : (
+              filteredLeads.map((lead) => (
+                <tr key={lead.id} onClick={() => handleRowClick(lead.id)} className="cursor-pointer hover:bg-gray-100">
+                  <td className="border px-3 py-1 text-sm">
+                    {lead.fields?.["Owner Name"] || '—'}</td>
+                  <td className="border px-3 py-1 text-sm">
+                    {lead.fields?.["Property Address"] || '—'}</td>
+                  <td className="border px-3 py-1 text-sm">
+                    {lead.fields?.Status || '—'}</td>
                 </tr>
-              ) : (
-                filteredLeads.map((lead) => (
-                  <tr key={lead.id} onClick={() => handleRowClick(lead.id)} className="cursor-pointer hover:bg-gray-100">
-                    <td className="border px-4 py-2">{lead.fields?.["Owner Name"] || '—'}</td>
-                    <td className="border px-4 py-2">{lead.fields?.["Property Address"] || '—'}</td>
-                    <td className="border px-4 py-2">{lead.fields?.Status || '—'}</td>
-                  </tr>
-                ))
-              )}
-</tbody>
-
+              ))
+            )}
+          </tbody>
         </table>
       </div>
     </div>

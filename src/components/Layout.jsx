@@ -20,35 +20,33 @@ export default function Layout({ children }) {
   const [showRecents, setShowRecents] = useState(true);
 
   useEffect(() => {
-  const stored = localStorage.getItem('recentLeads');
-  if (stored) {
-    const parsed = JSON.parse(stored);
-    // Validate each record by pinging the backend
-    Promise.all(
-      parsed.map(async (r) => {
-        try {
-          const res = await axios.get(`/api/properties/${r.id}`);
-          return {
-            id: r.id,
-            name: res.data.fields?.['Owner Name'] || 'Unnamed',
-          };
-        } catch {
-          return null; // deleted or invalid
-        }
-      })
-    ).then((validated) => {
-      const filtered = validated.filter(Boolean);
-      setRecentLeads(filtered);
-      localStorage.setItem('recentLeads', JSON.stringify(filtered));
-    });
-  }
-}, []);
+    const stored = localStorage.getItem('recentLeads');
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      Promise.all(
+        parsed.map(async (r) => {
+          try {
+            const res = await axios.get(`/api/properties/${r.id}`);
+            return {
+              id: r.id,
+              name: res.data.fields?.['Owner Name'] || 'Unnamed',
+            };
+          } catch {
+            return null;
+          }
+        })
+      ).then((validated) => {
+        const filtered = validated.filter(Boolean);
+        setRecentLeads(filtered);
+        localStorage.setItem('recentLeads', JSON.stringify(filtered));
+      });
+    }
+  }, []);
 
   useEffect(() => {
     const match = location.pathname.match(/^\/lead\/(.+)$/);
     const id = match?.[1];
     if (id) {
-      // fetch latest lead data to get name
       axios.get(`/api/properties/${id}`).then(res => {
         const name = res.data?.fields?.['Owner Name'] || 'Unnamed';
         const entry = { id, name };
@@ -58,7 +56,6 @@ export default function Layout({ children }) {
           return updated;
         });
       }).catch(() => {
-        // fallback in case of failure
         const entry = { id, name: 'Unnamed' };
         setRecentLeads(prev => {
           const updated = [entry, ...prev.filter(r => r.id !== id)].slice(0, 5);
@@ -116,7 +113,7 @@ export default function Layout({ children }) {
           collapsed ? 'w-16' : 'w-60'
         } bg-white border-r shadow-sm transition-all duration-200 ease-in-out`}
       >
-        <div className="flex items-center justify-between p-4 border-b">
+<div className="flex items-center justify-between px-4 py-2 h-16 border-b">
           {!collapsed && <div className="font-bold text-lg">REI-CRM</div>}
           <button onClick={() => setCollapsed(!collapsed)} className="text-gray-500">
             {collapsed ? <ChevronRight size={20} /> : <ChevronLeft size={20} />}
@@ -203,10 +200,17 @@ export default function Layout({ children }) {
       {/* Content container */}
       <div className="flex flex-col flex-1 min-h-screen">
         {/* Top header */}
-        <header className="bg-white border-b shadow-sm px-6 py-5 flex justify-between items-center h-20">
-          <div className="text-lg font-semibold text-gray-800">REI-CRM</div>
-          <div className="text-sm text-gray-600">Welcome, User</div>
-        </header>
+<header className="bg-white border-b px-6 py-2 flex justify-between items-center h-16">
+  <div className="text-lg font-semibold text-gray-800">REI-CRM</div>
+  
+  <nav className="flex items-center space-x-6 text-sm">
+    <Link to="/dashboard" className="text-gray-700 hover:text-blue-600 font-medium">Dashboard</Link>
+    <Link to="/analytics" className="text-gray-700 hover:text-blue-600 font-medium">Analytics</Link>
+    <Link to="/settings" className="text-gray-700 hover:text-blue-600 font-medium">Settings</Link>
+    <span className="text-gray-600">Welcome, User</span>
+  </nav>
+</header>
+
 
         {/* Main content */}
         <main className="flex-1 p-4 sm:p-6">
