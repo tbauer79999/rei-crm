@@ -13,7 +13,7 @@ export default function CompanySettings() {
 
   const [startHour, setStartHour] = useState("");
   const [endHour, setEndHour] = useState("");
-  const [days, setDays] = useState("");
+  const [dayPreset, setDayPreset] = useState("");
 
   useEffect(() => {
     const loadSettings = async () => {
@@ -22,15 +22,17 @@ export default function CompanySettings() {
         const json = await res.json();
         setData(json);
 
-        const rawHours = json.hours?.value || "";
-        const parts = rawHours.split("|");
-        if (parts.length === 2) {
-          setDays(parts[0]);
-          const hourParts = parts[1].split("-");
-          if (hourParts.length === 2) {
-            setStartHour(hourParts[0]);
-            setEndHour(hourParts[1]);
-          }
+        const open = json.officeOpenHour?.value || "";
+        const close = json.officeCloseHour?.value || "";
+        const days = json.officeDays?.value || [];
+
+        setStartHour(open);
+        setEndHour(close);
+
+        if (Array.isArray(days)) {
+          if (days.length === 7) setDayPreset("Everyday");
+          else if (days.length === 6 && !days.includes("Sunday")) setDayPreset("M–Sat");
+          else if (days.length === 5 && days.includes("Monday") && days.includes("Friday")) setDayPreset("M–F");
         }
       } catch (err) {
         console.error("Failed to load settings", err);
@@ -52,43 +54,64 @@ export default function CompanySettings() {
     }));
   };
 
-const handleSave = async () => {
-  try {
-    setSaving(true);
+  const handleSave = async () => {
+    try {
+      setSaving(true);
 
-    // ✅ Push separate values into Airtable-backed state
-    handleChange("officeOpenHour", startHour);
-    handleChange("officeCloseHour", endHour);
-    handleChange("officeDays", days);
-
-    const flattened = {};
-    for (const key in data) {
-      const entry = data[key];
-      flattened[key] = {
-        id: entry.id,
-        value: typeof entry.value === "boolean" ? String(entry.value) : entry.value,
+      const dayMap = {
+        "M–F": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
+        "M–Sat": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
+        "Everyday": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
       };
+
+      const translatedDays = dayMap[dayPreset] || [];
+
+      const updated = {
+        ...data,
+        officeOpenHour: {
+          ...(data.officeOpenHour || {}),
+          value: startHour,
+        },
+        officeCloseHour: {
+          ...(data.officeCloseHour || {}),
+          value: endHour,
+        },
+        officeDays: {
+          ...(data.officeDays || {}),
+          value: translatedDays,
+        },
+      };
+
+      const flattened = {};
+      for (const key in updated) {
+        const entry = updated[key];
+        flattened[key] = {
+          id: entry.id,
+          value: Array.isArray(entry.value)
+            ? entry.value.join(",")
+            : typeof entry.value === "boolean"
+            ? String(entry.value)
+            : entry.value,
+        };
+      }
+
+      const res = await fetch("/api/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(flattened),
+      });
+
+      if (!res.ok) throw new Error("Failed to save settings");
+
+      setData(updated);
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 2000);
+    } catch (err) {
+      console.error("Save failed", err);
+    } finally {
+      setSaving(false);
     }
-
-    const res = await fetch("/api/settings", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(flattened),
-    });
-
-    if (!res.ok) throw new Error("Failed to save settings");
-
-    setSaveSuccess(true);
-    setTimeout(() => setSaveSuccess(false), 2000);
-  } catch (err) {
-    console.error("Save failed", err);
-  } finally {
-    setSaving(false);
-  }
-};
-
-
-
+  };
 
   const hourOptions = [
     { label: "8:00 AM", value: "8" },
@@ -238,8 +261,8 @@ const handleSave = async () => {
               <Label>Active Days</Label>
               <select
                 className="w-full border rounded px-3 py-2"
-                value={days}
-                onChange={(e) => setDays(e.target.value)}
+                value={dayPreset}
+                onChange={(e) => setDayPreset(e.target.value)}
               >
                 <option value="">Select</option>
                 {dayOptions.map((opt) => (
@@ -248,6 +271,15 @@ const handleSave = async () => {
                   </option>
                 ))}
               </select>
+            </div>
+
+            <div className="col-span-2">
+              <Label htmlFor="statuses">Acceptable Lead Statuses</Label>
+              <Input
+                id="statuses"
+                value={data.statuses?.value || ""}
+                onChange={(e) => handleChange("statuses", e.target.value)}
+              />
             </div>
 
             <div className="col-span-2">

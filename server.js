@@ -3,7 +3,10 @@ const axios = require('axios');
 const dotenv = require('dotenv');
 const cors = require('cors');
 const { buildInstructionBundle } = require('./src/lib/instructionBuilder');
-
+const multer = require('multer');
+const upload = multer();
+const pdf = require('pdf-parse');
+const { default: fetch } = require('node-fetch');
 
 dotenv.config();
 const app = express();
@@ -357,23 +360,35 @@ app.post('/api/settings', async (req, res) => {
 
 
 app.post('/api/settings/instructions', async (req, res) => {
-  const { tone, persona, industry } = req.body;
+  const { tone, persona, industry, role } = req.body;
   const headers = {
     Authorization: `Bearer ${AIRTABLE_API_TOKEN}`,
     'Content-Type': 'application/json'
   };
 
   try {
-    // ✅ THIS is where you use it:
-    const bundle = buildInstructionBundle({ tone, persona, industry });
+    // ⬇️ Fetch the dynamic knowledge bundle
+    const bundleRes = await axios.get('http://localhost:5000/api/knowledge-bundle');
+    const knowledgeBlock = bundleRes.data.bundle;
 
+    // ⬇️ Build the instruction bundle with the knowledge
+    const finalBundle = buildInstructionBundle({
+      tone,
+      persona,
+      industry,
+      role,
+      knowledgeBlock
+    });
+
+ // ⬇️ Save to Airtable
     const payload = {
       fields: {
         Key: 'AIInstructionBundle',
-        Value: bundle
+        Value: finalBundle
       }
     };
 
+    // 🔁 Lookup existing key and update
     const formula = `LOWER(TRIM({Key})) = "aiinstructionbundle"`;
     const lookupUrl = `${AIRTABLE_BASE_URL}/PlatformSettings?filterByFormula=${encodeURIComponent(formula)}`;
     const existing = await axios.get(lookupUrl, { headers });
@@ -387,10 +402,12 @@ app.post('/api/settings/instructions', async (req, res) => {
 
     res.status(200).json({ success: true });
   } catch (err) {
-    console.error('Error saving AIInstructionBundle:', err.response?.data || err.message);
+    console.error('Error saving AIInstructionBundle with knowledge:', err.response?.data || err.message);
     res.status(500).json({ error: 'Failed to save AIInstructionBundle' });
   }
 });
+
+
 
 
 
@@ -435,9 +452,128 @@ app.put('/api/settings', async (req, res) => {
 });
 
 
+
+
+app.post('/api/knowledge-upload', async (req, res) => {
+  try {
+    const { title = '', description = '', fileUrl, fileName } = req.body;
+
+    if (!fileUrl || !fileName) {
+      return res.status(400).json({ error: 'Missing fileUrl or fileName' });
+    }
+
+    // ⬇️ Download PDF from Cloudinary
+    const fileRes = await fetch(fileUrl);
+    const arrayBuffer = await fileRes.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+
+    // ⬇️ Extract text from PDF
+    const data = await pdf(buffer);
+    const extractedText = data.text || '';
+
+    // ⬇️ Build Airtable record
+    const airtablePayload = {
+      fields: {
+        Title: title,
+        Description: description,
+        Content: extractedText.trim().slice(0, 100000), // optional: limit long text
+        File: [{ url: fileUrl }]
+      }
+    };
+
+    // ⬇️ Upload to Airtable
+    const response = await axios.post(
+      `${AIRTABLE_BASE_URL}/KnowledgeBase`,
+      airtablePayload,
+      {
+        headers: {
+          Authorization: `Bearer ${AIRTABLE_API_TOKEN}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+
+    res.status(200).json({ success: true, record: response.data });
+  } catch (err) {
+    console.error('Knowledge upload failed:', err.response?.data || err.message);
+    res.status(500).json({ error: 'Failed to upload knowledge file' });
+  }
+});
+
+
+
+app.get('/api/knowledge-docs', async (req, res) => {
+  try {
+    const resDocs = await axios.get(`${AIRTABLE_BASE_URL}/KnowledgeBase`, {
+      headers: {
+        Authorization: `Bearer ${AIRTABLE_API_TOKEN}`
+      }
+    });
+    res.status(200).json(resDocs.data.records);
+  } catch (err) {
+    console.error('Error fetching knowledge docs:', err.response?.data || err.message);
+    res.status(500).json({ error: 'Failed to fetch documents' });
+  }
+});
+
+app.get('/api/knowledge-docs/:id', async (req, res) => {
+  const { id } = req.params;
+  try {
+    const record = await fetchRecordById('KnowledgeBase', id);
+    res.status(200).json(record);
+  } catch (err) {
+    console.error('Error fetching document by ID:', err.response?.data || err.message);
+    res.status(500).json({ error: 'Failed to fetch document' });
+  }
+});
+
+app.delete('/api/knowledge-docs/:id', async (req, res) => {
+  const { id } = req.params;
+  try {
+    await axios.delete(`${AIRTABLE_BASE_URL}/KnowledgeBase/${id}`, {
+      headers: {
+        Authorization: `Bearer ${AIRTABLE_API_TOKEN}`
+      }
+    });
+    res.status(200).json({ success: true });
+  } catch (err) {
+    console.error('Error deleting document:', err.response?.data || err.message);
+    res.status(500).json({ error: 'Failed to delete document' });
+  }
+});
+
+app.get('/api/knowledge-bundle', async (req, res) => {
+  try {
+    const resDocs = await axios.get(`${AIRTABLE_BASE_URL}/KnowledgeBase`, {
+      headers: { Authorization: `Bearer ${AIRTABLE_API_TOKEN}` }
+    });
+
+    const bundle = resDocs.data.records
+      .map((doc) => {
+        const title = doc.fields.Title || '';
+        const content = doc.fields.Content || '';
+        return `📄 ${title}\n\n${content}`;
+      })
+      .join('\n\n');
+
+    res.status(200).json({ bundle });
+  } catch (err) {
+    console.error('Error generating knowledge bundle:', err.response?.data || err.message);
+    res.status(500).json({ error: 'Failed to generate bundle' });
+  }
+});
+
+
+
+
+
+
 app.get('/', (req, res) => {
   res.send('REI-CRM server running.');
 });
+
+
+
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {

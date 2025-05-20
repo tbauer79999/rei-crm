@@ -4,13 +4,18 @@ import MessagingSettings from '../components/settings/MessagingSettings';
 import AISettings from '../components/settings/AISettings';
 import SystemTools from '../components/settings/SystemTools';
 import AIInstructionSettings from '../components/settings/AIInstructionSettings';
+import AIKnowledgeBase from '../components/settings/AIKnowledgeBase';
+
+
 
 const tabs = [
   { key: 'company', label: 'Company Info' },
   { key: 'messaging', label: 'Messaging' },
   { key: 'ai', label: 'AI & Automation' },
   { key: 'instruction', label: 'AI Instruction Hub' },
+  { key: 'knowledge', label: 'AI Knowledge Base' },
   { key: 'systemtools', label: 'System Tools' }
+  
 ];
 
 export default function Settings() {
@@ -43,6 +48,7 @@ export default function Settings() {
         {activeTab === 'messaging' && <MessagingSettings />}
         {activeTab === 'ai' && <AISettings />}
         {activeTab === 'instruction' && <AIInstructionSettings />}
+        {activeTab === 'knowledge' && <AIKnowledgeBase />}
         {activeTab === 'systemtools' && <SystemTools />}
       </div>
     </div>

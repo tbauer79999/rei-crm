@@ -107,22 +107,23 @@ export default function Dashboard() {
     }
   };
 
-  const downloadSampleCSV = () => {
-    const headers = [
-      'Owner Name', 'Property Address', 'City', 'State', 'Zip Code',
-      'Phone', 'Email', 'Bedrooms', 'Bathrooms', 'Square Footage',
-      'Notes', 'Status', 'Campaign'
-    ];
-    const csvContent = headers.join(',') + '\n';
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
+const downloadSampleCSV = () => {
+  const headers = [
+    'Owner Name', 'Property Address', 'City', 'State', 'Zip Code',
+    'Phone', 'Email', 'Bedrooms', 'Bathrooms', 'Square Footage',
+    'Notes', 'Campaign' // ❌ includes "Status"
+  ];
+  const csvContent = headers.join(',') + '\n';
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
 
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'sample_leads.csv';
-    a.click();
-    URL.revokeObjectURL(url);
-  };
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'sample_leads.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+};
+
 
   const statuses = [
     'All',
