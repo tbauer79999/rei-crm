@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import { supabase } from '../../lib/supabaseClient';
 import { Label } from '../ui/label';
 import Button from '../ui/button';
 
@@ -12,26 +12,44 @@ export default function AISettings() {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    axios.get('/api/settings').then((res) => {
-      const data = res.data;
-      setAutoReplies(data.EnableAIAutoReplies?.value === 'true');
-      setScoring(data.EnableMotivationScoring?.value === 'true');
-      setEscalation(data.EscalateHotLeadImmediately?.value === 'true');
-      setDelay(data.AIResponseDelay?.value || '3');
-      setStatusField(data.AIStatusFieldEnabled?.value === 'true');
-    });
+    const fetchSettings = async () => {
+      const { data, error } = await supabase
+        .from('platform_settings')
+        .select('Key, Value');
+
+      if (error) {
+        console.error('Failed to fetch settings:', error);
+        return;
+      }
+
+      const settings = data.reduce((acc, row) => {
+        acc[row.Key] = row.Value;
+        return acc;
+      }, {});
+
+      setAutoReplies(settings.EnableAIAutoReplies === 'true');
+      setScoring(settings.EnableMotivationScoring === 'true');
+      setEscalation(settings.EscalateHotLeadImmediately === 'true');
+      setDelay(settings.AIResponseDelay || '3');
+      setStatusField(settings.AIStatusFieldEnabled === 'true');
+    };
+
+    fetchSettings();
   }, []);
 
   const handleSave = async () => {
     setSaving(true);
     try {
-      await axios.put('/api/settings', {
-        EnableAIAutoReplies: { value: String(autoReplies) },
-        EnableMotivationScoring: { value: String(scoring) },
-        EscalateHotLeadImmediately: { value: String(escalation) },
-        AIResponseDelay: { value: delay },
-        AIStatusFieldEnabled: { value: String(statusField) },
-      });
+      const updates = [
+        { Key: 'EnableAIAutoReplies', Value: String(autoReplies) },
+        { Key: 'EnableMotivationScoring', Value: String(scoring) },
+        { Key: 'EscalateHotLeadImmediately', Value: String(escalation) },
+        { Key: 'AIResponseDelay', Value: delay },
+        { Key: 'AIStatusFieldEnabled', Value: String(statusField) }
+      ];
+
+      const { error } = await supabase.from('platform_settings').upsert(updates);
+      if (error) throw error;
     } catch (err) {
       console.error('Failed to save AI automation settings:', err);
     } finally {

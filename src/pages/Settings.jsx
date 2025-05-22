@@ -2,54 +2,49 @@ import React, { useState } from 'react';
 import CompanySettings from '../components/settings/CompanySettings';
 import MessagingSettings from '../components/settings/MessagingSettings';
 import AISettings from '../components/settings/AISettings';
-import SystemTools from '../components/settings/SystemTools';
 import AIInstructionSettings from '../components/settings/AIInstructionSettings';
 import AIKnowledgeBase from '../components/settings/AIKnowledgeBase';
-
-
+import SystemTools from '../components/settings/SystemTools';
 
 const tabs = [
-  { key: 'company', label: 'Company Info' },
-  { key: 'messaging', label: 'Messaging' },
-  { key: 'ai', label: 'AI & Automation' },
-  { key: 'instruction', label: 'AI Instruction Hub' },
-  { key: 'knowledge', label: 'AI Knowledge Base' },
-  { key: 'systemtools', label: 'System Tools' }
-  
+  { key: 'company', label: 'Company Info', component: CompanySettings },
+  { key: 'messaging', label: 'Messaging', component: MessagingSettings },
+  { key: 'ai', label: 'AI & Automation', component: AISettings },
+  { key: 'instruction', label: 'AI Instruction Hub', component: AIInstructionSettings },
+  { key: 'knowledge', label: 'AI Knowledge Base', component: AIKnowledgeBase },
+  { key: 'systemtools', label: 'System Tools', component: SystemTools },
 ];
 
 export default function Settings() {
-  const [activeTab, setActiveTab] = useState('company');
+  const [activeTab, setActiveTab] = useState(tabs[0]);
+  const ActiveComponent = activeTab.component;
 
   return (
-    <div className="p-6 bg-gray-100 min-h-screen">
-      <h1 className="text-2xl font-bold mb-6 text-gray-800">Settings</h1>
+    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white px-6 py-8">
+      <div className="max-w-6xl mx-auto">
+        <h1 className="text-2xl font-bold text-gray-800 mb-6">Settings</h1>
 
-      {/* Folder Tabs */}
-      <div className="flex space-x-2 mb-6">
-        {tabs.map(tab => (
-          <button
-            key={tab.key}
-            onClick={() => setActiveTab(tab.key)}
-            className={`px-4 py-2 rounded-t-md border border-b-0 ${
-              activeTab === tab.key
-                ? 'bg-white border-gray-300 text-blue-600 font-semibold'
-                : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
+        <div className="flex space-x-2 overflow-x-auto mb-6">
+          {tabs.map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab)}
+              className={`px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-all border
+  ${
+    activeTab.key === tab.key
+      ? 'bg-slate-800 text-white border-slate-800'
+      : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-100'
+  }`}
 
-      {/* Tab Content */}
-      <div className="bg-white p-6 rounded-b-md shadow border border-gray-300">
-        {activeTab === 'company' && <CompanySettings />}
-        {activeTab === 'messaging' && <MessagingSettings />}
-        {activeTab === 'ai' && <AISettings />}
-        {activeTab === 'instruction' && <AIInstructionSettings />}
-        {activeTab === 'knowledge' && <AIKnowledgeBase />}
-        {activeTab === 'systemtools' && <SystemTools />}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="bg-white rounded-xl shadow-md p-6 border border-slate-200">
+          <ActiveComponent />
+        </div>
       </div>
     </div>
   );

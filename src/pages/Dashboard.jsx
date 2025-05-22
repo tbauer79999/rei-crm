@@ -1,8 +1,8 @@
-// ... all imports remain unchanged
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import Papa from 'papaparse';
+import { supabase } from '../lib/supabaseClient';
 
 export default function Dashboard() {
   const [leads, setLeads] = useState([]);
@@ -17,33 +17,35 @@ export default function Dashboard() {
   const [uploadError, setUploadError] = useState(false);
   const navigate = useNavigate();
 
-  const goToAnalytics = () => navigate('/analytics');
-  const goToSettings = () => navigate('/settings');
-
   useEffect(() => {
     fetchLeads();
   }, []);
 
   const fetchLeads = async () => {
-    try {
-      const res = await axios.get('/api/properties');
-      setLeads(res.data);
-      setFilteredLeads(res.data);
-    } catch (err) {
-      console.error('Error fetching leads:', err);
+    const { data, error } = await supabase
+      .from('properties')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching leads:', error);
+      return;
     }
+
+    setLeads(data);
+    setFilteredLeads(data);
   };
 
   useEffect(() => {
     let updated = [...leads];
     if (filterStatus) {
-      updated = updated.filter(lead => lead.fields?.Status === filterStatus);
+      updated = updated.filter(lead => lead.status === filterStatus);
     }
     if (search.trim()) {
       const lower = search.toLowerCase();
       updated = updated.filter(lead =>
-        lead.fields?.["Owner Name"]?.toLowerCase().includes(lower) ||
-        lead.fields?.["Property Address"]?.toLowerCase().includes(lower)
+        lead.owner_name?.toLowerCase().includes(lower) ||
+        lead.property_address?.toLowerCase().includes(lower)
       );
     }
     setFilteredLeads(updated);
@@ -107,23 +109,22 @@ export default function Dashboard() {
     }
   };
 
-const downloadSampleCSV = () => {
-  const headers = [
-    'Owner Name', 'Property Address', 'City', 'State', 'Zip Code',
-    'Phone', 'Email', 'Bedrooms', 'Bathrooms', 'Square Footage',
-    'Notes', 'Campaign' // ❌ includes "Status"
-  ];
-  const csvContent = headers.join(',') + '\n';
-  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
+  const downloadSampleCSV = () => {
+    const headers = [
+      'Owner Name', 'Property Address', 'City', 'State', 'Zip Code',
+      'Phone', 'Email', 'Bedrooms', 'Bathrooms', 'Square Footage',
+      'Notes', 'Campaign'
+    ];
+    const csvContent = headers.join(',') + '\n';
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
 
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'sample_leads.csv';
-  a.click();
-  URL.revokeObjectURL(url);
-};
-
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'sample_leads.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   const statuses = [
     'All',
@@ -136,19 +137,18 @@ const downloadSampleCSV = () => {
   ];
 
   return (
-    <div className="p-6 bg-gray-100 min-h-screen">
+    <div className="p-6 bg-gradient-to-b from-slate-50 to-white min-h-screen">
       <div className="flex justify-between items-center mb-4">
-  <h1 className="text-2xl font-semibold text-gray-800">Lead Dashboard</h1>
-  <button
-  onClick={() => setShowForm(!showForm)}
-  className="bg-white text-blue-600 border border-blue-600 hover:bg-blue-50 px-4 py-2 rounded text-sm shadow-sm transition"
->
-  + Add Lead
-</button>
-
-
-</div>
-
+        <h2 className="text-lg font-medium text-gray-700">
+          Showing {filteredLeads.length} {(filterStatus || 'All').toLowerCase()} lead{filteredLeads.length !== 1 ? 's' : ''}
+        </h2>
+        <button
+          onClick={() => setShowForm(!showForm)}
+          className="text-sm border border-gray-300 px-3 py-1.5 rounded-md hover:bg-gray-50 flex items-center gap-2"
+        >
+          + Add Lead
+        </button>
+      </div>
 
       {showForm && (
         <div className="bg-white p-4 rounded-md shadow-md mb-6">
@@ -193,9 +193,9 @@ const downloadSampleCSV = () => {
 
           {tab === 'single' && (
             <form className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <input type="text" placeholder="Owner Name" className="p-2 border rounded" />
-              <input type="text" placeholder="Property Address" className="p-2 border rounded" />
-              <select className="p-2 border rounded">
+              <input type="text" placeholder="Owner Name" className="p-2 border rounded text-sm" />
+              <input type="text" placeholder="Property Address" className="p-2 border rounded text-sm" />
+              <select className="p-2 border rounded text-sm">
                 <option>Status</option>
                 <option>New Lead</option>
                 <option>Hot Lead</option>
@@ -212,57 +212,58 @@ const downloadSampleCSV = () => {
         </div>
       )}
 
-      {/* New Tabbed Status Filter */}
-      <div className="flex space-x-2 mb-6">
-  {statuses.map((status) => (
-    <button
-      key={status}
-      onClick={() => setFilterStatus(status === 'All' ? null : status)}
-      className={`px-4 py-2 rounded-t-md border border-b-0 ${
-        (filterStatus === status || (status === 'All' && filterStatus === null))
-          ? 'bg-white border-gray-300 text-blue-600 font-semibold'
-          : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
-      }`}
-    >
-      {status}
-    </button>
-  ))}
-</div>
-
+      <div className="flex space-x-2 mb-4">
+        {statuses.map((status) => (
+          <button
+            key={status}
+            onClick={() => setFilterStatus(status === 'All' ? null : status)}
+            className={`px-4 py-1.5 rounded-full border text-sm font-medium transition ${
+              (filterStatus === status || (status === 'All' && filterStatus === null))
+                ? 'bg-slate-800 text-white border-slate-800'
+                : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-100'
+            }`}
+          >
+            {status}
+          </button>
+        ))}
+      </div>
 
       <input
         type="text"
         placeholder="Search by name or address..."
         value={search}
         onChange={(e) => setSearch(e.target.value)}
-        className="mb-4 p-2 w-full border rounded"
+        className="mb-4 p-2 w-full border rounded text-sm"
       />
 
-      <div className="overflow-x-auto bg-white rounded-md shadow">
-        <table className="min-w-full">
+      <div className="overflow-x-auto bg-white rounded-md shadow border border-slate-200">
+        <table className="min-w-full text-sm">
           <thead className="bg-gray-50">
             <tr>
-              <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Owner Name</th>
-              <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Property Address</th>
-              <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Status</th>
+              <th className="px-4 py-2 text-left font-medium text-gray-700">Owner Name</th>
+              <th className="px-4 py-2 text-left font-medium text-gray-700">Property Address</th>
+              <th className="px-4 py-2 text-left font-medium text-gray-700">Status</th>
             </tr>
           </thead>
           <tbody>
             {filteredLeads.length === 0 ? (
               <tr>
-                <td colSpan="3" className="text-center text-sm text-gray-500 py-6">
+                <td colSpan="3" className="text-center text-sm text-gray-500 py-4">
                   No leads found for this view.
                 </td>
               </tr>
             ) : (
               filteredLeads.map((lead) => (
                 <tr key={lead.id} onClick={() => handleRowClick(lead.id)} className="cursor-pointer hover:bg-gray-100">
-                  <td className="border px-3 py-1 text-sm">
-                    {lead.fields?.["Owner Name"] || '—'}</td>
-                  <td className="border px-3 py-1 text-sm">
-                    {lead.fields?.["Property Address"] || '—'}</td>
-                  <td className="border px-3 py-1 text-sm">
-                    {lead.fields?.Status || '—'}</td>
+                  <td className="border-t px-3 py-1 text-sm truncate max-w-xs">
+                    {lead.owner_name || '—'}
+                  </td>
+                  <td className="border-t px-3 py-1 text-sm truncate max-w-xs">
+                    {lead.property_address || '—'}
+                  </td>
+                  <td className="border-t px-3 py-1 text-sm">
+                    {lead.status || '—'}
+                  </td>
                 </tr>
               ))
             )}

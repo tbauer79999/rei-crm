@@ -9,70 +9,94 @@ const pdf = require('pdf-parse');
 const { default: fetch } = require('node-fetch');
 
 dotenv.config();
+const { supabase } = require('./supabaseClient');
+
+
 const app = express();
 
 app.use(cors());
 app.use(express.json());
 
-const AIRTABLE_API_TOKEN = process.env.AIRTABLE_API_TOKEN;
-const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID;
-const AIRTABLE_BASE_URL = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}`;
+const fetchAllRecords = async (table) => {
+  const { data, error } = await supabase
+    .from(table)
+    .select('*');
 
-const fetchAllRecords = async (table, view = 'Grid view') => {
-  let records = [];
-  let offset = null;
+  if (error) {
+    throw new Error(`Failed to fetch records from ${table}: ${error.message}`);
+  }
 
-  do {
-    let url = `${AIRTABLE_BASE_URL}/${table}?view=${view}`;
-    if (offset) url += `&offset=${offset}`;
-
-    const res = await axios.get(url, {
-      headers: { Authorization: `Bearer ${AIRTABLE_API_TOKEN}` },
-    });
-
-    records = records.concat(res.data.records);
-    offset = res.data.offset;
-  } while (offset);
-
-  return records;
+  return data;
 };
+
 
 const fetchRecordById = async (table, id) => {
-  const url = `${AIRTABLE_BASE_URL}/${table}/${id}`;
-  const res = await axios.get(url, {
-    headers: { Authorization: `Bearer ${AIRTABLE_API_TOKEN}` },
-  });
-  return res.data;
+  const { data, error } = await supabase
+    .from(table)
+    .select('*')
+    .eq('id', id)
+    .single(); // ensures you get a single object, not an array
+
+  if (error) {
+    throw new Error(`Failed to fetch record from ${table} with id ${id}: ${error.message}`);
+  }
+
+  return data;
 };
 
+
 const fetchSettingValue = async (key) => {
-  const url = `${AIRTABLE_BASE_URL}/PlatformSettings?filterByFormula={Key}='${key}'`;
-  const res = await axios.get(url, {
-    headers: { Authorization: `Bearer ${AIRTABLE_API_TOKEN}` },
-  });
-  const record = res.data.records[0];
-  return record?.fields?.Value || '';
+  const { data, error } = await supabase
+    .from('platform_settings')
+    .select('Value')
+    .eq('Key', key)
+    .single(); // ensures we get one row, not an array
+
+  if (error) {
+    console.error(`Error fetching setting "${key}":`, error.message);
+    return '';
+  }
+
+  return data?.Value || '';
 };
+
 
 app.get('/api/properties', async (req, res) => {
   try {
-    const records = await fetchAllRecords('Properties');
-    res.json(records);
+    const { data, error } = await supabase
+      .from('properties')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    res.json(data);
   } catch (err) {
-    console.error('Error fetching properties:', err.response?.data || err.message);
+    console.error('Supabase error:', err.message);
     res.status(500).json({ error: 'Failed to fetch properties' });
   }
 });
 
+
 app.get('/api/properties/:id', async (req, res) => {
+  const { id } = req.params;
+
   try {
-    const record = await fetchRecordById('Properties', req.params.id);
-    res.json(record);
+    const { data, error } = await supabase
+      .from('properties')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (error) throw error;
+
+    res.json(data);
   } catch (err) {
-    console.error('Error fetching property by ID:', err.response?.data || err.message);
+    console.error('Supabase error:', err.message);
     res.status(500).json({ error: 'Failed to fetch property' });
   }
 });
+
 
 app.patch('/api/properties/:id/status', async (req, res) => {
   try {
@@ -90,19 +114,18 @@ app.patch('/api/properties/:id/status', async (req, res) => {
       updatedHistory = history ? `${history}\n${newLine}` : newLine;
     }
 
-    const url = `${AIRTABLE_BASE_URL}/Properties/${id}`;
-    const resUpdate = await axios.patch(
-      url,
-      {
-        fields: {
-          Status: status,
-          'Status History': updatedHistory,
-        },
-      },
-      {
-        headers: { Authorization: `Bearer ${AIRTABLE_API_TOKEN}` },
-      }
-    );
+    const { error } = await supabase
+  .from('properties')
+  .update({
+    status: status,
+    status_history: updatedHistory
+  })
+  .eq('id', id);
+
+if (error) {
+  throw new Error(`Failed to update property status: ${error.message}`);
+}
+
 
     res.json(resUpdate.data);
   } catch (err) {
@@ -113,30 +136,40 @@ app.patch('/api/properties/:id/status', async (req, res) => {
 
 app.get('/api/messages', async (req, res) => {
   try {
-    const records = await fetchAllRecords('Messages');
-    res.json(records);
+    const { data, error } = await supabase
+      .from('messages')
+      .select('*')
+      .order('timestamp', { ascending: true });
+
+    if (error) throw error;
+
+    res.json(data);
   } catch (err) {
-    console.error('Error fetching messages:', err.response?.data || err.message);
+    console.error('Supabase error:', err.message);
     res.status(500).json({ error: 'Failed to fetch messages' });
   }
 });
+
 
 app.get('/api/messages/:id', async (req, res) => {
+  const { id } = req.params;
+
   try {
-    const id = req.params.id;
-    const formula = `{Property ID} = '${id}'`;
+    const { data, error } = await supabase
+      .from('messages')
+      .select('*')
+      .eq('property_id', id)
+      .order('timestamp', { ascending: true });
 
-    const url = `${AIRTABLE_BASE_URL}/Messages?filterByFormula=${encodeURIComponent(formula)}`;
-    const resAirtable = await axios.get(url, {
-      headers: { Authorization: `Bearer ${AIRTABLE_API_TOKEN}` },
-    });
+    if (error) throw error;
 
-    res.json(resAirtable.data.records);
+    res.json(data);
   } catch (err) {
-    console.error('Error fetching messages:', err.response?.data || err.message);
+    console.error('Supabase error:', err.message);
     res.status(500).json({ error: 'Failed to fetch messages' });
   }
 });
+
 
 app.get('/api/analytics', async (req, res) => {
   try {
@@ -177,25 +210,21 @@ app.get('/api/analytics', async (req, res) => {
       const messageRecords = [];
       const messageIds = r.fields?.Messages || [];
 
-      for (const id of messageIds) {
-        try {
-          const url = `${AIRTABLE_BASE_URL}/Messages/${id}`;
-          const resMsg = await axios.get(url, {
-            headers: { Authorization: `Bearer ${AIRTABLE_API_TOKEN}` }
-          });
+      const { data: messages, error } = await supabase
+  .from('messages')
+  .select('direction, timestamp, body')
+  .in('id', messageIds); // assumes messageIds is an array of Supabase UUIDs
 
-          const msg = resMsg.data?.fields;
-          if (msg) {
-            messageRecords.push({
-              direction: msg.Direction,
-              timestamp: msg.Timestamp,
-              body: msg.Body || ''
-            });
-          }
-        } catch (e) {
-          console.warn(`Failed to fetch message ${id}:`, e.message);
-        }
-      }
+if (error) {
+  console.warn('Failed to fetch messages:', error.message);
+} else {
+  const messageRecords = messages.map(msg => ({
+    direction: msg.direction,
+    timestamp: msg.timestamp,
+    body: msg.body || ''
+  }));
+}
+
 
       raw.push({
         Campaign: campaign,
@@ -220,17 +249,32 @@ app.get('/api/analytics', async (req, res) => {
   }
 });
 
+const { createClient } = require('@supabase/supabase-js');
+
 app.post('/api/properties/bulk', async (req, res) => {
   try {
-    const records = req.body.records;
+    const records = req.body.records || [];
 
-    const rawCampaigns = await fetchSettingValue('Campaigns');
-    const allowedCampaigns = rawCampaigns.split('\n').map(s => s.trim()).filter(Boolean);
+    // Pull allowed campaign values from Supabase settings
+    const { data: settingsData, error: settingsError } = await supabase
+      .from('platform_settings')
+      .select('*')
+      .eq('key', 'Campaigns')
+      .single();
+
+    if (settingsError || !settingsData?.value) {
+      throw new Error('Failed to retrieve allowed campaigns');
+    }
+
+    const allowedCampaigns = settingsData.value
+      .split('\n')
+      .map(s => s.trim())
+      .filter(Boolean);
 
     const validRecords = records.filter(r =>
-      r.fields["Owner Name"] &&
-      r.fields["Property Address"] &&
-      r.fields["Campaign"]
+      r.fields?.["Owner Name"] &&
+      r.fields?.["Property Address"] &&
+      r.fields?.["Campaign"]
     );
 
     if (validRecords.length === 0) {
@@ -256,10 +300,18 @@ app.post('/api/properties/bulk', async (req, res) => {
       });
     }
 
-    const existing = await fetchAllRecords('Properties');
+    // Fetch existing leads for deduplication
+    const { data: existingData, error: existingError } = await supabase
+      .from('properties')
+      .select('owner_name, property_address');
+
+    if (existingError) {
+      throw existingError;
+    }
+
     const existingSet = new Set(
-      existing.map(e =>
-        `${e.fields["Owner Name"]?.toLowerCase().trim()}|${e.fields["Property Address"]?.toLowerCase().trim()}`
+      existingData.map(e =>
+        `${e.owner_name?.toLowerCase().trim()}|${e.property_address?.toLowerCase().trim()}`
       )
     );
 
@@ -268,110 +320,132 @@ app.post('/api/properties/bulk', async (req, res) => {
       return !existingSet.has(key);
     });
 
-    const uploaded = records.length;
-    const skipped = uploaded - deduplicated.length;
+    const enrichedRecords = deduplicated.map(r => {
+      const f = r.fields;
+      const today = new Date().toISOString().split('T')[0];
+      return {
+        owner_name: f["Owner Name"],
+        property_address: f["Property Address"],
+        city: f.City || '',
+        state: f.State || '',
+        zip_code: f["Zip Code"] || '',
+        phone: f.Phone || '',
+        email: f.Email || '',
+        bedrooms: f.Bedrooms || '',
+        bathrooms: f.Bathrooms || '',
+        square_footage: f["Square Footage"] || '',
+        notes: f.Notes || '',
+        campaign: f.Campaign,
+        status: f.Status || 'New Lead',
+        status_history: `${today}: ${f.Status || 'New Lead'}`
+      };
+    });
 
-    if (deduplicated.length === 0) {
+    if (enrichedRecords.length === 0) {
       return res.status(409).json({
         error: 'All records are duplicates or missing required fields.',
-        uploaded,
-        skipped,
+        uploaded: records.length,
+        skipped: records.length,
         added: 0
       });
     }
 
-    const enrichedRecords = deduplicated.map(r => {
-      const status = r.fields.Status || 'New Lead';
-      const today = new Date().toISOString().split('T')[0];
-      const historyLine = `${today}: ${status}`;
-      return {
-        fields: {
-          ...r.fields,
-          "Status": status,
-          "Status History": historyLine
-        }
-      };
-    });
 
-    const url = `${AIRTABLE_BASE_URL}/Properties`;
-    const response = await axios.post(url, { records: enrichedRecords }, {
-      headers: { Authorization: `Bearer ${AIRTABLE_API_TOKEN}` }
-    });
 
-    const added = response.data.records?.length || 0;
 
-    res.json({
+    const { error: insertError } = await supabase
+      .from('properties')
+      .insert(enrichedRecords);
+
+    if (insertError) {
+      throw insertError;
+    }
+
+    res.status(200).json({
       message: 'Upload successful',
-      uploaded,
-      skipped,
-      added
+      uploaded: records.length,
+      skipped: records.length - enrichedRecords.length,
+      added: enrichedRecords.length
     });
   } catch (err) {
-    console.error('Bulk upload failed:', err.response?.data || err.message);
+    console.error('Bulk upload failed:', err.message);
     res.status(500).json({ error: 'Bulk upload failed' });
   }
 });
 
+
 app.get('/api/settings', async (req, res) => {
   try {
-    const records = await fetchAllRecords('PlatformSettings');
-    const settings = {};
+    const { data, error } = await supabase
+      .from('platform_settings')
+      .select('*');
 
-    records.forEach(record => {
-      const key = record.fields.Key;
-      const value = record.fields.Value;
-      settings[key] = { value, id: record.id };
-    });
+    if (error) throw error;
+
+    const settings = {};
+    for (const row of data) {
+      settings[row.key] = {
+        value: row.value,
+        id: row.id
+      };
+    }
 
     res.json(settings);
   } catch (err) {
-    console.error('Error fetching settings:', err.response?.data || err.message);
+    console.error('Error fetching settings from Supabase:', err.message);
     res.status(500).json({ error: 'Failed to fetch settings' });
   }
 });
 
+
+
 app.post('/api/settings', async (req, res) => {
   const { key, value } = req.body;
-  const headers = {
-    Authorization: `Bearer ${AIRTABLE_API_TOKEN}`,
-    'Content-Type': 'application/json'
-  };
 
   try {
-    const formula = `LOWER(TRIM({Key})) = "${key.toLowerCase().trim()}"`;
-    const lookupUrl = `${AIRTABLE_BASE_URL}/PlatformSettings?filterByFormula=${encodeURIComponent(formula)}`;
-    const existing = await axios.get(lookupUrl, { headers });
+    const { data: existing, error: fetchError } = await supabase
+      .from('platform_settings')
+      .select('id')
+      .eq('key', key.trim().toLowerCase())
+      .single();
 
-    const payload = { fields: { Key: key, Value: value } };
+    if (fetchError && fetchError.code !== 'PGRST116') {
+      throw fetchError;
+    }
 
-    if (existing.data.records.length > 0) {
-      const existingId = existing.data.records[0].id;
-      await axios.patch(`${AIRTABLE_BASE_URL}/PlatformSettings/${existingId}`, payload, { headers });
+    if (existing) {
+      const { error: updateError } = await supabase
+        .from('platform_settings')
+        .update({ value })
+        .eq('id', existing.id);
+
+      if (updateError) throw updateError;
     } else {
-      await axios.post(`${AIRTABLE_BASE_URL}/PlatformSettings`, payload, { headers });
+      const { error: insertError } = await supabase
+        .from('platform_settings')
+        .insert({ key: key.trim().toLowerCase(), value });
+
+      if (insertError) throw insertError;
     }
 
     res.status(200).json({ success: true });
   } catch (err) {
-    console.error('Error saving setting:', err.response?.data || err.message);
+    console.error('Error saving setting to Supabase:', err.message || err);
     res.status(500).json({ error: 'Failed to save setting' });
   }
 });
 
 
+
 app.post('/api/settings/instructions', async (req, res) => {
   const { tone, persona, industry, role } = req.body;
-  const headers = {
-    Authorization: `Bearer ${AIRTABLE_API_TOKEN}`,
-    'Content-Type': 'application/json'
-  };
 
   try {
-    // ⬇️ Fetch the dynamic knowledge bundle
-    const bundleRes = await axios.get('http://localhost:5000/api/knowledge-bundle');
-    const knowledgeBlock = bundleRes.data.bundle;
+    // Get knowledge base data
+    const bundleRes = await fetch('http://localhost:5000/api/knowledge-bundle');
+    const { bundle: knowledgeBlock } = await bundleRes.json();
 
-    // ⬇️ Build the instruction bundle with the knowledge
+    // Generate final instruction bundle
     const finalBundle = buildInstructionBundle({
       tone,
       persona,
@@ -380,32 +454,34 @@ app.post('/api/settings/instructions', async (req, res) => {
       knowledgeBlock
     });
 
- // ⬇️ Save to Airtable
-    const payload = {
-      fields: {
-        Key: 'AIInstructionBundle',
-        Value: finalBundle
-      }
-    };
+    // ✅ Upsert (create or update) with unique `key`
+    const { error } = await supabase
+      .from('platform_settings')
+      .upsert(
+        [{
+          key: 'aiInstruction_bundle',
+          value: finalBundle,
+          updated_at: new Date().toISOString()
+        }],
+        {
+          onConflict: 'key', // ensure this field is unique in Supabase
+          ignoreDuplicates: false
+        }
+      );
 
-    // 🔁 Lookup existing key and update
-    const formula = `LOWER(TRIM({Key})) = "aiinstructionbundle"`;
-    const lookupUrl = `${AIRTABLE_BASE_URL}/PlatformSettings?filterByFormula=${encodeURIComponent(formula)}`;
-    const existing = await axios.get(lookupUrl, { headers });
-
-    if (existing.data.records.length > 0) {
-      const existingId = existing.data.records[0].id;
-      await axios.patch(`${AIRTABLE_BASE_URL}/PlatformSettings/${existingId}`, payload, { headers });
-    } else {
-      await axios.post(`${AIRTABLE_BASE_URL}/PlatformSettings`, payload, { headers });
-    }
+    if (error) throw error;
 
     res.status(200).json({ success: true });
   } catch (err) {
-    console.error('Error saving AIInstructionBundle with knowledge:', err.response?.data || err.message);
-    res.status(500).json({ error: 'Failed to save AIInstructionBundle' });
+    console.error('Error saving aiInstruction_bundle to Supabase:', err.message);
+    res.status(500).json({ error: 'Failed to save aiInstruction_bundle' });
   }
 });
+
+
+
+
+
 
 
 
@@ -414,112 +490,92 @@ app.post('/api/settings/instructions', async (req, res) => {
 
 app.put('/api/settings', async (req, res) => {
   const settings = req.body;
-  const headers = {
-    Authorization: `Bearer ${AIRTABLE_API_TOKEN}`,
-    'Content-Type': 'application/json',
-  };
-
-  const deprecatedKeys = ['AIInstructions', 'IndustryDetails', 'AISampleDialog', 'AIPersona'];
 
   try {
+    const upserts = [];
+
     for (const [key, setting] of Object.entries(settings)) {
-      if (deprecatedKeys.includes(key)) {
-        console.log(`⏩ Skipping deprecated key: ${key}`);
-        continue;
-      }
-
       const value = typeof setting.value === 'boolean' ? String(setting.value) : setting.value;
-      const escapedKey = key.replace(/"/g, '\\"');
-      const formula = `LOWER(TRIM({Key})) = "${escapedKey.toLowerCase().trim()}"`;
-      const lookupUrl = `${AIRTABLE_BASE_URL}/PlatformSettings?filterByFormula=${encodeURIComponent(formula)}`;
-      const existing = await axios.get(lookupUrl, { headers });
 
-      const payload = { fields: { Key: key, Value: value } };
-
-      if (existing.data.records.length > 0) {
-        const existingId = existing.data.records[0].id;
-        await axios.patch(`${AIRTABLE_BASE_URL}/PlatformSettings/${existingId}`, payload, { headers });
-      } else {
-        await axios.post(`${AIRTABLE_BASE_URL}/PlatformSettings`, payload, { headers });
-      }
+      upserts.push({ key, value });
     }
+
+    const { error } = await supabase
+      .from('platform_settings')
+      .upsert(upserts, { onConflict: 'key' });
+
+    if (error) throw error;
 
     res.status(200).json({ message: 'All settings saved.' });
   } catch (err) {
-    console.error('Error saving setting:', err.response?.data || err.message);
+    console.error('Error saving settings to Supabase:', err.message);
     res.status(500).json({ error: 'Failed to save one or more settings' });
   }
 });
 
-
-
-
 app.post('/api/knowledge-upload', async (req, res) => {
   try {
-    const { title = '', description = '', fileUrl, fileName } = req.body;
+    const { title = '', description = '', file_url, file_name } = req.body;
 
-    if (!fileUrl || !fileName) {
-      return res.status(400).json({ error: 'Missing fileUrl or fileName' });
+    if (!file_url || !file_name) {
+      return res.status(400).json({ error: 'Missing file_url or file_name' });
     }
 
-    // ⬇️ Download PDF from Cloudinary
-    const fileRes = await fetch(fileUrl);
-    const arrayBuffer = await fileRes.arrayBuffer();
+    // Download and parse the PDF
+    const response = await fetch(file_url);
+    const arrayBuffer = await response.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
-
-    // ⬇️ Extract text from PDF
+console.log('✅ Buffer length:', buffer.length); // Should be > 0
+    // Extract text
     const data = await pdf(buffer);
-    const extractedText = data.text || '';
+    const extractedText = data?.text?.trim() || '';
 
-    // ⬇️ Build Airtable record
-    const airtablePayload = {
-      fields: {
-        Title: title,
-        Description: description,
-        Content: extractedText.trim().slice(0, 100000), // optional: limit long text
-        File: [{ url: fileUrl }]
-      }
-    };
-
-    // ⬇️ Upload to Airtable
-    const response = await axios.post(
-      `${AIRTABLE_BASE_URL}/KnowledgeBase`,
-      airtablePayload,
-      {
-        headers: {
-          Authorization: `Bearer ${AIRTABLE_API_TOKEN}`,
-          'Content-Type': 'application/json'
+    // Save to Supabase
+    const { data: inserted, error } = await supabase
+      .from('knowledge_base')
+      .insert([
+        {
+          title,
+          description,
+          file_url,
+          file_name,
+          content: extractedText.slice(0, 100000) // limit if needed
         }
-      }
-    );
+      ]);
 
-    res.status(200).json({ success: true, record: response.data });
+    if (error) throw error;
+
+    res.status(200).json({ success: true, record: inserted?.[0] });
   } catch (err) {
-    console.error('Knowledge upload failed:', err.response?.data || err.message);
+    console.error('Supabase upload failed:', err.message);
     res.status(500).json({ error: 'Failed to upload knowledge file' });
   }
 });
 
 
 
+
 app.get('/api/knowledge-docs', async (req, res) => {
   try {
-    const resDocs = await axios.get(`${AIRTABLE_BASE_URL}/KnowledgeBase`, {
-      headers: {
-        Authorization: `Bearer ${AIRTABLE_API_TOKEN}`
-      }
-    });
-    res.status(200).json(resDocs.data.records);
+    const { data, error } = await supabase
+      .from('knowledge_base')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    res.status(200).json(data);
   } catch (err) {
-    console.error('Error fetching knowledge docs:', err.response?.data || err.message);
+    console.error('Error fetching knowledge docs:', err.message);
     res.status(500).json({ error: 'Failed to fetch documents' });
   }
 });
 
+
 app.get('/api/knowledge-docs/:id', async (req, res) => {
   const { id } = req.params;
   try {
-    const record = await fetchRecordById('KnowledgeBase', id);
+    const record = await fetchRecordById('knowledge_base', id);
     res.status(200).json(record);
   } catch (err) {
     console.error('Error fetching document by ID:', err.response?.data || err.message);
@@ -530,38 +586,42 @@ app.get('/api/knowledge-docs/:id', async (req, res) => {
 app.delete('/api/knowledge-docs/:id', async (req, res) => {
   const { id } = req.params;
   try {
-    await axios.delete(`${AIRTABLE_BASE_URL}/KnowledgeBase/${id}`, {
-      headers: {
-        Authorization: `Bearer ${AIRTABLE_API_TOKEN}`
-      }
-    });
+    const { error } = await supabase
+      .from('knowledge_base')
+      .delete()
+      .eq('id', id);
+
+    if (error) throw error;
+
     res.status(200).json({ success: true });
   } catch (err) {
-    console.error('Error deleting document:', err.response?.data || err.message);
+    console.error('Error deleting document:', err.message);
     res.status(500).json({ error: 'Failed to delete document' });
   }
 });
 
+
 app.get('/api/knowledge-bundle', async (req, res) => {
   try {
-    const resDocs = await axios.get(`${AIRTABLE_BASE_URL}/KnowledgeBase`, {
-      headers: { Authorization: `Bearer ${AIRTABLE_API_TOKEN}` }
-    });
+    const { data, error } = await supabase
+      .from('knowledge_base')
+      .select('title, content')
+      .order('created_at', { ascending: false });
 
-    const bundle = resDocs.data.records
-      .map((doc) => {
-        const title = doc.fields.Title || '';
-        const content = doc.fields.Content || '';
-        return `📄 ${title}\n\n${content}`;
-      })
+    if (error) throw error;
+
+    const bundle = data
+      .map((doc) => `📄 ${doc.title || 'Untitled'}\n\n${doc.content || ''}`)
       .join('\n\n');
 
     res.status(200).json({ bundle });
   } catch (err) {
-    console.error('Error generating knowledge bundle:', err.response?.data || err.message);
+    console.error('Error generating knowledge bundle:', err.message);
     res.status(500).json({ error: 'Failed to generate bundle' });
   }
 });
+
+
 
 
 

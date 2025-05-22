@@ -4,6 +4,7 @@ import { Label } from "../ui/label";
 import { Textarea } from "../ui/textarea";
 import { Select, SelectItem } from "../ui/select";
 import { Card, CardContent } from "../ui/card";
+import { supabase } from '../../lib/supabaseClient';
 
 export default function CompanySettings() {
   const [data, setData] = useState({});
@@ -18,13 +19,26 @@ export default function CompanySettings() {
   useEffect(() => {
     const loadSettings = async () => {
       try {
-        const res = await fetch("/api/settings");
-        const json = await res.json();
+        const { data: settingsData, error } = await supabase
+          .from('platform_settings')
+          .select('key, value');
+
+        if (error) throw error;
+
+        const json = settingsData.reduce((acc, row) => {
+          acc[row.key] = {
+            id: row.key,
+            value: row.value
+          };
+          return acc;
+        }, {});
+
         setData(json);
 
         const open = json.officeOpenHour?.value || "";
         const close = json.officeCloseHour?.value || "";
-        const days = json.officeDays?.value || [];
+        const daysRaw = json.officeDays?.value || "";
+        const days = daysRaw.split(",");
 
         setStartHour(open);
         setEndHour(close);
@@ -82,26 +96,17 @@ export default function CompanySettings() {
         },
       };
 
-      const flattened = {};
-      for (const key in updated) {
-        const entry = updated[key];
-        flattened[key] = {
-          id: entry.id,
-          value: Array.isArray(entry.value)
-            ? entry.value.join(",")
-            : typeof entry.value === "boolean"
-            ? String(entry.value)
-            : entry.value,
-        };
-      }
+      const upserts = Object.entries(updated).map(([key, entry]) => ({
+        key: key,
+        value: Array.isArray(entry.value)
+          ? entry.value.join(",")
+          : typeof entry.value === "boolean"
+          ? String(entry.value)
+          : entry.value,
+      }));
 
-      const res = await fetch("/api/settings", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(flattened),
-      });
-
-      if (!res.ok) throw new Error("Failed to save settings");
+      const { error } = await supabase.from("platform_settings").upsert(upserts);
+      if (error) throw error;
 
       setData(updated);
       setSaveSuccess(true);

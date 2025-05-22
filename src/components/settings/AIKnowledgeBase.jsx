@@ -1,9 +1,7 @@
-// File: AIKnowledgeBase.jsx
 import React, { useEffect, useState } from 'react';
-import axios from 'axios';
+import { supabase } from '../../lib/supabaseClient';
 
-const CLOUD_NAME = 'dku1a0kjh'; // Replace with your actual Cloudinary cloud name
-const UPLOAD_PRESET = 'unsigned_upload'; // Replace with your actual upload preset
+const BUCKET = 'documents';
 
 export default function AIKnowledgeBase() {
   const [files, setFiles] = useState([]);
@@ -17,41 +15,56 @@ export default function AIKnowledgeBase() {
   }, []);
 
   const fetchDocs = async () => {
-    try {
-      const res = await axios.get('/api/knowledge-docs');
-      setDocs(res.data);
-    } catch (err) {
-      console.error('Failed to load knowledge base documents', err);
+    const { data, error } = await supabase
+      .from('knowledge_base')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Failed to fetch knowledge docs:', error);
+    } else {
+      setDocs(data);
     }
   };
 
-  const uploadToCloudinary = async (file) => {
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('upload_preset', UPLOAD_PRESET);
+  const uploadFile = async (file) => {
+    const filePath = `${Date.now()}_${file.name}`;
+    const { error: uploadError } = await supabase.storage
+      .from(BUCKET)
+      .upload(filePath, file);
 
-    const response = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/auto/upload`, {
-      method: 'POST',
-      body: formData,
-    });
+    if (uploadError) throw uploadError;
 
-    const data = await response.json();
-    if (!data.secure_url) throw new Error('Cloudinary upload failed');
-    return data.secure_url;
+    const { data: publicUrlData } = supabase.storage
+      .from(BUCKET)
+      .getPublicUrl(filePath);
+
+    return {
+      url: publicUrlData.publicUrl,
+      name: file.name,
+      path: filePath
+    };
   };
 
   const handleUpload = async () => {
     if (!files.length) return;
     setUploading(true);
+
     try {
       for (const file of files) {
-        const fileUrl = await uploadToCloudinary(file);
-        await axios.post('/api/knowledge-upload', {
-          title,
-          description,
-          fileUrl,
-          fileName: file.name,
-        });
+        const uploaded = await uploadFile(file);
+
+        const { error } = await supabase.from('knowledge_base').insert([
+          {
+            title,
+            description,
+            file_url: uploaded.url,
+            file_name: uploaded.name,
+            created_at: new Date().toISOString()
+          }
+        ]);
+
+        if (error) throw error;
       }
 
       setFiles([]);
@@ -59,7 +72,7 @@ export default function AIKnowledgeBase() {
       setDescription('');
       await fetchDocs();
     } catch (err) {
-      console.error('Upload failed:', err);
+      console.error('Upload failed:', err.message);
     } finally {
       setUploading(false);
     }
@@ -67,10 +80,15 @@ export default function AIKnowledgeBase() {
 
   const handleDelete = async (id) => {
     try {
-      await axios.delete(`/api/knowledge-docs/${id}`);
+      const { error } = await supabase
+        .from('knowledge_base')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
       await fetchDocs();
     } catch (err) {
-      console.error('Delete failed:', err);
+      console.error('Delete failed:', err.message);
     }
   };
 
@@ -98,7 +116,11 @@ export default function AIKnowledgeBase() {
           onChange={(e) => setFiles([...e.target.files])}
         />
         <p className="text-sm text-gray-600">
-          {files.length > 0 ? `${files.length} file${files.length > 1 ? 's' : ''} selected: ${files.map(f => f.name).join(', ')}` : 'No files selected.'}
+          {files.length > 0
+            ? `${files.length} file${files.length > 1 ? 's' : ''} selected: ${files
+                .map((f) => f.name)
+                .join(', ')}`
+            : 'No files selected.'}
         </p>
         <button
           onClick={handleUpload}
@@ -127,19 +149,19 @@ export default function AIKnowledgeBase() {
               {docs.map((doc) => (
                 <tr key={doc.id} className="border-b">
                   <td className="py-2">
-                    {doc.fields.File && doc.fields.File[0] && (
+                    {doc.file_url && (
                       <a
-                        href={doc.fields.File[0].url}
+                        href={doc.file_url}
                         className="text-blue-600 underline"
                         target="_blank"
                         rel="noreferrer"
                       >
-                        {doc.fields.File[0].filename}
+                        {doc.file_name || 'View File'}
                       </a>
                     )}
                   </td>
-                  <td className="py-2">{doc.fields.Title || '-'}</td>
-                  <td className="py-2">{doc.fields.Description || '-'}</td>
+                  <td className="py-2">{doc.title || '-'}</td>
+                  <td className="py-2">{doc.description || '-'}</td>
                   <td className="py-2">
                     <button
                       onClick={() => handleDelete(doc.id)}

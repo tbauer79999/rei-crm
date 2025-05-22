@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import { supabase } from '../../lib/supabaseClient';
 import { Label } from '../ui/label';
 import Button from '../ui/button';
 import { buildInstructionBundle } from '../../lib/instructionBuilder';
-
 
 export default function AIInstructionSettings() {
   const [industry, setIndustry] = useState('');
@@ -11,7 +10,6 @@ export default function AIInstructionSettings() {
   const [persona, setPersona] = useState('');
   const [saving, setSaving] = useState(false);
   const [role, setRole] = useState('');
-
 
   const industryOptions = {
     'Real Estate': ['Wholesaler', 'Agent/Broker', 'Property Manager', 'Cash Buyer'],
@@ -27,14 +25,14 @@ export default function AIInstructionSettings() {
   };
 
   const roleOptions = [
-  'Prospector',
-  'Appointment Setter',
-  'Closer',
-  'Sales Director',
-  'Solo Operator',
-  'Follow-Up Specialist',
-  'Customer Service Rep'
-];
+    'Prospector',
+    'Appointment Setter',
+    'Closer',
+    'Sales Director',
+    'Solo Operator',
+    'Follow-Up Specialist',
+    'Customer Service Rep'
+  ];
 
   const toneOptions = [
     'Friendly & Casual',
@@ -54,37 +52,51 @@ export default function AIInstructionSettings() {
   ];
 
   useEffect(() => {
-    axios.get('/api/settings')
-      .then(res => {
-        const bundle = res.data.AIInstructionBundle?.value || '';
-        setTone(extractLine(bundle, 'TONE'));
-        setPersona(extractLine(bundle, 'PERSONA'));
-        // extract industry and role/intent is to be handled once formatting is finalized
-      })
-      .catch(err => console.error('Failed to load instructions:', err));
+    const fetchSettings = async () => {
+      const { data, error } = await supabase
+        .from('platform_settings')
+        .select('value')
+        .eq('key', 'aiInstruction_bundle');
+
+      if (error) {
+        console.error('Failed to fetch instruction bundle:', error);
+        return;
+      }
+
+      const bundle = data?.value || '';
+      setTone(extractLine(bundle, 'TONE'));
+      setPersona(extractLine(bundle, 'PERSONA'));
+      setIndustry(extractLine(bundle, 'INDUSTRY'));
+      setRole(extractLine(bundle, 'ROLE'));
+    };
+
+    fetchSettings();
   }, []);
 
   const extractLine = (bundle, label) => {
-    const match = bundle.match(new RegExp(`${label}:\s*(.+)`));
+    const match = bundle.match(new RegExp(`${label}:\\s*(.+)`));
     return match ? match[1].trim() : '';
   };
 
   const handleSave = async () => {
   setSaving(true);
   try {
-    await axios.post('/api/settings/instructions', {
-      tone,
-      persona,
-      industry,
-      role
+    const res = await fetch('/api/settings/instructions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tone, persona, industry, role })
     });
+
+    if (!res.ok) {
+      const errorData = await res.json();
+      throw new Error(errorData.error || 'Unknown error saving instructions');
+    }
   } catch (err) {
     console.error('Failed to save instructions:', err);
   } finally {
     setSaving(false);
   }
 };
-
 
 
   return (
@@ -149,7 +161,6 @@ export default function AIInstructionSettings() {
           ))}
         </select>
       </div>
-
 
       <Button onClick={handleSave} disabled={saving} className="mt-4">
         {saving ? 'Saving...' : 'Save Instructions'}
