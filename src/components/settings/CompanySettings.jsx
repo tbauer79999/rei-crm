@@ -105,8 +105,10 @@ export default function CompanySettings() {
           : entry.value,
       }));
 
-      const { error } = await supabase.from("platform_settings").upsert(upserts);
-      if (error) throw error;
+const { error } = await supabase
+  .from("platform_settings")
+  .upsert(upserts, { onConflict: 'key' });
+
 
       setData(updated);
       setSaveSuccess(true);
@@ -144,11 +146,12 @@ export default function CompanySettings() {
           <h2 className="text-xl font-bold">Basic Company Info</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="companyName">Company Name</Label>
+              <Label htmlFor="company_name">Company Name</Label>
               <Input
-                id="companyName"
-                value={data.companyName?.value || ""}
-                onChange={(e) => handleChange("companyName", e.target.value)}
+                id="company_name"
+                value={data.company_name?.value || ""}
+
+                onChange={(e) => handleChange("company_name", e.target.value)}
               />
             </div>
             <div>
@@ -177,10 +180,10 @@ export default function CompanySettings() {
               />
             </div>
             <div>
-              <Label htmlFor="businessType">Business Type</Label>
+              <Label htmlFor="business_type">Business Type</Label>
               <Select
                 defaultValue={data.businessType?.value || ""}
-                onChange={(val) => handleChange("businessType", val)}
+                onChange={(val) => handleChange("business_type", val)}
               >
                 <SelectItem value="llc">LLC</SelectItem>
                 <SelectItem value="corp">Corporation</SelectItem>
@@ -190,11 +193,11 @@ export default function CompanySettings() {
               </Select>
             </div>
             <div>
-              <Label htmlFor="primaryContact">Primary Contact Name</Label>
+              <Label htmlFor="primary_contact">Primary Contact Name</Label>
               <Input
-                id="primaryContact"
+                id="primary_contact"
                 value={data.primaryContact?.value || ""}
-                onChange={(e) => handleChange("primaryContact", e.target.value)}
+                onChange={(e) => handleChange("primary_contact", e.target.value)}
               />
             </div>
             <div>

@@ -46,37 +46,51 @@ export default function AIKnowledgeBase() {
     };
   };
 
-  const handleUpload = async () => {
-    if (!files.length) return;
-    setUploading(true);
+const handleUpload = async () => {
+  if (!files.length) return;
+  setUploading(true);
 
-    try {
-      for (const file of files) {
-        const uploaded = await uploadFile(file);
+  try {
+    for (const file of files) {
+      const filePath = `${Date.now()}_${file.name}`;
 
-        const { error } = await supabase.from('knowledge_base').insert([
-          {
-            title,
-            description,
-            file_url: uploaded.url,
-            file_name: uploaded.name,
-            created_at: new Date().toISOString()
-          }
-        ]);
+      // Upload to Supabase Storage
+      const { error: uploadError } = await supabase.storage
+        .from(BUCKET)
+        .upload(filePath, file);
 
-        if (error) throw error;
-      }
+      if (uploadError) throw uploadError;
 
-      setFiles([]);
-      setTitle('');
-      setDescription('');
-      await fetchDocs();
-    } catch (err) {
-      console.error('Upload failed:', err.message);
-    } finally {
-      setUploading(false);
+      const { data: publicUrlData } = supabase.storage
+        .from(BUCKET)
+        .getPublicUrl(filePath);
+
+      // ✅ CALL YOUR OWN BACKEND TO PARSE PDF AND INSERT
+      const response = await fetch('/api/knowledge-upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title,
+          description,
+          file_url: publicUrlData.publicUrl,
+          file_name: file.name
+        })
+      });
+
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Upload failed');
     }
-  };
+
+    setFiles([]);
+    setTitle('');
+    setDescription('');
+    await fetchDocs();
+  } catch (err) {
+    console.error('Upload failed:', err.message);
+  } finally {
+    setUploading(false);
+  }
+};
 
   const handleDelete = async (id) => {
     try {
