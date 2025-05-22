@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
-  BarChart2, Settings, Home, ChevronLeft, ChevronRight
+  BarChart2, Settings, Home, ChevronLeft, ChevronRight, LogOut
 } from 'lucide-react';
-import axios from 'axios';
+import { useAuth } from '../../context/AuthContext';
+import { signOutUser } from '../../lib/authService';
+import apiClient from '../../lib/apiClient';
 
 const navItems = [
   { path: '/dashboard', label: 'Dashboard', icon: <Home size={20} /> },
@@ -13,11 +15,20 @@ const navItems = [
 
 export default function Layout({ children }) {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { user } = useAuth(); // Get user from AuthContext
+
   const [collapsed, setCollapsed] = useState(false);
   const [recentLeads, setRecentLeads] = useState([]);
   const [recentMessages, setRecentMessages] = useState([]);
   const [hotLead, setHotLead] = useState(null);
   const [showRecents, setShowRecents] = useState(true);
+  const [recentsError, setRecentsError] = useState(null); // New state for recents error
+
+  const handleLogout = async () => {
+    await signOutUser();
+    navigate('/login');
+  };
 
   useEffect(() => {
     const stored = localStorage.getItem('recentLeads');
@@ -26,19 +37,23 @@ export default function Layout({ children }) {
       Promise.all(
         parsed.map(async (r) => {
           try {
-            const res = await axios.get(`/api/properties/${r.id}`);
+            const res = await apiClient.get(`/properties/${r.id}`);
             return {
               id: r.id,
-              name: res.data.fields?.['Owner Name'] || 'Unnamed',
+              name: res.data.owner_name || 'Unnamed',
             };
-          } catch {
+          } catch (err) {
+            // console.error('Error fetching individual recent lead (localStorage):', err); // Optional: more specific logging
             return null;
           }
         })
       ).then((validated) => {
         const filtered = validated.filter(Boolean);
         setRecentLeads(filtered);
-        localStorage.setItem('recentLeads', JSON.stringify(filtered));
+        // localStorage.setItem('recentLeads', JSON.stringify(filtered)); // Already set by other useEffect
+      }).catch(err => {
+        // console.error('Error processing recent leads from localStorage:', err); // Optional
+        // Potentially set an error state here if this is critical
       });
     }
   }, []);
@@ -46,17 +61,20 @@ export default function Layout({ children }) {
   useEffect(() => {
     const match = location.pathname.match(/^\/lead\/(.+)$/);
     const id = match?.[1];
-    if (id) {
-      axios.get(`/api/properties/${id}`).then(res => {
-        const name = res.data?.fields?.['Owner Name'] || 'Unnamed';
+    if (id && user) { // Only update if user is logged in
+      apiClient.get(`/properties/${id}`).then(res => {
+        const name = res.data.owner_name || 'Unnamed';
         const entry = { id, name };
         setRecentLeads(prev => {
           const updated = [entry, ...prev.filter(r => r.id !== id)].slice(0, 5);
           localStorage.setItem('recentLeads', JSON.stringify(updated));
           return updated;
         });
-      }).catch(() => {
-        const entry = { id, name: 'Unnamed' };
+      }).catch(err => {
+        // console.error(`Error fetching lead details for recents (ID: ${id}):`, err); // Optional
+        // Don't necessarily set recentsError here as it's for a specific lead update
+        // and not the general "Recents" section loading.
+        const entry = { id, name: 'Unnamed (Error)' }; // Indicate error in name if desired
         setRecentLeads(prev => {
           const updated = [entry, ...prev.filter(r => r.id !== id)].slice(0, 5);
           localStorage.setItem('recentLeads', JSON.stringify(updated));
@@ -64,31 +82,33 @@ export default function Layout({ children }) {
         });
       });
     }
-  }, [location.pathname]);
+  }, [location.pathname, user]); // Add user dependency
 
   useEffect(() => {
     const fetchData = async () => {
+      if (!user) return; 
+      setRecentsError(null); // Clear previous errors on new fetch attempt
       try {
         const [propsRes, messagesRes] = await Promise.all([
-          axios.get('/api/properties'),
-          axios.get('/api/messages')
+          apiClient.get('/properties'),
+          apiClient.get('/messages')
         ]);
 
         const leads = propsRes.data;
         const messages = messagesRes.data;
 
         const inbound = messages
-          .filter(m => m.fields?.Direction === 'inbound')
-          .sort((a, b) => new Date(b.fields?.Timestamp) - new Date(a.fields?.Timestamp));
+          .filter(m => m.direction === 'inbound') 
+          .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)); 
         setRecentMessages(inbound.slice(0, 5));
 
         const hotCandidates = leads.filter(l =>
-          (l.fields?.['Status History'] || '').includes('Hot Lead')
+          (l.status_history || '').includes('Hot Lead') 
         );
 
         const lastHot = hotCandidates
           .map(l => {
-            const historyLines = (l.fields?.['Status History'] || '').split('\n');
+            const historyLines = (l.status_history || '').split('\n'); 
             const hotLine = historyLines.find(h => h.includes('Hot Lead'));
             const date = hotLine ? new Date(hotLine.split(':')[0]) : null;
             return { ...l, hotDate: date };
@@ -98,12 +118,21 @@ export default function Layout({ children }) {
 
         setHotLead(lastHot);
       } catch (err) {
-        console.error('Failed to load recents:', err);
+        console.error('Failed to load recents:', err.message); 
+        setRecentsError('Failed to load recent activity. Please try again later.');
       }
     };
 
-    fetchData();
-  }, []);
+    if (user) { 
+      fetchData();
+    } else {
+      // Clear recents data if user logs out
+      setRecentLeads([]);
+      setRecentMessages([]);
+      setHotLead(null);
+      setRecentsError(null);
+    }
+  }, [user]); 
 
   return (
     <div className="flex min-h-screen bg-gradient-to-br from-slate-50 to-white">
@@ -136,7 +165,7 @@ export default function Layout({ children }) {
         </nav>
 
         {/* Recents */}
-        {!collapsed && (
+        {!collapsed && user && ( 
           <div className="mt-6 border-t pt-4 px-4 text-sm text-gray-700">
             <button
               onClick={() => setShowRecents(!showRecents)}
@@ -146,31 +175,37 @@ export default function Layout({ children }) {
               <span>{showRecents ? '▾' : '▸'}</span>
             </button>
 
-            {showRecents && (
+            {showRecents && recentsError && (
+              <div className="mt-2 px-2 py-2 text-sm text-red-600 bg-red-100 border border-red-300 rounded-md">
+                {recentsError}
+              </div>
+            )}
+
+            {showRecents && !recentsError && ( // Only show lists if no error
               <div className="mt-3 space-y-4">
                 <div>
                   <p className="font-medium mb-1 text-indigo-700">🆕 Leads</p>
                   <ul className="space-y-1">
-                    {recentLeads.map((lead) => (
+                    {recentLeads.length > 0 ? recentLeads.map((lead) => (
                       <li key={lead.id}>
                         <Link to={`/lead/${lead.id}`} className="block hover:underline truncate text-sm">
                           {lead.name}
                         </Link>
                       </li>
-                    ))}
+                    )) : <li className="text-xs text-gray-500">No recent leads.</li>}
                   </ul>
                 </div>
 
                 <div>
                   <p className="font-medium mt-3 mb-1 text-indigo-700">💬 Messages</p>
                   <ul className="space-y-1">
-                    {recentMessages.map((msg) => (
+                    {recentMessages.length > 0 ? recentMessages.map((msg) => (
                       <li key={msg.id}>
-                        <Link to={`/lead/${msg.fields?.Property}`} className="block hover:underline truncate text-sm">
-                          {msg.fields?.From || 'Lead'}: "{msg.fields?.Body?.slice(0, 30)}"
+                        <Link to={`/lead/${msg.property_id}`} className="block hover:underline truncate text-sm"> 
+                          {msg.from || 'Lead'}: "{msg.body?.slice(0, 30)}" 
                         </Link>
                       </li>
-                    ))}
+                    )) : <li className="text-xs text-gray-500">No recent messages.</li>}
                   </ul>
                 </div>
 
@@ -178,12 +213,15 @@ export default function Layout({ children }) {
                   <div>
                     <p className="font-medium mt-3 mb-1 text-indigo-700">🔥 Last Hot Lead</p>
                     <Link to={`/lead/${hotLead.id}`} className="block text-red-600 hover:underline truncate">
-                      {hotLead.fields?.['Owner Name'] || 'Unnamed'}
+                      {hotLead.owner_name || 'Unnamed'} 
                     </Link>
                     <p className="text-xs text-gray-500">
                       {hotLead.hotDate?.toLocaleDateString()}
                     </p>
                   </div>
+                )}
+                 {!hotLead && recentLeads.length > 0 && recentMessages.length > 0 && ( // Show if no specific hot lead but other recents exist
+                    <li className="text-xs text-gray-500 mt-1">No current hot lead.</li>
                 )}
               </div>
             )}
@@ -194,13 +232,21 @@ export default function Layout({ children }) {
       {/* Content container */}
       <div className="flex flex-col flex-1 min-h-screen">
         {/* Top header */}
-<header className="bg-gradient-to-b from-blue-200 to-white border-b border-blue-300 px-6 py-3 flex justify-between items-center h-16 shadow-sm">
+        <header className="bg-gradient-to-b from-blue-200 to-white border-b border-blue-300 px-6 py-3 flex justify-between items-center h-16 shadow-sm">
           <div className="text-base font-semibold text-gray-700 tracking-tight">Welcome to REI-CRM</div>
           <nav className="flex items-center space-x-6 text-sm">
-            <Link to="/dashboard" className="text-gray-700 hover:text-indigo-600 font-medium">Dashboard</Link>
-            <Link to="/analytics" className="text-gray-700 hover:text-indigo-600 font-medium">Analytics</Link>
-            <Link to="/settings" className="text-gray-700 hover:text-indigo-600 font-medium">Settings</Link>
-            <span className="text-gray-500">Welcome, <span className="font-semibold text-indigo-700">User</span></span>
+            <span className="text-gray-500">
+              Welcome, <span className="font-semibold text-indigo-700">{user ? user.email : 'Guest'}</span>
+            </span>
+            {user && (
+              <button 
+                onClick={handleLogout} 
+                className="flex items-center text-gray-700 hover:text-indigo-600 font-medium"
+                title="Logout"
+              >
+                <LogOut size={18} className="mr-1" /> Logout
+              </button>
+            )}
           </nav>
         </header>
 
