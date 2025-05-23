@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { supabase } from '../lib/supabaseClient';
+import supabase from '../../lib/supabaseClient';
+
 
 export default function LeadDetail() {
   const { id } = useParams();

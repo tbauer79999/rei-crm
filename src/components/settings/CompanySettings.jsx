@@ -4,7 +4,8 @@ import { Label } from "../ui/label";
 import { Textarea } from "../ui/textarea";
 import { Select, SelectItem } from "../ui/select";
 import { Card, CardContent } from "../ui/card";
-import { supabase } from '../../lib/supabaseClient';
+import supabase from '../../lib/supabaseClient';
+
 
 export default function CompanySettings() {
   const [data, setData] = useState({});

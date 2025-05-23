@@ -3,12 +3,12 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 
 import Layout from './components/Layout';
 import Dashboard from './pages/Dashboard';
-import Analytics from './pages/Analytics';
+import AIControlRoom from './pages/AIControlRoom'; // Updated name
 import Settings from './pages/Settings';
 import LeadDetail from './pages/LeadDetail';
-import LoginPage from './pages/LoginPage'; // Import LoginPage
-import SignupPage from './pages/SignupPage'; // Import SignupPage
-import ProtectedRoute from './components/ProtectedRoute'; // Import ProtectedRoute
+import LoginPage from './pages/LoginPage';
+import SignupPage from './pages/SignupPage';
+import ProtectedRoute from './components/ProtectedRoute';
 
 export default function App() {
   return (
@@ -23,13 +23,12 @@ export default function App() {
           <Route path="/*" element={
             <Layout>
               <Routes>
-                {/* Default redirect to dashboard */}
-                <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                {/* Redirect root to control room */}
+                <Route path="/" element={<Navigate to="/control-room" replace />} />
+                <Route path="/control-room" element={<AIControlRoom />} />
                 <Route path="/dashboard" element={<Dashboard />} />
-                <Route path="/analytics" element={<Analytics />} />
                 <Route path="/settings" element={<Settings />} />
                 <Route path="/lead/:id" element={<LeadDetail />} />
-                {/* Add other layout-wrapped routes here */}
               </Routes>
             </Layout>
           } />

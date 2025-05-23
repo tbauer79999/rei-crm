@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { supabase } from '../../lib/supabaseClient';
+import supabase from '../../lib/supabaseClient';
 import { Label } from '../ui/label';
 import Button from '../ui/button';
 import { buildInstructionBundle } from '../../lib/instructionBuilder';

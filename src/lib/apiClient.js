@@ -1,6 +1,7 @@
 // src/lib/apiClient.js
 import axios from 'axios';
-import { supabase } from './supabaseClient';
+import supabase from '../../lib/supabaseClient';
+
 
 const apiClient = axios.create({
   baseURL: '/api', // Assuming all API calls are prefixed with /api

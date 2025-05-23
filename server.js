@@ -11,6 +11,7 @@ const { default: fetch } = require('node-fetch'); // Keep, used by settingsApiRo
 dotenv.config();
 const { supabase } = require('./supabaseClient');
 
+
 // Import new routers
 const propertiesRouter = require('./src/api_routes/propertiesRoutes');
 const messagesRouter = require('./src/api_routes/messagesRoutes');
@@ -91,7 +92,7 @@ const authenticateToken = async (req, res, next) => {
     console.error('Token validation error:', err);
     return res.status(403).json({ error: 'Forbidden: Token validation failed' });
   }
-});
+};
 
 const { createClient } = require('@supabase/supabase-js');
 

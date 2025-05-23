@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import Button from '../ui/button';
 import { Label } from '../ui/label';
 import { Combobox } from '@headlessui/react';
-import { supabase } from '../../lib/supabaseClient';
+import supabase from '../../lib/supabaseClient';
+
 
 export default function SystemTools() {
   const [leads, setLeads] = useState([]);

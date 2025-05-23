@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { supabase } from '../../lib/supabaseClient';
+import supabase from '../../lib/supabaseClient';
+
 
 const BUCKET = 'documents';
 

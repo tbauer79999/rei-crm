@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { signInUser } from '../lib/authService';
-import { Button } from '../components/ui/button'; // Assuming you have a Button component
+import Button from '../components/ui/button';
 import { Input } from '../components/ui/input';   // Assuming you have an Input component
 import { Label } from '../components/ui/label';   // Assuming you have a Label component
 import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription } from '../components/ui/card'; // Assuming Card components
