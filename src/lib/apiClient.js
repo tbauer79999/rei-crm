@@ -1,6 +1,6 @@
 // src/lib/apiClient.js
 import axios from 'axios';
-import supabase from '../../lib/supabaseClient';
+import supabase from '../lib/supabaseClient';
 
 
 const apiClient = axios.create({

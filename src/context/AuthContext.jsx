@@ -1,6 +1,6 @@
 // src/context/AuthContext.jsx
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { supabase } from '../lib/supabaseClient'; // Assuming supabaseClient is directly in lib
+import supabase from '../lib/supabaseClient'; // Assuming supabaseClient is directly in lib
 // Removed direct import of onAuthStateChange and getCurrentUser from authService
 // as we'll use supabase.auth methods directly for simplicity here,
 // though authService.js provides a good abstraction layer.

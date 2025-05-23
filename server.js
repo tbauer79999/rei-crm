@@ -9,7 +9,7 @@ const pdf = require('pdf-parse'); // Keep, used by knowledgeBaseRoutes
 const { default: fetch } = require('node-fetch'); // Keep, used by settingsApiRoutes and knowledgeBaseRoutes
 
 dotenv.config();
-const { supabase } = require('./supabaseClient');
+const supabase = require('./supabaseClient');
 
 
 // Import new routers
@@ -23,6 +23,12 @@ const app = express();
 
 app.use(cors());
 app.use(express.json());
+app.use('/api/properties', propertiesRouter);
+app.use('/api/messages', messagesRouter);
+app.use('/api/analytics', analyticsRouter);
+app.use('/api/settings', settingsApiRouter);
+app.use('/api/knowledge', knowledgeBaseRouter);
+
 
 // Helper functions (to be exported)
 const fetchAllRecords = async (table) => {

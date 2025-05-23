@@ -1,7 +1,12 @@
 // src/api_routes/analyticsRoutes.js
 const express = require('express');
 // Assuming supabase client and helpers will be exported from server.js eventually
-const { supabase, fetchAllRecords } = require('../../server'); 
+const {
+  supabase,
+  fetchRecordById,
+  fetchAllRecords,
+  fetchSettingValue
+} = require('../lib/supabaseService'); // adjust path if needed
 // const { supabase } = require('../../supabaseClient'); // Adjusted to current supabaseClient path
 // Assuming fetchAllRecords will be available from server.js or another helper module.
 // For now, this will cause an error if not defined globally or imported differently.

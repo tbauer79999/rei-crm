@@ -1,7 +1,12 @@
 // src/api_routes/messagesRoutes.js
 const express = require('express');
 // Assuming supabase client and helpers will be exported from server.js eventually
-const { supabase } = require('../../server'); // Changed to import from server.js
+const {
+  supabase,
+  fetchRecordById,
+  fetchAllRecords,
+  fetchSettingValue
+} = require('../lib/supabaseService'); // adjust path if needed
 // const { supabase } = require('../../supabaseClient'); // Adjusted to current supabaseClient path
 
 const router = express.Router();

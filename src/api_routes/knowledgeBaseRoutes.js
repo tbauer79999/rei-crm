@@ -3,7 +3,12 @@ const express = require('express');
 const multer = require('multer');
 const pdf = require('pdf-parse');
 const fetch = require('node-fetch'); // Kept as node-fetch, consistent with server.js top-level import
-const { supabase, fetchRecordById } = require('../../server'); // Import from server.js
+const {
+  supabase,
+  fetchRecordById,
+  fetchAllRecords,
+  fetchSettingValue
+} = require('../lib/supabaseService'); // adjust path if needed
 
 // Placeholder for helper functions that will eventually be imported from server.js
 // const { fetchRecordById } = require('../../server'); // Keep for reference

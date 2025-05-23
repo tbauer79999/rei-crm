@@ -1,4 +1,4 @@
-const { supabase } = require('../../supabaseClient'); // ✅ Right: loads root version
+const supabase = require('../../supabaseClient'); // ✅ Right: loads root version
 
 
 

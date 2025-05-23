@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import Papa from 'papaparse';
-import supabase from '../../lib/supabaseClient';
+import supabase from '../lib/supabaseClient';
 
 
 export default function Dashboard() {

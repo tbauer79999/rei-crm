@@ -1,7 +1,12 @@
 // src/api_routes/propertiesRoutes.js
 const express = require('express');
 // const { supabase } = require('../../supabaseClient'); // No longer needed
-const { supabase, fetchRecordById, fetchAllRecords, fetchSettingValue } = require('../../server');
+const {
+  supabase,
+  fetchRecordById,
+  fetchAllRecords,
+  fetchSettingValue
+} = require('../lib/supabaseService'); // adjust path if needed
 
 const router = express.Router();
 

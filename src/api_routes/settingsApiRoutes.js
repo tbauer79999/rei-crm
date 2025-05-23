@@ -1,6 +1,11 @@
 // src/api_routes/settingsApiRoutes.js
 const express = require('express');
-const { supabase, fetchSettingValue } = require('../../server'); // Import from server.js
+const {
+  supabase,
+  fetchRecordById,
+  fetchAllRecords,
+  fetchSettingValue
+} = require('../lib/supabaseService'); // adjust path if needed
 const { buildInstructionBundle } = require('../lib/instructionBuilder');
 // const fetch = require('node-fetch'); // No longer needed for knowledge bundle
 const { generateKnowledgeBundleString } = require('../lib/knowledgeService'); // Import new service
