@@ -16,27 +16,38 @@ const { generateKnowledgeBundleString } = require('../lib/knowledgeService'); //
 const router = express.Router();
 
 // GET /api/settings
+// GET /api/settings
 router.get('/', async (req, res) => {
+  const tenantId = req.query.tenant_id || null;
+
   try {
-    const { data, error } = await supabase
+    let query = supabase
       .from('platform_settings')
       .select('*');
+
+    if (tenantId) {
+      query = query.eq('tenant_id', tenantId);
+    }
+
+    const { data, error } = await query;
 
     if (error) throw error;
 
     const settings = {};
     for (const row of data) {
-      settings[row.key] = { // Assuming 'key' and 'value' are the column names
+      settings[row.key] = {
         value: row.value,
         id: row.id
       };
     }
+
     res.json(settings);
   } catch (err) {
     console.error('Error fetching settings from Supabase:', err.message);
     res.status(500).json({ error: 'Failed to fetch settings' });
   }
 });
+
 
 // POST /api/settings
 router.post('/', async (req, res) => {
@@ -78,16 +89,14 @@ router.post('/', async (req, res) => {
 
 // POST /api/settings/instructions
 router.post('/instructions', async (req, res) => {
-  const { tone, persona, industry, role } = req.body;
+  const { tone, persona, industry, role, tenant_id } = req.body;
+
+  if (!tenant_id) {
+    return res.status(400).json({ error: 'Missing tenant_id' });
+  }
 
   try {
-    // Assuming the knowledge-bundle endpoint will be available or refactored.
-    // For now, this might require the server to be running to respond.
-    // const bundleRes = await fetch('http://localhost:5000/api/knowledge-bundle'); // Removed
-    // const bundleData = await bundleRes.json(); // Removed
-    // const knowledgeBlock = bundleData.bundle; // Removed
-    const knowledgeBlock = await generateKnowledgeBundleString(); // Use the service directly
-
+    const knowledgeBlock = await generateKnowledgeBundleString(tenant_id);
 
     const finalBundle = buildInstructionBundle({
       tone,
@@ -98,27 +107,30 @@ router.post('/instructions', async (req, res) => {
     });
 
     const { error } = await supabase
-      .from('platform_settings')
-      .upsert(
-        [{
-          key: 'aiInstruction_bundle',
-          value: finalBundle,
-          updated_at: new Date().toISOString()
-        }],
-        {
-          onConflict: 'key',
-          ignoreDuplicates: false
-        }
-      );
+  .from('platform_settings')
+  .upsert([
+    {
+      key: 'aiinstruction_bundle',
+      value: finalBundle,
+      tenant_id,
+      updated_at: new Date().toISOString()
+    }
+  ], {
+    onConflict: 'key,tenant_id',
+    ignoreDuplicates: false
+  });
+
 
     if (error) throw error;
 
     res.status(200).json({ success: true });
   } catch (err) {
-    console.error('Error saving aiInstruction_bundle to Supabase:', err.message);
-    res.status(500).json({ error: 'Failed to save aiInstruction_bundle' });
+    console.error('Error saving aiinstruction_bundle:', err.message);
+    res.status(500).json({ error: 'Failed to save aiinstruction_bundle' });
   }
 });
+
+
 
 // PUT /api/settings
 router.put('/', async (req, res) => {

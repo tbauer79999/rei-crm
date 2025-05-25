@@ -1,4 +1,3 @@
-// src/api_routes/propertiesRoutes.js
 const express = require('express');
 // const { supabase } = require('../../supabaseClient'); // No longer needed
 const {
@@ -13,7 +12,7 @@ const router = express.Router();
 router.get('/', async (req, res) => {
   try {
     const { data, error } = await supabase
-      .from('properties')
+      .from('leads')
       .select('*')
       .order('created_at', { ascending: false });
 
@@ -22,7 +21,7 @@ router.get('/', async (req, res) => {
     res.json(data);
   } catch (err) {
     console.error('Supabase error:', err.message);
-    res.status(500).json({ error: 'Failed to fetch properties' });
+    res.status(500).json({ error: 'Failed to fetch leads' });
   }
 });
 
@@ -31,19 +30,23 @@ router.get('/:id', async (req, res) => {
 
   try {
     const { data, error } = await supabase
-      .from('properties')
+      .from('leads')
       .select('*')
       .eq('id', id)
       .single();
 
-    if (error) throw error;
+    if (error || !data) {
+      console.warn('Lead not found or fetch error:', error?.message || id);
+      return res.status(404).json({ error: 'Lead not found' });
+    }
 
     res.json(data);
   } catch (err) {
     console.error('Supabase error:', err.message);
-    res.status(500).json({ error: 'Failed to fetch property' });
+    res.status(500).json({ error: 'Failed to fetch lead' });
   }
 });
+
 
 router.patch('/:id/status', async (req, res) => {
   try {
@@ -52,7 +55,7 @@ router.patch('/:id/status', async (req, res) => {
     const today = new Date().toISOString().split('T')[0];
 
     // Note: fetchRecordById is assumed to be imported or defined elsewhere
-    const existing = await fetchRecordById('properties', id); // Changed 'Properties' to 'properties'
+    const existing = await fetchRecordById('leads', id); 
     const oldStatus = existing?.fields?.Status || existing?.status || ''; // Adjusted to check existing.status as well
     const history = existing?.fields?.['Status History'] || existing?.status_history || ''; // Adjusted to check existing.status_history
 
@@ -63,7 +66,7 @@ router.patch('/:id/status', async (req, res) => {
     }
 
     const { data: updatedRecords, error } = await supabase // Renamed resUpdate to updatedRecords for clarity
-  .from('properties')
+  .from('leads')
   .update({
     status: status,
     status_history: updatedHistory
@@ -137,7 +140,7 @@ router.post('/bulk', async (req, res) => {
     }
 
     const { data: existingData, error: existingError } = await supabase
-      .from('properties')
+      .from('leads')
       .select('owner_name, property_address');
 
     if (existingError) {
@@ -186,7 +189,7 @@ router.post('/bulk', async (req, res) => {
     }
 
     const { error: insertError } = await supabase
-      .from('properties')
+      .from('leads')
       .insert(enrichedRecords);
 
     if (insertError) {

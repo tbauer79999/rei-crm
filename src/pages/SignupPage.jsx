@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { signUpUser } from '../lib/authService';
+import supabase from '../lib/supabaseClient';
 import Button from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -23,22 +24,49 @@ const SignupPage = () => {
 
     const { data, error: signUpError } = await signUpUser(email, password);
 
-    setLoading(false);
     if (signUpError) {
       setError(signUpError.message);
-    } else if (data.user) {
-      // data.user.identities may be empty if email confirmation is pending
-      if (data.user.identities && data.user.identities.length > 0) {
+      setLoading(false);
+      return;
+    }
+
+    const newUser = data?.user;
+
+    if (!newUser) {
+      setError('Signup succeeded but no user returned.');
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const { error: profileError } = await supabase.from('users_profile').insert([
+        {
+          id: newUser.id,
+          email: newUser.email,
+          tenant_id: null,
+          role: 'member',
+        },
+      ]);
+
+      if (profileError) {
+        console.error('Profile insert error:', profileError.message);
+        setError('Signup succeeded but failed to create user profile.');
+        setLoading(false);
+        return;
+      }
+
+      if (newUser.identities && newUser.identities.length > 0) {
         setMessage('Signup successful! Redirecting to login...');
         setTimeout(() => navigate('/login'), 2000);
       } else {
-         // This case usually means email confirmation is required.
         setMessage('Signup successful! Please check your email to verify your account before logging in.');
       }
-    } else {
-      // Fallback error
-      setError('Signup failed. Please try again.');
+    } catch (err) {
+      console.error('Unexpected error during profile creation:', err);
+      setError('Unexpected error during signup.');
     }
+
+    setLoading(false);
   };
 
   return (

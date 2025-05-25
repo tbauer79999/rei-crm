@@ -3,9 +3,16 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { signInUser } from '../lib/authService';
 import Button from '../components/ui/button';
-import { Input } from '../components/ui/input';   // Assuming you have an Input component
-import { Label } from '../components/ui/label';   // Assuming you have a Label component
-import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription } from '../components/ui/card'; // Assuming Card components
+import { Input } from '../components/ui/input';
+import { Label } from '../components/ui/label';
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardFooter,
+  CardDescription
+} from '../components/ui/card';
 
 const LoginPage = () => {
   const [email, setEmail] = useState('');
@@ -19,21 +26,37 @@ const LoginPage = () => {
     setError('');
     setLoading(true);
 
-    const { data, error: signInError } = await signInUser(email, password);
+    try {
+      const { data, error: signInError } = await signInUser(email, password);
 
-    setLoading(false);
-    if (signInError) {
-      setError(signInError.message);
-    } else if (data.user) {
-      navigate('/dashboard'); // Redirect to dashboard on successful login
-    } else {
-      // Fallback error if no user data is present but no explicit error (should not happen often)
-      setError('Login failed. Please try again.');
+      if (signInError) {
+        console.error('Supabase login error:', signInError.message);
+        setError(signInError.message || 'Login failed. Please try again.');
+      } else if (data?.session?.user) {
+        console.log('Login successful for user:', data.session.user.email);
+        navigate('/dashboard');
+      } else {
+        console.warn('Login attempt failed with no error and no user.');
+        setError('Login failed. No user session returned.');
+      }
+    } catch (err) {
+      console.error('Unexpected login exception:', err);
+      setError('Unexpected error during login.');
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', background: '#f0f2f5' }}>
+    <div
+      style={{
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        minHeight: '100vh',
+        background: '#f0f2f5'
+      }}
+    >
       <Card style={{ width: '400px' }}>
         <CardHeader>
           <CardTitle>Login</CardTitle>
@@ -63,14 +86,23 @@ const LoginPage = () => {
                 placeholder="••••••••"
               />
             </div>
-            {error && <p style={{ color: 'red', marginBottom: '1rem', textAlign: 'center' }}>{error}</p>}
+            {error && (
+              <p style={{ color: 'red', marginBottom: '1rem', textAlign: 'center' }}>
+                {error}
+              </p>
+            )}
             <Button type="submit" disabled={loading} style={{ width: '100%' }}>
               {loading ? 'Logging in...' : 'Login'}
             </Button>
           </form>
         </CardContent>
         <CardFooter style={{ justifyContent: 'center' }}>
-          <p>Don't have an account? <a href="/signup" style={{ color: '#007bff', textDecoration: 'none' }}>Sign up</a></p>
+          <p>
+            Don't have an account?{' '}
+            <a href="/signup" style={{ color: '#007bff', textDecoration: 'none' }}>
+              Sign up
+            </a>
+          </p>
         </CardFooter>
       </Card>
     </div>

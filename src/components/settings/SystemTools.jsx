@@ -12,7 +12,7 @@ export default function SystemTools() {
 
   useEffect(() => {
     const fetchLeads = async () => {
-      const { data, error } = await supabase.from('properties').select('*');
+      const { data, error } = await supabase.from('leads').select('*');
       if (error) {
         console.error('Failed to load leads', error);
         return;
@@ -60,12 +60,12 @@ export default function SystemTools() {
   const exportMessages = async () => {
     try {
       const { data: messages, error: msgError } = await supabase.from('messages').select('*');
-      const { data: properties, error: propError } = await supabase.from('properties').select('*');
+      const { data: leads, error: propError } = await supabase.from('leads').select('*');
 
       if (msgError || propError) throw msgError || propError;
 
       const leadMap = {};
-      properties.forEach(p => {
+      leads.forEach(p => {
         leadMap[p.id] = p.owner_name || p.property_address || 'Unknown';
       });
 
@@ -94,7 +94,7 @@ export default function SystemTools() {
 
   const exportHotLeads = async () => {
     try {
-      const { data, error } = await supabase.from('properties').select('*');
+      const { data, error } = await supabase.from('leads').select('*');
       if (error) throw error;
 
       const rows = data

@@ -1,9 +1,6 @@
 // src/context/AuthContext.jsx
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import supabase from '../lib/supabaseClient'; // Assuming supabaseClient is directly in lib
-// Removed direct import of onAuthStateChange and getCurrentUser from authService
-// as we'll use supabase.auth methods directly for simplicity here,
-// though authService.js provides a good abstraction layer.
+import supabase from '../lib/supabaseClient';
 
 const AuthContext = createContext();
 
@@ -12,28 +9,29 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Get current user on initial load
-    const getCurrentAuthUser = async () => {
-      const { data: { user: currentUser } } = await supabase.auth.getUser();
-      setUser(currentUser);
+    console.log('AuthProvider mounted');
+
+    const fetchUser = async () => {
+      const { data, error } = await supabase.auth.getUser();
+      if (error) {
+        console.error('getUser error:', error.message);
+        setUser(null);
+      } else {
+        console.log('Loaded user:', data?.user?.email);
+        setUser(data.user);
+      }
       setLoading(false);
     };
 
-    getCurrentAuthUser();
+    fetchUser();
 
-    // Listen for auth state changes
-    const { data: authListener } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        setUser(session?.user ?? null);
-        // setLoading(false) // Typically not needed here again unless initial load logic changes
-      }
-    );
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      console.log('Auth state changed:', session?.user?.email);
+      setUser(session?.user ?? null);
+    });
 
-    // Cleanup listener on component unmount
     return () => {
-      if (authListener && authListener.subscription) {
-        authListener.subscription.unsubscribe();
-      }
+      listener?.subscription?.unsubscribe?.();
     };
   }, []);
 
@@ -44,4 +42,8 @@ export const AuthProvider = ({ children }) => {
   );
 };
 
-export const useAuth = () => useContext(AuthContext);
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (!context) throw new Error('useAuth must be used within an AuthProvider');
+  return context;
+};

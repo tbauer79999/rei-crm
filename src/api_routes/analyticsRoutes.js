@@ -17,18 +17,8 @@ const router = express.Router();
 // GET /api/analytics
 router.get('/', async (req, res) => {
   try {
-    const leads = await fetchAllRecords('properties'); // Changed 'Properties' to 'properties' for consistency
-    // Temporary placeholder for fetchAllRecords if it's not directly available
-    // const fetchAllRecords = async (table) => {
-    //     const { data, error } = await supabase
-    //         .from(table)
-    //         .select('*');
-    //     if (error) {
-    //         throw new Error(`Failed to fetch records from ${table}: ${error.message}`);
-    //     }
-    //     return data;
-    // };
-    // const leads = await fetchAllRecords('properties'); // Changed 'Properties' to 'properties' for consistency
+    const leads = await fetchAllRecords('leads'); 
+ 
 
     const byCampaign = {};
     const byStatus = {};
@@ -37,7 +27,6 @@ router.get('/', async (req, res) => {
     const statusProgression = {};
 
     for (const r of leads) {
-      // Adjusted to directly access properties of 'r' instead of 'r.fields'
       const campaign = r.campaign || 'Unlabeled';
       const status = r.status || 'Unknown';
       // const created = r.createdTime; // createdTime might not exist, using created_at

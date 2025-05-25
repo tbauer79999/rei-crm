@@ -16,7 +16,7 @@ export default function AddLeadForm({ onSuccess }) {
     e.preventDefault();
 
     try {
-      const res = await fetch('http://localhost:5000/api/properties', {
+      const res = await fetch('http://localhost:5000/api/leads', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

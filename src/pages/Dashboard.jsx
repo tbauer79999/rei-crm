@@ -24,7 +24,7 @@ export default function Dashboard() {
 
   const fetchLeads = async () => {
     const { data, error } = await supabase
-      .from('properties')
+      .from('leads')
       .select('*')
       .order('created_at', { ascending: false });
 
@@ -91,7 +91,7 @@ export default function Dashboard() {
 
   const handleBulkSubmit = async () => {
     try {
-      const res = await axios.post('/api/properties/bulk', { records: parsedRecords });
+      const res = await axios.post('/api/leads/bulk', { records: parsedRecords });
       const { uploaded = 0, skipped = 0, added = 0 } = res.data;
       setUploadMessage(`${uploaded} uploaded. ${skipped} failed. ${added} added.`);
       setUploadError(skipped > 0);
@@ -257,11 +257,17 @@ export default function Dashboard() {
               filteredLeads.map((lead) => (
                 <tr key={lead.id} onClick={() => handleRowClick(lead.id)} className="cursor-pointer hover:bg-gray-100">
                   <td className="border-t px-3 py-1 text-sm truncate max-w-xs">
-                    {lead.owner_name || '—'}
-                  </td>
+  {lead.owner_name || lead.name || '—'}
+</td>
                   <td className="border-t px-3 py-1 text-sm truncate max-w-xs">
-                    {lead.property_address || '—'}
-                  </td>
+  {[
+    lead.property_address,
+    lead.city,
+    lead.state,
+    lead.zip_code
+  ].filter(Boolean).join(', ') || '—'}
+</td>
+
                   <td className="border-t px-3 py-1 text-sm">
                     {lead.status || '—'}
                   </td>

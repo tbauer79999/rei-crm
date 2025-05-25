@@ -37,7 +37,7 @@ export default function Layout({ children }) {
       const parsed = JSON.parse(stored);
       Promise.all(parsed.map(async (r) => {
         try {
-          const res = await apiClient.get(`/properties/${r.id}`);
+          const res = await apiClient.get(`/leads/${r.id}`);
           return { id: r.id, name: res.data.owner_name || 'Unnamed' };
         } catch {
           return null;
@@ -54,7 +54,7 @@ export default function Layout({ children }) {
     const match = location.pathname.match(/^\/lead\/(.+)$/);
     const id = match?.[1];
     if (id && user) {
-      apiClient.get(`/properties/${id}`).then(res => {
+      apiClient.get(`/leads/${id}`).then(res => {
         const name = res.data.owner_name || 'Unnamed';
         const entry = { id, name };
         setRecentLeads(prev => {
@@ -62,14 +62,19 @@ export default function Layout({ children }) {
           localStorage.setItem('recentLeads', JSON.stringify(updated));
           return updated;
         });
-      }).catch(() => {
-        const entry = { id, name: 'Unnamed (Error)' };
-        setRecentLeads(prev => {
-          const updated = [entry, ...prev.filter(r => r.id !== id)].slice(0, 5);
-          localStorage.setItem('recentLeads', JSON.stringify(updated));
-          return updated;
-        });
-      });
+      }).catch((err) => {
+  if (err.response?.status === 404) {
+    console.warn('Removing stale recent lead ID:', id);
+    setRecentLeads(prev => {
+      const updated = prev.filter(r => r.id !== id);
+      localStorage.setItem('recentLeads', JSON.stringify(updated));
+      return updated;
+    });
+  } else {
+    console.error('Unexpected error loading lead:', err);
+  }
+});
+
     }
   }, [location.pathname, user]);
 
@@ -79,7 +84,7 @@ export default function Layout({ children }) {
       setRecentsError(null);
       try {
         const [propsRes, messagesRes] = await Promise.all([
-          apiClient.get('/properties'),
+          apiClient.get('/leads'),
           apiClient.get('/messages')
         ]);
         const leads = propsRes.data;

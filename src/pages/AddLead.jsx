@@ -35,7 +35,7 @@ export default function AddLead() {
         
       });
 
-      const res = await axios.post('/api/properties/bulk', data);
+      const res = await axios.post('/api/leads/bulk', data);
       setUploadStatus(`✅ Successfully uploaded ${res.data.length} records.`);
     } catch (err) {
       console.error(err);

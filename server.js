@@ -7,73 +7,35 @@ const multer = require('multer'); // Keep, used by knowledgeBaseRoutes
 const upload = multer(); // Keep, used by knowledgeBaseRoutes
 const pdf = require('pdf-parse'); // Keep, used by knowledgeBaseRoutes
 const { default: fetch } = require('node-fetch'); // Keep, used by settingsApiRoutes and knowledgeBaseRoutes
+const { fetchAllRecords, fetchRecordById, fetchSettingValue } = require('./src/lib/supabaseHelpers');
+const onboardingDemo = require('./src/api_routes/onboardingDemo');
+
+
 
 dotenv.config();
 const supabase = require('./supabaseClient');
 
 
 // Import new routers
-const propertiesRouter = require('./src/api_routes/propertiesRoutes');
+const leadsRouter = require('./src/api_routes/leadRoutes');
 const messagesRouter = require('./src/api_routes/messagesRoutes');
 const analyticsRouter = require('./src/api_routes/analyticsRoutes');
 const settingsApiRouter = require('./src/api_routes/settingsApiRoutes');
 const knowledgeBaseRouter = require('./src/api_routes/knowledgeBaseRoutes');
+const funnelRouter = require('./src/api_routes/funnel');
 
 const app = express();
 
 app.use(cors());
 app.use(express.json());
-app.use('/api/properties', propertiesRouter);
+app.use('/api/leads', leadsRouter);
 app.use('/api/messages', messagesRouter);
 app.use('/api/analytics', analyticsRouter);
 app.use('/api/settings', settingsApiRouter);
 app.use('/api/knowledge', knowledgeBaseRouter);
-
-
-// Helper functions (to be exported)
-const fetchAllRecords = async (table) => {
-  const { data, error } = await supabase
-    .from(table)
-    .select('*');
-
-  if (error) {
-    throw new Error(`Failed to fetch records from ${table}: ${error.message}`);
-  }
-
-  return data;
-};
-
-const fetchRecordById = async (table, id) => {
-  const { data, error } = await supabase
-    .from(table)
-    .select('*')
-    .eq('id', id)
-    .single();
-
-  if (error) {
-    // Log the error or handle it as per application's needs
-    // console.error(`Error in fetchRecordById for table ${table}, id ${id}: ${error.message}`);
-    // Rethrow or return null/undefined based on how callers expect to handle it
-    throw new Error(`Failed to fetch record from ${table} with id ${id}: ${error.message}`);
-  }
-
-  return data;
-};
-
-const fetchSettingValue = async (key) => {
-  const { data, error } = await supabase
-    .from('platform_settings')
-    .select('value') // Corrected 'Value' to 'value'
-    .eq('key', key)   // Corrected 'Key' to 'key'
-    .single();
-
-  if (error) {
-    console.error(`Error fetching setting "${key}":`, error.message);
-    return ''; // Default value or error handling as appropriate
-  }
-
-  return data?.value || ''; // Corrected data.Value to data.value
-};
+app.use('/api/funnel', funnelRouter);
+app.use('/api/analytics', require('./src/api_routes/analyticsRoutes'));
+app.use('/api/onboarding', onboardingDemo);
 
 // Authentication Middleware
 const authenticateToken = async (req, res, next) => {
@@ -102,7 +64,7 @@ const authenticateToken = async (req, res, next) => {
 
 const { createClient } = require('@supabase/supabase-js');
 
-app.post('/api/properties/bulk', async (req, res) => {
+app.post('/api/leads/bulk', async (req, res) => {
   try {
     const records = req.body.records || [];
 
@@ -153,7 +115,7 @@ app.post('/api/properties/bulk', async (req, res) => {
 
     // Fetch existing leads for deduplication
     const { data: existingData, error: existingError } = await supabase
-      .from('properties')
+      .from('leads')
       .select('owner_name, property_address');
 
     if (existingError) {
@@ -205,7 +167,7 @@ app.post('/api/properties/bulk', async (req, res) => {
 
 
     const { error: insertError } = await supabase
-      .from('properties')
+      .from('leads')
       .insert(enrichedRecords);
 
     if (insertError) {

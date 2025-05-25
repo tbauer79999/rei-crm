@@ -14,7 +14,7 @@ export default function LeadDetail() {
       try {
         // Fetch the lead record by ID
         const { data: leadData, error: leadError } = await supabase
-          .from('properties')
+          .from('leads')
           .select('*')
           .eq('id', id)
           .single();
