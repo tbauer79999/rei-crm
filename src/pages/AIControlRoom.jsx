@@ -44,10 +44,15 @@ import {
   Filter
 } from 'lucide-react';
 
-
+import { createClient } from '@supabase/supabase-js';
 import apiClient from '../lib/apiClient';
 import FunnelChart from '../components/FunnelChart';
 import ColdFollowupQueueCard from '../components/ColdFollowupQueueCard';
+
+const supabase = createClient(
+  process.env.REACT_APP_SUPABASE_URL,
+  process.env.REACT_APP_SUPABASE_ANON_KEY
+);
 
 // Sortable wrapper
 function SortableCard({ id, children, className = "" }) {
@@ -86,7 +91,6 @@ function SortableCard({ id, children, className = "" }) {
   );
 }
 
-
 const deltaClass = (val) => {
   if (typeof val !== 'string') return '';
   if (val.trim().startsWith('+')) return 'text-green-600';
@@ -117,21 +121,12 @@ export default function AIControlRoom() {
   const [weekOffset, setWeekOffset] = useState(0);
   const [selectedCampaign, setSelectedCampaign] = useState('All');
   const [selectedTimeFrame, setSelectedTimeFrame] = useState('Last 7 Days');
-const currentRangeLabel = "May 25 – May 31";
-const goToPreviousWeek = () => {
-  console.log("Previous week clicked");
-};
-const [threshold, setThreshold] = useState(70);
+  const [threshold, setThreshold] = useState(70);
+  const [lastUpdated, setLastUpdated] = useState(null);
 
-const handleThresholdChange = (val) => {
-  setThreshold(val[0]);
-};
-
-const goToNextWeek = () => {
-  console.log("Next week clicked");
-};
-
-
+  const currentRangeLabel = "May 25 – May 31";
+  const goToPreviousWeek = () => console.log("Previous week clicked");
+  const goToNextWeek = () => console.log("Next week clicked");
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -140,14 +135,6 @@ const goToNextWeek = () => {
     })
   );
 
-  const deltaClass = (val) => {
-  if (typeof val !== 'string') return '';
-  if (val.trim().startsWith('+')) return 'text-green-600';
-  if (val.trim().startsWith('-')) return 'text-red-600';
-  return '';
-};
-
-
   useEffect(() => {
     async function fetchStats() {
       try {
@@ -155,11 +142,19 @@ const goToNextWeek = () => {
         setTotalLeads(res.data.total || 247);
         setEngagedLeads(res.data.engaged || 82);
         setHotLeads(res.data.hot || 17);
+        setLastUpdated(new Date().toLocaleTimeString());
       } catch (err) {
         console.error('Failed to fetch analytics', err);
       }
     }
     fetchStats();
+
+    const sub = supabase.channel('control-room-refresh')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, fetchStats)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'leads' }, fetchStats)
+      .subscribe();
+
+    return () => supabase.removeChannel(sub);
   }, []);
 
   const handleOverrideToggle = async () => {
@@ -169,6 +164,10 @@ const goToNextWeek = () => {
     } catch (err) {
       console.error('Failed to update override setting', err);
     }
+  };
+
+  const handleThresholdChange = (val) => {
+    setThreshold(val[0]);
   };
 
   const handleDragEnd = ({ active, over }) => {
@@ -190,6 +189,8 @@ const goToNextWeek = () => {
   };
 
   const { start, end } = getWeekRange(weekOffset);
+
+  // 👇 Everything below (cardComponents, JSX, etc.) is untouched and now shows live updates
 
   const commonCardClass = "min-h-[200px] flex flex-col shadow-md rounded-xl border border-gray-100 bg-white hover:shadow-lg transition-shadow duration-200";
   const commonContentClass = "flex-grow p-4 flex flex-col justify-between";

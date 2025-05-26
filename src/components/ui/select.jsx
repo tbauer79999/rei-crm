@@ -1,12 +1,20 @@
 // select.jsx
 import * as React from "react"
 
-export function Select({ children, ...props }) {
+export function Select({ children, value, onValueChange, ...props }) {
+  const handleChange = (event) => {
+    if (onValueChange) {
+      onValueChange(event.target.value); // Pass the selected value to onValueChange
+    }
+  };
+
   return (
     <div className="relative w-full">
       <select
         className="w-full appearance-none rounded-md border border-input bg-background px-3 py-2 pr-8 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
-        {...props}
+        value={value} // Pass value directly
+        onChange={handleChange} // Use the new handleChange for native onChange
+        {...props} // Pass other props (like id, name, disabled, etc.)
       >
         {children}
       </select>

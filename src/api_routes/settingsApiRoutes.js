@@ -134,28 +134,62 @@ router.post('/instructions', async (req, res) => {
 
 // PUT /api/settings
 router.put('/', async (req, res) => {
-  const settings = req.body; // Expects an object of settings { key: { value: 'val' }, ... }
+  const settings = req.body; // Expects an object like { setting_key: { value: 'val', tenant_id: 'id' }, ... }
 
   try {
     const upserts = [];
     for (const [key, setting] of Object.entries(settings)) {
-      // Ensure value is a string if it's a boolean, as Supabase might store booleans differently
+      if (typeof setting !== 'object' || setting === null || typeof setting.value === 'undefined') {
+        // Skip malformed setting entries
+        console.warn(`Skipping malformed setting for key: ${key}`);
+        continue;
+      }
+
       const value = typeof setting.value === 'boolean' ? String(setting.value) : setting.value;
-      upserts.push({ key, value }); // Assumes 'key' is the unique column for onConflict
+      
+      // All settings processed here are assumed to be tenant-specific
+      // and thus must have a tenant_id.
+      if (!setting.tenant_id) {
+        console.error(`Error: tenant_id is missing for setting key: ${key}. This setting will not be saved.`);
+        // Optionally, you could throw an error or collect errors to send in the response
+        continue; // Skip this setting
+      }
+      
+      upserts.push({ 
+        key: key, 
+        value: value, 
+        tenant_id: setting.tenant_id 
+      });
     }
 
     if (upserts.length > 0) {
       const { error } = await supabase
         .from('platform_settings')
-        .upsert(upserts, { onConflict: 'key' }); // Make sure 'key' has a unique constraint in DB
+        .upsert(upserts, { onConflict: 'key, tenant_id' }); // Use composite key for conflict resolution
 
-      if (error) throw error;
+      if (error) {
+        // Check if the error is related to the ON CONFLICT specification
+        if (error.message.includes("constraint matching the ON CONFLICT specification")) {
+          // This specific error indicates the (key, tenant_id) constraint might not exist
+          // or is not what's expected.
+          console.error('Supabase upsert error: Potential issue with (key, tenant_id) unique constraint in platform_settings table.', error);
+          return res.status(500).json({ 
+            error: 'Failed to save settings due to a database constraint configuration issue. Please check if a unique constraint exists for (key, tenant_id) in the platform_settings table.' 
+          });
+        }
+        throw error; // Re-throw other errors
+      }
+    } else {
+      // It's not an error if there were no valid settings to save, 
+      // but the client might expect a different response.
+      // For now, a 200 is okay, or a 204 (No Content).
+      return res.status(200).json({ message: 'No valid settings processed or provided.' });
     }
 
-    res.status(200).json({ message: 'All settings saved.' });
+    res.status(200).json({ message: 'Settings saved successfully.' });
   } catch (err) {
     console.error('Error saving settings to Supabase:', err.message);
-    res.status(500).json({ error: 'Failed to save one or more settings' });
+    res.status(500).json({ error: 'Failed to save one or more settings.' });
   }
 });
 

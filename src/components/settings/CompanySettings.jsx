@@ -1,14 +1,17 @@
 import React, { useState, useEffect } from "react";
+import { useAuth } from "../../context/AuthContext"; // Import useAuth
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { Textarea } from "../ui/textarea";
 import { Select, SelectItem } from "../ui/select";
 import { Card, CardContent } from "../ui/card";
 import supabase from "../../lib/supabaseClient";
+import Button from '../ui/button'; // Import the custom Button component
 
 export default function CompanySettings() {
+  const { user, loading: authLoading } = useAuth(); // Get user and auth loading state
   const [data, setData] = useState({});
-  const [loading, setLoading] = useState(true);
+  const [settingsLoading, setSettingsLoading] = useState(true); // Renamed to avoid conflict
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
@@ -18,16 +21,36 @@ export default function CompanySettings() {
 
   useEffect(() => {
     const loadSettings = async () => {
+      if (authLoading) {
+        // Don't run if auth is still loading, wait for user object to be available
+        return;
+      }
+
+      if (!user || !user.tenant_id) {
+        console.warn(
+          "User or tenant_id not available. Skipping settings load."
+        );
+        setData({}); // Reset data or handle as appropriate
+        setStartHour("");
+        setEndHour("");
+        setDayPreset("");
+        setSettingsLoading(false);
+        return;
+      }
+
+      setSettingsLoading(true);
       try {
+        console.log("Loading settings for tenant_id:", user.tenant_id);
         const { data: settingsData, error } = await supabase
           .from("platform_settings")
-          .select("key, value");
+          .select("key, value")
+          .eq("tenant_id", user.tenant_id); // Filter by tenant_id
 
         if (error) throw error;
 
         const json = settingsData.reduce((acc, row) => {
           acc[row.key] = {
-            id: row.key,
+            id: row.key, // Assuming 'key' from DB is the ID for the setting entry
             value: row.value,
           };
           return acc;
@@ -35,83 +58,132 @@ export default function CompanySettings() {
 
         setData(json);
 
+        // Update local state for hour/day presets based on loaded data
         const open = json.officeOpenHour?.value || "";
         const close = json.officeCloseHour?.value || "";
         const daysRaw = json.officeDays?.value || "";
-        const days = daysRaw.split(",");
+        const days = daysRaw ? daysRaw.split(",") : [];
 
         setStartHour(open);
         setEndHour(close);
 
-        if (Array.isArray(days)) {
+        if (Array.isArray(days) && days.length > 0) {
           if (days.length === 7) setDayPreset("Everyday");
-          else if (days.length === 6 && !days.includes("Sunday")) setDayPreset("M–Sat");
-          else if (days.length === 5 && days.includes("Monday") && days.includes("Friday")) setDayPreset("M–F");
+          else if (days.length === 6 && !days.includes("Sunday"))
+            setDayPreset("M–Sat");
+          else if (
+            days.length === 5 &&
+            days.includes("Monday") &&
+            days.includes("Friday")
+          )
+            setDayPreset("M–F");
+          else setDayPreset(""); // Reset if no match
+        } else {
+          setDayPreset(""); // Reset if not an array or empty
         }
       } catch (err) {
         console.error("Failed to load settings", err);
+        setData({}); // Reset data on error
+        setStartHour("");
+        setEndHour("");
+        setDayPreset("");
       } finally {
-        setLoading(false);
+        setSettingsLoading(false);
       }
     };
 
     loadSettings();
-  }, []);
+  }, [user?.tenant_id, user?.role, authLoading]); 
 
   const handleChange = (key, value) => {
     setData((prev) => ({
       ...prev,
       [key]: {
-        ...prev[key],
+        ...(prev[key] || { id: key }), 
         value,
       },
     }));
   };
 
   const handleSave = async () => {
+    if (!user || !user.tenant_id) {
+      console.error("Cannot save settings: User or tenant_id not available.");
+      return;
+    }
+    if (user.role !== "admin") {
+      console.warn("Save operation denied: User is not an admin.");
+      return;
+    }
+
     try {
       setSaving(true);
 
       const dayMap = {
         "M–F": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
-        "M–Sat": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
-        Everyday: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
+        "M–Sat": [
+          "Monday",
+          "Tuesday",
+          "Wednesday",
+          "Thursday",
+          "Friday",
+          "Saturday",
+        ],
+        Everyday: [
+          "Monday",
+          "Tuesday",
+          "Wednesday",
+          "Thursday",
+          "Friday",
+          "Saturday",
+          "Sunday",
+        ],
       };
 
-      const translatedDays = dayMap[dayPreset] || [];
+      const translatedDays = dayPreset ? dayMap[dayPreset] || [] : [];
 
       const updated = {
         ...data,
         officeOpenHour: {
-          ...(data.officeOpenHour || {}),
+          ...(data.officeOpenHour || { id: "officeOpenHour" }),
           value: startHour,
         },
         officeCloseHour: {
-          ...(data.officeCloseHour || {}),
+          ...(data.officeCloseHour || { id: "officeCloseHour" }),
           value: endHour,
         },
         officeDays: {
-          ...(data.officeDays || {}),
-          value: translatedDays,
+          ...(data.officeDays || { id: "officeDays" }),
+          value: translatedDays.join(","), 
         },
       };
 
-      const upserts = Object.entries(updated).map(([key, entry]) => ({
-        key: key,
-        value: Array.isArray(entry.value)
-          ? entry.value.join(",")
-          : typeof entry.value === "boolean"
-          ? String(entry.value)
-          : entry.value,
+      const upserts = Object.entries(updated)
+        .filter(([key, entry]) => entry && typeof entry.value !== 'undefined') 
+        .map(([key, entry]) => ({
+          key: key,
+          value: entry.value, 
+          tenant_id: user.tenant_id,
       }));
 
+      if (upserts.length === 0) {
+        console.log("No data to save.");
+        setSaving(false);
+        return;
+      }
+      
+      console.log("Upserting settings:", upserts);
       const { error } = await supabase
         .from("platform_settings")
-        .upsert(upserts, { onConflict: "key" });
+        .upsert(upserts, { onConflict: "key,tenant_id" }); 
 
       if (error) throw error;
+      
+      const newData = { ...updated };
+      if (newData.officeDays) {
+          newData.officeDays = { ...newData.officeDays, value: translatedDays.join(",") };
+      }
+      setData(newData);
 
-      setData(updated);
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 2000);
     } catch (err) {
@@ -138,7 +210,11 @@ export default function CompanySettings() {
 
   const dayOptions = ["M–F", "M–Sat", "Everyday"];
 
-  if (loading) return <p>Loading settings...</p>;
+  if (authLoading) return <p>Loading user data...</p>;
+  if (!user) return <p>User not found. Please log in to manage company settings.</p>;
+  if (settingsLoading && user.tenant_id) return <p>Loading settings...</p>; 
+  if (!user.tenant_id && !settingsLoading) return <p>Tenant information is missing. Cannot load or save settings.</p>;
+
 
   return (
     <div className="space-y-6">
@@ -158,8 +234,8 @@ export default function CompanySettings() {
             <div>
               <Label htmlFor="business_type">Business Type</Label>
               <Select
-                defaultValue={data.businessType?.value || ""}
-                onChange={(val) => handleChange("business_type", val)}
+                value={data.business_type?.value || ""} 
+                onValueChange={(val) => handleChange("business_type", val)}
               >
                 <SelectItem value="llc">LLC</SelectItem>
                 <SelectItem value="corp">Corporation</SelectItem>
@@ -274,14 +350,20 @@ export default function CompanySettings() {
         </CardContent>
       </Card>
 
-      <div className="flex justify-end pt-2">
-        <button
+      <div className="flex justify-end pt-2 items-center space-x-4"> 
+        {/* Added space-x-4 for spacing between button and message */}
+        <Button
           onClick={handleSave}
-          disabled={saving}
-          className="bg-black text-white px-4 py-2 rounded-md shadow hover:bg-gray-800 transition"
+          disabled={saving || user?.role !== 'admin' || settingsLoading || authLoading}
+          aria-disabled={saving || user?.role !== 'admin' || settingsLoading || authLoading}
         >
           {saving ? "Saving..." : saveSuccess ? "Saved ✅" : "Save Settings"}
-        </button>
+        </Button>
+        {user?.role !== 'admin' && !authLoading && !settingsLoading && (
+          <p className="text-sm text-red-500" role="alert"> {/* Removed mr-4, relies on space-x from parent */}
+            Save disabled: Admin role required.
+          </p>
+        )}
       </div>
     </div>
   );
