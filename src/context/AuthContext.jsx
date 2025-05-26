@@ -18,6 +18,8 @@ export const AuthProvider = ({ children }) => {
         setUser(null);
       } else {
         console.log('Loaded user:', data?.user?.email);
+        console.log('Authenticated Supabase user ID:', data?.user?.id);
+
         setUser(data.user);
       }
       setLoading(false);

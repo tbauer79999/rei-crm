@@ -52,6 +52,7 @@ export default function AIInstructionSettings() {
   };
 
   useEffect(() => {
+    
     const fetchSettings = async () => {
       try {
         setError(''); // Clear previous errors
@@ -59,7 +60,7 @@ export default function AIInstructionSettings() {
         const { data: profile, error: profileError } = await supabase
           .from('users_profile')
           .select('tenant_id')
-          .eq('id', user?.id)
+          .eq('id', user.id)
           .single();
 
         if (profileError || !profile?.tenant_id) {

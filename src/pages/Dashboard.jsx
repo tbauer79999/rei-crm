@@ -129,10 +129,10 @@ export default function Dashboard() {
 
   const statuses = [
     'All',
-    'Hot Lead',
-    'Warm Lead',
-    'Cold Lead',
-    'New Lead',
+    'Hot',
+    'Warm',
+    'Cold',
+    'New',
     'Nurtured',
     'Unsubscribed',
   ];

@@ -1,154 +1,128 @@
+// File: src/components/settings/MessagingSettings.jsx
+
 import React, { useEffect, useState } from 'react';
-import axios from 'axios';
-import Button from '../ui/button';
+import { useAuth } from '../../context/AuthContext';
+import supabase from '../../lib/supabaseClient';
 import { Label } from '../ui/label';
-import { Textarea } from '../ui/textarea';
-import { Input } from '../ui/input';
+import Button from '../ui/button';
 
 export default function MessagingSettings() {
-  const [settings, setSettings] = useState({});
+  const { user } = useAuth();
+  const [tenantId, setTenantId] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [success, setSuccess] = useState('');
+  const [error, setError] = useState('');
 
-  const keys = [
-    'enable_sms',
-    'sms_provider',
-    'daily_send_limit',
-    'default_sms_signature',
-    'unsubscribe_footer',
-    'sms_intro_template',
-    'ai_message_delay_range',
+  const [replyMode, setReplyMode] = useState('paced');
+  const [hourlyLimit, setHourlyLimit] = useState('30');
+
+  const replyOptions = [
+    { label: 'Paced (2–5 min delay)', value: 'paced' },
+    { label: 'Status-Based (1–10 min)', value: 'status-based' }
   ];
 
   useEffect(() => {
     const fetchSettings = async () => {
       try {
-        const res = await axios.get('/api/settings');
-        const allSettings = Array.isArray(res.data) ? res.data : Object.values(res.data);
+        const { data: profile, error: profileError } = await supabase
+          .from('users_profile')
+          .select('tenant_id')
+          .eq('id', user?.id)
+          .single();
 
+        if (profileError || !profile?.tenant_id) {
+          throw new Error('Tenant ID not found.');
+        }
 
-        const extracted = {};
-        keys.forEach(key => {
-          const entry = allSettings.find(s => s.key === key);
-          extracted[key] = entry ? entry.value : '';
-        });
+        setTenantId(profile.tenant_id);
 
-        setSettings(extracted);
+        const res = await fetch(`/api/settings?tenant_id=${profile.tenant_id}`);
+        const settings = await res.json();
+
+        setReplyMode(settings['ai_reply_mode']?.value || 'paced');
+        setHourlyLimit(settings['ai_hourly_throttle_limit']?.value || '30');
       } catch (err) {
-        console.error('Failed to load settings', err);
+        console.error('Error loading messaging settings:', err.message);
+        setError('Failed to load settings.');
       } finally {
         setLoading(false);
       }
     };
 
-    fetchSettings();
-  }, []);
+    if (user?.id) fetchSettings();
+  }, [user]);
 
-  const handleChange = (e) => {
-    const { name, value, type, checked } = e.target;
-    setSettings(prev => ({
-      ...prev,
-      [name]: type === 'checkbox' ? checked.toString() : value,
-    }));
+const handleSave = async () => {
+  setSaving(true);
+  setSuccess('');
+  setError('');
+
+  const settingsPayload = {
+    ai_reply_mode: {
+      value: replyMode,
+      tenant_id: user?.tenant_id, // ✅ include tenant_id here
+    },
+    ai_hourly_throttle_limit: {
+      value: hourlyLimit,
+      tenant_id: user?.tenant_id, // ✅ include tenant_id here
+    },
   };
 
-  const handleSave = async () => {
-    setSaving(true);
-    try {
-      await Promise.all(keys.map(key =>
-        axios.put('/api/settings', {
-          key,
-          value: settings[key]
-        })
-      ));
-      alert('Settings saved!');
-    } catch (err) {
-      console.error('Failed to save settings', err);
-      alert('Error saving settings.');
-    } finally {
-      setSaving(false);
-    }
-  };
+  try {
+    const res = await fetch('/api/settings', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(settingsPayload),
+    });
 
-  if (loading) return <div>Loading messaging settings...</div>;
+    if (!res.ok) throw new Error('Failed to save settings');
+    setSuccess('Settings saved successfully!');
+  } catch (err) {
+    setError(err.message);
+  } finally {
+    setSaving(false);
+  }
+};
+
 
   return (
-    <div className="space-y-6 p-4">
+    <div className="space-y-6">
       <h2 className="text-xl font-semibold">Messaging Settings</h2>
 
-      <div className="space-y-4">
-        <div>
-          <Label>Enable SMS</Label>
-          <input
-            type="checkbox"
-            name="enable_sms"
-            checked={settings.enable_sms === 'true'}
-            onChange={handleChange}
-            className="ml-2"
-          />
-        </div>
+      {error && <p className="text-red-600">{error}</p>}
+      {success && <p className="text-green-600">{success}</p>}
 
-        <div>
-          <Label>SMS Provider</Label>
-          <Input
-            name="sms_provider"
-            value={settings.sms_provider || ''}
-            onChange={handleChange}
-          />
-        </div>
-
-        <div>
-          <Label>Daily Send Limit</Label>
-          <Input
-            type="number"
-            name="daily_send_limit"
-            value={settings.daily_send_limit || ''}
-            onChange={handleChange}
-          />
-        </div>
-
-        <div>
-          <Label>SMS Signature</Label>
-          <Input
-            name="default_sms_signature"
-            value={settings.default_sms_signature || ''}
-            onChange={handleChange}
-          />
-        </div>
-
-        <div>
-          <Label>Unsubscribe Footer</Label>
-          <Input
-            name="unsubscribe_footer"
-            value={settings.unsubscribe_footer || ''}
-            onChange={handleChange}
-          />
-        </div>
-
-        <div>
-          <Label>Intro SMS Template</Label>
-          <Textarea
-            name="sms_intro_template"
-            value={settings.sms_intro_template || ''}
-            onChange={handleChange}
-          />
-        </div>
-
-        <div>
-          <Label>AI Message Delay Range (in seconds)</Label>
-          <Input
-            name="ai_message_delay_range"
-            value={settings.ai_message_delay_range || ''}
-            onChange={handleChange}
-          />
-        </div>
+      <div>
+        <Label>AI Reply Mode</Label>
+        <select
+          className="w-full border rounded px-3 py-2"
+          value={replyMode}
+          onChange={(e) => setReplyMode(e.target.value)}
+        >
+          {replyOptions.map((opt) => (
+            <option key={opt.value} value={opt.value}>{opt.label}</option>
+          ))}
+        </select>
       </div>
 
-      <div className="pt-4">
-        <Button onClick={handleSave} disabled={saving}>
-          {saving ? 'Saving...' : 'Save Settings'}
-        </Button>
+      <div>
+        <Label>Max AI Messages per Hour</Label>
+        <input
+          type="number"
+          min="1"
+          value={hourlyLimit}
+          className="w-full border rounded px-3 py-2"
+          onChange={(e) => setHourlyLimit(e.target.value)}
+        />
+        <p className="text-sm text-gray-500 mt-1">
+          Prevents overwhelming carriers or triggering spam flags by pacing output.
+        </p>
       </div>
+
+      <Button onClick={handleSave} disabled={saving}>
+        {saving ? 'Saving...' : 'Save Settings'}
+      </Button>
     </div>
   );
 }

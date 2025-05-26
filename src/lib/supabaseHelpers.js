@@ -1,4 +1,5 @@
-const supabase = require('../../supabaseClient').default;
+const { supabase } = require('./supabaseService');
+
 
 // Helper functions (to be exported)
 const fetchAllRecords = async (table) => {

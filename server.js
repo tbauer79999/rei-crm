@@ -163,9 +163,6 @@ app.post('/api/leads/bulk', async (req, res) => {
       });
     }
 
-
-
-
     const { error: insertError } = await supabase
       .from('leads')
       .insert(enrichedRecords);
@@ -186,68 +183,39 @@ app.post('/api/leads/bulk', async (req, res) => {
   }
 });
 
+app.put('/api/settings', async (req, res) => {
+  const settings = req.body;
 
-app.get('/api/settings', async (req, res) => {
   try {
-    const { data, error } = await supabase
+    const { data: userProfile, error: profileError } = await supabase
+      .from('users_profile')
+      .select('tenant_id')
+      .eq('id', req.headers['x-user-id']) // or your session user ID
+      .single();
+
+    if (profileError) throw profileError;
+
+    const tenantId = userProfile.tenant_id;
+    const upserts = [];
+
+    for (const [key, setting] of Object.entries(settings)) {
+      const value = typeof setting.value === 'boolean' ? String(setting.value) : setting.value;
+
+      upserts.push({ key, value, tenant_id: tenantId }); // ✅ include tenant_id
+    }
+
+    const { error } = await supabase
       .from('platform_settings')
-      .select('*');
+      .upsert(upserts, { onConflict: ['tenant_id', 'key'] });
 
     if (error) throw error;
 
-    const settings = {};
-    for (const row of data) {
-      settings[row.key] = {
-        value: row.value,
-        id: row.id
-      };
-    }
-
-    res.json(settings);
+    res.status(200).json({ message: 'All settings saved.' });
   } catch (err) {
-    console.error('Error fetching settings from Supabase:', err.message);
-    res.status(500).json({ error: 'Failed to fetch settings' });
+    console.error('Error saving settings to Supabase:', err.message);
+    res.status(500).json({ error: 'Failed to save one or more settings' });
   }
 });
-
-
-
-app.post('/api/settings', async (req, res) => {
-  const { key, value } = req.body;
-
-  try {
-    const { data: existing, error: fetchError } = await supabase
-      .from('platform_settings')
-      .select('id')
-      .eq('key', key.trim().toLowerCase())
-      .single();
-
-    if (fetchError && fetchError.code !== 'PGRST116') {
-      throw fetchError;
-    }
-
-    if (existing) {
-      const { error: updateError } = await supabase
-        .from('platform_settings')
-        .update({ value })
-        .eq('id', existing.id);
-
-      if (updateError) throw updateError;
-    } else {
-      const { error: insertError } = await supabase
-        .from('platform_settings')
-        .insert({ key: key.trim().toLowerCase(), value });
-
-      if (insertError) throw insertError;
-    }
-
-    res.status(200).json({ success: true });
-  } catch (err) {
-    console.error('Error saving setting to Supabase:', err.message || err);
-    res.status(500).json({ error: 'Failed to save setting' });
-  }
-});
-
 
 
 app.post('/api/settings/instructions', async (req, res) => {
@@ -301,30 +269,8 @@ app.post('/api/settings/instructions', async (req, res) => {
 
 
 
-app.put('/api/settings', async (req, res) => {
-  const settings = req.body;
 
-  try {
-    const upserts = [];
 
-    for (const [key, setting] of Object.entries(settings)) {
-      const value = typeof setting.value === 'boolean' ? String(setting.value) : setting.value;
-
-      upserts.push({ key, value });
-    }
-
-    const { error } = await supabase
-      .from('platform_settings')
-      .upsert(upserts, { onConflict: 'key' });
-
-    if (error) throw error;
-
-    res.status(200).json({ message: 'All settings saved.' });
-  } catch (err) {
-    console.error('Error saving settings to Supabase:', err.message);
-    res.status(500).json({ error: 'Failed to save one or more settings' });
-  }
-});
 
 app.post('/api/knowledge-upload', async (req, res) => {
   try {

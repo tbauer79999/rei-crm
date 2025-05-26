@@ -4,8 +4,7 @@ import { Label } from "../ui/label";
 import { Textarea } from "../ui/textarea";
 import { Select, SelectItem } from "../ui/select";
 import { Card, CardContent } from "../ui/card";
-import supabase from '../../lib/supabaseClient';
-
+import supabase from "../../lib/supabaseClient";
 
 export default function CompanySettings() {
   const [data, setData] = useState({});
@@ -21,15 +20,15 @@ export default function CompanySettings() {
     const loadSettings = async () => {
       try {
         const { data: settingsData, error } = await supabase
-          .from('platform_settings')
-          .select('key, value');
+          .from("platform_settings")
+          .select("key, value");
 
         if (error) throw error;
 
         const json = settingsData.reduce((acc, row) => {
           acc[row.key] = {
             id: row.key,
-            value: row.value
+            value: row.value,
           };
           return acc;
         }, {});
@@ -76,7 +75,7 @@ export default function CompanySettings() {
       const dayMap = {
         "M–F": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
         "M–Sat": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
-        "Everyday": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
+        Everyday: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
       };
 
       const translatedDays = dayMap[dayPreset] || [];
@@ -106,10 +105,11 @@ export default function CompanySettings() {
           : entry.value,
       }));
 
-const { error } = await supabase
-  .from("platform_settings")
-  .upsert(upserts, { onConflict: 'key' });
+      const { error } = await supabase
+        .from("platform_settings")
+        .upsert(upserts, { onConflict: "key" });
 
+      if (error) throw error;
 
       setData(updated);
       setSaveSuccess(true);
@@ -151,35 +151,10 @@ const { error } = await supabase
               <Input
                 id="company_name"
                 value={data.company_name?.value || ""}
-
                 onChange={(e) => handleChange("company_name", e.target.value)}
               />
             </div>
-            <div>
-              <Label htmlFor="industry">Industry</Label>
-              <Input
-                id="industry"
-                value={data.industry?.value || ""}
-                onChange={(e) => handleChange("industry", e.target.value)}
-              />
-            </div>
-            <div>
-              <Label htmlFor="tagline">Company Tagline</Label>
-              <Input
-                id="tagline"
-                value={data.tagline?.value || ""}
-                onChange={(e) => handleChange("tagline", e.target.value)}
-              />
-            </div>
-            <div>
-              <Label htmlFor="logoUpload">Company Logo Upload</Label>
-              <Input
-                id="logoUpload"
-                type="file"
-                disabled
-                placeholder="Coming soon"
-              />
-            </div>
+
             <div>
               <Label htmlFor="business_type">Business Type</Label>
               <Select
@@ -193,6 +168,7 @@ const { error } = await supabase
                 <SelectItem value="other">Other</SelectItem>
               </Select>
             </div>
+
             <div>
               <Label htmlFor="primary_contact">Primary Contact Name</Label>
               <Input
@@ -201,6 +177,7 @@ const { error } = await supabase
                 onChange={(e) => handleChange("primary_contact", e.target.value)}
               />
             </div>
+
             <div>
               <Label htmlFor="phone">Phone Number</Label>
               <Input
@@ -209,6 +186,7 @@ const { error } = await supabase
                 onChange={(e) => handleChange("phone", e.target.value)}
               />
             </div>
+
             <div>
               <Label htmlFor="email">Support Email Address</Label>
               <Input
@@ -217,14 +195,7 @@ const { error } = await supabase
                 onChange={(e) => handleChange("email", e.target.value)}
               />
             </div>
-            <div>
-              <Label htmlFor="website">Business Website</Label>
-              <Input
-                id="website"
-                value={data.website?.value || ""}
-                onChange={(e) => handleChange("website", e.target.value)}
-              />
-            </div>
+
             <div>
               <Label htmlFor="timezone">Time Zone</Label>
               <Input
@@ -283,15 +254,6 @@ const { error } = await supabase
             </div>
 
             <div className="col-span-2">
-              <Label htmlFor="statuses">Acceptable Lead Statuses</Label>
-              <Input
-                id="statuses"
-                value={data.statuses?.value || ""}
-                onChange={(e) => handleChange("statuses", e.target.value)}
-              />
-            </div>
-
-            <div className="col-span-2">
               <Label htmlFor="address">Business Address</Label>
               <Textarea
                 id="address"
@@ -299,6 +261,7 @@ const { error } = await supabase
                 onChange={(e) => handleChange("address", e.target.value)}
               />
             </div>
+
             <div className="col-span-2">
               <Label htmlFor="regions">Service Areas / Regions</Label>
               <Textarea

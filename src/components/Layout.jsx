@@ -126,7 +126,7 @@ export default function Layout({ children }) {
 
   return (
     <div className="flex min-h-screen bg-gradient-to-br from-slate-50 to-white">
-      <aside className={`${collapsed ? 'w-16' : 'w-64'} bg-gradient-to-b from-indigo-50 to-white text-gray-800 border-r shadow-sm transition-all duration-200 ease-in-out`}>
+      <aside className={`${collapsed ? 'w-16' : 'w-52'} bg-gradient-to-b from-indigo-50 to-white text-gray-800 border-r shadow-sm transition-all duration-200 ease-in-out`}>
         <div className="flex items-center justify-between px-4 py-3 h-16 border-b border-indigo-300">
           {!collapsed && <div className="font-bold text-lg tracking-tight text-indigo-800">REI-CRM</div>}
           <button onClick={() => setCollapsed(!collapsed)} className="text-gray-500">
