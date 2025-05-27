@@ -44,15 +44,11 @@ import {
   Filter
 } from 'lucide-react';
 
-import { createClient } from '@supabase/supabase-js';
+import supabase from '../lib/supabaseClient'; // ✅ Use singleton
 import apiClient from '../lib/apiClient';
 import FunnelChart from '../components/FunnelChart';
 import ColdFollowupQueueCard from '../components/ColdFollowupQueueCard';
 
-const supabase = createClient(
-  process.env.REACT_APP_SUPABASE_URL,
-  process.env.REACT_APP_SUPABASE_ANON_KEY
-);
 
 // Sortable wrapper
 function SortableCard({ id, children, className = "" }) {
