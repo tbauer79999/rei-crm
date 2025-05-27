@@ -25,6 +25,7 @@ export default function Step1_CompanyInfo({ onNext }) {
   const [companyName, setCompanyName] = useState('');
   const [industry, setIndustry] = useState('');
   const [description, setDescription] = useState('');
+  const [preferredAreaCode, setPreferredAreaCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -39,7 +40,8 @@ export default function Step1_CompanyInfo({ onNext }) {
             name: companyName,
             industry,
             description,
-            onboarding_complete: false
+            onboarding_complete: false,
+            preferred_area_code: preferredAreaCode
           }
         ])
         .select()
@@ -55,6 +57,13 @@ export default function Step1_CompanyInfo({ onNext }) {
         .eq('id', user.id);
 
       if (userUpdateError) throw userUpdateError;
+
+      // Trigger Twilio number assignment
+      await fetch('/api/onboarding/complete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tenant_id: tenantId }),
+      });
 
       onNext(tenantId);
     } catch (err) {
@@ -90,6 +99,14 @@ export default function Step1_CompanyInfo({ onNext }) {
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           placeholder="Brief Description"
+        />
+
+        <Input
+          type="text"
+          value={preferredAreaCode}
+          onChange={(e) => setPreferredAreaCode(e.target.value)}
+          placeholder="Preferred Area Code (e.g. 602)"
+          maxLength={3}
         />
 
         {error && <p className="text-red-500 text-sm">{error}</p>}

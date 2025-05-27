@@ -1,4 +1,5 @@
-const supabase = require('./supabaseClient');
+const { supabase } = require('./src/lib/supabaseService'); // ✅
+
 
 const fetchPlatformSetting = async (key) => {
   const { data, error } = await supabase

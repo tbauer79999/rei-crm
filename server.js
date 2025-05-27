@@ -13,7 +13,8 @@ const onboardingDemo = require('./src/api_routes/onboardingDemo');
 
 
 dotenv.config();
-const supabase = require('./supabaseClient');
+const { supabase } = require('./src/lib/supabaseService'); // ✅
+
 
 
 // Import new routers
@@ -183,39 +184,11 @@ app.post('/api/leads/bulk', async (req, res) => {
   }
 });
 
-app.put('/api/settings', async (req, res) => {
-  const settings = req.body;
 
-  try {
-    const { data: userProfile, error: profileError } = await supabase
-      .from('users_profile')
-      .select('tenant_id')
-      .eq('id', req.headers['x-user-id']) // or your session user ID
-      .single();
 
-    if (profileError) throw profileError;
 
-    const tenantId = userProfile.tenant_id;
-    const upserts = [];
 
-    for (const [key, setting] of Object.entries(settings)) {
-      const value = typeof setting.value === 'boolean' ? String(setting.value) : setting.value;
 
-      upserts.push({ key, value, tenant_id: tenantId }); // ✅ include tenant_id
-    }
-
-    const { error } = await supabase
-      .from('platform_settings')
-      .upsert(upserts, { onConflict: ['tenant_id', 'key'] });
-
-    if (error) throw error;
-
-    res.status(200).json({ message: 'All settings saved.' });
-  } catch (err) {
-    console.error('Error saving settings to Supabase:', err.message);
-    res.status(500).json({ error: 'Failed to save one or more settings' });
-  }
-});
 
 
 app.post('/api/settings/instructions', async (req, res) => {

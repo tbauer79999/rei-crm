@@ -3,12 +3,9 @@ const express = require('express');
 const multer = require('multer');
 const pdf = require('pdf-parse');
 const fetch = require('node-fetch'); // Kept as node-fetch, consistent with server.js top-level import
-const {
-  supabase,
-  fetchRecordById,
-  fetchAllRecords,
-  fetchSettingValue
-} = require('../lib/supabaseService'); // adjust path if needed
+const { supabase } = require('../lib/supabaseService');
+const { fetchRecordById, fetchAllRecords, fetchSettingValue } = require('../lib/supabaseService');
+
 
 // Placeholder for helper functions that will eventually be imported from server.js
 // const { fetchRecordById } = require('../../server'); // Keep for reference
@@ -61,7 +58,7 @@ router.get('/docs', async (req, res) => {
   try {
     const { data, error } = await supabase
       .from('knowledge_base')
-      .select('*')
+      .select('id, title, file_name, file_url, created_at')
       .order('created_at', { ascending: false });
 
     if (error) throw error;
@@ -72,6 +69,7 @@ router.get('/docs', async (req, res) => {
     res.status(500).json({ error: 'Failed to fetch documents' });
   }
 });
+
 
 // GET /api/knowledge-docs/:id
 router.get('/docs/:id', async (req, res) => {
@@ -95,22 +93,37 @@ router.get('/docs/:id', async (req, res) => {
 });
 
 // DELETE /api/knowledge-docs/:id
+// DELETE /api/knowledge-docs/:id
 router.delete('/docs/:id', async (req, res) => {
   const { id } = req.params;
+  console.log('🗑️ DELETE called for knowledge_base ID:', id);
+
   try {
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('knowledge_base')
       .delete()
-      .eq('id', id);
+      .match({ id }) // ✅ safest match strategy
 
-    if (error) throw error;
+    if (error) {
+      console.error('❌ Supabase delete error:', error.message);
+      return res.status(500).json({ error: 'Supabase delete failed' });
+    }
+
+    if (!data || data.length === 0) {
+      console.warn('⚠️ No matching document deleted. ID may not exist:', id);
+    } else {
+      console.log('✅ Deleted document:', data[0]);
+    }
 
     res.status(200).json({ success: true });
   } catch (err) {
-    console.error('Error deleting document:', err.message);
-    res.status(500).json({ error: 'Failed to delete document' });
+    console.error('🚨 Server crash in DELETE:', err.message);
+    res.status(500).json({ error: 'Internal server error deleting document' });
   }
 });
+
+
+
 
 // GET /api/knowledge-bundle
 const { generateKnowledgeBundleString } = require('../lib/knowledgeService'); // Import the new service

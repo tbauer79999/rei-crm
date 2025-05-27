@@ -15,18 +15,18 @@ export default function AIKnowledgeBase() {
     fetchDocs();
   }, []);
 
-  const fetchDocs = async () => {
-    const { data, error } = await supabase
-      .from('knowledge_base')
-      .select('*')
-      .order('created_at', { ascending: false });
+const fetchDocs = async () => {
+  try {
+    const response = await fetch('/api/knowledge-docs');
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Failed to fetch');
 
-    if (error) {
-      console.error('Failed to fetch knowledge docs:', error);
-    } else {
-      setDocs(data);
-    }
-  };
+    setDocs(data);
+  } catch (err) {
+    console.error('Failed to load docs:', err.message);
+  }
+};
+
 
   const uploadFile = async (file) => {
     const filePath = `${Date.now()}_${file.name}`;
@@ -93,19 +93,26 @@ const handleUpload = async () => {
   }
 };
 
-  const handleDelete = async (id) => {
-    try {
-      const { error } = await supabase
-        .from('knowledge_base')
-        .delete()
-        .eq('id', id);
+const handleDelete = async (id) => {
+  try {
+    console.log('🔥 Calling DELETE route for ID:', id);
 
-      if (error) throw error;
-      await fetchDocs();
-    } catch (err) {
-      console.error('Delete failed:', err.message);
-    }
-  };
+    const res = await fetch(`/api/knowledge-docs/${id}`, {
+      method: 'DELETE'
+    });
+
+    const result = await res.json();
+    console.log('🧾 Response:', result);
+
+    if (!res.ok) throw new Error(result.error || 'Delete failed');
+
+    setDocs((prev) => prev.filter((doc) => doc.id !== id));
+  } catch (err) {
+    console.error('❌ Delete failed:', err.message);
+  }
+};
+
+
 
   return (
     <div className="space-y-6">

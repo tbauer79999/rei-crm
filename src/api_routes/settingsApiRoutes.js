@@ -134,62 +134,42 @@ router.post('/instructions', async (req, res) => {
 
 // PUT /api/settings
 router.put('/', async (req, res) => {
-  const settings = req.body; // Expects an object like { setting_key: { value: 'val', tenant_id: 'id' }, ... }
+  const { settings, tenant_id } = req.body;
 
   try {
-    const upserts = [];
-    for (const [key, setting] of Object.entries(settings)) {
-      if (typeof setting !== 'object' || setting === null || typeof setting.value === 'undefined') {
-        // Skip malformed setting entries
+    if (!tenant_id || !settings) {
+      return res.status(400).json({ error: 'Missing tenant_id or settings in request body.' });
+    }
+
+    const upserts = Object.entries(settings).map(([key, setting]) => {
+      const raw = setting?.value ?? '';
+      const value = typeof raw === 'boolean' ? String(raw) : raw;
+
+      if (!key || typeof value !== 'string') {
         console.warn(`Skipping malformed setting for key: ${key}`);
-        continue;
+        return null;
       }
 
-      const value = typeof setting.value === 'boolean' ? String(setting.value) : setting.value;
-      
-      // All settings processed here are assumed to be tenant-specific
-      // and thus must have a tenant_id.
-      if (!setting.tenant_id) {
-        console.error(`Error: tenant_id is missing for setting key: ${key}. This setting will not be saved.`);
-        // Optionally, you could throw an error or collect errors to send in the response
-        continue; // Skip this setting
-      }
-      
-      upserts.push({ 
-        key: key, 
-        value: value, 
-        tenant_id: setting.tenant_id 
-      });
+      return {
+        key,
+        value,
+        tenant_id
+      };
+    }).filter(Boolean); // Remove invalid rows
+
+    const { error } = await supabase
+      .from('platform_settings')
+      .upsert(upserts, { onConflict: ['key', 'tenant_id'] });
+
+    if (error) {
+      console.error('[Supabase error]', error);
+      return res.status(500).json({ error: 'Failed to save settings to Supabase.' });
     }
 
-    if (upserts.length > 0) {
-      const { error } = await supabase
-        .from('platform_settings')
-        .upsert(upserts, { onConflict: 'key, tenant_id' }); // Use composite key for conflict resolution
-
-      if (error) {
-        // Check if the error is related to the ON CONFLICT specification
-        if (error.message.includes("constraint matching the ON CONFLICT specification")) {
-          // This specific error indicates the (key, tenant_id) constraint might not exist
-          // or is not what's expected.
-          console.error('Supabase upsert error: Potential issue with (key, tenant_id) unique constraint in platform_settings table.', error);
-          return res.status(500).json({ 
-            error: 'Failed to save settings due to a database constraint configuration issue. Please check if a unique constraint exists for (key, tenant_id) in the platform_settings table.' 
-          });
-        }
-        throw error; // Re-throw other errors
-      }
-    } else {
-      // It's not an error if there were no valid settings to save, 
-      // but the client might expect a different response.
-      // For now, a 200 is okay, or a 204 (No Content).
-      return res.status(200).json({ message: 'No valid settings processed or provided.' });
-    }
-
-    res.status(200).json({ message: 'Settings saved successfully.' });
+    return res.status(200).json({ message: 'Settings saved successfully.' });
   } catch (err) {
-    console.error('Error saving settings to Supabase:', err.message);
-    res.status(500).json({ error: 'Failed to save one or more settings.' });
+    console.error('[Server error]', err);
+    return res.status(500).json({ error: 'Unexpected error in settings save.' });
   }
 });
 
