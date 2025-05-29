@@ -8,9 +8,9 @@ import { signOutUser } from '../lib/authService';
 import apiClient from '../lib/apiClient';
 
 const navItems = [
-  { path: '/control-room', label: 'Pipeline', icon: <BarChart2 size={20} /> },
-  { path: '/dashboard', label: 'Dashboard', icon: <Home size={20} /> },
-  { path: '/settings', label: 'Settings', icon: <Settings size={20} /> },
+  { path: '/control-room', label: 'Pipeline', icon: BarChart2 },
+  { path: '/dashboard', label: 'Dashboard', icon: Home },
+  { path: '/settings', label: 'Settings', icon: Settings },
 ];
 
 export default function Layout({ children }) {
@@ -19,110 +19,12 @@ export default function Layout({ children }) {
   const { user } = useAuth();
   const isControlRoom = location.pathname === '/control-room';
 
-  const [collapsed, setCollapsed] = useState(false);
-  const [recentLeads, setRecentLeads] = useState([]);
-  const [recentMessages, setRecentMessages] = useState([]);
-  const [hotLead, setHotLead] = useState(null);
-  const [showRecents, setShowRecents] = useState(true);
-  const [recentsError, setRecentsError] = useState(null);
+  const [collapsed, setCollapsed] = useState(true);
 
   const handleLogout = async () => {
     await signOutUser();
     navigate('/login');
   };
-
-  useEffect(() => {
-    const stored = localStorage.getItem('recentLeads');
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      Promise.all(parsed.map(async (r) => {
-        try {
-          const res = await apiClient.get(`/leads/${r.id}`);
-          return { id: r.id, name: res.data.owner_name || 'Unnamed' };
-        } catch {
-          return null;
-        }
-      }))
-      .then(validated => {
-        const filtered = validated.filter(Boolean);
-        setRecentLeads(filtered);
-      });
-    }
-  }, []);
-
-  useEffect(() => {
-    const match = location.pathname.match(/^\/lead\/(.+)$/);
-    const id = match?.[1];
-    if (id && user) {
-      apiClient.get(`/leads/${id}`).then(res => {
-        const name = res.data.owner_name || 'Unnamed';
-        const entry = { id, name };
-        setRecentLeads(prev => {
-          const updated = [entry, ...prev.filter(r => r.id !== id)].slice(0, 5);
-          localStorage.setItem('recentLeads', JSON.stringify(updated));
-          return updated;
-        });
-      }).catch((err) => {
-  if (err.response?.status === 404) {
-    console.warn('Removing stale recent lead ID:', id);
-    setRecentLeads(prev => {
-      const updated = prev.filter(r => r.id !== id);
-      localStorage.setItem('recentLeads', JSON.stringify(updated));
-      return updated;
-    });
-  } else {
-    console.error('Unexpected error loading lead:', err);
-  }
-});
-
-    }
-  }, [location.pathname, user]);
-
-  useEffect(() => {
-    const fetchData = async () => {
-      if (!user) return;
-      setRecentsError(null);
-      try {
-        const [propsRes, messagesRes] = await Promise.all([
-          apiClient.get('/leads'),
-          apiClient.get('/messages')
-        ]);
-        const leads = propsRes.data;
-        const messages = messagesRes.data;
-
-        const inbound = messages
-          .filter(m => m.direction === 'inbound')
-          .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-        setRecentMessages(inbound.slice(0, 5));
-
-        const hotCandidates = leads.filter(l =>
-          (l.status_history || '').includes('Hot Lead')
-        );
-        const lastHot = hotCandidates
-          .map(l => {
-            const historyLines = (l.status_history || '').split('\n');
-            const hotLine = historyLines.find(h => h.includes('Hot Lead'));
-            const date = hotLine ? new Date(hotLine.split(':')[0]) : null;
-            return { ...l, hotDate: date };
-          })
-          .filter(l => l.hotDate)
-          .sort((a, b) => b.hotDate - a.hotDate)[0];
-        setHotLead(lastHot);
-      } catch (err) {
-        console.error('Failed to load recents:', err.message);
-        setRecentsError('Failed to load recent activity. Please try again later.');
-      }
-    };
-
-    if (user) {
-      fetchData();
-    } else {
-      setRecentLeads([]);
-      setRecentMessages([]);
-      setHotLead(null);
-      setRecentsError(null);
-    }
-  }, [user]);
 
   return (
     <div className="flex min-h-screen bg-gradient-to-br from-slate-50 to-white">
@@ -135,82 +37,21 @@ export default function Layout({ children }) {
         </div>
 
         <nav className="mt-2 space-y-1">
-          {navItems.map(({ path, label, icon }) => {
+          {navItems.map(({ path, label, icon: Icon }) => {
             const isActive = location.pathname === path;
             return (
               <Link
                 key={path}
                 to={path}
-                className={`flex items-center px-4 py-2 text-sm rounded-md mx-2 transition font-medium 
+                className={`group flex items-center ${collapsed ? 'justify-center' : 'px-4'} py-2 text-sm rounded-md mx-2 transition font-medium 
                   ${isActive ? 'bg-indigo-600 text-white' : 'hover:bg-indigo-100 text-gray-800'}`}
               >
-                <div className="mr-3 text-indigo-800">{icon}</div>
-                {!collapsed && <span>{label}</span>}
+                <Icon className={`h-5 w-5 group-hover:text-indigo-500 ${isActive ? 'text-white' : 'text-indigo-800'}`} />
+                {!collapsed && <span className="ml-3">{label}</span>}
               </Link>
             );
           })}
         </nav>
-
-        {/* Recents */}
-        {!collapsed && user && !isControlRoom && (
-          <div className="mt-6 border-t pt-4 px-4 text-sm text-gray-700">
-            <button onClick={() => setShowRecents(!showRecents)} className="flex justify-between items-center w-full font-semibold text-gray-800">
-              <span>Recents</span>
-              <span>{showRecents ? '▾' : '▸'}</span>
-            </button>
-
-            {showRecents && recentsError && (
-              <div className="mt-2 px-2 py-2 text-sm text-red-600 bg-red-100 border border-red-300 rounded-md">
-                {recentsError}
-              </div>
-            )}
-
-            {showRecents && !recentsError && (
-              <div className="mt-3 space-y-4">
-                <div>
-                  <p className="font-medium mb-1 text-indigo-700">🆕 Leads</p>
-                  <ul className="space-y-1">
-                    {recentLeads.length > 0 ? recentLeads.map((lead) => (
-                      <li key={lead.id}>
-                        <Link to={`/lead/${lead.id}`} className="block hover:underline truncate text-sm">
-                          {lead.name}
-                        </Link>
-                      </li>
-                    )) : <li className="text-xs text-gray-500">No recent leads.</li>}
-                  </ul>
-                </div>
-
-                <div>
-                  <p className="font-medium mt-3 mb-1 text-indigo-700">💬 Messages</p>
-                  <ul className="space-y-1">
-                    {recentMessages.length > 0 ? recentMessages.map((msg) => (
-                      <li key={msg.id}>
-                        <Link to={`/lead/${msg.property_id}`} className="block hover:underline truncate text-sm">
-                          {msg.from || 'Lead'}: "{msg.body?.slice(0, 30)}"
-                        </Link>
-                      </li>
-                    )) : <li className="text-xs text-gray-500">No recent messages.</li>}
-                  </ul>
-                </div>
-
-                {hotLead && (
-                  <div>
-                    <p className="font-medium mt-3 mb-1 text-indigo-700">🔥 Last Hot Lead</p>
-                    <Link to={`/lead/${hotLead.id}`} className="block text-red-600 hover:underline truncate">
-                      {hotLead.owner_name || 'Unnamed'}
-                    </Link>
-                    <p className="text-xs text-gray-500">
-                      {hotLead.hotDate?.toLocaleDateString()}
-                    </p>
-                  </div>
-                )}
-                {!hotLead && recentLeads.length > 0 && recentMessages.length > 0 && (
-                  <li className="text-xs text-gray-500 mt-1">No current hot lead.</li>
-                )}
-              </div>
-            )}
-          </div>
-        )}
       </aside>
 
       <div className="flex flex-col flex-1 min-h-screen">

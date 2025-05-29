@@ -3,6 +3,8 @@ import { useEffect, useState } from 'react';
 import supabase from '../../lib/supabaseClient';
 import Button from '../ui/button';
 import { Select } from '../ui/select';
+import { useAuth } from '../../context/AuthContext';
+
 
 const toneOptions = [
   { value: 'Friendly & Casual', label: 'Friendly & Casual' },

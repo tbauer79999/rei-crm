@@ -1,103 +1,73 @@
-// src/api_routes/analyticsRoutes.js
+console.log('✅ analyticsRoutes.js is loaded');
 const express = require('express');
-// Assuming supabase client and helpers will be exported from server.js eventually
-const {
-  supabase,
-  fetchRecordById,
-  fetchAllRecords,
-  fetchSettingValue
-} = require('../lib/supabaseService'); // adjust path if needed
-// const { supabase } = require('../../supabaseClient'); // Adjusted to current supabaseClient path
-// Assuming fetchAllRecords will be available from server.js or another helper module.
-// For now, this will cause an error if not defined globally or imported differently.
-// We will need to define/import fetchAllRecords properly in a later step.
-
 const router = express.Router();
+const supabase = require('../lib/supabaseClient');
+const { getTenantIdFromRequest } = require('../lib/authMiddleware');
 
-// GET /api/analytics
 router.get('/', async (req, res) => {
   try {
-    const leads = await fetchAllRecords('leads'); 
- 
+    const tenant_id = await getTenantIdFromRequest(req);
+console.log('Resolved tenant_id:', tenant_id);
 
-    const byCampaign = {};
-    const byStatus = {};
-    const byDate = {};
-    const raw = [];
-    const statusProgression = {};
-
-    for (const r of leads) {
-      const campaign = r.campaign || 'Unlabeled';
-      const status = r.status || 'Unknown';
-      // const created = r.createdTime; // createdTime might not exist, using created_at
-      const created = r.created_at;
-
-
-      byCampaign[campaign] = (byCampaign[campaign] || 0) + 1;
-      byStatus[status] = (byStatus[status] || 0) + 1;
-
-      if (created) {
-        const dateKey = new Date(created).toISOString().split('T')[0];
-        byDate[dateKey] = (byDate[dateKey] || 0) + 1;
-      }
-
-      // const history = r.fields?.['Status History'];
-      const history = r.status_history; // Adjusted to status_history
-      if (history) {
-        const lines = history.trim().split('\n');
-        for (let i = 1; i < lines.length; i++) {
-          const prev = lines[i - 1].split(': ').slice(1).join(': ');
-          const curr = lines[i].split(': ').slice(1).join(': ');
-          if (prev && curr && prev !== curr) {
-            const key = `${prev} → ${curr}`;
-            statusProgression[key] = (statusProgression[key] || 0) + 1;
-          }
-        }
-      }
-
-      // const messageIds = r.fields?.Messages || []; // Messages field might not exist directly
-      // This part needs to be re-evaluated based on actual data structure for messages relationship
-      // For now, assuming messages are not directly fetched here or structure is different.
-      let messageRecords = []; // Default to empty
-      // Example: if messages were linked by property_id and fetched separately
-      // const { data: messagesData, error: messagesError } = await supabase
-      // .from('messages')
-      // .select('direction, timestamp, body')
-      // .eq('property_id', r.id);
-      // if (!messagesError && messagesData) {
-      //   messageRecords = messagesData.map(msg => ({
-      //     direction: msg.direction,
-      //     timestamp: msg.timestamp,
-      //     body: msg.body || ''
-      //   }));
-      // }
-
-
-      raw.push({
-        // Campaign: campaign, // Already have campaign
-        // Status: status, // Already have status
-        // Created: created, // Already have created
-        // Messages: messageRecords, // Populated above if logic is added
-        ...r, // Spread the rest of the record
-        // Ensure not to overwrite campaign, status, created if they are named differently in 'r'
-        Campaign: campaign, // Explicitly set from derived value
-        Status: status,     // Explicitly set from derived value
-        Created: created,   // Explicitly set from derived value
-        Messages: messageRecords, // Set from derived value
-      });
+    // Step 1: Get leads
+    const { data: leads, error: leadsError } = await supabase
+      .from('leads')
+      .select('id, status, campaign, created_at, status_history')
+      .eq('tenant_id', tenant_id);
+console.log('✅ Leads fetched:', leads);
+    if (leadsError) {
+      console.error('Leads error:', leadgetTenantIdFromRequestsError);
+      return res.status(500).json({ error: 'Failed to fetch leads' });
     }
 
-    res.json({
-      totalLeads: leads.length,
-      byCampaign,
-      byStatus,
-      byDate,
-      raw,
-      statusProgression,
+    // Step 2: Get messages
+    const { data: messages, error: messagesError } = await supabase
+      .from('messages')
+      .select('id, lead_id, direction, timestamp')
+      .in('lead_id', leads.map(l => l.id));
+console.log('✅ Messages fetched:', messages);
+    if (messagesError) {
+      console.error('Messages error:', messagesError);
+      return res.status(500).json({ error: 'Failed to fetch messages' });
+    }
+
+    // Step 3: Attach messages to each lead
+    const leadMap = {};
+    leads.forEach((lead) => {
+      leadMap[lead.id] = {
+        ID: lead.id,
+        Status: lead.status || 'Unknown',
+        Campaign: lead.campaign || 'Unlabeled',
+        Created: lead.created_at,
+        'Status History': lead.status_history || '',
+        Messages: []
+      };
+    });
+
+    messages.forEach((msg) => {
+      if (leadMap[msg.lead_id]) {
+        leadMap[msg.lead_id].Messages.push({
+          id: msg.id,
+          direction: msg.direction,
+          timestamp: msg.timestamp
+        });
+      }
+    });
+
+    const byCampaign = {};
+    Object.values(leadMap).forEach((lead) => {
+      const campaign = lead.Campaign;
+      if (!byCampaign[campaign]) byCampaign[campaign] = 0;
+      byCampaign[campaign]++;
+    });
+
+    return res.json({
+      raw: Object.values(leadMap),
+      byCampaign
     });
   } catch (err) {
-    console.error('Error fetching analytics:', err.response?.data || err.message);
-    res.status(500).json({ error: 'Failed to fetch analytics data' });
+    console.error('Error in /api/analytics:', err);
+    return res.status(500).json({ error: 'Server error' });
   }
 });
 

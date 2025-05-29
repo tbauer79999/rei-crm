@@ -8,7 +8,7 @@ const upload = multer(); // Keep, used by knowledgeBaseRoutes
 const pdf = require('pdf-parse'); // Keep, used by knowledgeBaseRoutes
 const { default: fetch } = require('node-fetch'); // Keep, used by settingsApiRoutes and knowledgeBaseRoutes
 const { fetchAllRecords, fetchRecordById, fetchSettingValue } = require('./src/lib/supabaseHelpers');
-const onboardingDemo = require('./src/api_routes/onboardingDemo');
+
 
 
 
@@ -19,27 +19,36 @@ const { supabase } = require('./src/lib/supabaseService'); // ✅
 
 // Import new routers
 const leadsRouter = require('./src/api_routes/leadRoutes');
-const messagesRouter = require('./src/api_routes/messagesRoutes');
-const analyticsRouter = require('./src/api_routes/analyticsRoutes');
+const analyticsRoute = require('./src/api_routes/analyticsRoutes');
 const settingsApiRouter = require('./src/api_routes/settingsApiRoutes');
 const knowledgeBaseRouter = require('./src/api_routes/knowledgeBaseRoutes');
 const funnelRouter = require('./src/api_routes/funnel');
+const onboardingRoute = require('./src/api_routes/onboardingDemo');
+const messageQuality = require('./src/api_routes/messageQuality');
+const weeklyMomentum = require('./src/api_routes/weeklyMomentum');
+const responseTime = require('./src/api_routes/responseTime');
+const replyPacing = require('./src/api_routes/replyPacing');
+const escalationStats = require('./src/api_routes/escalationStats');
+const leadConversionSpeed = require('./src/api_routes/leadConversionSpeed');
+const conversationFlow = require('./src/api_routes/conversationFlowSparklineCard');
+const failureRate = require('./src/api_routes/failureRate');
+const aiVsHuman = require('./src/api_routes/aiVsHumanToggleCard');
+const aiEfficiency = require('./src/api_routes/aiEfficiencyCard');
+const hotSummary = require('./src/api_routes/hot-summary');
+const keywordsRoute = require('./src/api_routes/keywords');
+const messagesRoute = require('./src/api_routes/messages');
+const hotRoute = require('./src/api_routes/hot');
 
 const app = express();
 
-app.use(cors());
-app.use(express.json());
-app.use('/api/leads', leadsRouter);
-app.use('/api/messages', messagesRouter);
-app.use('/api/analytics', analyticsRouter);
-app.use('/api/settings', settingsApiRouter);
-app.use('/api/knowledge', knowledgeBaseRouter);
-app.use('/api/funnel', funnelRouter);
-app.use('/api/analytics', require('./src/api_routes/analyticsRoutes'));
-app.use('/api/onboarding', onboardingDemo);
-
 // Authentication Middleware
 const authenticateToken = async (req, res, next) => {
+  // ✅ Dev-mode shortcut — skip token validation
+  if (process.env.NODE_ENV !== 'production') {
+    req.user = { id: 'dev-user-id' }; // needed for getTenantIdFromRequest
+    return next();
+  }
+
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1]; // Bearer YOUR_JWT_TOKEN
 
@@ -62,6 +71,31 @@ const authenticateToken = async (req, res, next) => {
     return res.status(403).json({ error: 'Forbidden: Token validation failed' });
   }
 };
+
+
+app.use(cors());
+app.use(express.json());
+app.use('/api/leads', leadsRouter);
+app.use('/api/analytics', authenticateToken, analyticsRoute);
+app.use('/api/settings', settingsApiRouter);
+app.use('/api/knowledge', knowledgeBaseRouter);
+app.use('/api/funnel', funnelRouter);
+app.use('/api/onboarding', onboardingRoute);
+app.use('/api/message-quality', messageQuality);
+app.use('/api/weekly-momentum', weeklyMomentum);
+app.use('/api/response-time', responseTime);
+app.use('/api/escalation-stats', escalationStats);
+app.use('/api/reply-pacing', replyPacing);
+app.use('/api/ai-efficiency', aiEfficiency);
+app.use('/api/ai-vs-human', aiVsHuman);
+app.use('/api/failure-rate', failureRate);
+app.use('/api/conversation-flow', conversationFlow);
+app.use('/api/lead-conversion-speed', leadConversionSpeed);
+app.use('/api/hot-summary', hotSummary);
+app.use('/api/keywords', keywordsRoute);
+app.use('/api/messages', messagesRoute);
+app.use('/api/hot', hotRoute);
+
 
 const { createClient } = require('@supabase/supabase-js');
 
