@@ -4,7 +4,7 @@ import supabase from '../lib/supabaseClient';
 
 
 const apiClient = axios.create({
-  baseURL: '/api', // Assuming all API calls are prefixed with /api
+  baseURL: '/', // Assuming all API calls are prefixed with /api
 });
 
 apiClient.interceptors.request.use(

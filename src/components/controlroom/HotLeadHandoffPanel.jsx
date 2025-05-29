@@ -8,7 +8,7 @@ const HotLeadHandoffPanel = () => {
 
   useEffect(() => {
     axios.get('/api/hot').then((res) => {
-      setHotLeads(res.data || []);
+      setHotLeads(res.data.hotLeads || []);
     });
 
     axios.get('/api/hot-summary').then((res) => {

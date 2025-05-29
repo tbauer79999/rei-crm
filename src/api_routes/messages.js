@@ -1,7 +1,7 @@
 // /api_routes/messages.js
 const express = require('express');
 const router = express.Router();
-const { supabase } = require('../lib/supabaseClient');
+const { supabase } = require('../lib/supabaseService');
 
 // Search messages by keyword
 router.get('/search', async (req, res) => {

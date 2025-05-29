@@ -16,13 +16,13 @@ const AiOptimizationPanel = () => {
   }, []);
 
   useEffect(() => {
-    if (selectedKeyword) {
-      apiClient
-        .get(`/api/messages?keyword=${encodeURIComponent(selectedKeyword)}`)
-        .then((res) => setMessageMatches(res.data.matches || []))
-        .catch(() => setMessageMatches([]));
-    }
-  }, [selectedKeyword]);
+  if (selectedKeyword) {
+    apiClient
+      .get(`/api/messages/search?keyword=${encodeURIComponent(selectedKeyword)}`)
+      .then((res) => setMessageMatches(res.data.matches || []))  // <- note this
+      .catch(() => setMessageMatches([]));
+  }
+}, [selectedKeyword]);
 
   return (
     <div className="space-y-6">
