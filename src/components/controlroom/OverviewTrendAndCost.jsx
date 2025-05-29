@@ -1,6 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  CartesianGrid,
+} from 'recharts';
+import { useAuth } from '../../context/AuthContext'; // Adjust path as needed
 
 const MetricCard = ({ title, value, subtext, trend, empty }) => (
   <div
@@ -35,70 +44,44 @@ const MetricCard = ({ title, value, subtext, trend, empty }) => (
 );
 
 export default function OverviewTrendAndCost() {
+  const { user } = useAuth();
+  const tenantId = user?.tenant_id;
+
   const [hotLeadTrend, setHotLeadTrend] = useState([]);
   const [messagesSent, setMessagesSent] = useState(0);
   const [hotLeadCount, setHotLeadCount] = useState(0);
-  const [totalLeadCount, setTotalLeadCount] = useState(0);
   const [previousHotLeadCount, setPreviousHotLeadCount] = useState(0);
   const [previousMessageCount, setPreviousMessageCount] = useState(0);
 
-  const COST_PER_MESSAGE = 0.01; // $0.01 per SMS
+  const COST_PER_MESSAGE = 0.01;
 
   useEffect(() => {
-    axios.get('/api/analytics').then((res) => {
-      const leads = res.data?.raw || [];
+    if (!tenantId) return;
 
-      const now = new Date();
-      const thisWeekStart = new Date(now);
-      thisWeekStart.setDate(now.getDate() - 7);
-      const lastWeekStart = new Date(now);
-      lastWeekStart.setDate(now.getDate() - 14);
+    axios
+      .get('/api/overview/analytics-trend-cost', {
+        params: { tenant_id: tenantId },
+      })
+      .then((res) => {
+        const {
+          trend,
+          totalMessagesSent,
+          totalHotLeads,
+          previousMessagesSent,
+          previousHotLeads,
+        } = res.data;
 
-      const grouped = {};
-      let sentCount = 0;
-      let hotCount = 0;
-      let prevSent = 0;
-      let prevHot = 0;
-
-      leads.forEach((lead) => {
-        const createdDate = new Date(lead.Created);
-        const date = createdDate.toISOString().slice(0, 10);
-
-        if (!grouped[date]) grouped[date] = { total: 0, hot: 0 };
-        grouped[date].total += 1;
-
-        if (lead.Status === 'Hot Lead') {
-          grouped[date].hot += 1;
-          hotCount++;
-          if (createdDate > lastWeekStart && createdDate <= thisWeekStart) prevHot++;
-        }
-
-        if (lead.Messages?.length) {
-          lead.Messages.forEach((msg) => {
-            if (msg.direction === 'outbound') {
-              if (createdDate > lastWeekStart && createdDate <= thisWeekStart) prevSent++;
-              sentCount++;
-            }
-          });
-        }
+        setHotLeadTrend(trend);
+        setMessagesSent(totalMessagesSent);
+        setHotLeadCount(totalHotLeads);
+        setPreviousMessageCount(previousMessagesSent);
+        setPreviousHotLeadCount(previousHotLeads);
       });
-
-      const trend = Object.entries(grouped).map(([date, data]) => ({
-        date,
-        hotRate: data.total ? ((data.hot / data.total) * 100).toFixed(1) : 0,
-      }));
-
-      setHotLeadTrend(trend);
-      setMessagesSent(sentCount);
-      setHotLeadCount(hotCount);
-      setTotalLeadCount(leads.length);
-      setPreviousHotLeadCount(prevHot);
-      setPreviousMessageCount(prevSent);
-    });
-  }, []);
+  }, [tenantId]);
 
   const cost = messagesSent * COST_PER_MESSAGE;
-  const costPerHotLead = hotLeadCount > 0 ? (cost / hotLeadCount).toFixed(2) : '—';
+  const costPerHotLead =
+    hotLeadCount > 0 ? (cost / hotLeadCount).toFixed(2) : '—';
 
   const calcTrend = (curr, prev) => {
     if (prev === 0) return curr > 0 ? '+100%' : '+0%';
@@ -118,7 +101,13 @@ export default function OverviewTrendAndCost() {
             <XAxis dataKey="date" fontSize={10} />
             <YAxis domain={[0, 100]} tickFormatter={(v) => `${v}%`} fontSize={10} />
             <Tooltip formatter={(value) => `${value}%`} />
-            <Line type="monotone" dataKey="hotRate" stroke="#3b82f6" strokeWidth={2} dot={false} />
+            <Line
+              type="monotone"
+              dataKey="hotRate"
+              stroke="#3b82f6"
+              strokeWidth={2}
+              dot={false}
+            />
           </LineChart>
         </ResponsiveContainer>
       </div>
@@ -136,7 +125,11 @@ export default function OverviewTrendAndCost() {
         title="Cost per Hot Lead"
         value={costPerHotLead === '—' ? '—' : `$${costPerHotLead}`}
         subtext={hotLeadCount ? `${hotLeadCount} hot leads` : 'No hot leads yet'}
-        trend={hotLeadCount > 0 ? calcTrend(hotLeadCount, previousHotLeadCount) : null}
+        trend={
+          hotLeadCount > 0
+            ? calcTrend(hotLeadCount, previousHotLeadCount)
+            : null
+        }
         empty={hotLeadCount === 0}
       />
     </div>

@@ -33,6 +33,9 @@ const hotSummary = require('./src/api_routes/hot-summary');
 const keywordsRoute = require('./src/api_routes/keywords');
 const messagesRoute = require('./src/api_routes/messages');
 const hotRoute = require('./src/api_routes/hot');
+const overviewRouter = require('./src/api_routes/overview');
+
+
 
 const app = express();
 
@@ -90,7 +93,7 @@ app.use('/api/lead-conversion-speed', leadConversionSpeed);
 app.use('/api/keywords', keywordsRoute);
 app.use('/api/messages', messagesRoute);
 app.use('/api/hot', hotRoute);
-
+app.use('/api/overview', overviewRouter);
 
 const { createClient } = require('@supabase/supabase-js');
 
