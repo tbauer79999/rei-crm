@@ -9,13 +9,8 @@ const pdf = require('pdf-parse'); // Keep, used by knowledgeBaseRoutes
 const { default: fetch } = require('node-fetch'); // Keep, used by settingsApiRoutes and knowledgeBaseRoutes
 const { fetchAllRecords, fetchRecordById, fetchSettingValue } = require('./src/lib/supabaseHelpers');
 
-
-
-
 dotenv.config();
 const { supabase } = require('./src/lib/supabaseService'); // ✅
-
-
 
 // Import new routers
 const leadsRouter = require('./src/api_routes/leadRoutes');
@@ -75,6 +70,7 @@ const authenticateToken = async (req, res, next) => {
 
 app.use(cors());
 app.use(express.json());
+app.use('/api/hot-summary', hotSummary);
 app.use('/api/leads', leadsRouter);
 app.use('/api/analytics', authenticateToken, analyticsRoute);
 app.use('/api/settings', settingsApiRouter);
@@ -91,7 +87,6 @@ app.use('/api/ai-vs-human', aiVsHuman);
 app.use('/api/failure-rate', failureRate);
 app.use('/api/conversation-flow', conversationFlow);
 app.use('/api/lead-conversion-speed', leadConversionSpeed);
-app.use('/api/hot-summary', hotSummary);
 app.use('/api/keywords', keywordsRoute);
 app.use('/api/messages', messagesRoute);
 app.use('/api/hot', hotRoute);

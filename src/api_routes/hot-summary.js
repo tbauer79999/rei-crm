@@ -1,7 +1,7 @@
 // api_routes/hot-summary.js
 const express = require('express');
 const router = express.Router();
-const supabase = require('../lib/supabaseClient');
+const { supabase } = require('../lib/supabaseService');
 
 router.get('/', async (req, res) => {
   const { data: leads, error } = await supabase
@@ -17,10 +17,11 @@ router.get('/', async (req, res) => {
   const hot = leads.filter((l) => l.status === 'Hot Lead');
   const noCall = hot.filter((l) => !l.call_logged);
   const preview = noCall.slice(0, 3).map((l) => ({
-    name: l.name,
-    summary: l.summary,
-    minutesAgo: Math.floor((Date.now() - new Date(l.marked_hot_at)) / 60000),
-  }));
+  name: l.name,
+  summary: l.status || 'Hot Lead',
+  minutesAgo: Math.max(0, Math.floor((Date.now() - new Date(l.marked_hot_at)) / 60000)),
+}));
+
 
   return res.json({
     markedHot: hot.length,

@@ -1,11 +1,10 @@
 const express = require('express');
-// const { supabase } = require('../../supabaseClient'); // No longer needed
 const {
   supabase,
   fetchRecordById,
   fetchAllRecords,
   fetchSettingValue
-} = require('../lib/supabaseService'); // adjust path if needed
+} = require('../lib/supabaseService');
 
 const router = express.Router();
 
@@ -47,17 +46,15 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-
 router.patch('/:id/status', async (req, res) => {
   try {
     const { status } = req.body;
     const id = req.params.id;
     const today = new Date().toISOString().split('T')[0];
 
-    // Note: fetchRecordById is assumed to be imported or defined elsewhere
-    const existing = await fetchRecordById('leads', id); 
-    const oldStatus = existing?.fields?.Status || existing?.status || ''; // Adjusted to check existing.status as well
-    const history = existing?.fields?.['Status History'] || existing?.status_history || ''; // Adjusted to check existing.status_history
+    const existing = await fetchRecordById('leads', id);
+    const oldStatus = existing?.fields?.Status || existing?.status || '';
+    const history = existing?.fields?.['Status History'] || existing?.status_history || '';
 
     let updatedHistory = history;
     if (status && status !== oldStatus) {
@@ -65,24 +62,28 @@ router.patch('/:id/status', async (req, res) => {
       updatedHistory = history ? `${history}\n${newLine}` : newLine;
     }
 
-    const { data: updatedRecords, error } = await supabase // Renamed resUpdate to updatedRecords for clarity
-  .from('leads')
-  .update({
-    status: status,
-    status_history: updatedHistory
-  })
-  .eq('id', id)
-  .select(); // Added select() to get the updated record
+    const updatePayload = {
+      status: status,
+      status_history: updatedHistory
+    };
 
-if (error) {
-  throw new Error(`Failed to update property status: ${error.message}`);
-}
+    if (status === 'Hot Lead' && !existing?.marked_hot_at) {
+      updatePayload.marked_hot_at = new Date().toISOString();
+    }
 
-    // .select() without .single() returns an array. Send the first element if it exists.
+    const { data: updatedRecords, error } = await supabase
+      .from('leads')
+      .update(updatePayload)
+      .eq('id', id)
+      .select();
+
+    if (error) {
+      throw new Error(`Failed to update property status: ${error.message}`);
+    }
+
     if (updatedRecords && updatedRecords.length > 0) {
-      res.json(updatedRecords[0]); 
+      res.json(updatedRecords[0]);
     } else {
-      // Fallback if no record is returned, though .select() should return the updated one
       res.status(404).json({ error: 'Property not found after update or no data returned.' });
     }
   } catch (err) {
@@ -97,8 +98,8 @@ router.post('/bulk', async (req, res) => {
 
     const { data: settingsData, error: settingsError } = await supabase
       .from('platform_settings')
-      .select('value') // Corrected 'Value' to 'value'
-      .eq('key', 'Campaigns') // Corrected 'Key' to 'key'
+      .select('value')
+      .eq('key', 'Campaigns')
       .single();
 
     if (settingsError || !settingsData?.value) {

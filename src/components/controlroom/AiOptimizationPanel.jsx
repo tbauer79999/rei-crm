@@ -10,7 +10,7 @@ const AiOptimizationPanel = () => {
   const [messageMatches, setMessageMatches] = useState([]);
 
   useEffect(() => {
-    apiClient.get('/api/analytics/keywords').then((res) => {
+    apiClient.get('/api/keywords').then((res) => {
       setKeywords(res.data.keywords || []);
     });
   }, []);
@@ -18,7 +18,7 @@ const AiOptimizationPanel = () => {
   useEffect(() => {
     if (selectedKeyword) {
       apiClient
-        .get(`/api/analytics/messages?keyword=${encodeURIComponent(selectedKeyword)}`)
+        .get(`/api/messages?keyword=${encodeURIComponent(selectedKeyword)}`)
         .then((res) => setMessageMatches(res.data.matches || []))
         .catch(() => setMessageMatches([]));
     }

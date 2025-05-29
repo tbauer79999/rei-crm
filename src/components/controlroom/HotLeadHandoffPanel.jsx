@@ -7,11 +7,11 @@ const HotLeadHandoffPanel = () => {
   const [stats, setStats] = useState({});
 
   useEffect(() => {
-    axios.get('/api/leads/hot').then((res) => {
+    axios.get('/api/hot').then((res) => {
       setHotLeads(res.data || []);
     });
 
-    axios.get('/api/leads/hot-summary').then((res) => {
+    axios.get('/api/hot-summary').then((res) => {
       setStats(res.data || {});
     });
   }, []);
