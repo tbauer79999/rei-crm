@@ -7,6 +7,7 @@ import Dashboard from './pages/Dashboard';
 import AIControlRoom from './pages/AIControlRoom';
 import Settings from './pages/Settings';
 import LeadDetail from './pages/LeadDetail';
+import EnterpriseAnalytics from './pages/EnterpriseAnalytics';
 import LoginPage from './pages/LoginPage';
 import SignupPage from './pages/SignupPage';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -32,6 +33,7 @@ export default function App() {
                     <Route path="/" element={<Navigate to="/control-room" replace />} />
                     <Route path="/control-room" element={<AIControlRoom />} />
                     <Route path="/dashboard" element={<Dashboard />} />
+                    <Route path="/enterprise-analytics" element={<EnterpriseAnalytics />} />
                     <Route path="/settings" element={<Settings />} />
                     <Route path="/lead/:id" element={<LeadDetail />} />
                   </Routes>

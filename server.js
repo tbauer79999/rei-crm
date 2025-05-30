@@ -12,6 +12,7 @@ const { fetchAllRecords, fetchRecordById, fetchSettingValue } = require('./src/l
 dotenv.config();
 const { supabase } = require('./src/lib/supabaseService'); // ✅
 
+
 // Import new routers
 const leadsRouter = require('./src/api_routes/leadRoutes');
 const analyticsRoute = require('./src/api_routes/analyticsRoutes');
@@ -29,14 +30,16 @@ const conversationFlow = require('./src/api_routes/conversationFlowSparklineCard
 const failureRate = require('./src/api_routes/failureRate');
 const aiVsHuman = require('./src/api_routes/aiVsHumanToggleCard');
 const aiEfficiency = require('./src/api_routes/aiEfficiencyCard');
-const hotSummary = require('./src/api_routes/hot-summary');
+const hotSummaryRoutes = require('./src/api_routes/hot-summary');
 const keywordsRoute = require('./src/api_routes/keywords');
 const messagesRoute = require('./src/api_routes/messages');
-const hotRoute = require('./src/api_routes/hot');
+const hotRoutes = require('./src/api_routes/hot');
 const overviewRouter = require('./src/api_routes/overview');
-
-
-
+const callLoggingRoutes = require('./src/api_routes/call-logging');
+const funnelAnalyticsRoutes = require('./src/api_routes/funnel-analytics');
+const leadTrendsRoutes = require('./src/api_routes/lead-trends');
+const healthRoutes = require('./src/api_routes/health');
+const enterpriseAnalyticsRoutes = require('./src/api_routes/enterprise-analytics');
 const app = express();
 
 // Authentication Middleware
@@ -73,7 +76,7 @@ const authenticateToken = async (req, res, next) => {
 
 app.use(cors());
 app.use(express.json());
-app.use('/api/hot-summary', hotSummary);
+app.use('/api/hot-summary', hotSummaryRoutes);
 app.use('/api/leads', leadsRouter);
 app.use('/api/analytics', authenticateToken, analyticsRoute);
 app.use('/api/settings', settingsApiRouter);
@@ -92,10 +95,15 @@ app.use('/api/conversation-flow', conversationFlow);
 app.use('/api/lead-conversion-speed', leadConversionSpeed);
 app.use('/api/keywords', keywordsRoute);
 app.use('/api/messages', messagesRoute);
-app.use('/api/hot', hotRoute);
+app.use('/api/hot', hotRoutes);
 app.use('/api/overview', overviewRouter);
+app.use('/api/call-logging', callLoggingRoutes);
+app.use('/api/funnel-analytics', funnelAnalyticsRoutes);
+app.use('/api/lead-trends', leadTrendsRoutes);
+app.use('/api/health', healthRoutes);
+app.use('/api/enterprise-analytics', enterpriseAnalyticsRoutes);
 
-const { createClient } = require('@supabase/supabase-js');
+
 
 app.post('/api/leads/bulk', async (req, res) => {
   try {

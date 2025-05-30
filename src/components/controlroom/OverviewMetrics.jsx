@@ -38,10 +38,9 @@ export default function OverviewMetrics() {
   useEffect(() => {
     if (!tenantId) return;
 
-    axios
-      .get('/api/overview/analytics-overview', {
-        params: { tenant_id: tenantId },
-      })
+    axios.get('/api/overview', {
+  params: { tenant_id: tenantId },
+})
       .then((res) => {
         const data = res.data;
 

@@ -14,7 +14,7 @@ router.get('/search', async (req, res) => {
   try {
     const { data, error } = await supabase
       .from('messages')
-      .select('message_body, timestamp')
+      .select('id, message_body, direction, timestamp, lead_id') // Return full objects now
       .not('message_body', 'is', null)
       .neq('message_body', '')
       .ilike('message_body', `%${keyword}%`)
@@ -26,14 +26,37 @@ router.get('/search', async (req, res) => {
       return res.status(500).json({ error: 'Failed to search messages' });
     }
 
-    const matches = data.map((msg) => msg.message_body);
-    res.json({ matches });
+    // Return full message objects instead of just message_body
+    res.json({ matches: data || [] });
   } catch (err) {
     console.error('Server error:', err);
     res.status(500).json({ error: 'Server error during keyword search' });
   }
 });
 
-// You can add other message-related routes here as needed
+// Get all messages for a specific lead
+router.get('/lead/:leadId', async (req, res) => {
+  const leadId = req.params.leadId;
+
+  try {
+    const { data, error } = await supabase
+      .from('messages')
+      .select('id, message_body, direction, timestamp, lead_id')
+      .eq('lead_id', leadId)
+      .not('message_body', 'is', null)
+      .neq('message_body', '')
+      .order('timestamp', { ascending: true }); // Oldest first for conversation flow
+
+    if (error) {
+      console.error('Supabase error:', error.message);
+      return res.status(500).json({ error: 'Failed to fetch messages' });
+    }
+
+    res.json({ messages: data || [] });
+  } catch (err) {
+    console.error('Server error:', err);
+    res.status(500).json({ error: 'Server error fetching messages' });
+  }
+});
 
 module.exports = router;

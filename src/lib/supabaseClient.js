@@ -1,4 +1,4 @@
-// src/lib/supabaseClient.js
+// src/lib/supabaseClient.js  
 const { createClient } = require('@supabase/supabase-js');
 
 const supabaseUrl = process.env.REACT_APP_SUPABASE_URL;

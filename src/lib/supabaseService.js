@@ -3,7 +3,7 @@ const { createClient } = require('@supabase/supabase-js');
 require('dotenv').config();
 
 const supabase = createClient(
-  process.env.SUPABASE_URL,
+  process.env.REACT_APP_SUPABASE_URL,  // Added REACT_APP_ prefix
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
