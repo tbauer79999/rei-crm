@@ -40,7 +40,7 @@ router.get('/', async (req, res) => {
     if (error) throw error;
 
     res.json({
-      ...data,
+      data,
       meta: { role, tenant_id, messages_count: data?.length || 0 }
     });
   } catch (err) {
@@ -90,7 +90,7 @@ router.get('/:id', async (req, res) => {
     if (error) throw error;
 
     res.json({
-      ...data,
+      data,
       meta: { role, tenant_id, property_id: id, messages_count: data?.length || 0 }
     });
   } catch (err) {

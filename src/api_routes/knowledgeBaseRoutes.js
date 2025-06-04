@@ -99,7 +99,7 @@ router.get('/docs', async (req, res) => {
     if (error) throw error;
 
     res.status(200).json({
-      ...data,
+      data,
       meta: { role, tenant_id, document_count: data?.length || 0 }
     });
   } catch (err) {

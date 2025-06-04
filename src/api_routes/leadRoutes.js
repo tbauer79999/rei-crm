@@ -38,7 +38,7 @@ router.get('/', async (req, res) => {
     if (error) throw error;
 
     res.json({
-      ...data,
+      data,
       meta: { role, tenant_id, leads_count: data?.length || 0 }
     });
   } catch (err) {
@@ -78,7 +78,7 @@ router.get('/:id', async (req, res) => {
     }
 
     res.json({
-      ...data,
+      data,
       meta: { role, tenant_id }
     });
   } catch (err) {
@@ -155,7 +155,7 @@ router.patch('/:id/status', async (req, res) => {
 
     if (updatedRecords && updatedRecords.length > 0) {
       res.json({
-        ...updatedRecords[0],
+        data: updatedRecords[0],
         meta: { role, tenant_id }
       });
     } else {

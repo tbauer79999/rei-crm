@@ -47,9 +47,11 @@ router.get('/:id', async (req, res) => {
     // Split name into first_name and last_name if needed
     const nameParts = data.name ? data.name.split(' ') : ['', ''];
     const response = {
-      ...data,
-      first_name: nameParts[0] || '',
-      last_name: nameParts.slice(1).join(' ') || '',
+      data: {
+        ...data,
+        first_name: nameParts[0] || '',
+        last_name: nameParts.slice(1).join(' ') || ''
+      },
       meta: { role, tenant_id }
     };
 
