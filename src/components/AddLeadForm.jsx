@@ -58,7 +58,10 @@ export default function AddLeadForm({ onSuccess, onCancel }) {
     console.log("FORM SUBMITTED!", form);
 
     try {
-      if (!user || !user.tenant_id || !user.access_token) {
+      const { data: { session } } = await supabase.auth.getSession();
+      const accessToken = session?.access_token || localStorage.getItem('auth_token');
+
+      if (!user || !user.tenant_id || !accessToken) {
         alert('User authentication information not available. Please log in.');
         return;
       }
@@ -75,8 +78,8 @@ export default function AddLeadForm({ onSuccess, onCancel }) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${user.access_token}`,
-          'apikey': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${accessToken}`,
+          'apikey': process.env.REACT_APP_SUPABASE_ANON_KEY,
         },
         body: JSON.stringify({
           name: form.name,
