@@ -1,5 +1,5 @@
 // ===================================================================
-// src/pages/SignupPage.jsx - Updated for Single Tab Confirmation
+// src/pages/SignupPage.jsx - FIXED: Calls Edge Function for invitations
 // ===================================================================
 
 import React, { useState, useEffect } from 'react';
@@ -12,7 +12,7 @@ import { Label } from '../components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription } from '../components/ui/card';
 
 // Email Confirmation Waiting Component
-const EmailConfirmationWaiting = ({ email, navigate }) => {
+const EmailConfirmationWaiting = ({ email, navigate, isInvitedUser }) => {
   const [isChecking, setIsChecking] = useState(false);
   const [timeLeft, setTimeLeft] = useState(300); // 5 minutes countdown
   const [canResend, setCanResend] = useState(false);
@@ -30,13 +30,17 @@ const EmailConfirmationWaiting = ({ email, navigate }) => {
           const { data: { session } } = await supabase.auth.getSession();
           
           if (session?.user?.email_confirmed_at) {
-            console.log('✅ Email confirmed! Redirecting to onboarding...');
+            console.log('✅ Email confirmed! Redirecting...');
             clearInterval(pollInterval);
             clearInterval(countdownInterval);
             setIsChecking(false);
             
-            // Smooth transition to onboarding
-            navigate('/onboarding', { replace: true });
+            // Different redirect based on user type
+            if (isInvitedUser) {
+              navigate('/dashboard', { replace: true }); // Invited users skip onboarding
+            } else {
+              navigate('/onboarding', { replace: true }); // Business admins go to onboarding
+            }
           }
         } catch (error) {
           console.error('Error checking confirmation status:', error);
@@ -66,7 +70,7 @@ const EmailConfirmationWaiting = ({ email, navigate }) => {
       if (pollInterval) clearInterval(pollInterval);
       if (countdownInterval) clearInterval(countdownInterval);
     };
-  }, [navigate]);
+  }, [navigate, isInvitedUser]);
 
   const handleResendEmail = async () => {
     try {
@@ -135,7 +139,7 @@ const EmailConfirmationWaiting = ({ email, navigate }) => {
             
             <div className="space-y-2 text-sm text-gray-600">
               <p>✅ Click the confirmation link in your email</p>
-              <p>🔄 We'll automatically take you to setup</p>
+              <p>🔄 We'll automatically take you to {isInvitedUser ? 'your dashboard' : 'setup'}</p>
               <p>📱 Stay on this page - no need to refresh!</p>
             </div>
           </div>
@@ -196,19 +200,40 @@ const SignupPage = () => {
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState('signup'); // 'signup', 'creating', 'success', 'confirmed'
+  const [invitationInfo, setInvitationInfo] = useState(null);
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Check URL parameters for email confirmation
+  // Enhanced URL parameter checking for invitations and email confirmation
   useEffect(() => {
     const urlParams = new URLSearchParams(location.search);
-    const confirmed = urlParams.get('confirmed');
-    const fragment = new URLSearchParams(window.location.hash.substring(1));
-    const accessToken = urlParams.get('access_token') || fragment.get('access_token');
-    const refreshToken = urlParams.get('refresh_token') || fragment.get('refresh_token');
-    const type = urlParams.get('type') || fragment.get('type');
+    const hashParams = new URLSearchParams(window.location.hash.substring(1));
+    
+    // Check for invitation parameters first
+    const invitationId = urlParams.get('invitation_id') || hashParams.get('invitation_id');
+    const tenantId = urlParams.get('tenant_id') || hashParams.get('tenant_id');
+    const role = urlParams.get('role') || hashParams.get('role');
+    const inviteEmail = urlParams.get('email') || hashParams.get('email');
 
-    console.log('🔍 SignupPage URL check:', { confirmed, accessToken: !!accessToken, type });
+    // Check for email confirmation parameters
+    const confirmed = urlParams.get('confirmed');
+    const accessToken = urlParams.get('access_token') || hashParams.get('access_token');
+    const refreshToken = urlParams.get('refresh_token') || hashParams.get('refresh_token');
+    const type = urlParams.get('type') || hashParams.get('type');
+
+    console.log('🔍 SignupPage URL analysis:', {
+      invitationId, tenantId, role, inviteEmail,
+      confirmed, hasAccessToken: !!accessToken, type
+    });
+
+    // Handle invitation parameters
+    if (invitationId) {
+      console.log('🎯 Invitation detected:', invitationId);
+      setInvitationInfo({ invitationId, tenantId, role, email: inviteEmail });
+      if (inviteEmail) {
+        setEmail(inviteEmail);
+      }
+    }
 
     // Handle email confirmation callback
     if (confirmed === 'true' || (type === 'signup' && accessToken)) {
@@ -221,24 +246,33 @@ const SignupPage = () => {
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
-        console.log('User already logged in, redirecting...');
+        console.log('User already logged in, checking redirect...');
         
-        // Check onboarding status
-        try {
-          const { data: tenant } = await supabase
-            .from('tenants')
-            .select('onboarding_complete')
-            .eq('id', session.user.id)
-            .single();
+        // Check if this is an invited user
+        const isInvitedUser = session.user.raw_user_meta_data?.invited_signup || 
+                             session.user.raw_user_meta_data?.invitation_id;
+        
+        if (isInvitedUser) {
+          console.log('🎯 Invited user already logged in, going to dashboard');
+          navigate('/dashboard');
+        } else {
+          // Check onboarding status for business admin
+          try {
+            const { data: tenant } = await supabase
+              .from('tenants')
+              .select('onboarding_complete')
+              .eq('id', session.user.id)
+              .single();
 
-          if (tenant?.onboarding_complete) {
-            navigate('/dashboard');
-          } else {
+            if (tenant?.onboarding_complete) {
+              navigate('/dashboard');
+            } else {
+              navigate('/onboarding');
+            }
+          } catch (error) {
+            console.error('Error checking onboarding:', error);
             navigate('/onboarding');
           }
-        } catch (error) {
-          console.error('Error checking onboarding:', error);
-          navigate('/onboarding');
         }
       }
     };
@@ -268,20 +302,35 @@ const SignupPage = () => {
 
         if (data?.user) {
           console.log('✅ Email confirmed for user:', data.user.email);
+          console.log('🔍 User metadata:', data.user.raw_user_meta_data);
           setMessage('Email confirmed! Setting up your account...');
 
-          // Check onboarding status and redirect
-          const { data: tenant } = await supabase
-            .from('tenants')
-            .select('onboarding_complete')
-            .eq('id', data.user.id)
-            .single();
+          // Check if this is an invited user from raw_user_meta_data
+          const isInvitedUser = data.user.raw_user_meta_data?.invited_signup === true || 
+                               data.user.raw_user_meta_data?.invitation_id;
 
+          console.log('🎯 Is invited user?', isInvitedUser);
+
+          // For invited users, call the Edge Function to process the invitation
+          if (isInvitedUser && data.user.raw_user_meta_data?.invitation_id) {
+            console.log('🎯 Processing invitation via Edge Function...');
+            setMessage('Processing your invitation...');
+            await processInvitationViaEdgeFunction(
+              data.user.id,
+              data.user.email,
+              data.user.raw_user_meta_data.invitation_id
+            );
+          }
+
+          // Redirect based on user type
           setTimeout(() => {
-            if (tenant?.onboarding_complete) {
+            if (isInvitedUser) {
+              console.log('🎯 Invited user confirmed, redirecting to dashboard');
               navigate('/dashboard', { replace: true });
             } else {
-              navigate('/onboarding', { replace: true });
+              console.log('👤 Business admin confirmed, checking onboarding status');
+              // Check onboarding status for business admin
+              checkBusinessAdminOnboarding(data.user.id);
             }
           }, 2000);
         }
@@ -291,10 +340,32 @@ const SignupPage = () => {
         
         if (session?.user) {
           console.log('✅ Session already active, proceeding...');
+          console.log('🔍 Session user metadata:', session.user.raw_user_meta_data);
           setMessage('Email confirmed! Redirecting...');
           
+          // Check if invited user from session metadata
+          const isInvitedUser = session.user.raw_user_meta_data?.invited_signup === true || 
+                               session.user.raw_user_meta_data?.invitation_id;
+          
+          console.log('🎯 Is invited user from session?', isInvitedUser);
+
+          // For invited users, call the Edge Function
+          if (isInvitedUser && session.user.raw_user_meta_data?.invitation_id) {
+            console.log('🎯 Processing invitation via Edge Function...');
+            setMessage('Processing your invitation...');
+            await processInvitationViaEdgeFunction(
+              session.user.id,
+              session.user.email,
+              session.user.raw_user_meta_data.invitation_id
+            );
+          }
+
           setTimeout(() => {
-            navigate('/onboarding', { replace: true });
+            if (isInvitedUser) {
+              navigate('/dashboard', { replace: true });
+            } else {
+              checkBusinessAdminOnboarding(session.user.id);
+            }
           }, 1500);
         } else {
           console.log('❌ No session found after confirmation');
@@ -306,6 +377,92 @@ const SignupPage = () => {
       console.error('Error handling email confirmation:', error);
       setError('An error occurred during confirmation. Please try again.');
       setStep('signup');
+    }
+  };
+
+  // NEW: Function to call the Edge Function for invitation processing
+  const processInvitationViaEdgeFunction = async (userId, email, invitationId) => {
+    try {
+      console.log('🚀 Calling process-invitation Edge Function...');
+      console.log('Data:', { userId, email, invitationId });
+
+      // Get the current session token
+      const { data: { session } } = await supabase.auth.getSession();
+      const authToken = session?.access_token;
+      
+      console.log('🔑 Auth token available:', !!authToken);
+
+      // Use your specific Supabase URL and add the anon key
+      const edgeFunctionUrl = 'https://wuuqrdlfgkasnwydyvgk.supabase.co/functions/v1/process-invitation';
+      
+      console.log('📍 Edge Function URL:', edgeFunctionUrl);
+
+      const headers = {
+        'Content-Type': 'application/json',
+        'apikey': process.env.REACT_APP_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXFyZGxmZ2thc253eWR5dmdrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc3Njg5NzcsImV4cCI6MjA2MzM0NDk3N30.jGwY-ZbyWnTrZQ1uUsPW5mrwGtp-_v05IKyGOk4Mm40'
+      };
+
+      // Add auth token if available
+      if (authToken) {
+        headers['Authorization'] = `Bearer ${authToken}`;
+      }
+
+      const response = await fetch(edgeFunctionUrl, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          user_id: userId,
+          email: email,
+          invitation_id: invitationId
+        })
+      });
+
+      console.log('📡 Edge Function response status:', response.status);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ Edge Function failed with status:', response.status);
+        console.error('❌ Error response:', errorText);
+        
+        let errorData;
+        try {
+          errorData = JSON.parse(errorText);
+        } catch (e) {
+          errorData = { error: `HTTP ${response.status}: ${errorText}` };
+        }
+        
+        throw new Error(errorData.error || 'Failed to process invitation');
+      }
+
+      const result = await response.json();
+      console.log('✅ Edge Function success:', result);
+      
+      return result;
+    } catch (error) {
+      console.error('💥 Edge Function error:', error);
+      // Don't throw - let the user continue even if edge function fails
+      // The profile might already exist or be created by triggers
+      console.log('⚠️ Continuing despite edge function failure...');
+    }
+  };
+
+  // Helper function to check business admin onboarding
+  const checkBusinessAdminOnboarding = async (userId) => {
+    try {
+      const { data: tenant } = await supabase
+        .from('tenants')
+        .select('onboarding_complete')
+        .eq('id', userId)
+        .single();
+
+      if (tenant?.onboarding_complete) {
+        navigate('/dashboard', { replace: true });
+      } else {
+        navigate('/onboarding', { replace: true });
+      }
+    } catch (error) {
+      console.error('Error checking tenant onboarding:', error);
+      navigate('/onboarding', { replace: true });
     }
   };
 
@@ -330,10 +487,27 @@ const SignupPage = () => {
 
     try {
       console.log('=== Starting Signup Process ===');
+      console.log('Invitation info:', invitationInfo);
       
-      // Step 1: Create auth user
-      setMessage('Creating your account...');
-      const { data, error: signUpError } = await signUpUser(email, password);
+      // Build user metadata for invitations
+      let signupOptions = {};
+      if (invitationInfo) {
+        signupOptions.data = {
+          invitation_id: invitationInfo.invitationId,
+          tenant_id: invitationInfo.tenantId,
+          role: invitationInfo.role,
+          invited_signup: true,
+          skip_onboarding: true
+        };
+        console.log('🎯 Including invitation metadata:', signupOptions.data);
+        setMessage('Creating your account and joining the team...');
+      } else {
+        console.log('👤 Regular business admin signup');
+        setMessage('Creating your account...');
+      }
+
+      // Step 1: Create auth user (with invitation metadata if present)
+      const { data, error: signUpError } = await signUpUser(email, password, signupOptions);
 
       if (signUpError) {
         console.error('Auth signup error:', signUpError.message);
@@ -361,117 +535,47 @@ const SignupPage = () => {
       }
 
       console.log('✅ Auth user created:', newUser.id);
+      console.log('🔍 User metadata stored:', newUser.raw_user_meta_data);
 
-      // Step 2: Set up company data
-      setMessage('Setting up your company...');
-      
-      // Check if tenant already exists
-      const { data: existingTenant, error: tenantCheckError } = await supabase
-        .from('tenants')
-        .select('id, name, onboarding_complete')
-        .eq('id', newUser.id)
-        .single();
-
-      if (tenantCheckError && tenantCheckError.code !== 'PGRST116') {
-        console.error('Error checking tenant:', tenantCheckError);
-        setError('Database error during setup. Please contact support.');
-        setStep('signup');
-        setLoading(false);
-        return;
-      }
-
-      let tenantData = existingTenant;
-
-      // Create tenant if doesn't exist
-      if (!existingTenant) {
-        console.log('Creating tenant...');
-        const { data: newTenantData, error: tenantError } = await supabase
-          .from('tenants')
-          .insert([{
-            id: newUser.id,
-            tenant_id: newUser.id,
-            name: `${email.split('@')[0]}'s Company`,
-            onboarding_complete: false
-          }])
-          .select()
-          .single();
-
-        if (tenantError) {
-          console.error('Tenant creation error:', tenantError);
-          setError('Failed to set up company. Please contact support.');
-          setStep('signup');
-          setLoading(false);
-          return;
-        }
-
-        tenantData = newTenantData;
-        console.log('✅ Tenant created');
-      }
-
-      // Step 3: Set up user profile
-      setMessage('Finalizing your profile...');
-      
-      const { data: existingProfile, error: profileCheckError } = await supabase
-        .from('users_profile')
-        .select('id')
-        .eq('id', newUser.id)
-        .single();
-
-      if (profileCheckError && profileCheckError.code !== 'PGRST116') {
-        console.error('Error checking profile:', profileCheckError);
-        setError('Database error during profile setup. Please contact support.');
-        setStep('signup');
-        setLoading(false);
-        return;
-      }
-
-      // Create profile if doesn't exist
-      if (!existingProfile) {
-        console.log('Creating user profile...');
-        const { error: profileError } = await supabase
-          .from('users_profile')
-          .insert([{
-            id: newUser.id,
-            email: newUser.email,
-            tenant_id: newUser.id,
-            role: 'business_admin',
-          }]);
-
-        if (profileError) {
-          console.error('Profile creation error:', profileError);
-          setError('Account created but profile setup failed. Please contact support.');
-          setStep('signup');
-          setLoading(false);
-          return;
-        }
-
-        console.log('✅ User profile created');
-      }
-
-      // Step 4: Handle post-signup flow
-      if (newUser.identities && newUser.identities.length > 0) {
-        // New user created - check if email confirmation is required
-        if (newUser.email_confirmed_at) {
-          // Email already confirmed (shouldn't happen for new signup, but handle it)
-          setMessage('Account created successfully!');
-          setStep('success');
+      // For invited users, call the Edge Function immediately after account creation
+      if (invitationInfo) {
+        console.log('🎯 Invited user - processing invitation immediately...');
+        setMessage('Processing your invitation...');
+        
+        try {
+          await processInvitationViaEdgeFunction(
+            newUser.id,
+            newUser.email,
+            invitationInfo.invitationId
+          );
           
-          setTimeout(() => {
-            if (tenantData?.onboarding_complete) {
-              navigate('/dashboard');
-            } else {
-              navigate('/onboarding');
-            }
-          }, 1500);
-        } else {
-          // Email confirmation required - show waiting screen
-          setStep('success');
-          setMessage('Account created! Check your email to verify your account.');
+          console.log('✅ Invitation processed successfully');
+          setMessage('Invitation processed! Check your email to verify and access your account.');
+        } catch (edgeError) {
+          console.error('Edge Function failed:', edgeError);
+          setMessage('Account created! Check your email to verify and join the team.');
         }
-      } else {
-        // Email confirmation required
+        
         setStep('success');
-        setMessage('Account created! Please check your email to verify your account before logging in.');
+        setLoading(false);
+        return;
+      }
+
+      // Business admin flow - create tenant and profile as fallback
+      console.log('👤 Business admin signup - setting up company...');
+      await setupBusinessAdmin(newUser);
+
+      // Handle post-signup flow
+      if (newUser.email_confirmed_at) {
+        setMessage('Account created successfully!');
+        setStep('success');
+        
+        setTimeout(() => {
+          navigate('/onboarding');
+        }, 1500);
+      } else {
+        setStep('success');
+        setMessage('Account created! Check your email to verify your account.');
       }
 
       console.log('=== Signup Process Complete ===');
@@ -483,6 +587,87 @@ const SignupPage = () => {
     }
 
     setLoading(false);
+  };
+
+  // Helper function to set up business admin (fallback)
+  const setupBusinessAdmin = async (newUser) => {
+    try {
+      setMessage('Setting up your company...');
+      
+      // Check if tenant already exists (trigger might have created it)
+      const { data: existingTenant, error: tenantCheckError } = await supabase
+        .from('tenants')
+        .select('id, name, onboarding_complete')
+        .eq('id', newUser.id)
+        .single();
+
+      if (tenantCheckError && tenantCheckError.code !== 'PGRST116') {
+        console.error('Error checking tenant:', tenantCheckError);
+        throw new Error('Database error during setup. Please contact support.');
+      }
+
+      // Create tenant if doesn't exist (fallback if trigger didn't work)
+      if (!existingTenant) {
+        console.log('Creating tenant (trigger may not have worked)...');
+        const { error: tenantError } = await supabase
+          .from('tenants')
+          .insert([{
+            id: newUser.id,
+            tenant_id: newUser.id,
+            name: `${email.split('@')[0]}'s Company`,
+            onboarding_complete: false
+          }]);
+
+        if (tenantError) {
+          console.error('Tenant creation error:', tenantError);
+          throw new Error('Failed to set up company. Please contact support.');
+        }
+        console.log('✅ Tenant created via fallback');
+      } else {
+        console.log('✅ Tenant already exists (trigger worked)');
+      }
+
+      // Set up user profile
+      setMessage('Finalizing your profile...');
+      
+      const { data: existingProfile, error: profileCheckError } = await supabase
+        .from('users_profile')
+        .select('id')
+        .eq('id', newUser.id)
+        .single();
+
+      if (profileCheckError && profileCheckError.code !== 'PGRST116') {
+        console.error('Error checking profile:', profileCheckError);
+        throw new Error(`Database error during profile setup: ${profileCheckError.message}`);
+      }
+
+      // Create profile if doesn't exist (fallback if trigger didn't work)
+      if (!existingProfile) {
+        console.log('Creating user profile (trigger may not have worked)...');
+        
+        const { error: profileError } = await supabase
+          .from('users_profile')
+          .insert([{
+            id: newUser.id,
+            email: newUser.email || email,
+            tenant_id: newUser.id,
+            role: 'business_admin'
+          }]);
+
+        if (profileError) {
+          console.error('Profile creation error:', profileError);
+          throw new Error(`Profile setup failed: ${profileError.message}. Please contact support.`);
+        }
+
+        console.log('✅ User profile created via fallback');
+      } else {
+        console.log('✅ Profile already exists (trigger worked)');
+      }
+
+    } catch (error) {
+      console.error('Business admin setup error:', error);
+      throw error;
+    }
   };
 
   // Email confirmation success state
@@ -515,7 +700,7 @@ const SignupPage = () => {
   }
 
   if (step === 'success') {
-    return <EmailConfirmationWaiting email={email} navigate={navigate} />;
+    return <EmailConfirmationWaiting email={email} navigate={navigate} isInvitedUser={!!invitationInfo} />;
   }
 
   return (
@@ -528,9 +713,14 @@ const SignupPage = () => {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
               </svg>
             </div>
-            <CardTitle className="text-2xl font-bold text-gray-800">Create Your Account</CardTitle>
+            <CardTitle className="text-2xl font-bold text-gray-800">
+              {invitationInfo ? 'Join the Team' : 'Create Your Account'}
+            </CardTitle>
             <CardDescription className="text-gray-600">
-              {step === 'creating' ? 'Setting up your lead generation system...' : 'Join thousands of successful real estate professionals'}
+              {step === 'creating' 
+                ? (invitationInfo ? 'Setting up your team access...' : 'Setting up your lead generation system...')
+                : (invitationInfo ? `You've been invited to join as ${invitationInfo.role}` : 'Join thousands of successful real estate professionals')
+              }
             </CardDescription>
           </CardHeader>
           
@@ -542,6 +732,20 @@ const SignupPage = () => {
               </div>
             ) : (
               <form onSubmit={handleSubmit} className="space-y-4">
+                {invitationInfo && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                    <div className="flex items-center">
+                      <svg className="w-5 h-5 text-blue-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                      </svg>
+                      <div>
+                        <p className="text-sm font-medium text-blue-800">Team Invitation</p>
+                        <p className="text-sm text-blue-600">You're joining as {invitationInfo.role}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 <div className="space-y-2">
                   <Label htmlFor="email" className="text-sm font-medium text-gray-700">
                     Email Address
@@ -552,6 +756,7 @@ const SignupPage = () => {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
+                    disabled={!!invitationInfo?.email}
                     placeholder="Enter your email"
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
                   />
@@ -604,10 +809,10 @@ const SignupPage = () => {
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                       </svg>
-                      Creating Account...
+                      {invitationInfo ? 'Joining Team...' : 'Creating Account...'}
                     </div>
                   ) : (
-                    'Create Account'
+                    invitationInfo ? 'Join Team' : 'Create Account'
                   )}
                 </Button>
               </form>

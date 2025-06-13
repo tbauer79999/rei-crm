@@ -9,9 +9,10 @@ import Settings from './pages/Settings';
 import LeadDetail from './pages/LeadDetail';
 import EnterpriseAnalytics from './pages/EnterpriseAnalytics';
 import BusinessAnalytics from './pages/businessAnalytics';
+import CampaignManagement from './pages/campaignManagement';
 import LoginPage from './pages/LoginPage';
 import SignupPage from './pages/SignupPage';
-import EmailConfirmationHandler from './pages/EmailConfirmationHandler'; // 👈 ADD THIS IMPORT
+import EmailConfirmationHandler from './pages/EmailConfirmationHandler';
 import ProtectedRoute from './components/ProtectedRoute';
 import EnterpriseRoute from './components/EnterpriseRoute';
 import OnboardingGuard from './components/OnboardingGuard';
@@ -24,7 +25,7 @@ export default function App() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/signup" element={<SignupPage />} />
         <Route path="/onboarding" element={<WizardLayout />} />
-        <Route path="/auth/callback" element={<EmailConfirmationHandler />} /> {/* 👈 ADD THIS ROUTE */}
+        <Route path="/auth/callback" element={<EmailConfirmationHandler />} />
 
         {/* Protected Routes wrapped by Layout and OnboardingGuard */}
         <Route element={<ProtectedRoute />}>
@@ -52,7 +53,7 @@ export default function App() {
             }
           />
           
-          {/* Fixed Enterprise Route - removed nested Routes */}
+          {/* Enterprise Analytics - only for global_admin and enterprise_admin */}
           <Route 
             path="/enterprise-analytics" 
             element={
@@ -73,6 +74,18 @@ export default function App() {
               <OnboardingGuard>
                 <Layout>
                   <BusinessAnalytics />
+                </Layout>
+              </OnboardingGuard>
+            } 
+          />
+          
+          {/* Campaign Management - for admin roles */}
+          <Route 
+            path="/campaign-management" 
+            element={
+              <OnboardingGuard>
+                <Layout>
+                  <CampaignManagement />
                 </Layout>
               </OnboardingGuard>
             } 

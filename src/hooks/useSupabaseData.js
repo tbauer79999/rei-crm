@@ -1,34 +1,100 @@
-import { supabase } from '../services/supabaseClient';
+// src/hooks/useAnalytics.js
+import { useState, useEffect, useCallback } from 'react';
+import { useAuth } from '../context/AuthContext';
+import { analyticsService } from '../lib/analyticsDataService';
 
-// Mock campaigns — replace with real Supabase fetch when ready
-export const fetchCampaigns = async () => {
-  return [
-    { id: 'mock-campaign-1', name: 'Campaign A' },
-    { id: 'mock-campaign-2', name: 'Campaign B' },
-    { id: 'mock-campaign-3', name: 'Campaign C' }
-  ];
-};
+export const useAnalytics = (initialDateRange = 30) => {
+  const { user } = useAuth();
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [dateRange, setDateRange] = useState(initialDateRange);
+  
+  const [data, setData] = useState({
+    campaigns: [],
+    performanceMetrics: {},
+    campaignPerformance: [],
+    aiInsights: { topPerformingPersonas: [], followupTiming: [], confidenceData: [] },
+    leadSourceROI: [],
+    historicalTrends: [],
+    salesRepPerformance: []
+  });
 
-// Mock sales reps — replace with real Supabase fetch when ready
-export const fetchSalesReps = async () => {
-  return [
-    { id: 'mock-rep-1', name: 'Alice Smith' },
-    { id: 'mock-rep-2', name: 'Bob Johnson' }
-  ];
-};
+  // Initialize analytics service when user changes
+  useEffect(() => {
+    if (user) {
+      analyticsService.initialize(user);
+    }
+  }, [user]);
 
-// Live Supabase query for dynamic lead segments (lead_source)
-export const fetchLeadSegments = async () => {
-  const { data, error } = await supabase
-    .from('leads')
-    .select('lead_source')
-    .neq('lead_source', null);
+  // Load all analytics data
+  const loadData = useCallback(async () => {
+    if (!user) return;
 
-  if (error) {
-    console.error('Error fetching lead segments:', error);
-    return [];
-  }
+    try {
+      setLoading(true);
+      setError('');
+      
+      // Set date range on service
+      analyticsService.setDateRange(dateRange);
+      
+      // Load all data in parallel
+      const [
+        campaigns,
+        performanceMetrics,
+        campaignPerformance,
+        aiInsights,
+        leadSourceROI,
+        historicalTrends,
+        salesRepPerformance
+      ] = await Promise.all([
+        analyticsService.getCampaignOverview(),
+        analyticsService.getPerformanceMetrics(),
+        analyticsService.getCampaignPerformanceData(),
+        analyticsService.getAIPerformanceInsights(),
+        analyticsService.getLeadSourceROI(),
+        analyticsService.getHistoricalTrends(),
+        analyticsService.getSalesRepPerformance()
+      ]);
 
-  const uniqueSegments = [...new Set(data.map((lead) => lead.lead_source))];
-  return uniqueSegments.map((segment) => ({ value: segment, label: segment }));
+      setData({
+        campaigns: campaigns || [],
+        performanceMetrics: performanceMetrics || {},
+        campaignPerformance: campaignPerformance || [],
+        aiInsights: aiInsights || { topPerformingPersonas: [], followupTiming: [], confidenceData: [] },
+        leadSourceROI: leadSourceROI || [],
+        historicalTrends: historicalTrends || [],
+        salesRepPerformance: salesRepPerformance || []
+      });
+
+    } catch (err) {
+      console.error('Error loading analytics:', err);
+      setError(err.message || 'Failed to load analytics data');
+    } finally {
+      setLoading(false);
+    }
+  }, [user, dateRange]);
+
+  // Load data when user or dateRange changes
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  // Update date range
+  const updateDateRange = useCallback((newDateRange) => {
+    setDateRange(newDateRange);
+  }, []);
+
+  // Refresh data manually
+  const refresh = useCallback(() => {
+    loadData();
+  }, [loadData]);
+
+  return {
+    data,
+    loading,
+    error,
+    dateRange,
+    updateDateRange,
+    refresh
+  };
 };

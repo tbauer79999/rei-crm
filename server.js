@@ -14,21 +14,11 @@ const { supabase } = require('./src/lib/supabaseService'); // ✅
 
 // Import new routers
 const leadsRouter = require('./src/api_routes/leadRoutes');
-const analyticsRoute = require('./src/api_routes/analyticsRoutes');
 const settingsApiRouter = require('./src/api_routes/settingsApiRoutes');
 const knowledgeBaseRouter = require('./src/api_routes/knowledgeBaseRoutes');
 const funnelRouter = require('./src/api_routes/funnel');
 const onboardingRoute = require('./src/api_routes/onboardingDemo');
-const messageQuality = require('./src/api_routes/messageQuality');
-const weeklyMomentum = require('./src/api_routes/weeklyMomentum');
-const responseTime = require('./src/api_routes/responseTime');
 const replyPacing = require('./src/api_routes/replyPacing');
-const escalationStats = require('./src/api_routes/escalationStats');
-const leadConversionSpeed = require('./src/api_routes/leadConversionSpeed');
-const conversationFlow = require('./src/api_routes/conversationFlowSparklineCard');
-const failureRate = require('./src/api_routes/failureRate');
-const aiVsHuman = require('./src/api_routes/aiVsHumanToggleCard');
-const aiEfficiency = require('./src/api_routes/aiEfficiencyCard');
 const hotSummaryRoutes = require('./src/api_routes/hot-summary');
 const keywordsRoute = require('./src/api_routes/keywords');
 const messagesRoute = require('./src/api_routes/messages');
@@ -42,6 +32,8 @@ const enterpriseAnalyticsRoutes = require('./src/api_routes/enterprise-analytics
 const companyResearchRoutes = require('./src/api_routes/companyResearchRoutes');
 //const experimentsRoutes = require('./src/api_routes/experiments');
 const phoneNumberRoutes = require('./src/api_routes/phone-numbers'); // ✅ Correct path
+const campaignsRouter = require('./src/api_routes/campaigns');
+const teamRoutes = require('./src/api_routes/team');
 
 const app = express();
 
@@ -52,33 +44,24 @@ app.use(cors());
 app.use(express.json());
 app.use('/api/hot-summary', hotSummaryRoutes);
 app.use('/api/leads', leadsRouter);
-app.use('/api/analytics', analyticsRoute);
 app.use('/api/settings', settingsApiRouter);
 app.use('/api/knowledge', knowledgeBaseRouter);
 app.use('/api/funnel', funnelRouter);
 app.use('/api/onboarding', onboardingRoute);
-app.use('/api/message-quality', messageQuality);
-app.use('/api/weekly-momentum', weeklyMomentum);
-app.use('/api/response-time', responseTime);
-app.use('/api/escalation-stats', escalationStats);
 app.use('/api/reply-pacing', replyPacing);
-app.use('/api/ai-efficiency', aiEfficiency);
-app.use('/api/ai-vs-human', aiVsHuman);
-app.use('/api/failure-rate', failureRate);
-app.use('/api/conversation-flow', conversationFlow);
-app.use('/api/lead-conversion-speed', leadConversionSpeed);
 app.use('/api/keywords', keywordsRoute);
 app.use('/api/messages', messagesRoute);
 app.use('/api/hot', hotRoutes);
 app.use('/api/overview', overviewRouter);
 app.use('/api/call-logging', callLoggingRoutes);
-app.use('/api/funnel-analytics', funnelAnalyticsRoutes);
+app.use('/api/funnel-analytics', funnelAnalyticsRoutes);  
 app.use('/api/lead-trends', leadTrendsRoutes);
 app.use('/api/health', healthRoutes);
 app.use('/api/enterprise-analytics', enterpriseAnalyticsRoutes);
 app.use('/api/research-company', companyResearchRoutes);
 app.use('/api/phone-numbers', phoneNumberRoutes);
-
+app.use('/api/campaigns', campaignsRouter);
+app.use('/api/team', teamRoutes);
 app.post('/api/leads/bulk', async (req, res) => {
   try {
     const records = req.body.records || [];

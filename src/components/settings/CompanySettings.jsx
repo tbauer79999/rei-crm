@@ -24,11 +24,54 @@ export default function CompanySettings() {
   const [data, setData] = useState({});
   const [settingsLoading, setSettingsLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [saveSuccess, setSaveSuccess] = useState(false);
+  const [success, setSuccess] = useState('');
+  const [error, setError] = useState('');
 
   const [startHour, setStartHour] = useState("");
   const [endHour, setEndHour] = useState("");
   const [dayPreset, setDayPreset] = useState("");
+
+  // Enhanced API call helper
+  const makeAuthenticatedRequest = async (url, options = {}) => {
+    try {
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError) {
+        throw new Error(`Authentication error: ${sessionError.message}`);
+      }
+
+      if (!session?.access_token) {
+        throw new Error('No valid session found. Please log in again.');
+      }
+
+      const headers = {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session.access_token}`,
+        ...options.headers
+      };
+
+      const response = await fetch(url, {
+        ...options,
+        headers
+      });
+
+      if (!response.ok) {
+        let errorMessage = `Request failed: ${response.status} ${response.statusText}`;
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.error || errorData.message || errorMessage;
+        } catch {
+          // If we can't parse error response, use the default message
+        }
+        throw new Error(errorMessage);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('API Request failed:', error);
+      throw error;
+    }
+  };
 
   useEffect(() => {
     const loadSettings = async () => {
@@ -45,28 +88,18 @@ export default function CompanySettings() {
       }
 
       setSettingsLoading(true);
+      setError('');
       try {
         console.log("Loading settings for tenant_id:", user.tenant_id);
-        const { data: settingsData, error } = await supabase
-          .from("platform_settings")
-          .select("key, value")
-          .eq("tenant_id", user.tenant_id);
+        
+        // Use API endpoint for consistency with other components
+        const settings = await makeAuthenticatedRequest(`/api/settings?tenant_id=${user.tenant_id}`);
 
-        if (error) throw error;
+        setData(settings);
 
-        const json = settingsData.reduce((acc, row) => {
-          acc[row.key] = {
-            id: row.key,
-            value: row.value,
-          };
-          return acc;
-        }, {});
-
-        setData(json);
-
-        const open = json.officeOpenHour?.value || "";
-        const close = json.officeCloseHour?.value || "";
-        const daysRaw = json.officeDays?.value || "";
+        const open = settings.officeOpenHour?.value || "";
+        const close = settings.officeCloseHour?.value || "";
+        const daysRaw = settings.officeDays?.value || "";
         const days = daysRaw ? daysRaw.split(",") : [];
 
         setStartHour(open);
@@ -88,6 +121,7 @@ export default function CompanySettings() {
         }
       } catch (err) {
         console.error("Failed to load settings", err);
+        setError(`Failed to load settings: ${err.message}`);
         setData({});
         setStartHour("");
         setEndHour("");
@@ -112,16 +146,19 @@ export default function CompanySettings() {
 
   const handleSave = async () => {
     if (!user || !user.tenant_id) {
-      console.error("Cannot save settings: User or tenant_id not available.");
+      setError("Cannot save settings: User or tenant_id not available.");
       return;
     }
-    if (user.role !== "admin") {
-      console.warn("Save operation denied: User is not an admin.");
+    
+    if (!['global_admin', 'business_admin'].includes(user.role)) {
+      setError("Admin role required to save settings.");
       return;
     }
 
     try {
       setSaving(true);
+      setError('');
+      setSuccess('');
 
       const dayMap = {
         "M–F": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
@@ -146,53 +183,49 @@ export default function CompanySettings() {
 
       const translatedDays = dayPreset ? dayMap[dayPreset] || [] : [];
 
-      const updated = {
+      const settingsPayload = {
         ...data,
-        officeOpenHour: {
-          ...(data.officeOpenHour || { id: "officeOpenHour" }),
-          value: startHour,
-        },
-        officeCloseHour: {
-          ...(data.officeCloseHour || { id: "officeCloseHour" }),
-          value: endHour,
-        },
-        officeDays: {
-          ...(data.officeDays || { id: "officeDays" }),
-          value: translatedDays.join(","),
-        },
+        officeOpenHour: { value: startHour },
+        officeCloseHour: { value: endHour },
+        officeDays: { value: translatedDays.join(",") },
       };
 
-      const upserts = Object.entries(updated)
-        .filter(([key, entry]) => entry && typeof entry.value !== 'undefined')
-        .map(([key, entry]) => ({
-          key: key,
-          value: entry.value,
-          tenant_id: user.tenant_id,
-        }));
+      // Filter out undefined values and prepare for API
+      const cleanedSettings = {};
+      Object.entries(settingsPayload).forEach(([key, entry]) => {
+        if (entry && typeof entry.value !== 'undefined') {
+          cleanedSettings[key] = entry;
+        }
+      });
 
-      if (upserts.length === 0) {
+      if (Object.keys(cleanedSettings).length === 0) {
         console.log("No data to save.");
         setSaving(false);
         return;
       }
 
-      console.log("Upserting settings:", upserts);
-      const { error } = await supabase
-        .from("platform_settings")
-        .upsert(upserts, { onConflict: "key,tenant_id" });
+      console.log("Saving company settings:", cleanedSettings);
+      
+      await makeAuthenticatedRequest('/api/settings', {
+        method: 'PUT',
+        body: JSON.stringify({ 
+          settings: cleanedSettings, 
+          tenant_id: user.tenant_id 
+        })
+      });
 
-      if (error) throw error;
-
-      const newData = { ...updated };
+      // Update local state
+      const newData = { ...settingsPayload };
       if (newData.officeDays) {
         newData.officeDays = { ...newData.officeDays, value: translatedDays.join(",") };
       }
       setData(newData);
 
-      setSaveSuccess(true);
-      setTimeout(() => setSaveSuccess(false), 2000);
+      setSuccess('Settings saved successfully!');
+      setTimeout(() => setSuccess(''), 3000);
     } catch (err) {
       console.error("Save failed", err);
+      setError(`Save failed: ${err.message}`);
     } finally {
       setSaving(false);
     }
@@ -243,11 +276,18 @@ export default function CompanySettings() {
 
   return (
     <div className="space-y-8">
-      {/* Success Message */}
-      {saveSuccess && (
+      {/* Success/Error Messages */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-center space-x-3">
+          <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0" />
+          <span className="text-red-800">{error}</span>
+        </div>
+      )}
+      
+      {success && (
         <div className="bg-green-50 border border-green-200 rounded-xl p-4 flex items-center space-x-3">
-          <CheckCircle className="w-5 h-5 text-green-600" />
-          <span className="text-green-800 font-medium">Settings saved successfully!</span>
+          <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0" />
+          <span className="text-green-800 font-medium">{success}</span>
         </div>
       )}
 
@@ -301,7 +341,7 @@ export default function CompanySettings() {
             </Label>
             <Input
               id="primary_contact"
-              value={data.primaryContact?.value || ""}
+              value={data.primary_contact?.value || ""}
               onChange={(e) => handleChange("primary_contact", e.target.value)}
               placeholder="Contact Person"
             />
@@ -463,10 +503,44 @@ export default function CompanySettings() {
         </div>
       </div>
 
+      {/* Current Configuration Summary */}
+      <div className="bg-white rounded-xl border border-gray-200 p-6">
+        <div className="flex items-center space-x-3 mb-6">
+          <div className="w-10 h-10 bg-orange-50 rounded-lg flex items-center justify-center">
+            <Building2 className="w-5 h-5 text-orange-600" />
+          </div>
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900">Current Configuration</h3>
+            <p className="text-gray-600 text-sm">Summary of your company settings</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="bg-gray-50 rounded-lg p-4">
+            <div className="text-sm text-gray-600 mb-1">Company</div>
+            <div className="font-medium text-gray-900">
+              {data.company_name?.value || 'Not set'}
+            </div>
+          </div>
+          <div className="bg-gray-50 rounded-lg p-4">
+            <div className="text-sm text-gray-600 mb-1">Operating Hours</div>
+            <div className="font-medium text-gray-900">
+              {startHour && endHour ? `${startHour}:00 - ${endHour}:00` : 'Not set'}
+            </div>
+          </div>
+          <div className="bg-gray-50 rounded-lg p-4">
+            <div className="text-sm text-gray-600 mb-1">Active Days</div>
+            <div className="font-medium text-gray-900">
+              {dayPreset || 'Not set'}
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Save Button */}
       <div className="flex justify-end">
         <div className="flex items-center space-x-4">
-          {user?.role !== 'admin' && !authLoading && !settingsLoading && (
+          {!['global_admin', 'business_admin'].includes(user?.role) && !authLoading && !settingsLoading && (
             <div className="flex items-center space-x-2 text-red-600">
               <AlertCircle className="w-4 h-4" />
               <span className="text-sm">Admin role required to save changes</span>
@@ -474,7 +548,7 @@ export default function CompanySettings() {
           )}
           <Button
             onClick={handleSave}
-            disabled={saving || user?.role !== 'admin' || settingsLoading || authLoading}
+            disabled={saving || !['global_admin', 'business_admin'].includes(user?.role) || settingsLoading || authLoading}
             className="px-6 py-2"
           >
             {saving ? (
@@ -482,7 +556,7 @@ export default function CompanySettings() {
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
                 <span>Saving...</span>
               </div>
-            ) : saveSuccess ? (
+            ) : success ? (
               <div className="flex items-center space-x-2">
                 <CheckCircle className="w-4 h-4" />
                 <span>Saved</span>

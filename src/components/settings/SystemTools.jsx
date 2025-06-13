@@ -32,22 +32,69 @@ export default function SystemTools() {
 
   const fileInputRef = useRef(null);
 
-  useEffect(() => {
-    const fetchLeads = async () => {
-      const { data, error } = await supabase.from('leads').select('*');
-      if (error) {
-        console.error('Failed to load leads', error);
-        setError('Failed to load leads for export options');
-        return;
+  // Enhanced API call helper
+  const makeAuthenticatedRequest = async (url, options = {}) => {
+    try {
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError) {
+        throw new Error(`Authentication error: ${sessionError.message}`);
       }
 
-      const formatted = data.map((p) => ({
-        id: p.id,
-        name: p.owner_name || 'Unnamed Lead',
-        address: p.property_address || '',
-        phone: p.phone || '',
-      }));
-      setLeads(formatted);
+      if (!session?.access_token) {
+        throw new Error('No valid session found. Please log in again.');
+      }
+
+      const headers = {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session.access_token}`,
+        ...options.headers
+      };
+
+      const response = await fetch(url, {
+        ...options,
+        headers
+      });
+
+      if (!response.ok) {
+        let errorMessage = `Request failed: ${response.status} ${response.statusText}`;
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.error || errorData.message || errorMessage;
+        } catch {
+          // If we can't parse error response, use the default message
+        }
+        throw new Error(errorMessage);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('API Request failed:', error);
+      throw error;
+    }
+  };
+
+  useEffect(() => {
+    const fetchLeads = async () => {
+      try {
+        const { data, error } = await supabase.from('leads').select('*');
+        if (error) {
+          console.error('Failed to load leads', error);
+          setError('Failed to load leads for export options');
+          return;
+        }
+
+        const formatted = data.map((p) => ({
+          id: p.id,
+          name: p.owner_name || 'Unnamed Lead',
+          address: p.property_address || '',
+          phone: p.phone || '',
+        }));
+        setLeads(formatted);
+      } catch (err) {
+        console.error('Error fetching leads:', err);
+        setError('Failed to load leads');
+      }
     };
 
     fetchLeads();
@@ -107,6 +154,7 @@ export default function SystemTools() {
   const exportMessages = async () => {
     setExportingMessages(true);
     try {
+      // Use Supabase for direct database queries for exports
       const { data: messages, error: msgError } = await supabase
         .from('messages')
         .select('*');
@@ -151,6 +199,7 @@ export default function SystemTools() {
   const exportHotLeads = async () => {
     setExportingHot(true);
     try {
+      // Use Supabase for direct database queries for exports
       const { data, error } = await supabase.from('leads').select('*');
       if (error) throw error;
 
@@ -183,10 +232,8 @@ export default function SystemTools() {
   const exportSettings = async () => {
     setExportingSettings(true);
     try {
-      const { data, error } = await supabase
-        .from('platform_settings')
-        .select('*');
-      if (error) throw error;
+      // Use API endpoint for settings export to ensure proper permissions
+      const data = await makeAuthenticatedRequest('/api/settings/export');
 
       if (!data.length) {
         showError('No settings found to export.');
@@ -217,18 +264,13 @@ export default function SystemTools() {
         return;
       }
 
-      const upserts = json.map((row) => ({
-        key: row.key,
-        value: row.value,
-      }));
+      // Use API endpoint for settings import to ensure proper validation and permissions
+      await makeAuthenticatedRequest('/api/settings/import', {
+        method: 'POST',
+        body: JSON.stringify({ settings: json })
+      });
 
-      const { error } = await supabase
-        .from('platform_settings')
-        .upsert(upserts, { onConflict: 'key' });
-
-      if (error) throw error;
-
-      showSuccess(`Imported ${upserts.length} settings successfully!`);
+      showSuccess(`Imported ${json.length} settings successfully!`);
     } catch (err) {
       console.error('Failed to import settings', err);
       showError('Import failed. Please check your file format.');

@@ -3,11 +3,6 @@ import { useState, useEffect } from 'react';
 import { Building2, Sparkles, CheckCircle, Search, Brain } from 'lucide-react';
 import supabase from '../../lib/supabaseClient';
 
-const industries = [
-  'Real Estate', 'Staffing/Recruiting', 'Solar/Home Improvement', 'Car Sales', 
-  'Mortgages/Lending', 'B2B Sales', 'For-Profit Education', 'Healthcare', 
-  'Insurance', 'Legal', 'Consulting', 'Finance', 'Other'
-];
 
 // Helper function to extract domain from email
 const extractDomain = (email) => {
@@ -133,6 +128,19 @@ export default function Step1_CompanyInfo({ formData, setFormData, onNext }) {
   const [companyResearch, setCompanyResearch] = useState(null);
   const [researchInsight, setResearchInsight] = useState('');
 
+  const [industryOptions, setIndustryOptions] = useState([]);
+
+useEffect(() => {
+  const fetchIndustries = async () => {
+    const { data, error } = await supabase.from('industries').select('*');
+    if (!error) setIndustryOptions(data);
+    else console.error('❌ Failed to load industries:', error);
+  };
+
+  fetchIndustries();
+}, []);
+
+
   useEffect(() => {
     const initializeUser = async () => {
       console.log('=== Step1 Debug Start ===');
@@ -213,7 +221,7 @@ export default function Step1_CompanyInfo({ formData, setFormData, onNext }) {
         setFormData(prev => ({
           ...prev,
           companyName: research.companyName || '',
-          industry: detectedIndustry,
+          industry_id: '',
           description: research.description || '',
         }));
 
@@ -262,14 +270,15 @@ export default function Step1_CompanyInfo({ formData, setFormData, onNext }) {
       console.log('Updating tenant with ID:', profile.tenant_id);
       
       const { error: tenantError } = await supabase
-        .from('tenants')
-        .update({
-          name: formData.companyName,
-          industry: formData.industry,
-          description: formData.description,
-          preferred_area_code: formData.areaCode
-        })
-        .eq('id', profile.tenant_id);
+  .from('tenants')
+  .update({
+    name: formData.companyName,
+    industry_id: formData.industry_id,
+    description: formData.description,
+    preferred_area_code: formData.areaCode
+  })
+  .eq('id', profile.tenant_id);
+
 
       if (tenantError) {
         console.error('Tenant update error:', tenantError);
@@ -441,13 +450,13 @@ export default function Step1_CompanyInfo({ formData, setFormData, onNext }) {
             )}
           </label>
           <select
-            value={formData.industry}
-            onChange={(e) => setFormData({...formData, industry: e.target.value})}
+            value={formData.industry_id}
+            onChange={(e) => setFormData({ ...formData, industry_id: e.target.value })}
             className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
           >
             <option value="">Select your industry</option>
-            {industries.map(industry => (
-              <option key={industry} value={industry}>{industry}</option>
+            {industryOptions.map(ind => (
+              <option key={ind.id} value={ind.id}>{ind.name}</option>
             ))}
           </select>
         </div>
@@ -502,10 +511,10 @@ export default function Step1_CompanyInfo({ formData, setFormData, onNext }) {
       <div className="flex justify-end">
         <button
           onClick={handleSubmit}
-          disabled={submitLoading || !formData.companyName || !formData.industry}
+          disabled={submitLoading || !formData.companyName || !formData.industry_id}
           className={`
             px-8 py-3 rounded-xl font-medium transition-all flex items-center gap-2
-            ${(formData.companyName && formData.industry) && !submitLoading
+            ${(formData.companyName && formData.industry_id) && !submitLoading
               ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white hover:shadow-lg transform hover:scale-105'
               : 'bg-gray-200 text-gray-400 cursor-not-allowed'}
           `}

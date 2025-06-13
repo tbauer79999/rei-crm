@@ -1,0 +1,12 @@
+version: '3.8'
+
+services:
+  supabase-storage:
+    image: public.ecr.aws/supabase/storage-api:latest
+    platform: linux/amd64
+    ports:
+      - "5000:5000"
+    depends_on:
+      - supabase-db
+    environment:
+      SUPABASE_URL: "http://localhost:54322"

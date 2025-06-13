@@ -1,9 +1,22 @@
-// src/lib/authService.js
+// src/lib/authService.js - FIXED: Added options parameter for invitation metadata
 import supabase from '../lib/supabaseClient';
 
+export const signUpUser = async (email, password, options = {}) => {
+  const signUpData = {
+    email,
+    password
+  };
 
-export const signUpUser = async (email, password) => {
-  return supabase.auth.signUp({ email, password });
+  // Add options if provided (for invitation metadata)
+  if (options.data) {
+    signUpData.options = {
+      data: options.data
+    };
+  }
+
+  console.log('🚀 Signing up user with data:', signUpData);
+  
+  return supabase.auth.signUp(signUpData);
 };
 
 export const signInUser = async (email, password) => {

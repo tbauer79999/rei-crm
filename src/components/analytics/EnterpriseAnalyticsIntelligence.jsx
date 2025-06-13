@@ -84,8 +84,8 @@ const EnterpriseFilterBar = ({ filters, setFilters, onRefresh, loading }) => (
     <div className="flex flex-wrap items-center gap-4">
       <div className="flex items-center space-x-2">
         <Building2 className="w-4 h-4 text-gray-500" />
-        <select 
-          value={filters.customerSegment} 
+        <select
+          value={filters.customerSegment}
           onChange={(e) => setFilters({...filters, customerSegment: e.target.value})}
           className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
         >
@@ -99,8 +99,8 @@ const EnterpriseFilterBar = ({ filters, setFilters, onRefresh, loading }) => (
 
       <div className="flex items-center space-x-2">
         <Globe className="w-4 h-4 text-gray-500" />
-        <select 
-          value={filters.geography} 
+        <select
+          value={filters.geography}
           onChange={(e) => setFilters({...filters, geography: e.target.value})}
           className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
         >
@@ -113,8 +113,8 @@ const EnterpriseFilterBar = ({ filters, setFilters, onRefresh, loading }) => (
 
       <div className="flex items-center space-x-2">
         <Calendar className="w-4 h-4 text-gray-500" />
-        <select 
-          value={filters.timeframe} 
+        <select
+          value={filters.timeframe}
           onChange={(e) => setFilters({...filters, timeframe: e.target.value})}
           className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
         >
@@ -127,8 +127,8 @@ const EnterpriseFilterBar = ({ filters, setFilters, onRefresh, loading }) => (
 
       <div className="flex items-center space-x-2">
         <Layers className="w-4 h-4 text-gray-500" />
-        <select 
-          value={filters.industry} 
+        <select
+          value={filters.industry}
           onChange={(e) => setFilters({...filters, industry: e.target.value})}
           className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
         >
@@ -141,7 +141,7 @@ const EnterpriseFilterBar = ({ filters, setFilters, onRefresh, loading }) => (
       </div>
 
       <div className="ml-auto flex items-center space-x-3">
-        <button 
+        <button
           onClick={onRefresh}
           disabled={loading}
           className="flex items-center px-3 py-2 text-gray-600 hover:text-gray-900 text-sm disabled:opacity-50"
@@ -268,8 +268,8 @@ async fetchIndustryBenchmarks(filters) {
       };
     } catch (error) {
       console.error('Error fetching predictive analytics:', error);
-      return { 
-        success: false, 
+      return {
+        success: false,
         churnRisk: { success: false, data: null },
         forecasting: { success: false, data: null }
       };
@@ -503,7 +503,7 @@ const PredictiveAnalytics = ({ data, loading }) => {
 
 const IndustryBenchmarks = ({ data, loading }) => {
   const benchmarkData = data || fallbackData.industryBenchmarks;
-  
+
   return (
     <div className="space-y-6">
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
@@ -564,7 +564,7 @@ export default function EnterpriseAnalyticsIntelligence() {
     industry: 'all'
   });
   const { user, canAccessEnterprise } = useAuth();
-    
+
 
   // Data state
   const [analyticsData, setAnalyticsData] = useState({
@@ -575,7 +575,7 @@ export default function EnterpriseAnalyticsIntelligence() {
     predictiveData: null,
     industryData: null
   });
-  
+
   const [loading, setLoading] = useState({
     global: true,
     portfolio: false,
@@ -584,7 +584,7 @@ export default function EnterpriseAnalyticsIntelligence() {
     predictive: false,
     benchmarks: false
   });
-  
+
   const [error, setError] = useState(null);
   const [apiAvailable, setApiAvailable] = useState(true);
 
@@ -608,21 +608,21 @@ useEffect(() => {
   const loadInitialData = async () => {
     try {
       setLoading(prev => ({ ...prev, global: true }));
-      
+
       // Try to load global KPIs first to test API connectivity
       const kpiResponse = await apiService.fetchGlobalKPIs();
-      
+
       if (kpiResponse.success) {
         setAnalyticsData(prev => ({ ...prev, globalKPIs: kpiResponse?.data || null }));
         setApiAvailable(true);
-        
+
         // Load initial view data
         await loadViewData('portfolio');
       }
     } catch (error) {
       console.warn('API not available, using fallback data:', error);
       setApiAvailable(false);
-      
+
       // Use fallback data
       setAnalyticsData({
         globalKPIs: {
@@ -644,17 +644,17 @@ useEffect(() => {
 
   const loadViewData = async (view) => {
     if (!apiAvailable) return;
-    
+
     try {
       setLoading(prev => ({ ...prev, [view]: true }));
-      
+
       switch (view) {
         case 'portfolio': {
           const [performance, cohort] = await Promise.all([
             apiService.fetchPortfolioPerformance(filters),
             apiService.fetchCohortAnalysis(filters)
           ]);
-          
+
           setAnalyticsData(prev => ({
   ...prev,
   portfolioData: {
@@ -664,13 +664,13 @@ useEffect(() => {
 }));
           break;
         }
-        
+
         case 'market': {
           const [competitive, benchmarks] = await Promise.all([
             apiService.fetchMarketIntelligence(filters),
             apiService.fetchIndustryBenchmarks(filters)
           ]);
-          
+
           setAnalyticsData(prev => ({
   ...prev,
   marketData: {
@@ -680,13 +680,13 @@ useEffect(() => {
 }));
           break;
         }
-        
+
         case 'revenue': {
           const [metrics, waterfall] = await Promise.all([
             apiService.fetchRevenueMetrics(filters),
             apiService.fetchARRWaterfall(filters)
           ]);
-          
+
           setAnalyticsData(prev => ({
   ...prev,
   revenueData: {
@@ -696,10 +696,10 @@ useEffect(() => {
 }));
           break;
         }
-        
+
         case 'predictive': {
           const predictiveResponse = await apiService.fetchPredictiveAnalytics(filters);
-          
+
           setAnalyticsData(prev => ({
   ...prev,
   predictiveData: {
@@ -709,10 +709,10 @@ useEffect(() => {
 }));
           break;
         }
-        
+
         case 'benchmarks': {
           const benchmarkResponse = await apiService.fetchIndustryBenchmarks(filters);
-          
+
           setAnalyticsData(prev => ({
   ...prev,
   industryData: benchmarkResponse?.data || []
@@ -720,7 +720,7 @@ useEffect(() => {
           break;
         }
       }
-      
+
     } catch (error) {
       console.error(`Error loading ${view} data:`, error);
       // Don't show error to user, just use fallback data
@@ -742,7 +742,7 @@ useEffect(() => {
             <AlertTriangle size={48} className="text-red-500 mx-auto mb-4" />
             <h3 className="text-lg font-semibold text-gray-900 mb-2">Access Restricted</h3>
             <p className="text-gray-600 mb-4">{error}</p>
-            <button 
+            <button
               onClick={() => window.location.href = '/dashboard'}
               className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
             >
@@ -796,9 +796,9 @@ useEffect(() => {
       </div>
 
       {/* Enterprise Filter Bar */}
-      <EnterpriseFilterBar 
-        filters={filters} 
-        setFilters={setFilters} 
+      <EnterpriseFilterBar
+        filters={filters}
+        setFilters={setFilters}
         onRefresh={handleRefresh}
         loading={Object.values(loading).some(l => l)}
       />

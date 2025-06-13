@@ -106,7 +106,10 @@ const fetchLeads = async () => {
 
     let query = supabase
       .from('leads')
-      .select('*')
+      .select(`
+        *,
+        campaigns(name)
+      `)
       .order(sortBy, { ascending: sortDirection === 'asc' });
 
     // --- MODIFIED LOGIC FOR GLOBAL ADMIN ACCESS ---
@@ -134,8 +137,15 @@ const fetchLeads = async () => {
       console.error('Error fetching leads:', error);
       return;
     }
-    setLeads(data);
-    setFilteredLeads(data);
+
+    // Transform the data to include campaign name
+    const transformedData = data?.map(lead => ({
+  ...lead,
+  campaign: lead.campaigns?.name || 'No Campaign'  // ← NEW LINE
+})) || [];
+
+    setLeads(transformedData);
+    setFilteredLeads(transformedData);
   };
 
   useEffect(() => {
@@ -421,11 +431,14 @@ const handleBulkSubmit = async () => {
             </div>
 
             {tab === 'single' && (
-  <AddLeadForm onSuccess={() => {
-    fetchLeads();
-    setShowForm(false);
-  }} />
-)}
+              <AddLeadForm 
+                onSuccess={() => {
+                  fetchLeads();
+                  setShowForm(false);
+                }} 
+                onCancel={() => setShowForm(false)}
+              />
+            )}
 
             {tab === 'bulk' && (
               <div className="space-y-4">

@@ -68,7 +68,7 @@ router.get('/search/:areaCode', async (req, res) => {
 // Purchase phone number and assign to user's subaccount
 router.post('/purchase', async (req, res) => {
   try {
-    const { phoneNumber, userId, subAccountSid } = req.body;
+    const { phoneNumber, userId, tenantId, subAccountSid } = req.body; // ✅ ADDED: tenantId
 
     if (!phoneNumber || !userId) {
       return res.status(400).json({ 
@@ -76,7 +76,30 @@ router.post('/purchase', async (req, res) => {
       });
     }
 
-    console.log(`Purchasing phone number: ${phoneNumber} for user: ${userId}`);
+    console.log(`Purchasing phone number: ${phoneNumber} for user: ${userId}, tenant: ${tenantId}`);
+
+    // Get user data and validate tenant association
+    const { data: userData, error: userError } = await supabase
+      .from('users_profile')
+      .select('tenant_id, email')
+      .eq('id', userId)
+      .single();
+
+    if (userError || !userData) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Use provided tenantId or fall back to user's tenant_id
+    const finalTenantId = tenantId || userData.tenant_id;
+    
+    if (!finalTenantId) {
+      return res.status(400).json({ error: 'Tenant ID is required for phone number assignment' });
+    }
+
+    // Verify user belongs to the tenant (security check)
+    if (tenantId && userData.tenant_id !== tenantId) {
+      return res.status(403).json({ error: 'User does not belong to specified tenant' });
+    }
 
     // Get or create subaccount for the user
     let userSubAccount;
@@ -84,23 +107,13 @@ router.post('/purchase', async (req, res) => {
       userSubAccount = await twilioClient.api.accounts(subAccountSid).fetch();
     } else {
       // Create new subaccount for user
-      const { data: userData } = await supabase
-  .from('users_profile')  // ✅ Correct table
-  .select('tenant_id')  // Get the data that actually exists
-  .eq('id', userId)
-  .single();
-
-      if (!userData) {
-        return res.status(404).json({ error: 'User not found' });
-      }
-
       userSubAccount = await twilioClient.api.accounts.create({
-        friendlyName: `${userData.company_name || userData.email} - AI Outreach`
+        friendlyName: `${userData.email} - AI Outreach`
       });
 
       // Save subaccount SID to user record
       await supabase
-        .from('users')
+        .from('users_profile')
         .update({ twilio_subaccount_sid: userSubAccount.sid })
         .eq('id', userId);
     }
@@ -113,14 +126,16 @@ router.post('/purchase', async (req, res) => {
     );
 
     const purchasedNumber = await subAccountClient.incomingPhoneNumbers.create({
-  phoneNumber: phoneNumber
-  // No webhook URLs for now - can add later when you have a public URL
-});
-    // Save phone number to database
+      phoneNumber: phoneNumber
+      // No webhook URLs for now - can add later when you have a public URL
+    });
+
+    // Save phone number to database with tenant_id
     const { data: phoneRecord, error: dbError } = await supabase
       .from('phone_numbers')
       .insert({
         user_id: userId,
+        tenant_id: finalTenantId, // ✅ ADDED: Store tenant association
         phone_number: phoneNumber,
         twilio_sid: purchasedNumber.sid,
         twilio_subaccount_sid: userSubAccount.sid,
@@ -144,17 +159,18 @@ router.post('/purchase', async (req, res) => {
 
     // Update user's onboarding status
     await supabase
-  .from('users_profile')  // ✅ Correct table
-  .update({ 
-    phone_number_configured: true
-  })
-  .eq('id', userId);
+      .from('users_profile')
+      .update({ 
+        phone_number_configured: true
+      })
+      .eq('id', userId);
 
     res.json({
       success: true,
       phoneNumber: purchasedNumber.phoneNumber,
       twilioSid: purchasedNumber.sid,
       subAccountSid: userSubAccount.sid,
+      tenantId: finalTenantId, // ✅ ADDED: Return tenant ID
       phoneRecord: phoneRecord,
       message: 'Phone number purchased and configured successfully'
     });
@@ -188,6 +204,33 @@ router.get('/user/:userId', async (req, res) => {
 
   } catch (error) {
     console.error('Error fetching user phone numbers:', error);
+    res.status(500).json({ 
+      error: 'Failed to fetch phone numbers',
+      details: error.message 
+    });
+  }
+});
+
+// ✅ NEW: Get tenant's phone numbers (for AI outreach)
+router.get('/tenant/:tenantId', async (req, res) => {
+  try {
+    const { tenantId } = req.params;
+
+    const { data: phoneNumbers, error } = await supabase
+      .from('phone_numbers')
+      .select('*')
+      .eq('tenant_id', tenantId)
+      .eq('status', 'active');
+
+    if (error) throw error;
+
+    res.json({
+      success: true,
+      phoneNumbers
+    });
+
+  } catch (error) {
+    console.error('Error fetching tenant phone numbers:', error);
     res.status(500).json({ 
       error: 'Failed to fetch phone numbers',
       details: error.message 

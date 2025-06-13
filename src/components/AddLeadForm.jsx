@@ -16,6 +16,9 @@ export default function AddLeadForm({ onSuccess, onCancel }) {
   const [campaigns, setCampaigns] = useState([]);
   const [loadingCampaigns, setLoadingCampaigns] = useState(true);
   const [errorCampaigns, setErrorCampaigns] = useState(null);
+  const [showCreateCampaign, setShowCreateCampaign] = useState(false);
+  const [newCampaignName, setNewCampaignName] = useState('');
+  const [creatingCampaign, setCreatingCampaign] = useState(false);
 
   useEffect(() => {
     const fetchCampaigns = async () => {
@@ -48,6 +51,51 @@ export default function AddLeadForm({ onSuccess, onCancel }) {
     fetchCampaigns();
   }, [user]);
 
+  const handleCreateCampaign = async () => {
+    if (!newCampaignName.trim()) {
+      alert('Please enter a campaign name');
+      return;
+    }
+
+    setCreatingCampaign(true);
+    try {
+      const now = new Date().toISOString();
+      const { data, error } = await supabase
+        .from('campaigns')
+        .insert([
+          {
+            name: newCampaignName.trim(),
+            tenant_id: user.tenant_id,
+            is_active: true,
+            created_at: now,
+            start_date: now, // Add required start_date field
+          }
+        ])
+        .select()
+        .single();
+
+      if (error) {
+        throw error;
+      }
+
+      // Add the new campaign to the list
+      setCampaigns([...campaigns, data]);
+      
+      // Auto-select the new campaign
+      setForm({ ...form, campaign_id: String(data.id) });
+      
+      // Reset create campaign form
+      setNewCampaignName('');
+      setShowCreateCampaign(false);
+      
+      alert('Campaign created successfully!');
+    } catch (error) {
+      console.error('Error creating campaign:', error);
+      alert(`Error creating campaign: ${error.message}`);
+    } finally {
+      setCreatingCampaign(false);
+    }
+  };
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -58,13 +106,16 @@ export default function AddLeadForm({ onSuccess, onCancel }) {
     console.log("FORM SUBMITTED!", form);
 
     try {
-      if (!user || !user.tenant_id || !user.access_token) {
+      const { data: { session } } = await supabase.auth.getSession();
+      const accessToken = session?.access_token || localStorage.getItem('auth_token');
+
+      if (!user || !user.tenant_id || !accessToken) {
         alert('User authentication information not available. Please log in.');
         return;
       }
 
-      // Check if a campaign is selected
-      if (!form.campaign_id) {
+      // Allow submission without campaign if no campaigns exist
+      if (!form.campaign_id && campaigns.length > 0) {
         alert('Please select a campaign for the lead.');
         return;
       }
@@ -75,8 +126,8 @@ export default function AddLeadForm({ onSuccess, onCancel }) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${user.access_token}`,
-          'apikey': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${accessToken}`,
+          'apikey': process.env.REACT_APP_SUPABASE_ANON_KEY,
         },
         body: JSON.stringify({
           name: form.name,
@@ -84,7 +135,7 @@ export default function AddLeadForm({ onSuccess, onCancel }) {
           email: form.email,
           status: form.status,
           tenant_id: user.tenant_id,
-          campaign_id: form.campaign_id,
+          campaign_id: form.campaign_id || null, // Allow null if no campaigns
         }),
       });
 
@@ -142,33 +193,102 @@ export default function AddLeadForm({ onSuccess, onCancel }) {
         <option>Unsubscribed</option>
       </select>
 
-      {/* Campaign Selection Dropdown */}
+      {/* Campaign Selection Section */}
       {loadingCampaigns ? (
         <p>Loading campaigns...</p>
       ) : errorCampaigns ? (
         <p className="text-red-500">Error loading campaigns: {errorCampaigns}</p>
+      ) : campaigns.length === 0 ? (
+        // No campaigns exist - show create option
+        <div className="space-y-3">
+          <div className="bg-yellow-50 border border-yellow-200 rounded p-3">
+            <p className="text-yellow-800 text-sm mb-2">
+              No campaigns found. You can either create a new campaign or add the lead without one.
+            </p>
+            <button
+              type="button"
+              onClick={() => setShowCreateCampaign(!showCreateCampaign)}
+              className="text-blue-600 hover:text-blue-800 text-sm underline"
+            >
+              {showCreateCampaign ? 'Cancel' : 'Create New Campaign'}
+            </button>
+          </div>
+          
+          {showCreateCampaign && (
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={newCampaignName}
+                onChange={(e) => setNewCampaignName(e.target.value)}
+                placeholder="Campaign name"
+                className="flex-1 border px-3 py-2 rounded"
+                disabled={creatingCampaign}
+              />
+              <button
+                type="button"
+                onClick={handleCreateCampaign}
+                disabled={creatingCampaign}
+                className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 disabled:opacity-50"
+              >
+                {creatingCampaign ? 'Creating...' : 'Create'}
+              </button>
+            </div>
+          )}
+        </div>
       ) : (
-        <select
-          name="campaign_id"
-          value={form.campaign_id}
-          onChange={handleChange}
-          className="w-full border px-3 py-2 rounded"
-          required
-        >
-          <option value="">Select a Campaign</option>
-          {campaigns.map((campaign) => (
-            <option key={campaign.id} value={String(campaign.id)}> {/* <--- CHANGE IS HERE: String(campaign.id) */}
-              {campaign.name}
-            </option>
-          ))}
-        </select>
+        // Campaigns exist - show dropdown
+        <div className="space-y-2">
+          <select
+            name="campaign_id"
+            value={form.campaign_id}
+            onChange={handleChange}
+            className="w-full border px-3 py-2 rounded"
+            required
+          >
+            <option value="">Select a Campaign</option>
+            {campaigns.map((campaign) => (
+              <option key={campaign.id} value={String(campaign.id)}>
+                {campaign.name}
+              </option>
+            ))}
+          </select>
+          
+          <button
+            type="button"
+            onClick={() => setShowCreateCampaign(!showCreateCampaign)}
+            className="text-blue-600 hover:text-blue-800 text-sm underline"
+          >
+            {showCreateCampaign ? 'Cancel' : 'Create New Campaign'}
+          </button>
+          
+          {showCreateCampaign && (
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={newCampaignName}
+                onChange={(e) => setNewCampaignName(e.target.value)}
+                placeholder="Campaign name"
+                className="flex-1 border px-3 py-2 rounded"
+                disabled={creatingCampaign}
+              />
+              <button
+                type="button"
+                onClick={handleCreateCampaign}
+                disabled={creatingCampaign}
+                className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 disabled:opacity-50"
+              >
+                {creatingCampaign ? 'Creating...' : 'Create'}
+              </button>
+            </div>
+          )}
+        </div>
       )}
 
       <div className="flex gap-4">
         <button
           type="submit"
           className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-          disabled={loadingCampaigns}
+          disabled={loadingCampaigns || creatingCampaign}
         >
           Submit
         </button>

@@ -1,7 +1,8 @@
-// src/components/controlroom/HotLeadHandoffPanel.jsx
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import apiClient from '../../lib/apiClient';
+
+// Edge Function URL - Update this with your actual Supabase project URL
+const EDGE_FUNCTION_URL = 'https://wuuqrdlfgkasnwydyvgk.supabase.co/functions/v1/HotLeadHandoffPanel';
 
 const HotLeadHandoffPanel = () => {
   const { user } = useAuth();
@@ -10,6 +11,40 @@ const HotLeadHandoffPanel = () => {
   const [loading, setLoading] = useState(true);
   const [showOutcomeModal, setShowOutcomeModal] = useState(false);
   const [selectedLead, setSelectedLead] = useState(null);
+
+  // Helper function to call edge function with auth
+  const callEdgeFunction = async (action = '', method = 'GET', body = null) => {
+    try {
+      // Get the auth token from localStorage
+      const token = localStorage.getItem('supabase.auth.token') || 
+                   JSON.parse(localStorage.getItem('sb-wuuqrdlfgkasnwydyvgk-auth-token') || '{}')?.access_token;
+      
+      const url = action ? `${EDGE_FUNCTION_URL}?action=${action}` : EDGE_FUNCTION_URL;
+      
+      const options = {
+        method,
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      };
+
+      if (body && method !== 'GET') {
+        options.body = JSON.stringify(body);
+      }
+
+      const response = await fetch(url, options);
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Edge function call failed:', error);
+      throw error;
+    }
+  };
 
   useEffect(() => {
     if (user?.tenant_id) {
@@ -28,17 +63,12 @@ const HotLeadHandoffPanel = () => {
       setLoading(true);
       console.log('Fetching hot leads data for tenant:', user.tenant_id);
 
-// Fetch hot leads
-const hotLeadsResponse = await apiClient.get(`/hot?tenant_id=${user.tenant_id}`);
-console.log('Hot leads response:', hotLeadsResponse.data);
-setHotLeads(hotLeadsResponse.data.hotLeads || []);
-
-
-// Fetch summary stats
-const summaryResponse = await apiClient.get(`/hot-summary?tenant_id=${user.tenant_id}`);
-console.log('Hot summary response:', summaryResponse.data);
-setStats(summaryResponse.data || {});
-
+      // Single call to get all hot lead data
+      const data = await callEdgeFunction();
+      console.log('Hot leads response:', data);
+      
+      setHotLeads(data.hotLeads || []);
+      setStats(data.hotSummary || {});
 
     } catch (error) {
       console.error('Error fetching hot leads data:', error);
@@ -60,13 +90,11 @@ setStats(summaryResponse.data || {});
       console.log('Calling lead:', leadId);
       
       // Log the call in the database
-      const response = await apiClient.post('/call-logging/log-call', {
-  lead_id: leadId,
-  tenant_id: user.tenant_id
-});
+      const response = await callEdgeFunction('log-call', 'POST', {
+        lead_id: leadId
+      });
 
-
-      if (response.data.success) {
+      if (response.success) {
         // Update the local state
         setHotLeads(prevLeads => 
           prevLeads.map(lead => 
@@ -93,14 +121,13 @@ setStats(summaryResponse.data || {});
   const handleOutcomeSelection = async (outcome) => {
     if (!selectedLead || !user?.tenant_id) return;
 
- try {
-  const response = await apiClient.post('/call-logging/update-outcome', {
-    lead_id: selectedLead.id,
-    tenant_id: user.tenant_id,
-    outcome: outcome
-  });
+    try {
+      const response = await callEdgeFunction('update-outcome', 'POST', {
+        lead_id: selectedLead.id,
+        outcome: outcome
+      });
 
-      if (response.data.success) {
+      if (response.success) {
         console.log('Outcome updated successfully!');
         setShowOutcomeModal(false);
         setSelectedLead(null);

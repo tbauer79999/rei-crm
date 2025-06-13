@@ -19,7 +19,7 @@ export default function WizardLayout() {
   // Centralized form data state
   const [formData, setFormData] = useState({
     companyName: '',
-    industry: '',
+    industry_id: '',
     description: '',
     areaCode: '',
     phoneNumber: '', // New field

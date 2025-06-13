@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { Label } from '../ui/label';
+import supabase from '../../lib/supabaseClient';
 import Button from '../ui/button';
 import { 
   MessageSquare, 
@@ -35,6 +36,48 @@ export default function MessagingSettings() {
     }
   ];
 
+  // Enhanced API call helper
+  const makeAuthenticatedRequest = async (url, options = {}) => {
+    try {
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError) {
+        throw new Error(`Authentication error: ${sessionError.message}`);
+      }
+
+      if (!session?.access_token) {
+        throw new Error('No valid session found. Please log in again.');
+      }
+
+      const headers = {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session.access_token}`,
+        ...options.headers
+      };
+
+      const response = await fetch(url, {
+        ...options,
+        headers
+      });
+
+      if (!response.ok) {
+        let errorMessage = `Request failed: ${response.status} ${response.statusText}`;
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.error || errorData.message || errorMessage;
+        } catch {
+          // If we can't parse error response, use the default message
+        }
+        throw new Error(errorMessage);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('API Request failed:', error);
+      throw error;
+    }
+  };
+
   useEffect(() => {
     const fetchSettings = async () => {
       if (authLoading) return;
@@ -50,12 +93,7 @@ export default function MessagingSettings() {
       setSettingsLoading(true);
       setError('');
       try {
-        const res = await fetch(`/api/settings?tenant_id=${user.tenant_id}`);
-        if (!res.ok) {
-          const errorData = await res.json();
-          throw new Error(errorData.message || `Failed to fetch settings (${res.status})`);
-        }
-        const settings = await res.json();
+        const settings = await makeAuthenticatedRequest(`/api/settings?tenant_id=${user.tenant_id}`);
 
         setReplyMode(settings['ai_reply_mode']?.value || 'paced');
         setHourlyLimit(settings['ai_hourly_throttle_limit']?.value || '30');
@@ -75,7 +113,8 @@ export default function MessagingSettings() {
       setError('User or tenant information is missing. Cannot save settings.');
       return;
     }
-    if (user.role !== 'admin') {
+    
+    if (!['global_admin', 'business_admin'].includes(user.role)) {
       setError('Admin role required to save settings.');
       return;
     }
@@ -90,16 +129,11 @@ export default function MessagingSettings() {
     };
 
     try {
-      const res = await fetch('/api/settings', {
+      await makeAuthenticatedRequest('/api/settings', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ settings: settingsPayload, tenant_id: user.tenant_id })
       });
 
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.message || `Failed to save settings (${res.status})`);
-      }
       setSuccess('Settings saved successfully!');
       setTimeout(() => setSuccess(''), 3000);
     } catch (err) {
@@ -279,7 +313,7 @@ export default function MessagingSettings() {
       {/* Save Button */}
       <div className="flex justify-end">
         <div className="flex items-center space-x-4">
-          {user?.role !== 'admin' && !authLoading && (
+          {!['global_admin', 'business_admin'].includes(user?.role) && !authLoading && (
             <div className="flex items-center space-x-2 text-red-600">
               <AlertCircle className="w-4 h-4" />
               <span className="text-sm">Admin role required to save changes</span>
@@ -287,7 +321,7 @@ export default function MessagingSettings() {
           )}
           <Button
             onClick={handleSave}
-            disabled={saving || user?.role !== 'admin' || settingsLoading || authLoading}
+            disabled={saving || !['global_admin', 'business_admin'].includes(user?.role) || settingsLoading || authLoading}
             className="px-6 py-2"
           >
             {saving ? (

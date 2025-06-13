@@ -94,47 +94,26 @@ router.post('/', async (req, res) => {
       return res.status(403).json({ error: 'Cannot modify settings for different tenant' });
     }
 
-    // Check for existing setting with tenant filtering
-    let existingQuery = supabase
+    // Use upsert instead of manual check and insert/update
+    const upsertData = { 
+      key: key.trim().toLowerCase(), 
+      value,
+      tenant_id: targetTenantId,
+      updated_at: new Date().toISOString()
+    };
+
+    console.log('Upserting setting:', upsertData);
+
+    const { error: upsertError } = await supabase
       .from('platform_settings')
-      .select('id')
-      .eq('key', key.trim().toLowerCase());
+      .upsert(upsertData, { 
+        onConflict: 'key,tenant_id',
+        ignoreDuplicates: false 
+      });
 
-    if (targetTenantId) {
-      existingQuery = existingQuery.eq('tenant_id', targetTenantId);
-    }
-
-    const { data: existing, error: fetchError } = await existingQuery.single();
-
-    // PGRST116 indicates no rows found, which is fine for insert.
-    if (fetchError && fetchError.code !== 'PGRST116') {
-      throw fetchError;
-    }
-
-    if (existing) {
-      // Update existing setting
-      const { error: updateError } = await supabase
-        .from('platform_settings')
-        .update({ value })
-        .eq('id', existing.id);
-
-      if (updateError) throw updateError;
-    } else {
-      // Insert new setting
-      const insertData = { 
-        key: key.trim().toLowerCase(), 
-        value 
-      };
-      
-      if (targetTenantId) {
-        insertData.tenant_id = targetTenantId;
-      }
-
-      const { error: insertError } = await supabase
-        .from('platform_settings')
-        .insert(insertData);
-
-      if (insertError) throw insertError;
+    if (upsertError) {
+      console.error('Upsert error:', upsertError);
+      throw upsertError;
     }
 
     res.status(200).json({ 
@@ -218,12 +197,17 @@ router.post('/instructions', async (req, res) => {
   }
 });
 
-// PUT /api/settings
+// PUT /api/settings - FIXED VERSION
 router.put('/', async (req, res) => {
-  const { settings } = req.body; // Remove tenant_id from body - get from authenticated user
+  const { settings } = req.body;
   const { role, tenant_id } = req.user || {};
 
   try {
+    console.log('🔥 PUT /api/settings called');
+    console.log('🔥 req.user:', JSON.stringify(req.user, null, 2));
+    console.log('🔥 settings:', JSON.stringify(settings, null, 2));
+    console.log('🔥 Request body tenant_id:', req.body.tenant_id);
+
     // Security check
     if (!tenant_id && role !== 'global_admin') {
       return res.status(403).json({ error: 'No tenant access configured' });
@@ -253,21 +237,48 @@ router.put('/', async (req, res) => {
         return null;
       }
 
-      return {
+      const upsertObj = {
         key,
         value,
-        tenant_id: targetTenantId
+        tenant_id: targetTenantId,
+        updated_at: new Date().toISOString()
       };
-    }).filter(Boolean); // Remove invalid rows
+      
+      console.log(`🔥 Building upsert for key ${key}:`, upsertObj);
+      return upsertObj;
+    }).filter(Boolean);
 
-    const { error } = await supabase
+    console.log('🔥 Final prepared upserts:', JSON.stringify(upserts, null, 2));
+
+    // FIXED: Force timestamp update by adding microseconds to make it unique
+    const { error, data } = await supabase
       .from('platform_settings')
-      .upsert(upserts, { onConflict: ['key', 'tenant_id'] });
+      .upsert(upserts, { 
+        onConflict: 'tenant_id,key',
+        ignoreDuplicates: false 
+      })
+      .select();
+
+    // Force update the timestamp separately if the upsert didn't update it
+    if (data && data.length > 0) {
+      const forceUpdatePromises = data.map(record => 
+        supabase
+          .from('platform_settings')
+          .update({ updated_at: new Date().toISOString() })
+          .eq('id', record.id)
+      );
+      
+      await Promise.all(forceUpdatePromises);
+      console.log('🔥 Forced timestamp updates completed');
+    }
 
     if (error) {
-      console.error('[Supabase error]', error);
+      console.error('🔥 [Supabase upsert error]', error);
       return res.status(500).json({ error: 'Failed to save settings to Supabase.' });
     }
+
+    console.log('🔥 Upsert successful, affected rows:', data?.length || 0);
+    console.log('🔥 Returned data:', JSON.stringify(data, null, 2));
 
     return res.status(200).json({ 
       message: 'Settings saved successfully.',
@@ -275,11 +286,12 @@ router.put('/', async (req, res) => {
         role, 
         user_tenant_id: tenant_id, 
         target_tenant_id: targetTenantId,
-        settings_updated: upserts.length
+        settings_updated: upserts.length,
+        affected_rows: data?.length || 0
       }
     });
   } catch (err) {
-    console.error('[Server error]', err);
+    console.error('🔥 [Server error]', err);
     return res.status(500).json({ error: 'Unexpected error in settings save.' });
   }
 });

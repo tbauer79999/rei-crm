@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import supabase from '../../lib/supabaseClient';
 import { Label } from '../ui/label';
 import Button from '../ui/button';
 import { Input } from '../ui/input';
@@ -20,12 +21,54 @@ export default function AISettings() {
   const [success, setSuccess] = useState('');
   const [error, setError] = useState('');
 
-  const [minScore, setMinScore] = useState('7');
+  const [minScore, setMinScore] = useState('75');
   const [followupDelay, setFollowupDelay] = useState('3');
   const [escalationMethod, setEscalationMethod] = useState('All');
 
   const delayOptions = ['1', '3', '7', '14', '30', '60', '90', '180'];
   const methodOptions = ['Email', 'SMS', 'Dashboard Only', 'All'];
+
+  // Enhanced API call helper
+  const makeAuthenticatedRequest = async (url, options = {}) => {
+    try {
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError) {
+        throw new Error(`Authentication error: ${sessionError.message}`);
+      }
+
+      if (!session?.access_token) {
+        throw new Error('No valid session found. Please log in again.');
+      }
+
+      const headers = {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session.access_token}`,
+        ...options.headers
+      };
+
+      const response = await fetch(url, {
+        ...options,
+        headers
+      });
+
+      if (!response.ok) {
+        let errorMessage = `Request failed: ${response.status} ${response.statusText}`;
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.error || errorData.message || errorMessage;
+        } catch {
+          // If we can't parse error response, use the default message
+        }
+        throw new Error(errorMessage);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('API Request failed:', error);
+      throw error;
+    }
+  };
 
   useEffect(() => {
     const fetchSettings = async () => {
@@ -34,7 +77,7 @@ export default function AISettings() {
       if (!user || !user.tenant_id) {
         setError('User or tenant information is missing. Cannot load AI settings.');
         setSettingsLoading(false);
-        setMinScore('7');
+        setMinScore('75');
         setFollowupDelay('3');
         setEscalationMethod('All');
         return;
@@ -43,14 +86,9 @@ export default function AISettings() {
       setSettingsLoading(true);
       setError('');
       try {
-        const res = await fetch(`/api/settings?tenant_id=${user.tenant_id}`);
-        if (!res.ok) {
-          const errorData = await res.json();
-          throw new Error(errorData.message || `Failed to fetch settings (${res.status})`);
-        }
-        const settings = await res.json();
+        const settings = await makeAuthenticatedRequest(`/api/settings?tenant_id=${user.tenant_id}`);
 
-        setMinScore(settings['ai_min_escalation_score']?.value || '7');
+        setMinScore(settings['ai_min_escalation_score']?.value || '75');
         setFollowupDelay(settings['ai_cold_followup_delay_days']?.value || '3');
         setEscalationMethod(settings['ai_escalation_method']?.value || 'All');
       } catch (err) {
@@ -69,7 +107,8 @@ export default function AISettings() {
       setError('User or tenant information is missing. Cannot save settings.');
       return;
     }
-    if (user.role !== 'admin') {
+    
+    if (!['global_admin', 'business_admin'].includes(user.role)) {
       setError('Admin role required to save settings.');
       return;
     }
@@ -85,16 +124,11 @@ export default function AISettings() {
     };
 
     try {
-      const res = await fetch('/api/settings', {
+      await makeAuthenticatedRequest('/api/settings', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ settings: settingsPayload, tenant_id: user.tenant_id })
       });
 
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.message || `Failed to save settings (${res.status})`);
-      }
       setSuccess('Settings saved successfully!');
       setTimeout(() => setSuccess(''), 3000);
     } catch (err) {
@@ -159,26 +193,89 @@ export default function AISettings() {
           </div>
         </div>
 
-        <div className="space-y-4">
-          <div>
-            <Label htmlFor="minScore" className="flex items-center space-x-2 mb-2">
-              <TrendingUp className="w-4 h-4 text-gray-500" />
-              <span>Minimum Score to Escalate (1–10)</span>
-            </Label>
-            <div className="max-w-xs">
-              <Input
-                id="minScore"
-                type="number"
-                min={1}
-                max={10}
-                value={minScore}
-                onChange={(e) => setMinScore(e.target.value)}
-                placeholder="7"
-              />
+        <div className="space-y-6">
+          {/* Current Value Display */}
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium text-gray-700">Minimum Score to Escalate</span>
+            <div className="flex items-center gap-3">
+              <div 
+                className="px-3 py-1 rounded-full text-sm font-medium"
+                style={{ 
+                  backgroundColor: parseInt(minScore) >= 85 ? '#fef2f2' : 
+                                 parseInt(minScore) >= 65 ? '#fff7ed' : 
+                                 parseInt(minScore) >= 45 ? '#fefce8' : '#eff6ff',
+                  color: parseInt(minScore) >= 85 ? '#ef4444' : 
+                         parseInt(minScore) >= 65 ? '#f97316' : 
+                         parseInt(minScore) >= 45 ? '#eab308' : '#3b82f6'
+                }}
+              >
+                {parseInt(minScore) >= 85 ? '🔥 Hot Lead' : 
+                 parseInt(minScore) >= 65 ? '🌶️ Warm Lead' : 
+                 parseInt(minScore) >= 45 ? '☀️ Responding' : '❄️ Cold Lead'}
+              </div>
+              <div className="text-2xl font-bold text-gray-900 min-w-[60px] text-right">
+                {minScore}
+              </div>
             </div>
-            <p className="text-sm text-gray-500 mt-2">
-              Leads scoring at or above this threshold will be automatically escalated to your team.
+          </div>
+
+          {/* Slider */}
+          <div className="relative">
+            <input
+              type="range"
+              min="1"
+              max="100"
+              value={minScore}
+              onChange={(e) => setMinScore(e.target.value)}
+              className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
+              style={{
+                background: `linear-gradient(to right, 
+                  #3b82f6 0%, 
+                  #3b82f6 ${(parseInt(minScore)-1)/99 * 44}%, 
+                  #eab308 ${(parseInt(minScore)-1)/99 * 44}%, 
+                  #eab308 ${(parseInt(minScore)-1)/99 * 64}%, 
+                  #f97316 ${(parseInt(minScore)-1)/99 * 64}%, 
+                  #f97316 ${(parseInt(minScore)-1)/99 * 84}%, 
+                  #ef4444 ${(parseInt(minScore)-1)/99 * 84}%, 
+                  #ef4444 ${(parseInt(minScore)-1)/99 * 100}%, 
+                  #e5e7eb ${(parseInt(minScore)-1)/99 * 100}%, 
+                  #e5e7eb 100%)`
+              }}
+            />
+            
+            {/* Zone Labels */}
+            <div className="flex justify-between mt-2 px-1">
+              <div className="flex flex-col items-center">
+                <span className="text-xs text-blue-600 font-medium">❄️</span>
+                <span className="text-xs text-gray-500">Cold</span>
+                <span className="text-xs text-gray-400">0-44</span>
+              </div>
+              <div className="flex flex-col items-center">
+                <span className="text-xs text-yellow-600 font-medium">☀️</span>
+                <span className="text-xs text-gray-500">Responding</span>
+                <span className="text-xs text-gray-400">45-64</span>
+              </div>
+              <div className="flex flex-col items-center">
+                <span className="text-xs text-orange-600 font-medium">🌶️</span>
+                <span className="text-xs text-gray-500">Warm</span>
+                <span className="text-xs text-gray-400">65-84</span>
+              </div>
+              <div className="flex flex-col items-center">
+                <span className="text-xs text-red-600 font-medium">🔥</span>
+                <span className="text-xs text-gray-500">Hot</span>
+                <span className="text-xs text-gray-400">85-100</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Helper Text */}
+          <div className="bg-gray-50 rounded-lg p-4">
+            <p className="text-sm text-gray-600">
+              Leads scoring <span className="font-semibold text-gray-900">{minScore} or higher</span> will be automatically escalated to your sales team.
             </p>
+            <div className="mt-2 text-xs text-gray-500">
+              💡 Most SaaS companies set this between 70-80 for optimal balance
+            </div>
           </div>
         </div>
       </div>
@@ -273,7 +370,7 @@ export default function AISettings() {
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="bg-gray-50 rounded-lg p-4">
-            <div className="text-2xl font-bold text-gray-900">{minScore}/10</div>
+            <div className="text-2xl font-bold text-gray-900">{minScore}/100</div>
             <div className="text-sm text-gray-600">Escalation Score</div>
           </div>
           <div className="bg-gray-50 rounded-lg p-4">
@@ -289,10 +386,39 @@ export default function AISettings() {
         </div>
       </div>
 
+      {/* Score Reference Guide */}
+      <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl border border-blue-200 p-6">
+        <div className="flex items-center space-x-3 mb-4">
+          <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+            <Brain className="w-4 h-4 text-blue-600" />
+          </div>
+          <h4 className="text-sm font-semibold text-gray-900">Score Reference Guide</h4>
+        </div>
+        
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+          <div className="bg-white/60 rounded-lg p-3">
+            <div className="font-semibold text-red-600">🔥 85-100</div>
+            <div className="text-gray-600">Hot Lead</div>
+          </div>
+          <div className="bg-white/60 rounded-lg p-3">
+            <div className="font-semibold text-orange-600">🌶️ 65-84</div>
+            <div className="text-gray-600">Warm Lead</div>
+          </div>
+          <div className="bg-white/60 rounded-lg p-3">
+            <div className="font-semibold text-yellow-600">☀️ 45-64</div>
+            <div className="text-gray-600">Responding</div>
+          </div>
+          <div className="bg-white/60 rounded-lg p-3">
+            <div className="font-semibold text-blue-600">❄️ 0-44</div>
+            <div className="text-gray-600">Cold Lead</div>
+          </div>
+        </div>
+      </div>
+
       {/* Save Button */}
       <div className="flex justify-end">
         <div className="flex items-center space-x-4">
-          {user?.role !== 'admin' && !authLoading && (
+          {!['global_admin', 'business_admin'].includes(user?.role) && !authLoading && (
             <div className="flex items-center space-x-2 text-red-600">
               <AlertCircle className="w-4 h-4" />
               <span className="text-sm">Admin role required to save changes</span>
@@ -300,7 +426,7 @@ export default function AISettings() {
           )}
           <Button
             onClick={handleSave}
-            disabled={saving || user?.role !== 'admin' || settingsLoading || authLoading}
+            disabled={saving || !['global_admin', 'business_admin'].includes(user?.role) || settingsLoading || authLoading}
             className="px-6 py-2"
           >
             {saving ? (
@@ -314,6 +440,31 @@ export default function AISettings() {
           </Button>
         </div>
       </div>
+
+      {/* Slider Styles */}
+      <style jsx>{`
+        .slider::-webkit-slider-thumb {
+          appearance: none;
+          height: 20px;
+          width: 20px;
+          border-radius: 50%;
+          background: #ffffff;
+          border: 2px solid #3b82f6;
+          cursor: pointer;
+          box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .slider::-moz-range-thumb {
+          height: 20px;
+          width: 20px;
+          border-radius: 50%;
+          background: #ffffff;
+          border: 2px solid #3b82f6;
+          cursor: pointer;
+          box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+          border: none;
+        }
+      `}</style>
     </div>
   );
 }

@@ -1,7 +1,6 @@
 // src/components/onboarding/Step2_PhoneNumber.jsx
 import React, { useState, useEffect } from 'react';
 import { Phone, Search, MapPin, Check, Loader, AlertCircle, Star } from 'lucide-react';
-import apiClient from '../../lib/apiClient';
 import supabase from '../../lib/supabaseClient';
 
 const PhoneNumberSelector = ({ tenantId, formData, setFormData, onNext }) => {
@@ -15,6 +14,36 @@ const PhoneNumberSelector = ({ tenantId, formData, setFormData, onNext }) => {
   const [popularAreaCodes, setPopularAreaCodes] = useState([]);
   const [purchasing, setPurchasing] = useState(false);
   const [userId, setUserId] = useState(null);
+
+  // Helper function to make API calls with auth
+  const callAPI = async (endpoint, options = {}) => {
+    try {
+      // Get the auth token from Supabase
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError || !session?.access_token) {
+        throw new Error('Authentication required');
+      }
+
+      const response = await fetch(endpoint, {
+        ...options,
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+          ...options.headers,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('API call failed:', error);
+      throw error;
+    }
+  };
 
   // Get user ID on component mount
   useEffect(() => {
@@ -41,8 +70,8 @@ const PhoneNumberSelector = ({ tenantId, formData, setFormData, onNext }) => {
   const loadPopularAreaCodes = async () => {
     try {
       setLoading(true);
-      const response = await apiClient.get('/phone-numbers/popular-area-codes');
-      setPopularAreaCodes(response.data.areaCodes);
+      const data = await callAPI('/api/phone-numbers/popular-area-codes');
+      setPopularAreaCodes(data.areaCodes);
     } catch (error) {
       console.error('Error loading area codes:', error);
       setError('Failed to load area codes');
@@ -56,14 +85,14 @@ const PhoneNumberSelector = ({ tenantId, formData, setFormData, onNext }) => {
       setLoading(true);
       setError('');
       
-      const response = await apiClient.get(`/phone-numbers/search/${areaCode}`);
+      const data = await callAPI(`/api/phone-numbers/search/${areaCode}`);
       
-      if (response.data.availableNumbers.length === 0) {
+      if (data.availableNumbers.length === 0) {
         setError(`No phone numbers available in area code ${areaCode}. Try a different area code.`);
         return;
       }
 
-      setAvailableNumbers(response.data.availableNumbers);
+      setAvailableNumbers(data.availableNumbers);
       setSelectedAreaCode(areaCode);
       setStep('select');
     } catch (error) {
@@ -79,12 +108,17 @@ const PhoneNumberSelector = ({ tenantId, formData, setFormData, onNext }) => {
       setPurchasing(true);
       setError('');
 
-      const response = await apiClient.post('/phone-numbers/purchase', {
-        phoneNumber: phoneNumber.phoneNumber,
-        userId: userId
+      // UPDATED: Include both userId and tenantId
+      const data = await callAPI('/api/phone-numbers/purchase', {
+        method: 'POST',
+        body: JSON.stringify({
+          phoneNumber: phoneNumber.phoneNumber,
+          userId: userId,
+          tenantId: tenantId // ✅ ADDED: Include tenant ID
+        }),
       });
 
-      if (response.data.success) {
+      if (data.success) {
         setSelectedNumber(phoneNumber);
         
         // Update form data with the purchased number
@@ -141,6 +175,17 @@ const PhoneNumberSelector = ({ tenantId, formData, setFormData, onNext }) => {
     return phoneNumber;
   };
 
+  // Validation: Check if tenantId is available
+  if (!tenantId) {
+    return (
+      <div className="text-center py-8">
+        <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+        <h3 className="text-lg font-medium text-gray-900 mb-2">Setup Required</h3>
+        <p className="text-gray-600">Tenant information is required before configuring phone numbers.</p>
+      </div>
+    );
+  }
+
   if (step === 'purchased') {
     return (
       <div className="space-y-8">
@@ -163,7 +208,7 @@ const PhoneNumberSelector = ({ tenantId, formData, setFormData, onNext }) => {
           </h3>
           <div className="bg-green-50 border border-green-200 rounded-lg p-4 max-w-md mx-auto">
             <p className="text-sm text-green-800">
-              Your phone number has been provisioned and is ready for AI campaigns. Continuing to AI configuration...
+              Your phone number has been provisioned and linked to your tenant account. Ready for AI campaigns!
             </p>
           </div>
         </div>

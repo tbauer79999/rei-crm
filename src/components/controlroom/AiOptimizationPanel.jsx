@@ -1,7 +1,9 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Card } from '../ui/card';
 import { Zap, MessageSquareText, User, ArrowRight, X, Phone, Calendar } from 'lucide-react';
-import apiClient from '../../lib/apiClient';
+
+// Edge Function URL - Update this with your actual Supabase project URL
+const EDGE_FUNCTION_URL = 'https://wuuqrdlfgkasnwydyvgk.supabase.co/functions/v1/AiOptimizationPanel';
 
 const AiOptimizationPanel = () => {
   const [keywords, setKeywords] = useState([]);
@@ -16,48 +18,76 @@ const AiOptimizationPanel = () => {
   });
   const [hotTriggerPhrases, setHotTriggerPhrases] = useState([]);
   const [optOutReasons, setOptOutReasons] = useState([]);
+  const [loading, setLoading] = useState(true);
   const keywordSectionRef = useRef(null);
 
+  // Helper function to call edge function with auth
+  const callEdgeFunction = async (params = '') => {
+    try {
+      // Get the auth token from localStorage or your auth context
+      const token = localStorage.getItem('supabase.auth.token') || 
+                   JSON.parse(localStorage.getItem('sb-wuuqrdlfgkasnwydyvgk-auth-token') || '{}')?.access_token;
+      
+      const response = await fetch(`${EDGE_FUNCTION_URL}${params}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Edge function call failed:', error);
+      throw error;
+    }
+  };
+
+  // Initial data load
   useEffect(() => {
-    apiClient.get('/keywords').then((res) => {
-      setKeywords(res.data.keywords || []);
-    });
+    const loadInitialData = async () => {
+      try {
+        setLoading(true);
+        const data = await callEdgeFunction();
+        
+        setKeywords(data.keywords || []);
+        setHotLeadMetrics(data.hotSummary?.metrics || {
+          avgMessages: 0,
+          avgTimeHours: 0,
+          fastestMessages: 0,
+          fastestTimeMinutes: 0
+        });
+        setHotTriggerPhrases(data.hotSummary?.triggerPhrases || []);
+        setOptOutReasons(data.hotSummary?.optOutReasons || []);
+      } catch (error) {
+        console.error('Error loading initial data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-    // Fetch hot lead metrics
-    apiClient.get('/hot-summary/metrics', {
-      params: { tenant_id: '46f58bba-b709-4460-8df1-ee61f0d42c57' }
-    }).then((res) => {
-      setHotLeadMetrics(res.data);
-    }).catch(err => {
-      console.error('Error fetching hot lead metrics:', err);
-    });
-
-    // Fetch hot trigger phrases
-    apiClient.get('/hot-summary/trigger-phrases', {
-      params: { tenant_id: '46f58bba-b709-4460-8df1-ee61f0d42c57' }
-    }).then((res) => {
-      setHotTriggerPhrases(res.data.phrases || []);
-    }).catch(err => {
-      console.error('Error fetching trigger phrases:', err);
-    });
-
-    // Fetch opt-out reasons
-    apiClient.get('/hot-summary/opt-out-reasons', {
-      params: { tenant_id: '46f58bba-b709-4460-8df1-ee61f0d42c57' }
-    }).then((res) => {
-      setOptOutReasons(res.data.reasons || []);
-    }).catch(err => {
-      console.error('Error fetching opt-out reasons:', err);
-    });
+    loadInitialData();
   }, []);
 
+  // Load message matches when keyword is selected
   useEffect(() => {
-    if (selectedKeyword) {
-      apiClient
-        .get(`/messages/search?keyword=${encodeURIComponent(selectedKeyword)}`)
-        .then((res) => setMessageMatches(res.data.matches || []))
-        .catch(() => setMessageMatches([]));
-    }
+    const loadMessageMatches = async () => {
+      if (selectedKeyword) {
+        try {
+          const data = await callEdgeFunction(`?keyword=${encodeURIComponent(selectedKeyword)}`);
+          setMessageMatches(data.messageSearch?.matches || []);
+        } catch (error) {
+          console.error('Error loading message matches:', error);
+          setMessageMatches([]);
+        }
+      }
+    };
+
+    loadMessageMatches();
   }, [selectedKeyword]);
 
   // Click outside to collapse keyword selection
@@ -88,6 +118,27 @@ const AiOptimizationPanel = () => {
       setSelectedKeyword(keyword);
     }
   };
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {[1, 2, 3].map(i => (
+            <Card key={i} className="p-4">
+              <div className="animate-pulse">
+                <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
+                <div className="h-3 bg-gray-200 rounded w-1/2 mb-4"></div>
+                <div className="space-y-2">
+                  <div className="h-3 bg-gray-200 rounded"></div>
+                  <div className="h-3 bg-gray-200 rounded w-5/6"></div>
+                </div>
+              </div>
+            </Card>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6" ref={keywordSectionRef}>
@@ -239,33 +290,52 @@ const AiOptimizationPanel = () => {
       {selectedMessage && (
         <MessageModal 
           message={selectedMessage} 
-          onClose={() => setSelectedMessage(null)} 
+          onClose={() => setSelectedMessage(null)}
+          edgeFunctionUrl={EDGE_FUNCTION_URL}
         />
       )}
     </div>
   );
 };
 
-const MessageModal = ({ message, onClose }) => {
+const MessageModal = ({ message, onClose, edgeFunctionUrl }) => {
   const [leadDetails, setLeadDetails] = useState(null);
   const [leadMessages, setLeadMessages] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (message?.lead_id) {
-      Promise.all([
-        apiClient.get(`/api/leads/${message.lead_id}`),
-        apiClient.get(`/api/messages/lead/${message.lead_id}`)
-      ]).then(([leadRes, messagesRes]) => {
-        setLeadDetails(leadRes.data);
-        setLeadMessages(messagesRes.data.messages || []);
-        setLoading(false);
-      }).catch(err => {
-        console.error('Error fetching lead details:', err);
-        setLoading(false);
-      });
-    }
-  }, [message?.lead_id]);
+    const loadLeadData = async () => {
+      if (message?.lead_id) {
+        try {
+          // Get the auth token
+          const token = localStorage.getItem('supabase.auth.token') || 
+                       JSON.parse(localStorage.getItem('sb-wuuqrdlfgkasnwydyvgk-auth-token') || '{}')?.access_token;
+          
+          const response = await fetch(`${edgeFunctionUrl}?lead_id=${message.lead_id}`, {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+          });
+
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+
+          const data = await response.json();
+          setLeadDetails(data.leadDetails);
+          setLeadMessages(data.leadMessages?.messages || []);
+        } catch (error) {
+          console.error('Error fetching lead details:', error);
+        } finally {
+          setLoading(false);
+        }
+      }
+    };
+
+    loadLeadData();
+  }, [message?.lead_id, edgeFunctionUrl]);
 
   if (!message) return null;
 

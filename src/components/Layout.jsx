@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
-  BarChart2, Settings, Home, ChevronLeft, ChevronRight, LogOut, Menu, X, TrendingUp, Brain
+  BarChart2, Settings, Home, ChevronLeft, ChevronRight, LogOut, Menu, X, TrendingUp, Brain, Megaphone
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { signOutUser } from '../lib/authService';
@@ -147,6 +147,13 @@ export default function Layout({ children }) {
           title: companyName,
           subtitle: 'Enterprise-level analytics and cross-business insights'
         };
+      case '/campaign-management':
+        return {
+          title: companyName,
+          subtitle: companyInfo.industry === 'staffing' ? 'Create and manage recruitment campaigns' :
+                   companyInfo.industry === 'real estate' ? 'Create and manage lead generation campaigns' :
+                   'Create and manage marketing campaigns'
+        };
       case '/settings':
         return {
           title: companyName,
@@ -183,12 +190,21 @@ export default function Layout({ children }) {
       });
     }
     
-    // Business Analytics - for all users
-    analyticsItems.push({
-      path: '/business-analytics', 
-      label: 'Business Analytics', 
-      icon: Brain 
-    });
+// AI Strategy Hub - for all users
+analyticsItems.push({
+  path: '/business-analytics', 
+  label: 'AI Strategy Hub', 
+  icon: Brain 
+});
+
+    // Campaign Management - for enterprise_admin and business_admin
+    if (['global_admin', 'enterprise_admin', 'business_admin'].includes(role)) {
+      analyticsItems.push({
+        path: '/campaign-management',
+        label: 'Campaign Management',
+        icon: Megaphone
+      });
+    }
 
     const endItems = [
       { path: '/settings', label: 'Settings', icon: Settings },

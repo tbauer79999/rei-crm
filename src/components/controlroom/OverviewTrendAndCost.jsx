@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from 'react';
-import apiClient from '../../lib/apiClient';
 import {
   LineChart,
   Line,
@@ -9,7 +8,10 @@ import {
   ResponsiveContainer,
   CartesianGrid,
 } from 'recharts';
-import { useAuth } from '../../context/AuthContext'; // Adjust path as needed
+import { useAuth } from '../../context/AuthContext';
+
+// Edge Function URL - Update this with your actual Supabase project URL
+const EDGE_FUNCTION_URL = 'https://wuuqrdlfgkasnwydyvgk.supabase.co/functions/v1/overview-analytics';
 
 const MetricCard = ({ title, value, subtext, trend, empty }) => (
   <div
@@ -45,38 +47,83 @@ const MetricCard = ({ title, value, subtext, trend, empty }) => (
 
 export default function OverviewTrendAndCost() {
   const { user } = useAuth();
-  const tenantId = user?.tenant_id;
 
   const [hotLeadTrend, setHotLeadTrend] = useState([]);
   const [messagesSent, setMessagesSent] = useState(0);
   const [hotLeadCount, setHotLeadCount] = useState(0);
   const [previousHotLeadCount, setPreviousHotLeadCount] = useState(0);
   const [previousMessageCount, setPreviousMessageCount] = useState(0);
+  const [loading, setLoading] = useState(true);
 
   const COST_PER_MESSAGE = 0.01;
 
-  useEffect(() => {
-    if (!tenantId) return;
+  // Helper function to call edge function with auth
+  const callEdgeFunction = async () => {
+    try {
+      // Get the auth token from localStorage
+      const token = localStorage.getItem('supabase.auth.token') || 
+                   JSON.parse(localStorage.getItem('sb-wuuqrdlfgkasnwydyvgk-auth-token') || '{}')?.access_token;
+      
+      const response = await fetch(EDGE_FUNCTION_URL, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
 
-    apiClient.get('/overview/analytics-trend-cost', {
-        params: { tenant_id: tenantId },
-      })
-      .then((res) => {
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Edge function call failed:', error);
+      throw error;
+    }
+  };
+
+  useEffect(() => {
+    // Ensure there's an active user before trying to fetch data
+    if (!user) {
+      console.log('No active user found, skipping fetch for OverviewTrendAndCost.');
+      setLoading(false);
+      return;
+    }
+
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        const data = await callEdgeFunction();
+        
         const {
           trend,
           totalMessagesSent,
           totalHotLeads,
           previousMessagesSent,
           previousHotLeads,
-        } = res.data;
+        } = data;
 
-        setHotLeadTrend(trend);
-        setMessagesSent(totalMessagesSent);
-        setHotLeadCount(totalHotLeads);
-        setPreviousMessageCount(previousMessagesSent);
-        setPreviousHotLeadCount(previousHotLeads);
-      });
-  }, [tenantId]);
+        setHotLeadTrend(trend || []);
+        setMessagesSent(totalMessagesSent || 0);
+        setHotLeadCount(totalHotLeads || 0);
+        setPreviousMessageCount(previousMessagesSent || 0);
+        setPreviousHotLeadCount(previousHotLeads || 0);
+      } catch (error) {
+        console.error('Error fetching overview trend and cost:', error);
+        // Set default values on error
+        setHotLeadTrend([]);
+        setMessagesSent(0);
+        setHotLeadCount(0);
+        setPreviousMessageCount(0);
+        setPreviousHotLeadCount(0);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [user]); // Depend on user to re-fetch if auth state changes
 
   const cost = messagesSent * COST_PER_MESSAGE;
   const costPerHotLead =
@@ -89,26 +136,46 @@ export default function OverviewTrendAndCost() {
     return `${sign}${Math.abs(change).toFixed(1)}%`;
   };
 
+  if (loading) {
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {[1, 2, 3].map(i => (
+          <div key={i} className="bg-white p-4 rounded-xl shadow border">
+            <div className="animate-pulse">
+              <div className="h-4 bg-gray-200 rounded w-1/2 mb-2"></div>
+              <div className="h-8 bg-gray-200 rounded w-3/4 mb-2"></div>
+              <div className="h-3 bg-gray-200 rounded w-2/3"></div>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
       {/* Hot Lead Trend (line chart) */}
       <div className="bg-white p-4 rounded-xl shadow border col-span-1 md:col-span-1">
         <h3 className="text-sm text-gray-500 mb-2">Hot Lead Trend (%)</h3>
-        <ResponsiveContainer width="100%" height={150}>
-          <LineChart data={hotLeadTrend}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="date" fontSize={10} />
-            <YAxis domain={[0, 100]} tickFormatter={(v) => `${v}%`} fontSize={10} />
-            <Tooltip formatter={(value) => `${value}%`} />
-            <Line
-              type="monotone"
-              dataKey="hotRate"
-              stroke="#3b82f6"
-              strokeWidth={2}
-              dot={false}
-            />
-          </LineChart>
-        </ResponsiveContainer>
+        {hotLeadTrend && hotLeadTrend.length > 0 ? (
+          <ResponsiveContainer width="100%" height={150}>
+            <LineChart data={hotLeadTrend}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="date" fontSize={10} />
+              <YAxis domain={[0, 100]} tickFormatter={(v) => `${v}%`} fontSize={10} />
+              <Tooltip formatter={(value) => `${value}%`} />
+              <Line
+                type="monotone"
+                dataKey="hotRate"
+                stroke="#3b82f6"
+                strokeWidth={2}
+                dot={false}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        ) : (
+          <p className="text-gray-400 text-center py-10">No trend data available.</p>
+        )}
       </div>
 
       {/* Messages Sent Cost */}

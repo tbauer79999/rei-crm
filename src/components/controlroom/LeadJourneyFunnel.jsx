@@ -4,7 +4,9 @@ import {
   PieChart, Pie, Cell, Tooltip, ResponsiveContainer,
   BarChart, Bar, XAxis, YAxis, LineChart, Line, Legend
 } from 'recharts';
-import apiClient from '../../lib/apiClient'
+
+// Edge Function URL - Update this with your actual Supabase project URL
+const EDGE_FUNCTION_URL = 'https://wuuqrdlfgkasnwydyvgk.supabase.co/functions/v1/LeadJourneyFunnel';
 
 const COLORS = ['#3b82f6', '#10b981', '#fbbf24', '#f97316', '#14b8a6', '#f43f5e', '#8b5cf6', '#ef4444'];
 
@@ -18,6 +20,32 @@ export default function LeadJourneyFunnel() {
   const [trendData, setTrendData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [dateRange, setDateRange] = useState(30); // Default 30 days
+
+  // Helper function to call edge function with auth
+  const callEdgeFunction = async (days = 30) => {
+    try {
+      // Get the auth token from localStorage
+      const token = localStorage.getItem('supabase.auth.token') || 
+                   JSON.parse(localStorage.getItem('sb-wuuqrdlfgkasnwydyvgk-auth-token') || '{}')?.access_token;
+      
+      const response = await fetch(`${EDGE_FUNCTION_URL}?days=${days}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Edge function call failed:', error);
+      throw error;
+    }
+  };
 
   useEffect(() => {
     if (user?.tenant_id) {
@@ -36,15 +64,20 @@ export default function LeadJourneyFunnel() {
       setLoading(true);
       console.log('Fetching lead journey data for tenant:', user.tenant_id);
 
-      // Fetch journey data (status distribution, funnel, transitions)
-      const journeyResponse = await apiClient.get(`/funnel-analytics?tenant_id=${user.tenant_id}&days=${dateRange}`);
-console.log('Journey response:', journeyResponse.data);
-setJourneyData(journeyResponse.data);
+      // Single call to get all lead journey data
+      const data = await callEdgeFunction(dateRange);
+      console.log('Lead journey response:', data);
+      
+      // Set journey data (status distribution, funnel, transitions)
+      setJourneyData({
+        statusDistribution: data.statusDistribution || [],
+        funnelData: data.funnelData || [],
+        transitionData: data.transitionData || [],
+        totalLeads: data.totalLeads || 0
+      });
 
-      // Fetch trend data
-      const trendsResponse = await apiClient.get(`/lead-trends?tenant_id=${user.tenant_id}&days=${dateRange}`);
-console.log('Trends response:', trendsResponse.data);
-setTrendData(trendsResponse.data.trends || []);
+      // Set trend data
+      setTrendData(data.trends || []);
 
     } catch (error) {
       console.error('Error fetching lead journey data:', error);
@@ -52,7 +85,8 @@ setTrendData(trendsResponse.data.trends || []);
       setJourneyData({
         statusDistribution: [],
         funnelData: [],
-        transitionData: []
+        transitionData: [],
+        totalLeads: 0
       });
       setTrendData([]);
     } finally {

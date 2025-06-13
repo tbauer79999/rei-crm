@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { Users } from 'lucide-react';
+import SalesTeamSettings from '../components/settings/SalesTeamSettings'; // New component we'll create
 import { 
   Building2, 
   MessageSquare, 
@@ -68,6 +70,15 @@ const settingsCategories = [
     status: 'healthy',
     statusText: 'Configured'
   },
+  {
+  key: 'salesteam',
+  title: 'Sales Team',
+  description: 'Invite team members, manage user access, and view your sales roster',
+  icon: Users,
+  component: SalesTeamSettings,
+  status: 'healthy',
+  statusText: 'Active Team'
+},
   {
     key: 'ai',
     title: 'AI & Automation',
@@ -244,6 +255,10 @@ export default function Settings() {
               <div className="text-2xl font-bold text-blue-600">1</div>
               <div className="text-sm text-gray-600">Pending Review</div>
             </div>
+            <div className="text-center">
+  <div className="text-2xl font-bold text-gray-900">7</div> {/* Changed from 6 to 7 */}
+  <div className="text-sm text-gray-600">Settings Categories</div>
+</div>
           </div>
 
           {/* Debug Access Token Tool */}

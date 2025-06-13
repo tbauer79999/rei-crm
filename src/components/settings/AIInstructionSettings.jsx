@@ -1,33 +1,170 @@
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '../../context/AuthContext';
-import supabase from '../../lib/supabaseClient';
-import { buildInstructionBundle } from '../../lib/instructionBuilder';
-import { Label } from '../ui/label';
-import Button from '../ui/button';
+import { useAuth } from '../../context/AuthContext.jsx';
+import supabase from '../../lib/supabaseClient.js';
+import { buildInstructionBundle, buildInitialInstruction } from '../../lib/instructionBuilder.js';
 import { 
-  FileText, 
-  Settings, 
-  User, 
-  Briefcase, 
-  MessageCircle,
+  Brain,
+  MessageSquare, 
+  Clock, 
+  Wand2, 
+  Save, 
+  Settings,
   Eye,
+  AlertTriangle,
   CheckCircle,
-  AlertCircle,
-  Brain
+  Plus,
+  Trash2,
+  ChevronDown,
+  ChevronRight,
+  User,
+  Briefcase,
+  MessageCircle,
+  Zap,
+  Target,
+  BarChart3,
+  Copy,
+  RotateCcw,
+  Filter,
+  Search,
+  Edit3,
+  Play,
+  Pause,
+  Activity,
+  Users,
+  Calendar,
+  ArrowRight,
+  RefreshCw
 } from 'lucide-react';
 
-export default function AIInstructionSettings() {
+const EnterpriseAIStrategyHub = () => {
   const { user } = useAuth();
-  const [industry, setIndustry] = useState('');
-  const [tone, setTone] = useState('');
-  const [persona, setPersona] = useState('');
-  const [role, setRole] = useState('');
-  const [preview, setPreview] = useState('');
+  const [activeTab, setActiveTab] = useState('dashboard');
+  const [selectedCampaign, setSelectedCampaign] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterStatus, setFilterStatus] = useState('all');
+  const [unsavedChanges, setUnsavedChanges] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
-  // Match onboarding industry options exactly
+  // Strategy Configuration State
+  const [strategyConfig, setStrategyConfig] = useState({
+    businessName: '',
+    industry: '',
+    role: '',
+    
+    // Initial Instructions (First Contact)
+    initialTone: '',
+    initialPersona: '',
+    
+    // Engagement Instructions (Ongoing)
+    engagementTone: '',
+    engagementPersona: '',
+    
+    followups: [
+      {
+        id: 1,
+        day: 3,
+        type: 'gentle_reminder',
+        tone: '',
+        persona: '',
+        enabled: true
+      },
+      {
+        id: 2,
+        day: 7,
+        type: 'value_add',
+        tone: '',
+        persona: '',
+        enabled: true
+      },
+      {
+        id: 3,
+        day: 14,
+        type: 'final_attempt',
+        tone: '',
+        persona: '',
+        enabled: true
+      }
+    ]
+  });
+
+  // Mock campaigns data (replace with real API call)
+  const [campaigns, setCampaigns] = useState([
+    { 
+      id: '1', 
+      name: 'Q1 Enterprise Outreach', 
+      status: 'active', 
+      leads: 1247, 
+      conversion: 12.3,
+      lastModified: '2024-01-15',
+      strategy: 'consultative',
+      aiPersona: 'Sales Consultant',
+      industry: 'Technology'
+    },
+    { 
+      id: '2', 
+      name: 'Fortune 500 Warm Leads', 
+      status: 'active', 
+      leads: 89, 
+      conversion: 18.7,
+      lastModified: '2024-01-12',
+      strategy: 'aggressive_sales',
+      aiPersona: 'Senior Account Executive',
+      industry: 'Enterprise Software'
+    },
+    { 
+      id: '3', 
+      name: 'Webinar Follow-up Sequence', 
+      status: 'paused', 
+      leads: 456, 
+      conversion: 8.1,
+      lastModified: '2024-01-10',
+      strategy: 'gentle_nurture',
+      aiPersona: 'Marketing Specialist',
+      industry: 'Education Technology'
+    }
+  ]);
+
+  const strategyTemplates = [
+    {
+      id: 'consultative',
+      name: 'Consultative Sales',
+      description: 'Relationship-first approach with value-driven messaging',
+      icon: '🤝',
+      industry: 'B2B SaaS',
+      avgConversion: '14.2%',
+      followupCount: 3,
+      timeline: '21 days',
+      tone: 'Professional & Consultative',
+      persona: 'Trusted Advisor'
+    },
+    {
+      id: 'aggressive_sales',
+      name: 'High-Velocity Sales',
+      description: 'Fast-paced, conversion-focused with urgency triggers',
+      icon: '🎯',
+      industry: 'Enterprise',
+      avgConversion: '18.3%',
+      followupCount: 3,
+      timeline: '14 days',
+      tone: 'Assertive & Confident',
+      persona: 'Closer'
+    },
+    {
+      id: 'gentle_nurture',
+      name: 'Long-term Nurture',
+      description: 'Patient relationship building with educational content',
+      icon: '🌱',
+      industry: 'Healthcare',
+      avgConversion: '9.1%',
+      followupCount: 3,
+      timeline: '45 days',
+      tone: 'Empathetic & Supportive',
+      persona: 'Educator'
+    }
+  ];
+
   const industryOptions = {
     'Real Estate': ['Wholesaler', 'Retail Agent', 'Lead Qualifier', 'Appointment Setter'],
     'Staffing': ['Recruiter', 'Interview Coordinator', 'Client Relations'],
@@ -49,338 +186,842 @@ export default function AIInstructionSettings() {
     'Empathetic & Supportive'
   ];
 
-  const personaOptions = [
+  const initialPersonaOptions = [
     'Icebreaker / Intro',
+    'Lead Qualifier',
+    'FAQ Assistant',
+    'Information Gatherer',
+    'First Contact Specialist'
+  ];
+
+  const engagementPersonaOptions = [
     'Nurturer',
     'Appointment Setter',
     'Closer',
-    'Qualifier',
-    'FAQ Assistant'
+    'Relationship Builder',
+    'Follow-up Specialist',
+    'Objection Handler'
   ];
 
-  const extractLine = (bundle, label) => {
-    const match = bundle.match(new RegExp(`${label}:\\s*(.+)`));
-    return match ? match[1].trim() : '';
+  const followupPersonaOptions = [
+    'Gentle Reminder',
+    'Value Provider',
+    'Urgency Creator',
+    'Relationship Builder',
+    'Closing Specialist',
+    'Final Attempt'
+  ];
+
+  // API helper function
+  const callAPI = async (endpoint, options = {}) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session?.access_token) {
+        throw new Error('Authentication required');
+      }
+
+      const response = await fetch(endpoint, {
+        ...options,
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+          ...options.headers,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('API call failed:', error);
+      throw error;
+    }
   };
 
+  // Load existing configuration
   useEffect(() => {
-    const fetchSettings = async () => {
+    const loadConfiguration = async () => {
+      if (!user?.tenant_id) return;
+
       try {
-        setError('');
+        const settings = await callAPI(`/api/settings?tenant_id=${user.tenant_id}`);
         
-        const { data: profile, error: profileError } = await supabase
-          .from('users_profile')
-          .select('tenant_id')
-          .eq('id', user.id)
-          .single();
+        // Extract configuration from existing settings
+        const extractLine = (bundle, label) => {
+          const match = bundle?.match(new RegExp(`${label}:\\s*(.+)`));
+          return match ? match[1].trim() : '';
+        };
 
-        if (profileError || !profile?.tenant_id) {
-          throw new Error('Could not retrieve tenant ID');
-        }
+        const initialBundle = settings['ai_instruction_initial']?.value || '';
+        const engagementBundle = settings['aiinstruction_bundle']?.value || '';
 
-        const tenantId = profile.tenant_id;
-        console.log('Fetching settings for tenant:', tenantId);
+        setStrategyConfig(prev => ({
+          ...prev,
+          businessName: extractLine(engagementBundle, 'BUSINESS_NAME') || 'Your Business',
+          industry: extractLine(engagementBundle, 'INDUSTRY') || '',
+          role: extractLine(engagementBundle, 'ROLE') || '',
+          initialTone: extractLine(initialBundle, 'TONE') || '',
+          initialPersona: extractLine(initialBundle, 'PERSONA') || '',
+          engagementTone: extractLine(engagementBundle, 'TONE') || '',
+          engagementPersona: extractLine(engagementBundle, 'PERSONA') || ''
+        }));
 
-        const res = await fetch(`/api/settings?tenant_id=${tenantId}`);
-        
-        if (!res.ok) {
-          throw new Error(`API request failed: ${res.status} ${res.statusText}`);
-        }
-        
-        const settings = await res.json();
-        const bundle = settings['aiinstruction_bundle']?.value || '';
-
-        setTone(extractLine(bundle, 'TONE'));
-        setPersona(extractLine(bundle, 'PERSONA'));
-        setIndustry(extractLine(bundle, 'INDUSTRY'));
-        setRole(extractLine(bundle, 'ROLE'));
       } catch (err) {
-        console.error('Error loading tenant-specific instructions:', err.message);
-        setError(`Failed to load settings: ${err.message}`);
+        console.error('Error loading configuration:', err);
+        setError('Failed to load existing configuration');
       }
     };
 
-    if (user?.id) {
-      fetchSettings();
-    }
-  }, [user]);
+    loadConfiguration();
+  }, [user?.tenant_id]);
 
-  useEffect(() => {
-    const bundle = buildInstructionBundle({ tone, persona, industry, role });
-    setPreview(bundle);
-  }, [tone, persona, industry, role]);
+  // Dashboard Component
+  const CampaignDashboard = () => {
+    const filteredCampaigns = campaigns.filter(campaign => {
+      const matchesSearch = campaign.name.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesFilter = filterStatus === 'all' || campaign.status === filterStatus;
+      return matchesSearch && matchesFilter;
+    });
 
-  const handleSave = async () => {
-    setSaving(true);
-    setError('');
-    setSuccess('');
-    
-    try {
-      if (!industry || !role || !tone || !persona) {
-        throw new Error('Please fill in all fields before saving');
-      }
-
-      const { data: profile, error: profileError } = await supabase
-        .from('users_profile')
-        .select('tenant_id')
-        .eq('id', user?.id)
-        .single();
-
-      if (profileError || !profile?.tenant_id) {
-        throw new Error('Unable to find tenant ID for this user');
-      }
-
-      console.log('Saving for tenant:', profile.tenant_id);
-
-      const res = await fetch('/api/settings/instructions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          tone,
-          persona,
-          industry,
-          role,
-          tenant_id: profile.tenant_id
-        })
-      });
-
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.error || `Server error: ${res.status}`);
-      }
-
-      const result = await res.json();
-      console.log('Save successful:', result);
-      setSuccess('Instructions saved successfully!');
-      setTimeout(() => setSuccess(''), 3000);
-      
-    } catch (err) {
-      console.error('Failed to save instructions:', err.message);
-      setError(`Save failed: ${err.message}`);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <div className="space-y-8">
-      {/* Success/Error Messages */}
-      {error && (
-        <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-center space-x-3">
-          <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0" />
-          <span className="text-red-800">{error}</span>
-        </div>
-      )}
-      
-      {success && (
-        <div className="bg-green-50 border border-green-200 rounded-xl p-4 flex items-center space-x-3">
-          <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0" />
-          <span className="text-green-800 font-medium">{success}</span>
-        </div>
-      )}
-
-      {/* Industry & Role Selection */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6">
-        <div className="flex items-center space-x-3 mb-6">
-          <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center">
-            <Briefcase className="w-5 h-5 text-blue-600" />
+    return (
+      <div className="space-y-8">
+        {/* Performance Overview Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          <div className="bg-gradient-to-r from-blue-500 to-blue-600 rounded-2xl p-6 text-white">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-blue-100 text-sm font-medium">Total Campaigns</p>
+                <p className="text-3xl font-bold">{campaigns.length}</p>
+                <p className="text-blue-100 text-xs mt-1">↑ 2 new this month</p>
+              </div>
+              <Target className="w-10 h-10 text-blue-200" />
+            </div>
           </div>
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900">Industry & Role</h3>
-            <p className="text-gray-600 text-sm">Define your business context and AI's primary role</p>
+
+          <div className="bg-gradient-to-r from-green-500 to-green-600 rounded-2xl p-6 text-white">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-green-100 text-sm font-medium">Avg. Conversion</p>
+                <p className="text-3xl font-bold">13.0%</p>
+                <p className="text-green-100 text-xs mt-1">↑ 2.1% vs last month</p>
+              </div>
+              <BarChart3 className="w-10 h-10 text-green-200" />
+            </div>
+          </div>
+
+          <div className="bg-gradient-to-r from-purple-500 to-purple-600 rounded-2xl p-6 text-white">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-purple-100 text-sm font-medium">Active Leads</p>
+                <p className="text-3xl font-bold">1,792</p>
+                <p className="text-purple-100 text-xs mt-1">Across all campaigns</p>
+              </div>
+              <Users className="w-10 h-10 text-purple-200" />
+            </div>
+          </div>
+
+          <div className="bg-gradient-to-r from-orange-500 to-orange-600 rounded-2xl p-6 text-white">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-orange-100 text-sm font-medium">Messages Sent</p>
+                <p className="text-3xl font-bold">12.8K</p>
+                <p className="text-orange-100 text-xs mt-1">This month</p>
+              </div>
+              <MessageSquare className="w-10 h-10 text-orange-200" />
+            </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div>
-            <Label className="flex items-center space-x-2 mb-2">
-              <Briefcase className="w-4 h-4 text-gray-500" />
-              <span>Industry</span>
-            </Label>
-            <select
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              value={industry}
-              onChange={(e) => {
-                setIndustry(e.target.value);
-                setRole('');
-                setError('');
-                setSuccess('');
+        {/* Search and Filter */}
+        <div className="bg-white rounded-2xl border border-gray-200 p-6">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900">Campaign Portfolio</h2>
+              <p className="text-gray-600 mt-1">Manage AI strategies across all your campaigns</p>
+            </div>
+            <button 
+              onClick={() => {
+                setSelectedCampaign(null);
+                setActiveTab('strategy');
               }}
+              className="flex items-center space-x-2 px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 font-medium"
             >
-              <option value="">Select your industry</option>
-              {Object.keys(industryOptions).map((option) => (
-                <option key={option} value={option}>{option}</option>
-              ))}
+              <Plus className="w-5 h-5" />
+              <span>Create New Strategy</span>
+            </button>
+          </div>
+
+          <div className="flex items-center space-x-4 mb-6">
+            <div className="flex-1 relative">
+              <Search className="w-5 h-5 absolute left-3 top-3 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search campaigns..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
+            <select
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value)}
+              className="px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            >
+              <option value="all">All Status</option>
+              <option value="active">Active</option>
+              <option value="paused">Paused</option>
+              <option value="draft">Draft</option>
             </select>
           </div>
 
-          {industry && (
-            <div>
-              <Label className="flex items-center space-x-2 mb-2">
-                <User className="w-4 h-4 text-gray-500" />
-                <span>Specific Role</span>
-              </Label>
-              <select
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                value={role}
-                onChange={(e) => {
-                  setRole(e.target.value);
-                  setError('');
-                  setSuccess('');
+          {/* Campaign Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+            {filteredCampaigns.map((campaign) => (
+              <div
+                key={campaign.id}
+                onClick={() => {
+                  setSelectedCampaign(campaign);
+                  setActiveTab('strategy');
                 }}
+                className="bg-white rounded-xl border-2 border-gray-200 p-6 hover:shadow-lg hover:border-blue-300 transition-all cursor-pointer group"
               >
-                <option value="">Select your role</option>
-                {industryOptions[industry].map((option) => (
-                  <option key={option} value={option}>{option}</option>
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center space-x-3">
+                    <div className={`w-4 h-4 rounded-full ${
+                      campaign.status === 'active' ? 'bg-green-500' : 
+                      campaign.status === 'paused' ? 'bg-yellow-500' : 'bg-gray-400'
+                    }`}></div>
+                    <span className={`px-3 py-1 text-xs rounded-full font-medium ${
+                      campaign.status === 'active' 
+                        ? 'bg-green-100 text-green-700' 
+                        : campaign.status === 'paused'
+                        ? 'bg-yellow-100 text-yellow-700'
+                        : 'bg-gray-100 text-gray-700'
+                    }`}>
+                      {campaign.status.toUpperCase()}
+                    </span>
+                  </div>
+                  <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-blue-600" />
+                </div>
+
+                <h3 className="font-bold text-lg text-gray-900 mb-3">{campaign.name}</h3>
+                
+                <div className="space-y-3 mb-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-600 text-sm">Active Leads</span>
+                    <span className="font-bold text-gray-900">{campaign.leads.toLocaleString()}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-600 text-sm">Conversion Rate</span>
+                    <span className="font-bold text-green-600">{campaign.conversion}%</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-600 text-sm">AI Persona</span>
+                    <span className="font-medium text-gray-900 text-sm">{campaign.aiPersona}</span>
+                  </div>
+                </div>
+
+                <div className="pt-3 border-t border-gray-100">
+                  <div className="flex items-center justify-between text-xs text-gray-500">
+                    <span>Modified {campaign.lastModified}</span>
+                    <span className="px-2 py-1 bg-gray-100 rounded-full capitalize text-gray-700">
+                      {campaign.strategy.replace('_', ' ')}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Quick Stats */}
+        <div className="bg-white rounded-2xl border border-gray-200 p-6">
+          <h3 className="text-lg font-bold text-gray-900 mb-4">AI Performance Insights</h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="bg-blue-50 rounded-xl p-4">
+              <h4 className="font-medium text-blue-900 mb-2">Top Performing Persona</h4>
+              <div className="text-2xl font-bold text-blue-600">Senior Account Executive</div>
+              <div className="text-sm text-blue-700">18.7% avg conversion</div>
+            </div>
+            <div className="bg-green-50 rounded-xl p-4">
+              <h4 className="font-medium text-green-900 mb-2">Optimal Follow-up Timing</h4>
+              <div className="text-2xl font-bold text-green-600">Day 3</div>
+              <div className="text-sm text-green-700">23.4% response rate</div>
+            </div>
+            <div className="bg-purple-50 rounded-xl p-4">
+              <h4 className="font-medium text-purple-900 mb-2">Best Industry Strategy</h4>
+              <div className="text-2xl font-bold text-purple-600">Consultative</div>
+              <div className="text-sm text-purple-700">For B2B SaaS campaigns</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Strategy Builder Component
+  const StrategyBuilder = () => {
+    const applyTemplate = (template) => {
+      setStrategyConfig(prev => ({
+        ...prev,
+        initialTone: template.tone,
+        initialPersona: initialPersonaOptions[0], // Default to first option
+        engagementTone: template.tone,
+        engagementPersona: template.persona,
+        followups: prev.followups.map((followup, index) => ({
+          ...followup,
+          tone: template.tone,
+          persona: followupPersonaOptions[index] || 'Gentle Reminder'
+        }))
+      }));
+      setUnsavedChanges(true);
+    };
+
+    const updateFollowup = (index, field, value) => {
+      setStrategyConfig(prev => ({
+        ...prev,
+        followups: prev.followups.map((followup, i) => 
+          i === index ? { ...followup, [field]: value } : followup
+        )
+      }));
+      setUnsavedChanges(true);
+    };
+
+    const saveStrategy = async () => {
+      setSaving(true);
+      setError('');
+      setSuccess('');
+
+      try {
+        if (!user?.tenant_id) {
+          throw new Error('Authentication required');
+        }
+
+        // Build instruction bundles
+        const initialBundle = buildInitialInstruction({
+          tone: strategyConfig.initialTone,
+          persona: strategyConfig.initialPersona,
+          industry: strategyConfig.industry,
+          role: strategyConfig.role,
+          businessName: strategyConfig.businessName
+        });
+
+        const engagementBundle = buildInstructionBundle({
+          tone: strategyConfig.engagementTone,
+          persona: strategyConfig.engagementPersona,
+          industry: strategyConfig.industry,
+          role: strategyConfig.role,
+          businessName: strategyConfig.businessName
+        });
+
+        // Build follow-up bundles
+        const followupBundles = strategyConfig.followups.map(followup => 
+          buildInstructionBundle({
+            tone: followup.tone || strategyConfig.engagementTone,
+            persona: followup.persona,
+            industry: strategyConfig.industry,
+            role: strategyConfig.role,
+            businessName: strategyConfig.businessName
+          })
+        );
+
+        const settingsPayload = {
+          ai_instruction_initial: { value: initialBundle },
+          aiinstruction_bundle: { value: engagementBundle },
+          ai_instruction_followup_1: { value: followupBundles[0] || '' },
+          ai_instruction_followup_2: { value: followupBundles[1] || '' },
+          ai_instruction_followup_3: { value: followupBundles[2] || '' },
+          followup_delay_1: { value: strategyConfig.followups[0]?.day.toString() || '3' },
+          followup_delay_2: { value: strategyConfig.followups[1]?.day.toString() || '7' },
+          followup_delay_3: { value: strategyConfig.followups[2]?.day.toString() || '14' }
+        };
+
+        await callAPI('/api/settings', {
+          method: 'PUT',
+          body: JSON.stringify({ 
+            settings: settingsPayload, 
+            tenant_id: user.tenant_id 
+          })
+        });
+
+        setSuccess('AI strategy saved successfully!');
+        setUnsavedChanges(false);
+        setTimeout(() => setSuccess(''), 3000);
+
+      } catch (err) {
+        console.error('Failed to save strategy:', err);
+        setError(`Save failed: ${err.message}`);
+      } finally {
+        setSaving(false);
+      }
+    };
+
+    return (
+      <div className="space-y-8">
+        {/* Strategy Header */}
+        <div className="bg-white rounded-2xl border border-gray-200 p-6">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900">
+                {selectedCampaign ? `Configure ${selectedCampaign.name}` : 'AI Strategy Builder'}
+              </h2>
+              <p className="text-gray-600 mt-1">Design your AI persona and automated follow-up sequence</p>
+            </div>
+            <div className="flex items-center space-x-3">
+              {unsavedChanges && (
+                <div className="flex items-center space-x-2 text-orange-600 text-sm font-medium">
+                  <AlertTriangle className="w-4 h-4" />
+                  <span>Unsaved changes</span>
+                </div>
+              )}
+              <button
+                onClick={saveStrategy}
+                disabled={saving}
+                className="flex items-center space-x-2 px-6 py-3 bg-green-600 text-white rounded-xl hover:bg-green-700 disabled:opacity-50 font-medium"
+              >
+                {saving ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    <span>Saving...</span>
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-4 h-4" />
+                    <span>Save Strategy</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+
+          {/* Core AI Configuration */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                AI Representative Name
+              </label>
+              <input
+                type="text"
+                value={strategyConfig.businessName}
+                onChange={(e) => {
+                  setStrategyConfig(prev => ({ ...prev, businessName: e.target.value }));
+                  setUnsavedChanges(true);
+                }}
+                className="w-full border border-gray-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="e.g., Sarah Thompson, Mike Chen"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Industry
+              </label>
+              <select
+                value={strategyConfig.industry}
+                onChange={(e) => {
+                  setStrategyConfig(prev => ({ ...prev, industry: e.target.value, role: '' }));
+                  setUnsavedChanges(true);
+                }}
+                className="w-full border border-gray-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              >
+                <option value="">Select industry</option>
+                {Object.keys(industryOptions).map(industry => (
+                  <option key={industry} value={industry}>{industry}</option>
                 ))}
               </select>
             </div>
-          )}
-        </div>
-      </div>
 
-      {/* Communication Style */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6">
-        <div className="flex items-center space-x-3 mb-6">
-          <div className="w-10 h-10 bg-green-50 rounded-lg flex items-center justify-center">
-            <MessageCircle className="w-5 h-5 text-green-600" />
+            {strategyConfig.industry && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Role
+                </label>
+                <select
+                  value={strategyConfig.role}
+                  onChange={(e) => {
+                    setStrategyConfig(prev => ({ ...prev, role: e.target.value }));
+                    setUnsavedChanges(true);
+                  }}
+                  className="w-full border border-gray-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="">Select role</option>
+                  {industryOptions[strategyConfig.industry].map(role => (
+                    <option key={role} value={role}>{role}</option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900">Communication Style</h3>
-            <p className="text-gray-600 text-sm">Configure how the AI speaks and behaves with prospects</p>
+
+          {/* Initial vs Engagement Instructions */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {/* Initial Instructions */}
+            <div className="bg-blue-50 rounded-2xl p-6 border-2 border-blue-200">
+              <div className="flex items-center space-x-3 mb-6">
+                <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
+                  <Users className="w-5 h-5 text-blue-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-blue-900">Initial Contact Instructions</h3>
+                  <p className="text-blue-700 text-sm">How AI introduces itself and makes first contact</p>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-blue-900 mb-2">
+                    Initial Tone
+                  </label>
+                  <select
+                    value={strategyConfig.initialTone}
+                    onChange={(e) => {
+                      setStrategyConfig(prev => ({ ...prev, initialTone: e.target.value }));
+                      setUnsavedChanges(true);
+                    }}
+                    className="w-full border border-blue-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                  >
+                    <option value="">Select tone</option>
+                    {toneOptions.map(tone => (
+                      <option key={tone} value={tone}>{tone}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-blue-900 mb-2">
+                    Initial Persona
+                  </label>
+                  <select
+                    value={strategyConfig.initialPersona}
+                    onChange={(e) => {
+                      setStrategyConfig(prev => ({ ...prev, initialPersona: e.target.value }));
+                      setUnsavedChanges(true);
+                    }}
+                    className="w-full border border-blue-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                  >
+                    <option value="">Select persona</option>
+                    {initialPersonaOptions.map(persona => (
+                      <option key={persona} value={persona}>{persona}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* Engagement Instructions */}
+            <div className="bg-green-50 rounded-2xl p-6 border-2 border-green-200">
+              <div className="flex items-center space-x-3 mb-6">
+                <div className="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center">
+                  <Zap className="w-5 h-5 text-green-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-green-900">Engagement Instructions</h3>
+                  <p className="text-green-700 text-sm">How AI nurtures and advances prospects</p>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-green-900 mb-2">
+                    Engagement Tone
+                  </label>
+                  <select
+                    value={strategyConfig.engagementTone}
+                    onChange={(e) => {
+                      setStrategyConfig(prev => ({ ...prev, engagementTone: e.target.value }));
+                      setUnsavedChanges(true);
+                    }}
+                    className="w-full border border-green-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white"
+                  >
+                    <option value="">Select tone</option>
+                    {toneOptions.map(tone => (
+                      <option key={tone} value={tone}>{tone}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-green-900 mb-2">
+                    Engagement Persona
+                  </label>
+                  <select
+                    value={strategyConfig.engagementPersona}
+                    onChange={(e) => {
+                      setStrategyConfig(prev => ({ ...prev, engagementPersona: e.target.value }));
+                      setUnsavedChanges(true);
+                    }}
+                    className="w-full border border-green-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white"
+                  >
+                    <option value="">Select persona</option>
+                    {engagementPersonaOptions.map(persona => (
+                      <option key={persona} value={persona}>{persona}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div>
-            <Label className="flex items-center space-x-2 mb-2">
-              <MessageCircle className="w-4 h-4 text-gray-500" />
-              <span>Conversation Tone</span>
-            </Label>
-            <select
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              value={tone}
-              onChange={(e) => {
-                setTone(e.target.value);
-                setError('');
-                setSuccess('');
-              }}
-            >
-              <option value="">Select communication tone</option>
-              {toneOptions.map((option) => (
-                <option key={option} value={option}>{option}</option>
+        {/* Strategy Templates */}
+        <div className="bg-white rounded-2xl border border-gray-200 p-6">
+          <h3 className="text-lg font-bold text-gray-900 mb-4">Quick Start Templates</h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {strategyTemplates.map((template) => (
+              <div
+                key={template.id}
+                className="p-6 border border-gray-200 rounded-xl hover:border-blue-300 cursor-pointer transition-all hover:shadow-md"
+              >
+                <div className="flex items-center space-x-3 mb-4">
+                  <span className="text-3xl">{template.icon}</span>
+                  <div>
+                    <h4 className="font-bold text-gray-900">{template.name}</h4>
+                    <p className="text-xs text-gray-500">{template.timeline} • {template.followupCount} messages</p>
+                  </div>
+                </div>
+                <p className="text-sm text-gray-600 mb-4">{template.description}</p>
+                <div className="flex items-center justify-between text-xs mb-4">
+                  <span className="text-green-600 font-medium">{template.avgConversion} conversion</span>
+                  <span className="text-gray-500">{template.industry}</span>
+                </div>
+                <button 
+                  onClick={() => applyTemplate(template)}
+                  className="w-full text-blue-600 hover:text-blue-700 font-medium text-sm py-2"
+                >
+                  Apply Template
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Follow-up Sequence */}
+        <div className="bg-white rounded-2xl border border-gray-200 p-6">
+          <h3 className="text-lg font-bold text-gray-900 mb-6">Follow-up Sequence</h3>
+          
+          <div className="space-y-6">
+            {strategyConfig.followups.map((followup, index) => (
+              <div key={followup.id} className="border border-gray-200 rounded-xl p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center space-x-4">
+                    <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-xl flex items-center justify-center text-white font-bold text-lg">
+                      {index + 1}
+                    </div>
+                    <div>
+                      <div className="font-bold text-gray-900">Follow-up {index + 1}</div>
+                      <div className="text-sm text-gray-600 capitalize">{followup.type.replace('_', ' ')}</div>
+                    </div>
+                  </div>
+                  <label className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      checked={followup.enabled}
+                      onChange={(e) => updateFollowup(index, 'enabled', e.target.checked)}
+                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    <span className="text-sm font-medium text-gray-700">Active</span>
+                  </label>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Delay (days)
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="90"
+                      value={followup.day}
+                      onChange={(e) => updateFollowup(index, 'day', parseInt(e.target.value))}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Communication Tone
+                    </label>
+                    <select
+                      value={followup.tone || strategyConfig.engagementTone}
+                      onChange={(e) => updateFollowup(index, 'tone', e.target.value)}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    >
+                      <option value="">Use engagement tone</option>
+                      {toneOptions.map(tone => (
+                        <option key={tone} value={tone}>{tone}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Follow-up Persona
+                    </label>
+                    <select
+                      value={followup.persona}
+                      onChange={(e) => updateFollowup(index, 'persona', e.target.value)}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    >
+                      <option value="">Select persona</option>
+                      {followupPersonaOptions.map(persona => (
+                        <option key={persona} value={persona}>{persona}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Timeline Visualization */}
+          <div className="mt-8 p-6 bg-gray-50 rounded-xl">
+            <h4 className="font-medium text-gray-900 mb-4">Follow-up Timeline</h4>
+            <div className="flex items-center space-x-4 text-sm overflow-x-auto">
+              <div className="flex items-center space-x-2 whitespace-nowrap">
+                <div className="w-3 h-3 bg-gray-500 rounded-full"></div>
+                <span>Day 0: Initial Contact</span>
+              </div>
+              {strategyConfig.followups.map((followup, index) => (
+                <React.Fragment key={followup.id}>
+                  <ArrowRight className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                  <div className="flex items-center space-x-2 whitespace-nowrap">
+                    <div className={`w-3 h-3 rounded-full ${
+                      index === 0 ? 'bg-blue-500' : 
+                      index === 1 ? 'bg-emerald-500' : 'bg-purple-500'
+                    }`}></div>
+                    <span>Day {followup.day}: {followup.persona || 'Follow-up'}</span>
+                  </div>
+                </React.Fragment>
               ))}
-            </select>
+            </div>
           </div>
+        </div>
 
-          <div>
-            <Label className="flex items-center space-x-2 mb-2">
-              <User className="w-4 h-4 text-gray-500" />
-              <span>AI Persona</span>
-            </Label>
-            <select
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              value={persona}
-              onChange={(e) => {
-                setPersona(e.target.value);
-                setError('');
-                setSuccess('');
-              }}
-            >
-              <option value="">Select AI personality</option>
-              {personaOptions.map((option) => (
-                <option key={option} value={option}>{option}</option>
-              ))}
-            </select>
+        {/* Performance Projection */}
+        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl border border-blue-200 p-6">
+          <h3 className="text-lg font-bold text-gray-900 mb-4">Strategy Performance Projection</h3>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <div className="text-center">
+              <div className="text-3xl font-bold text-blue-600">
+                {Math.max(...strategyConfig.followups.map(f => f.day))}
+              </div>
+              <div className="text-sm text-gray-600">Total Days</div>
+            </div>
+            <div className="text-center">
+              <div className="text-3xl font-bold text-green-600">14.2%</div>
+              <div className="text-sm text-gray-600">Est. Conversion</div>
+            </div>
+            <div className="text-center">
+              <div className="text-3xl font-bold text-purple-600">
+                {strategyConfig.followups.filter(f => f.enabled).length + 1}
+              </div>
+              <div className="text-sm text-gray-600">Touch Points</div>
+            </div>
+            <div className="text-center">
+              <div className="text-3xl font-bold text-orange-600">87%</div>
+              <div className="text-sm text-gray-600">Engagement Rate</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* Top Navigation */}
+      <div className="bg-white border-b border-gray-200 sticky top-0 z-40">
+        <div className="max-w-7xl mx-auto px-6">
+          <div className="flex items-center justify-between h-16">
+            <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-3">
+                <Brain className="w-8 h-8 text-blue-600" />
+                <span className="text-xl font-bold text-gray-900">AI Strategy Hub</span>
+              </div>
+              <div className="h-6 w-px bg-gray-300"></div>
+              <nav className="flex space-x-8">
+                <button
+                  onClick={() => setActiveTab('dashboard')}
+                  className={`px-3 py-2 text-sm font-medium border-b-2 transition-colors ${
+                    activeTab === 'dashboard'
+                      ? 'border-blue-500 text-blue-600'
+                      : 'border-transparent text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  Dashboard
+                </button>
+                <button
+                  onClick={() => setActiveTab('strategy')}
+                  className={`px-3 py-2 text-sm font-medium border-b-2 transition-colors ${
+                    activeTab === 'strategy'
+                      ? 'border-blue-500 text-blue-600'
+                      : 'border-transparent text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  Strategy Builder
+                </button>
+              </nav>
+            </div>
+            <div className="flex items-center space-x-4">
+              <button className="p-2 text-gray-400 hover:text-gray-600">
+                <Settings className="w-5 h-5" />
+              </button>
+              <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
+                <span className="text-white text-sm font-medium">
+                  {user?.email?.[0]?.toUpperCase() || 'U'}
+                </span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Instruction Preview */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6">
-        <div className="flex items-center space-x-3 mb-6">
-          <div className="w-10 h-10 bg-purple-50 rounded-lg flex items-center justify-center">
-            <Eye className="w-5 h-5 text-purple-600" />
+      {/* Main Content */}
+      <div className="max-w-7xl mx-auto px-6 py-8">
+        {/* Status Messages */}
+        {error && (
+          <div className="mb-6 bg-red-50 border border-red-200 rounded-xl p-4 flex items-center space-x-3">
+            <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0" />
+            <span className="text-red-800">{error}</span>
           </div>
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900">Generated Instructions Preview</h3>
-            <p className="text-gray-600 text-sm">Review the AI instructions that will be generated from your settings</p>
+        )}
+        
+        {success && (
+          <div className="mb-6 bg-green-50 border border-green-200 rounded-xl p-4 flex items-center space-x-3">
+            <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0" />
+            <span className="text-green-800 font-medium">{success}</span>
           </div>
-        </div>
+        )}
 
-        <div className="bg-gray-50 rounded-lg border border-gray-200">
-          <div className="border-b border-gray-200 px-4 py-3">
-            <div className="flex items-center space-x-2">
-              <FileText className="w-4 h-4 text-gray-600" />
-              <span className="text-sm font-medium text-gray-700">AI System Instructions</span>
-            </div>
+        {/* Breadcrumb */}
+        {selectedCampaign && activeTab === 'strategy' && (
+          <div className="mb-6">
+            <nav className="flex items-center space-x-2 text-sm text-gray-500">
+              <button
+                onClick={() => {
+                  setActiveTab('dashboard');
+                  setSelectedCampaign(null);
+                }}
+                className="hover:text-gray-700"
+              >
+                All Campaigns
+              </button>
+              <ChevronRight className="w-4 h-4" />
+              <span className="text-gray-900 font-medium">{selectedCampaign.name}</span>
+            </nav>
           </div>
-          <div className="p-4">
-            <textarea
-              value={preview}
-              readOnly
-              className="w-full bg-transparent border-0 text-sm font-mono text-gray-800 resize-none focus:outline-none"
-              rows={20}
-              placeholder="Select your industry, role, tone, and persona to generate AI instructions..."
-            />
-          </div>
-        </div>
-      </div>
+        )}
 
-      {/* Current Configuration Summary */}
-      {(industry || role || tone || persona) && (
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <div className="flex items-center space-x-3 mb-6">
-            <div className="w-10 h-10 bg-orange-50 rounded-lg flex items-center justify-center">
-              <Brain className="w-5 h-5 text-orange-600" />
-            </div>
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900">Current Configuration</h3>
-              <p className="text-gray-600 text-sm">Summary of your AI instruction settings</p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="bg-gray-50 rounded-lg p-4">
-              <div className="text-sm text-gray-600 mb-1">Industry</div>
-              <div className="font-medium text-gray-900">{industry || 'Not set'}</div>
-            </div>
-            <div className="bg-gray-50 rounded-lg p-4">
-              <div className="text-sm text-gray-600 mb-1">Role</div>
-              <div className="font-medium text-gray-900">{role || 'Not set'}</div>
-            </div>
-            <div className="bg-gray-50 rounded-lg p-4">
-              <div className="text-sm text-gray-600 mb-1">Tone</div>
-              <div className="font-medium text-gray-900">{tone || 'Not set'}</div>
-            </div>
-            <div className="bg-gray-50 rounded-lg p-4">
-              <div className="text-sm text-gray-600 mb-1">Persona</div>
-              <div className="font-medium text-gray-900">{persona || 'Not set'}</div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Save Button */}
-      <div className="flex justify-end">
-        <Button 
-          onClick={handleSave} 
-          disabled={saving || !industry || !role || !tone || !persona}
-          className="px-6 py-2"
-        >
-          {saving ? (
-            <div className="flex items-center space-x-2">
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-              <span>Saving...</span>
-            </div>
-          ) : (
-            <div className="flex items-center space-x-2">
-              <Settings className="w-4 h-4" />
-              <span>Save Instructions</span>
-            </div>
-          )}
-        </Button>
+        {/* Tab Content */}
+        {activeTab === 'dashboard' && <CampaignDashboard />}
+        {activeTab === 'strategy' && <StrategyBuilder />}
       </div>
     </div>
   );
-}
+};
+
+export default EnterpriseAIStrategyHub;

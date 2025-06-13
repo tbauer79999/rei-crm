@@ -14,7 +14,7 @@ const upload = multer();
 router.use(addUserProfile);
 router.use(filterByTenant);
 
-// POST /api/knowledge-upload
+// POST /api/knowledge/upload
 router.post('/upload', async (req, res) => {
   try {
     const { title = '', description = '', file_url, file_name } = req.body;
@@ -34,15 +34,27 @@ router.post('/upload', async (req, res) => {
     const buffer = Buffer.from(arrayBuffer);
 
     const data = await pdf(buffer);
-    const extractedText = data?.text?.trim() || '';
+    
+    // DEBUG: Log what we're getting from PDF
+    console.log('PDF data type:', typeof data?.text);
+    console.log('PDF data length:', data?.text?.length);
+    console.log('PDF data first 100 chars:', data?.text?.substring(0, 100));
+    
+    // Force it to be a clean string
+    let extractedText = '';
+    if (data?.text && typeof data.text === 'string') {
+      extractedText = data.text.trim().slice(0, 100000);
+    }
+    
+    console.log('Final extracted text length:', extractedText.length);
+    console.log('Final extracted text type:', typeof extractedText);
 
-    // Prepare insert data with tenant_id
     const insertData = {
-      title,
-      description,
+      title: title || '',
+      description: description || '',
       file_url,
       file_name,
-      content: extractedText.slice(0, 100000) // Limit content size if needed
+      content: extractedText || null
     };
 
     // Add tenant_id unless global admin (global admin creates global knowledge)
@@ -50,12 +62,17 @@ router.post('/upload', async (req, res) => {
       insertData.tenant_id = tenant_id;
     }
 
+    console.log('Insert data:', JSON.stringify(insertData, null, 2));
+
     const { data: inserted, error } = await supabase
       .from('knowledge_base')
       .insert([insertData])
       .select();
 
-    if (error) throw error;
+    if (error) {
+      console.error('Supabase insert error:', error);
+      throw error;
+    }
 
     res.status(200).json({ 
       success: true, 
@@ -64,11 +81,13 @@ router.post('/upload', async (req, res) => {
     });
   } catch (err) {
     console.error('Supabase upload failed:', err.message);
+    console.error('Full error:', err);
     res.status(500).json({ error: 'Failed to upload knowledge file' });
   }
 });
 
-// GET /api/knowledge-docs
+// GET /api/knowledge/docs
+// GET /api/knowledge/docs
 router.get('/docs', async (req, res) => {
   try {
     const { role, tenant_id } = req.user || {};
@@ -98,8 +117,9 @@ router.get('/docs', async (req, res) => {
 
     if (error) throw error;
 
+    // FIX: Return data properly without spreading
     res.status(200).json({
-      ...data,
+      data: data,  // ← Changed from ...data to data: data
       meta: { role, tenant_id, document_count: data?.length || 0 }
     });
   } catch (err) {
@@ -108,7 +128,7 @@ router.get('/docs', async (req, res) => {
   }
 });
 
-// GET /api/knowledge-docs/:id
+// GET /api/knowledge/docs/:id
 router.get('/docs/:id', async (req, res) => {
   const { id } = req.params;
   const { role, tenant_id } = req.user || {};
@@ -154,7 +174,7 @@ router.get('/docs/:id', async (req, res) => {
   }
 });
 
-// DELETE /api/knowledge-docs/:id
+// DELETE /api/knowledge/docs/:id
 router.delete('/docs/:id', async (req, res) => {
   const { id } = req.params;
   const { role, tenant_id } = req.user || {};
@@ -222,7 +242,7 @@ router.delete('/docs/:id', async (req, res) => {
   }
 });
 
-// GET /api/knowledge-bundle
+// GET /api/knowledge/bundle
 const { generateKnowledgeBundleString } = require('../lib/knowledgeService');
 
 router.get('/bundle', async (req, res) => {
