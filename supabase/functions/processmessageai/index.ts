@@ -15,6 +15,17 @@ if (!googleApiKey) {
   console.error('❌ GOOGLE_CLOUD_API_KEY is not set');
 }
 
+// Function to get random delay for human-like responses
+function getRandomDelay(): number {
+  // Random delay between 45 seconds and 3 minutes (in milliseconds)
+  const minDelay = 45 * 1000;  // 45 seconds
+  const maxDelay = 180 * 1000; // 3 minutes
+  
+  const delay = Math.floor(Math.random() * (maxDelay - minDelay + 1)) + minDelay;
+  console.log(`🕐 Random delay selected: ${delay / 1000} seconds`);
+  return delay;
+}
+
 // Function to get sentiment from Google Natural Language API
 async function getSentiment(text: string): Promise<{score: number, magnitude: number}> {
   try {
@@ -491,8 +502,13 @@ console.log('🔍 CONTEXTUAL MATCH:', output.match(/Contextual Sentiment Score:\
       return new Response('Failed to save AI response', { status: 500 });
     }
 
-    // ✅ NEW: Send AI response via Twilio (same logic as ai-initial-outreach)
-    console.log('📤 Sending AI response via Twilio...');
+    // ✅ NEW: Send AI response via Twilio (with human-like delay)
+    console.log('📤 Preparing to send AI response via Twilio...');
+    
+    // Add random delay to simulate human typing/thinking
+    const delay = getRandomDelay();
+    console.log(`⏳ Waiting ${delay / 1000} seconds before sending to appear more human...`);
+    await new Promise(resolve => setTimeout(resolve, delay));
     
     // Get tenant's Twilio phone number
     const { data: phoneNumber, error: phoneError } = await supabase
@@ -514,6 +530,7 @@ console.log('🔍 CONTEXTUAL MATCH:', output.match(/Contextual Sentiment Score:\
         console.error("❌ Twilio credentials not configured");
       } else {
         try {
+          console.log('📱 Sending SMS after human-like delay...');
           const twilioResponse = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${twilioSid}/Messages.json`, {
             method: "POST",
             headers: {
@@ -532,7 +549,7 @@ console.log('🔍 CONTEXTUAL MATCH:', output.match(/Contextual Sentiment Score:\
             console.error(`❌ Twilio SMS sending failed: ${twilioError}`);
           } else {
             const twilioData = await twilioResponse.json();
-            console.log(`✅ AI response sent via SMS. Twilio SID: ${twilioData.sid}`);
+            console.log(`✅ AI response sent via SMS after ${delay / 1000}s delay. Twilio SID: ${twilioData.sid}`);
             
             // Update the message record with the Twilio SID
             await supabase.from('messages')

@@ -21,6 +21,7 @@ import HotLeadHandoffPanel from '../components/controlroom/HotLeadHandoffPanel';
 import SystemMetricsPanel from '../components/controlroom/SystemMetricsPanel';
 import CustomizationPanel from '../components/controlroom/CustomizationPanel';
 import { fetchHealth, fetchHotSummary } from '../lib/api'; // Import your API helper
+import supabase from '../lib/supabaseClient';
 
 const SECTIONS = [
   { 
@@ -111,6 +112,7 @@ const AIControlRoom = () => {
   const [sectionStatuses, setSectionStatuses] = useState({});
   const [sectionMetrics, setSectionMetrics] = useState({});
   const [statusReasons, setStatusReasons] = useState({});
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
     const saved = localStorage.getItem('controlroom-collapse');
@@ -124,22 +126,20 @@ const AIControlRoom = () => {
       setCollapsed(defaultState);
     }
 
-    // Fetch dynamic status for Overview & Health
     const fetchOverviewStatus = async () => {
       try {
-        // ✅ Use your API helper instead of direct fetch
         const data = await fetchHealth();
-        
+
         setSectionStatuses(prev => ({
           ...prev,
           overview: data.status || 'healthy'
         }));
-        
+
         setSectionMetrics(prev => ({
           ...prev,
           overview: data.message || 'System operational'
         }));
-        
+
         setStatusReasons(prev => ({
           ...prev,
           overview: data.metrics ? 
@@ -148,28 +148,25 @@ const AIControlRoom = () => {
         }));
       } catch (err) {
         console.error('Error fetching overview status:', err);
-        // Set fallback values on error
         setSectionStatuses(prev => ({ ...prev, overview: 'attention' }));
         setSectionMetrics(prev => ({ ...prev, overview: 'Unable to fetch data' }));
       }
     };
 
-    // Fetch dynamic status for Hot Lead Handoff
     const fetchHandoffStatus = async () => {
       try {
-        // ✅ Use your API helper instead of direct fetch
         const data = await fetchHotSummary();
-        
+
         setSectionStatuses(prev => ({
           ...prev,
           handoff: data.status || 'healthy'
         }));
-        
+
         setSectionMetrics(prev => ({
           ...prev,
           handoff: data.message || data.avg_response || 'Response tracking active'
         }));
-        
+
         setStatusReasons(prev => ({
           ...prev,
           handoff: data.connected !== undefined ? 
@@ -178,28 +175,25 @@ const AIControlRoom = () => {
         }));
       } catch (err) {
         console.error('Error fetching handoff status:', err);
-        // Set fallback values on error
         setSectionStatuses(prev => ({ ...prev, handoff: 'attention' }));
         setSectionMetrics(prev => ({ ...prev, handoff: 'Unable to fetch data' }));
       }
     };
 
-    // Fetch dynamic status for Lead Journey & Funnel
     const fetchJourneyStatus = async () => {
       try {
-        // For now, use overview data or create a specific funnel health endpoint
         const data = await fetchHealth();
-        
+
         setSectionStatuses(prev => ({
           ...prev,
           journey: data.status || 'healthy'
         }));
-        
+
         setSectionMetrics(prev => ({
           ...prev,
           journey: 'Funnel analysis complete'
         }));
-        
+
         setStatusReasons(prev => ({
           ...prev,
           journey: data.metrics ? 
@@ -208,15 +202,22 @@ const AIControlRoom = () => {
         }));
       } catch (err) {
         console.error('Error fetching journey status:', err);
-        // Set fallback values on error
         setSectionStatuses(prev => ({ ...prev, journey: 'healthy' }));
         setSectionMetrics(prev => ({ ...prev, journey: 'Default metrics' }));
       }
     };
 
-    fetchOverviewStatus();
-    fetchHandoffStatus();
-    fetchJourneyStatus();
+    const loadData = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.access_token) {
+        await fetchOverviewStatus();
+        await fetchHandoffStatus();
+        await fetchJourneyStatus();
+        setReady(true);
+      }
+    };
+
+    loadData();
   }, []);
 
   const toggleSection = (id) => {
@@ -229,14 +230,12 @@ const AIControlRoom = () => {
     <div className="p-6 space-y-4">
       {SECTIONS.map((section) => {
         const { id, label, description, icon: SectionIcon } = section;
-        
-        // Use dynamic status/metrics if available, fallback to static
+
         const status = sectionStatuses[id] || section.status;
         const metrics = sectionMetrics[id] || section.metrics;
-        
         const statusConfig = getStatusConfig(status);
         const StatusIcon = statusConfig.icon;
-        
+
         return (
           <div 
             key={id} 
@@ -276,8 +275,6 @@ const AIControlRoom = () => {
                   <span className="text-xs text-gray-400 font-medium">{metrics}</span>
                 </div>
               </div>
-
-              {/* Chevron */}
               <div className="ml-4">
                 {collapsed[id] ? (
                   <ChevronRight className="w-5 h-5 text-gray-400" />
@@ -286,8 +283,6 @@ const AIControlRoom = () => {
                 )}
               </div>
             </button>
-
-            {/* Expandable Content */}
             <div
               className={clsx(
                 'transition-all duration-300 ease-in-out',
@@ -298,17 +293,12 @@ const AIControlRoom = () => {
             >
               <div className="px-6 pb-6 border-t border-gray-100">
                 <div className="pt-6">
-                  {label === 'Overview & Health' && (
-                    <>
-                      <OverviewMetrics />
-                      <OverviewTrendAndCost />
-                    </>
-                  )}
-                  {label === 'Lead Journey & Funnel' && (<LeadJourneyFunnel />)}
-                  {label === 'AI Optimization' && (<AiOptimizationPanel />)}
-                  {label === 'Hot Lead Handoff' && (<HotLeadHandoffPanel />)}
-                  {label === 'System Metrics' && (<SystemMetricsPanel />)}
-                  {label === 'Customization & Control' && (<CustomizationPanel />)}
+                  {ready && label === 'Overview & Health' && (<><OverviewMetrics /><OverviewTrendAndCost /></>)}
+                  {ready && label === 'Lead Journey & Funnel' && (<LeadJourneyFunnel />)}
+                  {ready && label === 'AI Optimization' && (<AiOptimizationPanel />)}
+                  {ready && label === 'Hot Lead Handoff' && (<HotLeadHandoffPanel />)}
+                  {ready && label === 'System Metrics' && (<SystemMetricsPanel />)}
+                  {ready && label === 'Customization & Control' && (<CustomizationPanel />)}
                 </div>
               </div>
             </div>

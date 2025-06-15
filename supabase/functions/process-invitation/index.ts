@@ -1,4 +1,4 @@
-// supabase/functions/process-invitation/index.ts - FIXED to match your schema
+// supabase/functions/process-invitation/index.ts - FIXED: Can lookup by email
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
@@ -6,7 +6,7 @@ import { corsHeaders } from "../_shared/cors.ts";
 interface ProcessInvitationRequest {
   user_id: string;
   email: string;
-  invitation_id: string;
+  invitation_id?: string; // Made optional - can lookup by email
 }
 
 serve(async (req) => {
@@ -36,10 +36,10 @@ serve(async (req) => {
     const { user_id, email, invitation_id }: ProcessInvitationRequest = await req.json();
 
     // Validate required fields
-    if (!user_id || !email || !invitation_id) {
+    if (!user_id || !email) {
       return new Response(
         JSON.stringify({ 
-          error: "Missing required fields: user_id, email, invitation_id" 
+          error: "Missing required fields: user_id, email" 
         }),
         { 
           status: 400,
@@ -48,24 +48,52 @@ serve(async (req) => {
       );
     }
 
-    console.log(`🎯 Processing invitation for user ${email} with invitation ${invitation_id}`);
+    console.log(`🎯 Processing invitation for user ${email}`);
 
-    // Step 1: Validate invitation
-    const { data: invitation, error: invitationError } = await supabase
-      .from("invitations")
-      .select("*")
-      .eq("id", invitation_id)
-      .eq("email", email)
-      .eq("status", "pending")
-      .gt("expires_at", new Date().toISOString())
-      .single();
+    // Step 1: Find invitation by ID or email
+    let invitation;
+    
+    if (invitation_id) {
+      // Try to find by ID first
+      const { data: invById, error: invByIdError } = await supabase
+        .from("invitations")
+        .select("*")
+        .eq("id", invitation_id)
+        .eq("email", email)
+        .eq("status", "pending")
+        .gt("expires_at", new Date().toISOString())
+        .single();
 
-    if (invitationError || !invitation) {
-      console.error("❌ Invalid or expired invitation:", invitationError?.message);
+      if (!invByIdError && invById) {
+        invitation = invById;
+        console.log("✅ Found invitation by ID");
+      }
+    }
+    
+    // If not found by ID, try by email (this is the fallback for when ID is lost)
+    if (!invitation) {
+      const { data: invByEmail, error: invByEmailError } = await supabase
+        .from("invitations")
+        .select("*")
+        .eq("email", email)
+        .eq("status", "pending")
+        .gt("expires_at", new Date().toISOString())
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .single();
+
+      if (!invByEmailError && invByEmail) {
+        invitation = invByEmail;
+        console.log("✅ Found invitation by email");
+      }
+    }
+
+    if (!invitation) {
+      console.error("❌ No valid invitation found for email:", email);
       return new Response(
         JSON.stringify({ 
-          error: "Invalid or expired invitation",
-          details: invitationError?.message 
+          error: "No valid invitation found for this email address",
+          details: "The invitation may have expired or already been used" 
         }),
         { 
           status: 400,
@@ -84,7 +112,7 @@ serve(async (req) => {
       .single();
 
     if (existingProfile) {
-      // Update existing profile - FIXED: removed updated_at field
+      // Update existing profile
       console.log(`📝 Updating existing profile for user ${user_id}`);
       
       const { error: updateError } = await supabase
@@ -92,7 +120,7 @@ serve(async (req) => {
         .update({
           tenant_id: invitation.tenant_id,
           role: invitation.role,
-          invited_by_invitation_id: invitation_id,
+          invited_by_invitation_id: invitation.id,
           is_active: true
         })
         .eq("id", user_id);
@@ -112,7 +140,7 @@ serve(async (req) => {
           email: email,
           tenant_id: invitation.tenant_id,
           role: invitation.role,
-          invited_by_invitation_id: invitation_id,
+          invited_by_invitation_id: invitation.id,
           is_active: true
         });
 
@@ -130,7 +158,7 @@ serve(async (req) => {
         accepted_at: new Date().toISOString(),
         accepted_by_user_id: user_id
       })
-      .eq("id", invitation_id);
+      .eq("id", invitation.id);
 
     if (invitationUpdateError) {
       console.error("❌ Error updating invitation status:", invitationUpdateError);
@@ -148,7 +176,7 @@ serve(async (req) => {
           email,
           tenant_id: invitation.tenant_id,
           role: invitation.role,
-          invitation_id
+          invitation_id: invitation.id
         }
       }),
       {

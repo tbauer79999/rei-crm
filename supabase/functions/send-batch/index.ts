@@ -2,6 +2,9 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
 
+// Helper function to create a delay
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -13,6 +16,51 @@ serve(async (req) => {
   );
 
   try {
+    let campaigns = [];
+    let isManualToggle = false;
+    
+    // For scheduled batch mode, check business hours first
+    const isScheduledBatch = !(req.method === "PATCH" || req.method === "POST") || 
+                           !(await req.json().then(body => body.campaignId && body.hasOwnProperty('ai_on')).catch(() => false));
+    
+    if (isScheduledBatch) {
+      // Get business hours settings from platform_settings
+      const { data: settings } = await supabase
+        .from("platform_settings")
+        .select("key, value")
+        .in("key", ["timezone", "officeOpenHour", "officeCloseHour", "officeDays"]);
+      
+      const settingsMap = settings?.reduce((acc, s) => ({ ...acc, [s.key]: s.value }), {}) || {};
+      
+      const timezone = settingsMap.timezone === "EST" ? "America/New_York" : "America/New_York";
+      const openHour = parseInt(settingsMap.officeOpenHour || "8");
+      const closeHour = parseInt(settingsMap.officeCloseHour || "17");
+      const officeDays = (settingsMap.officeDays || "Monday,Tuesday,Wednesday,Thursday,Friday").split(",");
+      
+      // Check current time in business timezone
+      const now = new Date();
+      const businessTime = new Date(now.toLocaleString("en-US", { timeZone: timezone }));
+      const hour = businessTime.getHours();
+      const dayOfWeek = businessTime.getDay(); // 0 = Sunday, 6 = Saturday
+      const dayName = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][dayOfWeek];
+      
+      // Check if outside business hours
+      if (hour < openHour || hour >= closeHour || !officeDays.includes(dayName)) {
+        console.log(`⏰ Outside business hours (${timezone}: ${businessTime.toLocaleString()}). Skipping batch processing.`);
+        return new Response(
+          JSON.stringify({
+            success: true,
+            message: "Outside business hours - batch processing skipped",
+            current_time: businessTime.toLocaleString(),
+            business_hours: `${openHour}:00 - ${closeHour}:00 ${timezone}`,
+            business_days: officeDays.join(", ")
+          }), 
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      }
+    }
     let campaigns = [];
     let isManualToggle = false;
 
@@ -68,6 +116,43 @@ serve(async (req) => {
     if (campaigns.length === 0) {
       console.log("🔄 Scheduled batch mode - processing all campaigns with ai_on=true");
       
+      // For scheduled batch mode, check business hours
+      const { data: settings } = await supabase
+        .from("platform_settings")
+        .select("key, value")
+        .in("key", ["timezone", "officeOpenHour", "officeCloseHour", "officeDays"]);
+      
+      const settingsMap = settings?.reduce((acc, s) => ({ ...acc, [s.key]: s.value }), {}) || {};
+      
+      const timezone = settingsMap.timezone === "EST" ? "America/New_York" : "America/New_York";
+      const openHour = parseInt(settingsMap.officeOpenHour || "8");
+      const closeHour = parseInt(settingsMap.officeCloseHour || "17");
+      const officeDays = (settingsMap.officeDays || "Monday,Tuesday,Wednesday,Thursday,Friday").split(",");
+      
+      // Check current time in business timezone
+      const now = new Date();
+      const businessTime = new Date(now.toLocaleString("en-US", { timeZone: timezone }));
+      const hour = businessTime.getHours();
+      const dayOfWeek = businessTime.getDay(); // 0 = Sunday, 6 = Saturday
+      const dayName = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][dayOfWeek];
+      
+      // Check if outside business hours
+      if (hour < openHour || hour >= closeHour || !officeDays.includes(dayName)) {
+        console.log(`⏰ Outside business hours (${timezone}: ${businessTime.toLocaleString()}). Skipping batch processing.`);
+        return new Response(
+          JSON.stringify({
+            success: true,
+            message: "Outside business hours - batch processing skipped",
+            current_time: businessTime.toLocaleString(),
+            business_hours: `${openHour}:00 - ${closeHour}:00 ${timezone}`,
+            business_days: officeDays.join(", ")
+          }), 
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      }
+      
       const { data: allCampaigns, error: campaignErr } = await supabase
         .from("campaigns")
         .select("*")
@@ -92,6 +177,8 @@ serve(async (req) => {
 
     let processedCampaigns = [];
     let totalNewLeadsProcessed = 0;
+    let totalLeadsAttempted = 0;
+    let processingErrors = [];
 
     for (const campaign of campaigns) {
       const { id: campaignId, tenant_id, ai_on, name } = campaign;
@@ -102,6 +189,16 @@ serve(async (req) => {
       }
 
       console.log(`🚀 Processing campaign ${campaignId} (${name}) for NEW leads...`);
+
+      // First, get the total count of unprocessed leads
+      const { count: totalUnprocessed } = await supabase
+        .from("leads")
+        .select("*", { count: 'exact', head: true })
+        .eq("tenant_id", tenant_id)
+        .eq("campaign_id", campaignId)
+        .eq("ai_sent", false);
+
+      console.log(`📊 Campaign "${name}" has ${totalUnprocessed} total unprocessed leads`);
 
       // Get NEW leads only (ai_sent = false)
       const { data: newLeads, error: leadErr } = await supabase
@@ -114,6 +211,7 @@ serve(async (req) => {
 
       if (leadErr) {
         console.error(`❌ Error fetching NEW leads for campaign ${campaignId}:`, leadErr);
+        processingErrors.push({ campaignId, error: `Failed to fetch leads: ${leadErr.message}` });
         continue;
       }
 
@@ -128,32 +226,34 @@ serve(async (req) => {
             .eq("id", campaignId);
         }
         
-        // Check if campaign should be marked as completed (no new leads left)
-        const { data: remainingLeads } = await supabase
-          .from("leads")
-          .select("id")
-          .eq("campaign_id", campaignId)
-          .eq("ai_sent", false)
-          .limit(1);
-
-        if (!remainingLeads || remainingLeads.length === 0) {
-          console.log(`🏁 Campaign ${campaignId} (${name}) has no remaining NEW leads - marking as completed`);
-          await supabase
-            .from("campaigns")
-            .update({ completed_at: new Date().toISOString() })
-            .eq("id", campaignId);
-        }
+        // Campaign is complete - no new leads left
+        console.log(`🏁 Campaign ${campaignId} (${name}) has no remaining NEW leads - marking as completed`);
+        await supabase
+          .from("campaigns")
+          .update({ completed_at: new Date().toISOString() })
+          .eq("id", campaignId);
         
         continue;
       }
 
-      console.log(`📤 Processing ${newLeads.length} NEW leads for campaign ${campaignId} (${name})`);
+      console.log(`📤 Processing batch of ${newLeads.length} leads (${newLeads.length} of ${totalUnprocessed} remaining)`);
 
       let campaignLeadsProcessed = 0;
+      let campaignLeadsAttempted = 0;
       
-      // Process each NEW lead
-      for (const lead of newLeads) {
-        console.log(`📧 Sending NEW lead ${lead.id} (${lead.name || lead.phone}) to AI initial outreach...`);
+      // Process each NEW lead with staggered delays
+      for (let i = 0; i < newLeads.length; i++) {
+        const lead = newLeads[i];
+        campaignLeadsAttempted++;
+        
+        // Add delay between leads (except for the first one)
+        if (i > 0) {
+          const delayMs = 3000 + Math.random() * 2000; // 3-5 seconds random delay
+          console.log(`⏱️ Waiting ${Math.round(delayMs/1000)}s before processing next lead...`);
+          await delay(delayMs);
+        }
+        
+        console.log(`📧 [${i + 1}/${newLeads.length}] Sending lead ${lead.id} (${lead.name || lead.phone}) - Progress: ${campaignLeadsProcessed + 1}/${totalUnprocessed} total`);
 
         const aiOutreachUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/ai-initial-outreach`;
         
@@ -174,11 +274,12 @@ serve(async (req) => {
           if (!outreachResponse.ok) {
             const errorText = await outreachResponse.text();
             console.error(`❌ AI outreach failed for lead ${lead.id}: ${errorText}`);
+            processingErrors.push({ leadId: lead.id, error: `AI outreach failed: ${errorText}` });
             continue;
           }
 
           // Mark lead as sent and update timestamps
-          await supabase
+          const { error: updateError } = await supabase
             .from("leads")
             .update({ 
               ai_sent: true, 
@@ -188,11 +289,18 @@ serve(async (req) => {
             })
             .eq("id", lead.id);
 
+          if (updateError) {
+            console.error(`❌ Failed to update lead ${lead.id} status:`, updateError);
+            processingErrors.push({ leadId: lead.id, error: `Failed to update lead status: ${updateError.message}` });
+            continue;
+          }
+
           campaignLeadsProcessed++;
           console.log(`✅ NEW lead ${lead.id} processed successfully`);
 
         } catch (fetchError) {
           console.error(`❌ Error calling AI outreach for NEW lead ${lead.id}:`, fetchError);
+          processingErrors.push({ leadId: lead.id, error: `Exception during processing: ${fetchError.message}` });
         }
       }
 
@@ -205,21 +313,34 @@ serve(async (req) => {
       }
 
       totalNewLeadsProcessed += campaignLeadsProcessed;
+      totalLeadsAttempted += campaignLeadsAttempted;
       
       const campaignResult = {
         ...campaign,
         new_leads_processed: campaignLeadsProcessed,
+        new_leads_attempted: campaignLeadsAttempted,
+        total_unprocessed_at_start: totalUnprocessed,
+        remaining_unprocessed: totalUnprocessed - campaignLeadsProcessed,
         processing_type: isManualToggle ? 'manual_toggle' : 'scheduled_batch'
       };
       
       processedCampaigns.push(campaignResult);
       
-      console.log(`🎯 Campaign ${campaignId} (${name}) complete: ${campaignLeadsProcessed} NEW leads processed`);
+      console.log(`🎯 Campaign ${campaignId} (${name}) batch complete:`);
+      console.log(`   - Processed: ${campaignLeadsProcessed}/${campaignLeadsAttempted} in this batch`);
+      console.log(`   - Remaining: ${totalUnprocessed - campaignLeadsProcessed} leads still to process`);
+      console.log(`   - Progress: ${Math.round((campaignLeadsProcessed / totalUnprocessed) * 100)}% of total campaign`);
     }
 
     const responseMessage = isManualToggle 
       ? `✅ Manual campaign processing complete.`
       : `✅ Scheduled batch processing complete.`;
+
+    console.log(`\n📊 Final Summary:`);
+    console.log(`- Campaigns processed: ${processedCampaigns.length}`);
+    console.log(`- Total leads attempted: ${totalLeadsAttempted}`);
+    console.log(`- Total leads successful: ${totalNewLeadsProcessed}`);
+    console.log(`- Total errors: ${processingErrors.length}`);
 
     return new Response(
       JSON.stringify({
@@ -228,7 +349,9 @@ serve(async (req) => {
         processing_type: isManualToggle ? 'manual_toggle' : 'scheduled_batch',
         campaigns_processed: processedCampaigns.length,
         total_new_leads_processed: totalNewLeadsProcessed,
-        campaigns: processedCampaigns
+        total_new_leads_attempted: totalLeadsAttempted,
+        campaigns: processedCampaigns,
+        errors: processingErrors.length > 0 ? processingErrors : undefined
       }), 
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

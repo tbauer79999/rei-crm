@@ -1,18 +1,20 @@
 const express = require('express');
 const dotenv = require('dotenv');
 const cors = require('cors');
-const { buildInstructionBundle } = require('./src/lib/instructionBuilder'); // Keep, used by settingsApiRoutes indirectly
-const multer = require('multer'); // Keep, used by knowledgeBaseRoutes
-const upload = multer(); // Keep, used by knowledgeBaseRoutes
-const pdf = require('pdf-parse'); // Keep, used by knowledgeBaseRoutes
-const { default: fetch } = require('node-fetch'); // Keep, used by settingsApiRoutes and knowledgeBaseRoutes
-const { fetchAllRecords, fetchRecordById, fetchSettingValue } = require('./src/lib/supabaseHelpers');
 
+// Load environment variables FIRST before any other imports that use them
 dotenv.config();
-const { supabase } = require('./src/lib/supabaseService'); // ✅
 
+// Now that env vars are loaded, we can safely import other modules
+const { buildInstructionBundle } = require('./src/lib/instructionBuilder');
+const multer = require('multer');
+const upload = multer();
+const pdf = require('pdf-parse');
+const { default: fetch } = require('node-fetch');
+const { fetchAllRecords, fetchRecordById, fetchSettingValue } = require('./src/lib/supabaseHelpers');
+const { supabase } = require('./src/lib/supabaseService');
 
-// Import new routers
+// Import routers AFTER environment variables are loaded
 const leadsRouter = require('./src/api_routes/leadRoutes');
 const settingsApiRouter = require('./src/api_routes/settingsApiRoutes');
 const knowledgeBaseRouter = require('./src/api_routes/knowledgeBaseRoutes');
@@ -30,15 +32,13 @@ const leadTrendsRoutes = require('./src/api_routes/lead-trends');
 const healthRoutes = require('./src/api_routes/health');
 const enterpriseAnalyticsRoutes = require('./src/api_routes/enterprise-analytics');
 const companyResearchRoutes = require('./src/api_routes/companyResearchRoutes');
-//const experimentsRoutes = require('./src/api_routes/experiments');
-const phoneNumberRoutes = require('./src/api_routes/phone-numbers'); // ✅ Correct path
+const phoneNumberRoutes = require('./src/api_routes/phone-numbers');
 const campaignsRouter = require('./src/api_routes/campaigns');
 const teamRoutes = require('./src/api_routes/team');
+const invitationsRoutes = require('./src/api_routes/invitations');
+const userRoutes = require('./src/api_routes/user'); // ADD THIS LINE
 
 const app = express();
-
-
-
 
 app.use(cors());
 app.use(express.json());
@@ -62,6 +62,9 @@ app.use('/api/research-company', companyResearchRoutes);
 app.use('/api/phone-numbers', phoneNumberRoutes);
 app.use('/api/campaigns', campaignsRouter);
 app.use('/api/team', teamRoutes);
+app.use('/api/invitations', invitationsRoutes);
+app.use('/api/user', userRoutes); // ADD THIS LINE
+
 app.post('/api/leads/bulk', async (req, res) => {
   try {
     const records = req.body.records || [];
@@ -181,13 +184,6 @@ app.post('/api/leads/bulk', async (req, res) => {
   }
 });
 
-
-
-
-
-
-
-
 app.post('/api/settings/instructions', async (req, res) => {
   const { tone, persona, industry, role } = req.body;
 
@@ -229,19 +225,6 @@ app.post('/api/settings/instructions', async (req, res) => {
   }
 });
 
-
-
-
-
-
-
-
-
-
-
-
-
-
 app.post('/api/knowledge-upload', async (req, res) => {
   try {
     const { title = '', description = '', file_url, file_name } = req.body;
@@ -254,7 +237,8 @@ app.post('/api/knowledge-upload', async (req, res) => {
     const response = await fetch(file_url);
     const arrayBuffer = await response.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
-console.log('✅ Buffer length:', buffer.length); // Should be > 0
+    console.log('✅ Buffer length:', buffer.length); // Should be > 0
+    
     // Extract text
     const data = await pdf(buffer);
     const extractedText = data?.text?.trim() || '';
@@ -281,9 +265,6 @@ console.log('✅ Buffer length:', buffer.length); // Should be > 0
   }
 });
 
-
-
-
 app.get('/api/knowledge-docs', async (req, res) => {
   try {
     const { data, error } = await supabase
@@ -299,7 +280,6 @@ app.get('/api/knowledge-docs', async (req, res) => {
     res.status(500).json({ error: 'Failed to fetch documents' });
   }
 });
-
 
 app.get('/api/knowledge-docs/:id', async (req, res) => {
   const { id } = req.params;
@@ -329,7 +309,6 @@ app.delete('/api/knowledge-docs/:id', async (req, res) => {
   }
 });
 
-
 app.get('/api/knowledge-bundle', async (req, res) => {
   try {
     const { data, error } = await supabase
@@ -349,13 +328,6 @@ app.get('/api/knowledge-bundle', async (req, res) => {
     res.status(500).json({ error: 'Failed to generate bundle' });
   }
 });
-
-
-
-
-
-
-
 
 app.get('/', (req, res) => {
   res.send('REI-CRM server running.');

@@ -1,4 +1,4 @@
-// src/api_routes/team.js
+// src/api_routes/team.js - FIXED: No inviteUserByEmail, just returns signup URL
 const express = require('express');
 const router = express.Router();
 const { supabase } = require('../lib/supabaseService');
@@ -96,13 +96,13 @@ router.get('/members', async (req, res) => {
     let query = supabase
       .from('users_profile')
       .select(`
-  id,
-  email,
-  role,
-  created_at,
-  tenant_id,
-  is_active
-`)
+        id,
+        email,
+        role,
+        created_at,
+        tenant_id,
+        is_active
+      `)
       .neq('role', 'global_admin'); // Don't show global admins
 
     // Apply tenant filtering
@@ -124,7 +124,7 @@ router.get('/members', async (req, res) => {
       name: member.email.split('@')[0], // Extract name from email
       email: member.email,
       role: member.role,
-      status: 'active', // You can enhance this with actual activity tracking
+      status: member.is_active !== false ? 'active' : 'inactive', // Default to active if not set
       lastLogin: null, // Add when you track login times
       invitedBy: 'Admin',
       joinedDate: member.created_at,
@@ -157,10 +157,8 @@ router.get('/invitations', async (req, res) => {
       return res.status(403).json({ error: 'No tenant access configured' });
     }
 
-    // First, let's check if the invitations table exists and what columns it has
     console.log('Querying invitations table...');
 
-    // Try simplified query first to avoid foreign key issues
     let query = supabase
       .from('invitations')
       .select(`
@@ -174,9 +172,8 @@ router.get('/invitations', async (req, res) => {
       `)
       .eq('status', 'pending');
 
-    // Apply tenant filtering - need to determine if it's tenant_id or business_id
+    // Apply tenant filtering
     if (role !== 'global_admin') {
-      // First try with tenant_id (matching users_profile)
       query = query.eq('tenant_id', tenant_id);
     }
 
@@ -184,61 +181,15 @@ router.get('/invitations', async (req, res) => {
       .order('created_at', { ascending: false });
 
     if (invitationsError) {
-      console.error('Error fetching invitations with tenant_id:', invitationsError);
+      console.error('Error fetching invitations:', invitationsError);
       console.error('Error details:', JSON.stringify(invitationsError, null, 2));
       
-      // If tenant_id doesn't work, try business_id
-      if (invitationsError.message?.includes('column') || invitationsError.code === '42703') {
-        console.log('Trying with business_id instead of tenant_id...');
-        
-        let retryQuery = supabase
-          .from('invitations')
-          .select(`
-            id,
-            email,
-            role,
-            status,
-            created_at,
-            expires_at,
-            invited_by
-          `)
-          .eq('status', 'pending');
-
-        if (role !== 'global_admin') {
-          retryQuery = retryQuery.eq('business_id', tenant_id);
-        }
-
-        const { data: retryInvitations, error: retryError } = await retryQuery
-          .order('created_at', { ascending: false });
-
-        if (retryError) {
-          console.error('Retry with business_id also failed:', retryError);
-          // Return empty array instead of failing completely
-          console.log('Returning empty invitations array due to errors');
-          return res.json([]);
-        }
-
-        // Use retry results
-        const transformedInvitations = (retryInvitations || []).map(invite => ({
-          id: invite.id,
-          email: invite.email,
-          role: invite.role,
-          status: invite.status,
-          invitedDate: invite.created_at,
-          expiresDate: invite.expires_at,
-          invitedBy: 'Admin' // Simplified since we removed the problematic join
-        }));
-
-        console.log('Found pending invitations (with business_id):', transformedInvitations.length);
-        return res.json(transformedInvitations);
-      }
-      
-      // If it's not a column error, return empty array to prevent 500 error
-      console.log('Returning empty invitations array due to other error');
+      // Return empty array instead of failing completely
+      console.log('Returning empty invitations array due to errors');
       return res.json([]);
     }
 
-    // Try to get inviter information separately to avoid join issues
+    // Transform invitations to match frontend expectations
     const transformedInvitations = (invitations || []).map(invite => ({
       id: invite.id,
       email: invite.email,
@@ -246,7 +197,7 @@ router.get('/invitations', async (req, res) => {
       status: invite.status,
       invitedDate: invite.created_at,
       expiresDate: invite.expires_at,
-      invitedBy: 'Admin' // Simplified - avoid the problematic foreign key lookup for now
+      invitedBy: 'Admin' // Simplified since we removed the problematic join
     }));
 
     console.log('Found pending invitations:', transformedInvitations.length);
@@ -260,10 +211,10 @@ router.get('/invitations', async (req, res) => {
   }
 });
 
-// POST /api/team/invite - Send invitation
+// POST /api/team/invite - Send invitation (NO SUPABASE EMAIL)
 router.post('/invite', async (req, res) => {
   const { role, tenant_id, id: user_id } = req.user || {};
-  const { email, role: inviteRole = 'user' } = req.body; // Fixed: use 'role' from body instead of 'inviteRole'
+  const { email, role: inviteRole = 'user' } = req.body;
   
   try {
     console.log('=== SEND INVITATION ENDPOINT ===');
@@ -289,32 +240,14 @@ router.post('/invite', async (req, res) => {
       return res.status(400).json({ error: 'Invalid email format' });
     }
 
-    // Check if invitation already exists - try both field names
-    let existingInvite;
-    try {
-      const { data: tenantIdCheck } = await supabase
-        .from('invitations')
-        .select('id')
-        .eq('email', email)
-        .eq('tenant_id', tenant_id)
-        .eq('status', 'pending')
-        .single();
-      existingInvite = tenantIdCheck;
-    } catch (err) {
-      // Try with business_id instead
-      try {
-        const { data: businessIdCheck } = await supabase
-          .from('invitations')
-          .select('id')
-          .eq('email', email)
-          .eq('business_id', tenant_id)
-          .eq('status', 'pending')
-          .single();
-        existingInvite = businessIdCheck;
-      } catch (err2) {
-        // Neither field exists or other error - continue
-      }
-    }
+    // Check if invitation already exists
+    const { data: existingInvite } = await supabase
+      .from('invitations')
+      .select('id')
+      .eq('email', email)
+      .eq('tenant_id', tenant_id)
+      .eq('status', 'pending')
+      .single();
 
     if (existingInvite) {
       return res.status(400).json({ error: 'Invitation already sent to this email' });
@@ -335,92 +268,46 @@ router.post('/invite', async (req, res) => {
     // Create invitation record with proper expiry
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
     
-    // Try to create invitation with tenant_id first
-    let invitation;
-    try {
-      const { data: newInvitation, error: inviteError } = await supabase
-        .from('invitations')
-        .insert({
-          email,
-          tenant_id: tenant_id,
-          invited_by: user_id,
-          role: inviteRole,
-          status: 'pending',
-          expires_at: expiresAt
-        })
-        .select()
-        .single();
+    // Generate a random token
+    const crypto = require('crypto');
+    const token = crypto.randomBytes(32).toString('hex');
 
-      if (inviteError) throw inviteError;
-      invitation = newInvitation;
-    } catch (err) {
-      console.log('tenant_id failed, trying business_id:', err.message);
-      
-      // Try with business_id instead
-      const { data: retryInvitation, error: retryError } = await supabase
-        .from('invitations')
-        .insert({
-          email,
-          business_id: tenant_id,
-          invited_by: user_id,
-          role: inviteRole,
-          status: 'pending',
-          expires_at: expiresAt
-        })
-        .select()
-        .single();
+    const { data: invitation, error: inviteError } = await supabase
+      .from('invitations')
+      .insert({
+        email,
+        tenant_id: tenant_id,
+        invited_by: user_id,
+        role: inviteRole,
+        status: 'pending',
+        expires_at: expiresAt,
+        token: token
+      })
+      .select()
+      .single();
 
-      if (retryError) {
-        console.error('Both tenant_id and business_id failed:', retryError);
-        throw retryError;
-      }
-      
-      invitation = retryInvitation;
+    if (inviteError) {
+      console.error('Failed to create invitation:', inviteError);
+      throw inviteError;
     }
 
-// Send invitation link (replace the entire try/catch block)
-// Send Supabase Auth invitation
-try {
-  console.log('🚀 Sending Supabase Auth invitation...');
-  console.log('Email:', email);
-  console.log('Invitation ID:', invitation.id);
+    // Build the signup URL
+    const signupUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/signup?invitation_email=${encodeURIComponent(email)}`;
 
-const invitationRedirectUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/signup?invitation_id=${invitation.id}&tenant_id=${tenant_id}&role=${inviteRole}&email=${encodeURIComponent(email)}`;
+    // Don't use Supabase's inviteUserByEmail - just return the signup URL
+    console.log('✅ Invitation created successfully');
+    console.log('📧 Signup link for user:', signupUrl);
 
-  console.log('✅ Invitation link created:', invitationRedirectUrl);
-  console.log('📧 Also sending email via Supabase Auth');
-
-  // Send actual email via Supabase Auth
-  const { error: authError } = await supabase.auth.admin.inviteUserByEmail(email, {
-  redirectTo: invitationRedirectUrl,
-  data: {
-    invitation_id: invitation.id,
-    tenant_id: tenant_id,
-    role: inviteRole,
-    invited_signup: true,
-    skip_onboarding: true
-  }
-});
-
-  if (authError) {
-    console.error('Auth invitation failed:', authError);
-    throw authError;
-  } else {
-    console.log('✅ Auth invitation email sent successfully');
-  }
-} catch (authErr) {
-  console.error('Auth invitation error:', authErr);
-  return res.status(500).json({ error: 'Failed to send invitation email: ' + authErr.message });
-}
-
-    console.log('Invitation created successfully:', invitation.id);
+    // Return success with the signup URL
     res.json({ 
       success: true, 
       invitation: {
         id: invitation.id,
         email: invitation.email,
         role: invitation.role
-      }
+      },
+      signupUrl: signupUrl,
+      message: `Invitation created. Send this link to ${email}: ${signupUrl}`
     });
 
   } catch (err) {
@@ -443,44 +330,21 @@ router.post('/invitations/:invitationId/resend', async (req, res) => {
       return res.status(403).json({ error: 'Insufficient permissions' });
     }
 
-    // Get invitation details - try both field names
-    let invitation;
-    try {
-      let query = supabase
-        .from('invitations')
-        .select('email, tenant_id, role')
-        .eq('id', invitationId)
-        .eq('status', 'pending');
+    // Get invitation details
+    let query = supabase
+      .from('invitations')
+      .select('email, tenant_id, role')
+      .eq('id', invitationId)
+      .eq('status', 'pending');
 
-      if (role !== 'global_admin') {
-        query = query.eq('tenant_id', tenant_id);
-      }
+    if (role !== 'global_admin') {
+      query = query.eq('tenant_id', tenant_id);
+    }
 
-      const { data: tenantIdResult, error: fetchError } = await query.single();
-      
-      if (fetchError) throw fetchError;
-      invitation = tenantIdResult;
-    } catch (err) {
-      console.log('tenant_id failed, trying business_id for resend');
-      
-      // Try with business_id
-      let query = supabase
-        .from('invitations')
-        .select('email, business_id, role')
-        .eq('id', invitationId)
-        .eq('status', 'pending');
-
-      if (role !== 'global_admin') {
-        query = query.eq('business_id', tenant_id);
-      }
-
-      const { data: businessIdResult, error: retryError } = await query.single();
-      
-      if (retryError || !businessIdResult) {
-        return res.status(404).json({ error: 'Invitation not found' });
-      }
-      
-      invitation = businessIdResult;
+    const { data: invitation, error: fetchError } = await query.single();
+    
+    if (fetchError || !invitation) {
+      return res.status(404).json({ error: 'Invitation not found' });
     }
 
     // Update invitation expiry
@@ -493,37 +357,20 @@ router.post('/invitations/:invitationId/resend', async (req, res) => {
       })
       .eq('id', invitationId);
 
-    // Optional: Resend Supabase Auth invitation
-    try {
-      const { error: authError } = await supabase.auth.admin.inviteUserByEmail(invitation.email, {
-        data: {
-          invitation_id: invitationId,
-          tenant_id: invitation.tenant_id || invitation.business_id,
-          role: invitation.role
-        }
-      });
-
-      if (authError) {
-        console.warn('Auth resend failed:', authError);
-      }
-    } catch (authErr) {
-      console.warn('Auth resend error (continuing anyway):', authErr);
-    }
+    // Build the signup URL
+    const signupUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/signup?invitation_email=${encodeURIComponent(invitation.email)}`;
 
     console.log('Invitation resent successfully');
-    res.json({ success: true, message: 'Invitation resent successfully' });
+    res.json({ 
+      success: true, 
+      message: 'Invitation resent successfully',
+      signupUrl: signupUrl
+    });
 
   } catch (err) {
     console.error('Resend invitation error:', err.message);
     res.status(500).json({ error: err.message || 'Failed to resend invitation' });
   }
-});
-
-// Legacy route for backward compatibility
-router.post('/resend/:invitationId', async (req, res) => {
-  // Redirect to new endpoint
-  req.url = `/invitations/${req.params.invitationId}/resend`;
-  return router.handle(req, res);
 });
 
 // DELETE /api/team/invitations/:invitationId - Cancel invitation
@@ -540,43 +387,21 @@ router.delete('/invitations/:invitationId', async (req, res) => {
       return res.status(403).json({ error: 'Insufficient permissions' });
     }
 
-    // Try to cancel with tenant_id first
-    let cancelResult;
-    try {
-      let query = supabase
-        .from('invitations')
-        .update({ status: 'cancelled' })
-        .eq('id', invitationId);
+    // Cancel invitation
+    let query = supabase
+      .from('invitations')
+      .update({ status: 'cancelled' })
+      .eq('id', invitationId);
 
-      if (role !== 'global_admin') {
-        query = query.eq('tenant_id', tenant_id);
-      }
+    if (role !== 'global_admin') {
+      query = query.eq('tenant_id', tenant_id);
+    }
 
-      const { error } = await query;
-      
-      if (error) throw error;
-      cancelResult = true;
-    } catch (err) {
-      console.log('tenant_id failed, trying business_id for cancel');
-      
-      // Try with business_id
-      let query = supabase
-        .from('invitations')
-        .update({ status: 'cancelled' })
-        .eq('id', invitationId);
-
-      if (role !== 'global_admin') {
-        query = query.eq('business_id', tenant_id);
-      }
-
-      const { error: retryError } = await query;
-      
-      if (retryError) {
-        console.error('Both tenant_id and business_id failed for cancel:', retryError);
-        throw retryError;
-      }
-      
-      cancelResult = true;
+    const { error } = await query;
+    
+    if (error) {
+      console.error('Failed to cancel invitation:', error);
+      throw error;
     }
 
     console.log('Invitation canceled successfully');
@@ -586,13 +411,6 @@ router.delete('/invitations/:invitationId', async (req, res) => {
     console.error('Cancel invitation error:', err.message);
     res.status(500).json({ error: 'Failed to cancel invitation' });
   }
-});
-
-// Legacy route for backward compatibility
-router.delete('/invite/:invitationId', async (req, res) => {
-  // Redirect to new endpoint
-  req.url = `/invitations/${req.params.invitationId}`;
-  return router.handle(req, res);
 });
 
 // PATCH /api/team/members/:userId/toggle-status - Toggle user active/inactive status
@@ -636,9 +454,10 @@ router.patch('/members/:userId/toggle-status', async (req, res) => {
 
     console.log('Current user data:', currentUser);
 
-    // Toggle the status
-    const newStatus = !currentUser.is_active;
-    console.log('Changing status from', currentUser.is_active, 'to', newStatus);
+    // Toggle the status - default to true if is_active is null/undefined
+    const currentStatus = currentUser.is_active !== false; // Default to active
+    const newStatus = !currentStatus;
+    console.log('Changing status from', currentStatus, 'to', newStatus);
     
     let updateQuery = supabase
       .from('users_profile')
@@ -668,14 +487,6 @@ router.patch('/members/:userId/toggle-status', async (req, res) => {
     console.error('Toggle user status error:', err.message);
     res.status(500).json({ error: 'Failed to toggle user status' });
   }
-});
-
-// Legacy route for backward compatibility
-router.post('/toggle-status/:userId', async (req, res) => {
-  // Redirect to new endpoint
-  req.method = 'PATCH';
-  req.url = `/members/${req.params.userId}/toggle-status`;
-  return router.handle(req, res);
 });
 
 module.exports = router;

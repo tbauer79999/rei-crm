@@ -1,187 +1,226 @@
 import supabase from './supabaseClient';
 
-// Base URL for your API
-const API_BASE = 'http://localhost:5000';
+// Helper function to invoke Edge Functions with proper auth
+const invokeEdgeFunction = async (functionName, options = {}) => {
+  // Try to get current session
+  let { data: { session }, error: sessionError } = await supabase.auth.getSession();
 
-// Helper function to get auth token
-const getAuthToken = async () => {
-  // Get current session from Supabase
-  const { data: { session } } = await supabase.auth.getSession();
-  return session?.access_token || null;
-};
+  // Refresh if missing or token is null
+  if (sessionError || !session || !session.access_token) {
+    const { data: refreshed, error: refreshError } = await supabase.auth.refreshSession();
 
-// Helper function to make authenticated fetch requests
-const authFetch = async (url, options = {}) => {
-  const token = await getAuthToken();
-  
-  const headers = {
-    'Content-Type': 'application/json',
-    ...options.headers,
-  };
-  
-  if (token) {
-    headers.Authorization = `Bearer ${token}`;
+    if (refreshError || !refreshed?.session?.access_token) {
+      console.error('❌ Unable to obtain access token for edge function');
+      throw new Error('No valid session or access token');
+    }
+
+    session = refreshed.session;
+    console.log('🔄 Session refreshed for Edge Function call');
   }
 
-  console.log(`🔗 API Request: ${options.method || 'GET'} ${url}`);
-  
-  const response = await fetch(url, {
+  console.log(`🔗 Edge Function Request: ${functionName}`);
+
+  const { data, error } = await supabase.functions.invoke(functionName, {
+    method: options.method || 'GET',
     ...options,
-    headers,
+    headers: {
+      Authorization: `Bearer ${session.access_token}`,
+      ...options.headers,
+    },
   });
 
-  if (!response.ok) {
-    console.error(`❌ API Error: ${response.status} ${url}`);
-    throw new Error(`Failed to fetch from ${url}`);
+  if (error) {
+    console.error(`❌ Edge Function Error: ${functionName}`, error);
+    throw error;
   }
 
-  const data = await response.json();
-  console.log(`✅ API Success: ${response.status} ${url}`, data);
+  console.log(`✅ Edge Function Success: ${functionName}`, data);
   return data;
 };
 
-// ============= ORIGINAL FUNCTIONS =============
-export async function fetchProperties() {
-  return await authFetch(`${API_BASE}/api/leads`);
+// ============= OVERVIEW & HEALTH =============
+export async function fetchHealth() {
+  return await invokeEdgeFunction('overview-analytics');
 }
 
-export async function fetchResponseTimeMetrics() {
-  return await authFetch(`${API_BASE}/api/response-time`);
-}
-
-export async function fetchMessageQualityMetrics() {
-  return await authFetch(`${API_BASE}/api/message-quality`);
-}
-
-export async function fetchWeeklyMomentumMetrics() {
-  return await authFetch(`${API_BASE}/api/weekly-momentum`);
-}
-
-export async function fetchEscalationStats() {
-  return await authFetch(`${API_BASE}/api/escalation-stats`);
-}
-
-export async function fetchReplyPacingStats() {
-  return await authFetch(`${API_BASE}/api/reply-pacing`);
-}
-
-export async function fetchAIEfficiency() {
-  return await authFetch(`${API_BASE}/api/ai-efficiency`);
-}
-
-export async function fetchAIvsHumanSplit() {
-  return await authFetch(`${API_BASE}/api/ai-vs-human`);
-}
-
-export async function fetchFailureRate() {
-  return await authFetch(`${API_BASE}/api/failure-rate`);
-}
-
-export async function fetchConversationFlow() {
-  return await authFetch(`${API_BASE}/api/conversation-flow`);
-}
-
-export async function fetchLeadConversionSpeed() {
-  return await authFetch(`${API_BASE}/api/lead-conversion-speed`);
-}
-
-// ============= NEW SECURED ENDPOINTS =============
 export async function fetchOverview() {
-  return await authFetch(`${API_BASE}/api/overview`);
+  return await invokeEdgeFunction('overview-analytics');
 }
 
-export async function fetchFunnel() {
-  return await authFetch(`${API_BASE}/api/funnel`);
+export async function fetchOverviewMetrics() {
+  return await invokeEdgeFunction('overview-analytics');
 }
 
-export async function fetchLeadTrends() {
-  const response = await authFetch(`${API_BASE}/api/lead-trends`);
-  
-  // Transform to match frontend expectations
+export async function fetchOverviewTrendAndCost() {
   return {
-    ...response,
-    totalLeads: response.totalPeriod, // Map totalPeriod to totalLeads
-    totalToday: response.trends?.[0]?.count || 0, // Get today's count
+    trend: [],
+    totalMessagesSent: 0,
+    totalHotLeads: 0,
+    previousMessagesSent: 0,
+    previousHotLeads: 0
   };
 }
 
-export async function fetchHotLeads() {
-  return await authFetch(`${API_BASE}/api/hot`);
-}
-
+// ============= HOT LEADS & HANDOFF =============
 export async function fetchHotSummary() {
-  return await authFetch(`${API_BASE}/api/hot-summary`);
+  return await invokeEdgeFunction('HotLeadHandoffPanel');
 }
 
-export async function fetchHealth() {
-  return await authFetch(`${API_BASE}/api/health/health-check`);
+export async function fetchHotLeads() {
+  return await invokeEdgeFunction('get-hot-leads');
 }
 
-export async function fetchSettings() {
-  return await authFetch(`${API_BASE}/api/settings`);
+// ============= LEAD JOURNEY & FUNNEL =============
+export async function fetchFunnel() {
+  return await invokeEdgeFunction('LeadJourneyFunnel');
 }
 
-export async function updateSettings(settings) {
-  return await authFetch(`${API_BASE}/api/settings`, {
-    method: 'PUT',
-    body: JSON.stringify({ settings })
-  });
-}
-
-// ============= HEALTH & MONITORING =============
-export async function fetchHealthCheck() {
-  return await authFetch(`${API_BASE}/api/health/health-check`);
+export async function fetchLeadJourneyFunnel() {
+  return await invokeEdgeFunction('LeadJourneyFunnel');
 }
 
 export async function fetchFunnelHealth() {
-  return await authFetch(`${API_BASE}/api/health/funnel-health`);
+  return await invokeEdgeFunction('LeadJourneyFunnel');
+}
+
+// ============= AI OPTIMIZATION =============
+export async function fetchAiOptimizationPanel() {
+  return await invokeEdgeFunction('AiOptimizationPanel');
+}
+
+export async function fetchKeywords() {
+  return await invokeEdgeFunction('AiOptimizationPanel');
+}
+
+export async function fetchAIEfficiency() {
+  return await invokeEdgeFunction('ai-efficiency-card');
+}
+
+export async function fetchAIvsHumanSplit() {
+  return await invokeEdgeFunction('ai-efficiency-card');
+}
+
+// ============= LEAD METRICS =============
+export async function fetchProperties() {
+  return await invokeEdgeFunction('get-lead-analytics');
+}
+
+export async function fetchLeadTrends() {
+  return await invokeEdgeFunction('overview-analytics');
+}
+
+export async function fetchLeadConversionSpeed() {
+  return await invokeEdgeFunction('get-lead-analytics');
+}
+
+// ============= PERFORMANCE METRICS =============
+export async function fetchResponseTimeMetrics() {
+  return await invokeEdgeFunction('response-time');
+}
+
+export async function fetchMessageQualityMetrics() {
+  return await invokeEdgeFunction('message-quality');
+}
+
+export async function fetchWeeklyMomentumMetrics() {
+  return await invokeEdgeFunction('weekly-momentum');
+}
+
+export async function fetchEscalationStats() {
+  return await invokeEdgeFunction('escalation-stats');
+}
+
+export async function fetchReplyPacingStats() {
+  return await invokeEdgeFunction('reply-pacing');
+}
+
+export async function fetchFailureRate() {
+  return await invokeEdgeFunction('failure-rate');
+}
+
+export async function fetchConversationFlow() {
+  return await invokeEdgeFunction('conversation-flow');
+}
+
+// ============= SETTINGS =============
+export async function fetchSettings() {
+  return await invokeEdgeFunction('settings');
+}
+
+export async function updateSettings(settings) {
+  return await invokeEdgeFunction('settings', {
+    body: { settings },
+    method: 'POST',
+  });
+}
+
+// ============= CAMPAIGNS =============
+export async function fetchCampaigns() {
+  return await invokeEdgeFunction('campaigns');
+}
+
+export async function createCampaign(campaign) {
+  return await invokeEdgeFunction('campaigns', {
+    body: campaign,
+    method: 'POST',
+  });
+}
+
+export async function updateCampaign(id, updates) {
+  return await invokeEdgeFunction('campaigns', {
+    body: { id, ...updates },
+    method: 'PUT',
+  });
+}
+
+export async function deleteCampaign(id) {
+  return await invokeEdgeFunction('campaigns', {
+    body: { id },
+    method: 'DELETE',
+  });
 }
 
 // ============= ENTERPRISE ANALYTICS =============
 export async function fetchPortfolioPerformance(params = {}) {
-  const queryString = new URLSearchParams(params).toString();
-  const url = `${API_BASE}/api/enterprise-analytics/portfolio/performance${queryString ? `?${queryString}` : ''}`;
-  return await authFetch(url);
+  return await invokeEdgeFunction('enterprise-analytics-portfolio-performance', {
+    body: params,
+  });
 }
 
 export async function fetchCohortAnalysis(params = {}) {
-  const queryString = new URLSearchParams(params).toString();
-  const url = `${API_BASE}/api/enterprise-analytics/portfolio/cohort-analysis${queryString ? `?${queryString}` : ''}`;
-  return await authFetch(url);
+  return await invokeEdgeFunction('enterprise-analytics-portfolio-cohort-analysis', {
+    body: params,
+  });
 }
 
 export async function fetchCompetitiveAnalysis() {
-  return await authFetch(`${API_BASE}/api/enterprise-analytics/market/competitive-analysis`);
+  return await invokeEdgeFunction('enterprise-analytics-market-competitive-analysis');
 }
 
 export async function fetchIndustryBenchmarks(params = {}) {
-  const queryString = new URLSearchParams(params).toString();
-  const url = `${API_BASE}/api/enterprise-analytics/market/industry-benchmarks${queryString ? `?${queryString}` : ''}`;
-  return await authFetch(url);
+  return await invokeEdgeFunction('enterprise-analytics-market-industry-benchmarks', {
+    body: params,
+  });
 }
 
 export async function fetchARRWaterfall(params = {}) {
-  const queryString = new URLSearchParams(params).toString();
-  const url = `${API_BASE}/api/enterprise-analytics/revenue/arr-waterfall${queryString ? `?${queryString}` : ''}`;
-  return await authFetch(url);
+  return await invokeEdgeFunction('enterprise-analytics-revenue-arr-waterfall', {
+    body: params,
+  });
 }
 
 export async function fetchRevenueMetrics() {
-  return await authFetch(`${API_BASE}/api/enterprise-analytics/revenue/metrics`);
+  return await invokeEdgeFunction('enterprise-analytics-revenue-metrics');
 }
 
 export async function fetchChurnRisk() {
-  return await authFetch(`${API_BASE}/api/enterprise-analytics/predictive/churn-risk`);
+  return await invokeEdgeFunction('enterprise-analytics-predictive-churn-risk');
 }
 
 export async function fetchForecasting() {
-  return await authFetch(`${API_BASE}/api/enterprise-analytics/predictive/forecasting`);
+  return await invokeEdgeFunction('enterprise-analytics-predictive-forecasting');
 }
 
 export async function fetchGlobalKPIs() {
-  return await authFetch(`${API_BASE}/api/enterprise-analytics/kpis/global`);
-}
-
-export async function fetchKeywords() {
-  return await authFetch(`${API_BASE}/api/keywords`);
+  return await invokeEdgeFunction('enterprise-analytics-kpis-global');
 }

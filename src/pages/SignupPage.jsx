@@ -1,5 +1,5 @@
 // ===================================================================
-// src/pages/SignupPage.jsx - FIXED: Calls Edge Function for invitations
+// src/pages/SignupPage.jsx - FIXED: Handles email-based invitation lookup
 // ===================================================================
 
 import React, { useState, useEffect } from 'react';
@@ -12,10 +12,11 @@ import { Label } from '../components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription } from '../components/ui/card';
 
 // Email Confirmation Waiting Component
-const EmailConfirmationWaiting = ({ email, navigate, isInvitedUser }) => {
+const EmailConfirmationWaiting = ({ email, navigate, isInvitedUser, invitationInfo }) => {
   const [isChecking, setIsChecking] = useState(false);
   const [timeLeft, setTimeLeft] = useState(300); // 5 minutes countdown
   const [canResend, setCanResend] = useState(false);
+  const [processingInvitation, setProcessingInvitation] = useState(false);
 
   useEffect(() => {
     let pollInterval;
@@ -27,19 +28,73 @@ const EmailConfirmationWaiting = ({ email, navigate, isInvitedUser }) => {
       
       pollInterval = setInterval(async () => {
         try {
-          const { data: { session } } = await supabase.auth.getSession();
+          // Try to get fresh session
+          const { data: { session }, error } = await supabase.auth.getSession();
+          
+          if (error) {
+            console.log('Session check error:', error);
+            return;
+          }
           
           if (session?.user?.email_confirmed_at) {
-            console.log('✅ Email confirmed! Redirecting...');
+            console.log('✅ Email confirmed! User:', session.user.email);
             clearInterval(pollInterval);
             clearInterval(countdownInterval);
             setIsChecking(false);
             
-            // Different redirect based on user type
-            if (isInvitedUser) {
-              navigate('/dashboard', { replace: true }); // Invited users skip onboarding
-            } else {
-              navigate('/onboarding', { replace: true }); // Business admins go to onboarding
+            // For invited users, process the invitation now
+            if (isInvitedUser && !processingInvitation) {
+              setProcessingInvitation(true);
+              console.log('🎯 Processing invitation after email confirmation...');
+              
+              try {
+                // Call the edge function with the confirmed user
+                // Use invitation ID if available, otherwise the function will lookup by email
+                const { data, error: edgeError } = await supabase.functions.invoke('process-invitation', {
+                  body: {
+                    user_id: session.user.id,
+                    email: session.user.email,
+                    invitation_id: invitationInfo?.invitationId || null
+                  }
+                });
+
+                if (edgeError) {
+                  console.error('❌ Edge Function error:', edgeError);
+                  // Continue anyway - the profile might exist
+                } else {
+                  console.log('✅ Edge Function success:', data);
+                }
+
+                console.log('✅ Invitation processed, redirecting to dashboard...');
+                
+                // Small delay to ensure everything is set up
+                setTimeout(() => {
+                  navigate('/dashboard', { replace: true });
+                }, 1000);
+                
+              } catch (error) {
+                console.error('Error processing invitation:', error);
+                // Continue to dashboard anyway
+                navigate('/dashboard', { replace: true });
+              }
+            } else if (!isInvitedUser) {
+              // Business admin - check onboarding
+              try {
+                const { data: tenant } = await supabase
+                  .from('tenants')
+                  .select('onboarding_complete')
+                  .eq('id', session.user.id)
+                  .single();
+
+                if (tenant?.onboarding_complete) {
+                  navigate('/dashboard', { replace: true });
+                } else {
+                  navigate('/onboarding', { replace: true });
+                }
+              } catch (error) {
+                console.error('Error checking onboarding:', error);
+                navigate('/onboarding', { replace: true });
+              }
             }
           }
         } catch (error) {
@@ -70,7 +125,7 @@ const EmailConfirmationWaiting = ({ email, navigate, isInvitedUser }) => {
       if (pollInterval) clearInterval(pollInterval);
       if (countdownInterval) clearInterval(countdownInterval);
     };
-  }, [navigate, isInvitedUser]);
+  }, [navigate, isInvitedUser, invitationInfo, processingInvitation]);
 
   const handleResendEmail = async () => {
     try {
@@ -151,7 +206,9 @@ const EmailConfirmationWaiting = ({ email, navigate, isInvitedUser }) => {
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
               </svg>
-              <span className="text-sm font-medium">Checking for confirmation...</span>
+              <span className="text-sm font-medium">
+                {processingInvitation ? 'Setting up your account...' : 'Checking for confirmation...'}
+              </span>
             </div>
           )}
 
@@ -209,7 +266,8 @@ const SignupPage = () => {
     const urlParams = new URLSearchParams(location.search);
     const hashParams = new URLSearchParams(window.location.hash.substring(1));
     
-    // Check for invitation parameters first
+    // Check for invitation parameters - simplified approach
+    const invitationEmail = urlParams.get('invitation_email') || hashParams.get('invitation_email');
     const invitationId = urlParams.get('invitation_id') || hashParams.get('invitation_id');
     const tenantId = urlParams.get('tenant_id') || hashParams.get('tenant_id');
     const role = urlParams.get('role') || hashParams.get('role');
@@ -222,13 +280,23 @@ const SignupPage = () => {
     const type = urlParams.get('type') || hashParams.get('type');
 
     console.log('🔍 SignupPage URL analysis:', {
-      invitationId, tenantId, role, inviteEmail,
+      invitationEmail, invitationId, tenantId, role, inviteEmail,
       confirmed, hasAccessToken: !!accessToken, type
     });
 
-    // Handle invitation parameters
-    if (invitationId) {
-      console.log('🎯 Invitation detected:', invitationId);
+    // Handle invitation parameters - email is the key now
+    if (invitationEmail) {
+      console.log('🎯 Invitation detected for email:', invitationEmail);
+      setInvitationInfo({ 
+        invitationId: invitationId || null, // ID might not be present
+        tenantId, 
+        role, 
+        email: invitationEmail 
+      });
+      setEmail(decodeURIComponent(invitationEmail));
+    } else if (invitationId) {
+      // Fallback for old invitation URLs
+      console.log('🎯 Legacy invitation detected:', invitationId);
       setInvitationInfo({ invitationId, tenantId, role, email: inviteEmail });
       if (inviteEmail) {
         setEmail(inviteEmail);
@@ -249,8 +317,8 @@ const SignupPage = () => {
         console.log('User already logged in, checking redirect...');
         
         // Check if this is an invited user
-        const isInvitedUser = session.user.raw_user_meta_data?.invited_signup || 
-                             session.user.raw_user_meta_data?.invitation_id;
+        const isInvitedUser = session.user.user_metadata?.invited_signup || 
+                             session.user.user_metadata?.invitation_id;
         
         if (isInvitedUser) {
           console.log('🎯 Invited user already logged in, going to dashboard');
@@ -302,23 +370,23 @@ const SignupPage = () => {
 
         if (data?.user) {
           console.log('✅ Email confirmed for user:', data.user.email);
-          console.log('🔍 User metadata:', data.user.raw_user_meta_data);
+          console.log('🔍 User metadata:', data.user.user_metadata);
           setMessage('Email confirmed! Setting up your account...');
 
-          // Check if this is an invited user from raw_user_meta_data
-          const isInvitedUser = data.user.raw_user_meta_data?.invited_signup === true || 
-                               data.user.raw_user_meta_data?.invitation_id;
+          // Check if this is an invited user from user metadata
+          const isInvitedUser = data.user.user_metadata?.invited_signup === true || 
+                               data.user.user_metadata?.invitation_id;
 
           console.log('🎯 Is invited user?', isInvitedUser);
 
           // For invited users, call the Edge Function to process the invitation
-          if (isInvitedUser && data.user.raw_user_meta_data?.invitation_id) {
+          if (isInvitedUser) {
             console.log('🎯 Processing invitation via Edge Function...');
             setMessage('Processing your invitation...');
             await processInvitationViaEdgeFunction(
               data.user.id,
               data.user.email,
-              data.user.raw_user_meta_data.invitation_id
+              data.user.user_metadata?.invitation_id || null
             );
           }
 
@@ -340,23 +408,23 @@ const SignupPage = () => {
         
         if (session?.user) {
           console.log('✅ Session already active, proceeding...');
-          console.log('🔍 Session user metadata:', session.user.raw_user_meta_data);
+          console.log('🔍 Session user metadata:', session.user.user_metadata);
           setMessage('Email confirmed! Redirecting...');
           
           // Check if invited user from session metadata
-          const isInvitedUser = session.user.raw_user_meta_data?.invited_signup === true || 
-                               session.user.raw_user_meta_data?.invitation_id;
+          const isInvitedUser = session.user.user_metadata?.invited_signup === true || 
+                               session.user.user_metadata?.invitation_id;
           
           console.log('🎯 Is invited user from session?', isInvitedUser);
 
           // For invited users, call the Edge Function
-          if (isInvitedUser && session.user.raw_user_meta_data?.invitation_id) {
+          if (isInvitedUser) {
             console.log('🎯 Processing invitation via Edge Function...');
             setMessage('Processing your invitation...');
             await processInvitationViaEdgeFunction(
               session.user.id,
               session.user.email,
-              session.user.raw_user_meta_data.invitation_id
+              session.user.user_metadata?.invitation_id || null
             );
           }
 
@@ -380,64 +448,29 @@ const SignupPage = () => {
     }
   };
 
-  // NEW: Function to call the Edge Function for invitation processing
+  // Function to call the Edge Function for invitation processing
   const processInvitationViaEdgeFunction = async (userId, email, invitationId) => {
     try {
       console.log('🚀 Calling process-invitation Edge Function...');
       console.log('Data:', { userId, email, invitationId });
 
-      // Get the current session token
-      const { data: { session } } = await supabase.auth.getSession();
-      const authToken = session?.access_token;
-      
-      console.log('🔑 Auth token available:', !!authToken);
-
-      // Use your specific Supabase URL and add the anon key
-      const edgeFunctionUrl = 'https://wuuqrdlfgkasnwydyvgk.supabase.co/functions/v1/process-invitation';
-      
-      console.log('📍 Edge Function URL:', edgeFunctionUrl);
-
-      const headers = {
-        'Content-Type': 'application/json',
-        'apikey': process.env.REACT_APP_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXFyZGxmZ2thc253eWR5dmdrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc3Njg5NzcsImV4cCI6MjA2MzM0NDk3N30.jGwY-ZbyWnTrZQ1uUsPW5mrwGtp-_v05IKyGOk4Mm40'
-      };
-
-      // Add auth token if available
-      if (authToken) {
-        headers['Authorization'] = `Bearer ${authToken}`;
-      }
-
-      const response = await fetch(edgeFunctionUrl, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
+      // Use the supabase client's functions.invoke method which handles auth automatically
+      const { data, error } = await supabase.functions.invoke('process-invitation', {
+        body: {
           user_id: userId,
           email: email,
-          invitation_id: invitationId
-        })
+          invitation_id: invitationId // Can be null - function will lookup by email
+        }
       });
 
-      console.log('📡 Edge Function response status:', response.status);
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('❌ Edge Function failed with status:', response.status);
-        console.error('❌ Error response:', errorText);
-        
-        let errorData;
-        try {
-          errorData = JSON.parse(errorText);
-        } catch (e) {
-          errorData = { error: `HTTP ${response.status}: ${errorText}` };
-        }
-        
-        throw new Error(errorData.error || 'Failed to process invitation');
+      if (error) {
+        console.error('❌ Edge Function error:', error);
+        throw error;
       }
 
-      const result = await response.json();
-      console.log('✅ Edge Function success:', result);
+      console.log('✅ Edge Function success:', data);
+      return data;
       
-      return result;
     } catch (error) {
       console.error('💥 Edge Function error:', error);
       // Don't throw - let the user continue even if edge function fails
@@ -535,27 +568,12 @@ const SignupPage = () => {
       }
 
       console.log('✅ Auth user created:', newUser.id);
-      console.log('🔍 User metadata stored:', newUser.raw_user_meta_data);
+      console.log('🔍 User metadata stored:', newUser.user_metadata);
 
-      // For invited users, call the Edge Function immediately after account creation
+      // For invited users, DO NOT call edge function here - wait for email confirmation
       if (invitationInfo) {
-        console.log('🎯 Invited user - processing invitation immediately...');
-        setMessage('Processing your invitation...');
-        
-        try {
-          await processInvitationViaEdgeFunction(
-            newUser.id,
-            newUser.email,
-            invitationInfo.invitationId
-          );
-          
-          console.log('✅ Invitation processed successfully');
-          setMessage('Invitation processed! Check your email to verify and access your account.');
-        } catch (edgeError) {
-          console.error('Edge Function failed:', edgeError);
-          setMessage('Account created! Check your email to verify and join the team.');
-        }
-        
+        console.log('🎯 Invited user - will process invitation after email confirmation');
+        setMessage('Account created! Check your email to verify and join the team.');
         setStep('success');
         setLoading(false);
         return;
@@ -589,7 +607,7 @@ const SignupPage = () => {
     setLoading(false);
   };
 
-  // Helper function to set up business admin (fallback)
+  // Helper function to set up business admin (fallback) - ONLY tenant_id
   const setupBusinessAdmin = async (newUser) => {
     try {
       setMessage('Setting up your company...');
@@ -700,7 +718,12 @@ const SignupPage = () => {
   }
 
   if (step === 'success') {
-    return <EmailConfirmationWaiting email={email} navigate={navigate} isInvitedUser={!!invitationInfo} />;
+    return <EmailConfirmationWaiting 
+      email={email} 
+      navigate={navigate} 
+      isInvitedUser={!!invitationInfo}
+      invitationInfo={invitationInfo}
+    />;
   }
 
   return (

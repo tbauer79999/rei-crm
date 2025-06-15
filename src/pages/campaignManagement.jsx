@@ -31,8 +31,57 @@ import {
   Tag,
   Palette,
   Rocket,
-  Settings
+  Settings,
+  Clock
 } from 'lucide-react';
+
+// API Base URL - Add this after imports
+const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+
+// Campaign Progress Component
+const CampaignProgress = ({ campaignId }) => {
+  const [progress, setProgress] = useState({ processed: 0, total: 0 });
+  
+  useEffect(() => {
+    const fetchProgress = async () => {
+      const { data, error } = await supabase
+        .from('leads')
+        .select('ai_sent')
+        .eq('campaign_id', campaignId);
+      
+      if (!error && data) {
+        const total = data.length;
+        const processed = data.filter(l => l.ai_sent).length;
+        setProgress({ processed, total });
+      }
+    };
+    
+    fetchProgress();
+  }, [campaignId]);
+  
+  if (progress.total === 0) {
+    return <span className="text-sm text-gray-500">No leads</span>;
+  }
+  
+  const percentage = Math.round((progress.processed / progress.total) * 100);
+  
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center text-sm">
+        <span className="font-medium">{progress.processed}</span>
+        <span className="text-gray-500 mx-1">/</span>
+        <span className="text-gray-500">{progress.total}</span>
+        <span className="text-gray-500 ml-2">({percentage}%)</span>
+      </div>
+      <div className="w-full bg-gray-200 rounded-full h-1.5">
+        <div 
+          className="bg-blue-600 h-1.5 rounded-full transition-all duration-300"
+          style={{ width: `${percentage}%` }}
+        />
+      </div>
+    </div>
+  );
+};
 
 export default function CampaignManagement() {
   const { user } = useAuth();
@@ -45,6 +94,11 @@ export default function CampaignManagement() {
   const [tenantFilter, setTenantFilter] = useState('all');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
+  const [campaignStats, setCampaignStats] = useState({
+    totalLeads: 0,
+    processedLeads: 0,
+    remainingLeads: 0
+  });
 
   // Campaign creation form state
   const [isCreating, setIsCreating] = useState(false);
@@ -84,7 +138,7 @@ export default function CampaignManagement() {
       setLoading(true);
       const token = localStorage.getItem('auth_token');
       
-      let url = '/api/campaigns';
+      let url = `${API_BASE}/api/campaigns`;
       const params = new URLSearchParams();
       
       // If global admin and specific tenant selected, filter by tenant
@@ -133,7 +187,7 @@ export default function CampaignManagement() {
   const fetchTenants = async () => {
     try {
       const token = localStorage.getItem('auth_token');
-      const response = await fetch('/api/tenants', {
+      const response = await fetch(`${API_BASE}/tenants`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -199,6 +253,38 @@ export default function CampaignManagement() {
     }
   };
 
+  const fetchCampaignStats = async () => {
+    try {
+      // Get all campaign IDs for the current view
+      const campaignIds = filteredCampaigns.map(c => c.id);
+      
+      if (campaignIds.length === 0) {
+        setCampaignStats({ totalLeads: 0, processedLeads: 0, remainingLeads: 0 });
+        return;
+      }
+
+      // Fetch lead counts from Supabase
+      const { data: allLeads, error: allError } = await supabase
+        .from('leads')
+        .select('id, ai_sent')
+        .in('campaign_id', campaignIds);
+
+      if (allError) throw allError;
+
+      const totalLeads = allLeads?.length || 0;
+      const processedLeads = allLeads?.filter(lead => lead.ai_sent === true).length || 0;
+      const remainingLeads = totalLeads - processedLeads;
+
+      setCampaignStats({
+        totalLeads,
+        processedLeads,
+        remainingLeads
+      });
+    } catch (err) {
+      console.error('Error fetching campaign stats:', err);
+    }
+  };
+
   const archiveCampaign = async (campaignId) => {
     if (!window.confirm('Are you sure you want to archive this campaign? It will be hidden from the main view but can be restored later.')) {
       return;
@@ -206,7 +292,7 @@ export default function CampaignManagement() {
 
     try {
       const token = localStorage.getItem('auth_token');
-      const response = await fetch(`/api/campaigns/${campaignId}/archive`, {
+      const response = await fetch(`${API_BASE}/api/campaigns/${campaignId}/archive`, {
         method: 'PATCH',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -234,7 +320,7 @@ export default function CampaignManagement() {
 
     try {
       const token = localStorage.getItem('auth_token');
-      const response = await fetch(`/api/campaigns/${campaignId}/unarchive`, {
+      const response = await fetch(`${API_BASE}/api/campaigns/${campaignId}/unarchive`, {
         method: 'PATCH',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -258,7 +344,7 @@ export default function CampaignManagement() {
   const updateCampaignActiveStatus = async (campaignId, newActiveStatus) => {
     try {
       const token = localStorage.getItem('auth_token');
-      const response = await fetch(`/api/campaigns/${campaignId}/toggle-active`, {
+      const response = await fetch(`${API_BASE}/api/campaigns/${campaignId}/toggle-active`, {
         method: 'PATCH',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -285,7 +371,7 @@ export default function CampaignManagement() {
     try {
       const token = localStorage.getItem('auth_token');
       
-      const response = await fetch(`/api/campaigns/${campaignId}/ai-toggle`, {
+      const response = await fetch(`${API_BASE}/api/campaigns/${campaignId}/ai-toggle`, {
         method: 'PATCH',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -473,11 +559,18 @@ export default function CampaignManagement() {
     return matchesSearch && matchesStatus;
   });
 
+  // Fetch stats when filtered campaigns change
+  useEffect(() => {
+    if (filteredCampaigns.length > 0) {
+      fetchCampaignStats();
+    } else {
+      setCampaignStats({ totalLeads: 0, processedLeads: 0, remainingLeads: 0 });
+    }
+  }, [filteredCampaigns]);
+
   // Calculate stats based on actual schema
   const totalCampaigns = campaigns.length;
-  const activeCampaigns = campaigns.filter(c => c.is_active === true).length;
-  const totalMessagesSent = 0; // This would come from message logs
-  const avgResponseRate = 0; // This would come from analytics
+  const activeCampaigns = campaigns.filter(c => c.is_active === true && c.ai_on === true).length;
 
   if (loading) {
     return (
@@ -557,23 +650,17 @@ export default function CampaignManagement() {
         <div className="bg-white rounded-xl border border-gray-200 p-6">
           <div className="flex items-center">
             <div className="w-10 h-10 bg-green-50 rounded-lg flex items-center justify-center">
-              <Play className="w-5 h-5 text-green-600" />
+              <CheckCircle className="w-5 h-5 text-green-600" />
             </div>
             <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Active Campaigns</p>
-              <p className="text-2xl font-bold text-gray-900">{activeCampaigns}</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <div className="flex items-center">
-            <div className="w-10 h-10 bg-purple-50 rounded-lg flex items-center justify-center">
-              <MessageSquare className="w-5 h-5 text-purple-600" />
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Messages Sent</p>
-              <p className="text-2xl font-bold text-gray-900">{totalMessagesSent.toLocaleString()}</p>
+              <p className="text-sm font-medium text-gray-600">Leads Processed</p>
+              <p className="text-2xl font-bold text-gray-900">{campaignStats.processedLeads.toLocaleString()}</p>
+              <p className="text-xs text-gray-500 mt-1">
+                {campaignStats.totalLeads > 0 
+                  ? `${Math.round((campaignStats.processedLeads / campaignStats.totalLeads) * 100)}% complete`
+                  : 'No leads yet'
+                }
+              </p>
             </div>
           </div>
         </div>
@@ -581,11 +668,32 @@ export default function CampaignManagement() {
         <div className="bg-white rounded-xl border border-gray-200 p-6">
           <div className="flex items-center">
             <div className="w-10 h-10 bg-orange-50 rounded-lg flex items-center justify-center">
-              <TrendingUp className="w-5 h-5 text-orange-600" />
+              <Clock className="w-5 h-5 text-orange-600" />
             </div>
             <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Avg Response Rate</p>
-              <p className="text-2xl font-bold text-gray-900">{avgResponseRate.toFixed(1)}%</p>
+              <p className="text-sm font-medium text-gray-600">Remaining Leads</p>
+              <p className="text-2xl font-bold text-gray-900">{campaignStats.remainingLeads.toLocaleString()}</p>
+              <p className="text-xs text-gray-500 mt-1">
+                {campaignStats.remainingLeads > 0 && activeCampaigns > 0
+                  ? `~${Math.ceil(campaignStats.remainingLeads / (activeCampaigns * 120))} hours to complete`
+                  : campaignStats.remainingLeads > 0 ? 'Activate campaigns to start' : 'All processed'
+                }
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl border border-gray-200 p-6">
+          <div className="flex items-center">
+            <div className="w-10 h-10 bg-purple-50 rounded-lg flex items-center justify-center">
+              <TrendingUp className="w-5 h-5 text-purple-600" />
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-600">Processing Rate</p>
+              <p className="text-2xl font-bold text-gray-900">
+                {activeCampaigns > 0 ? `${activeCampaigns * 120}` : '0'}
+              </p>
+              <p className="text-xs text-gray-500 mt-1">leads/hour</p>
             </div>
           </div>
         </div>
@@ -658,7 +766,7 @@ export default function CampaignManagement() {
                   Status
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Duration
+                  Progress
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   AI Status
@@ -690,14 +798,8 @@ export default function CampaignManagement() {
                   <td className="px-6 py-4">
                     {getStatusBadge(campaign)}
                   </td>
-                  <td className="px-6 py-4 text-sm text-gray-900">
-                    <div className="flex items-center space-x-1">
-                      <Calendar className="w-4 h-4 text-gray-400" />
-                      <span>
-                        {campaign.start_date ? new Date(campaign.start_date).toLocaleDateString() : 'N/A'} - {' '}
-                        {campaign.end_date ? new Date(campaign.end_date).toLocaleDateString() : 'N/A'}
-                      </span>
-                    </div>
+                  <td className="px-6 py-4">
+                    <CampaignProgress campaignId={campaign.id} />
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center space-x-3">

@@ -4,7 +4,6 @@ import {
   BarChart2, Settings, Home, ChevronLeft, ChevronRight, LogOut, Menu, X, TrendingUp, Brain, Megaphone
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { signOutUser } from '../lib/authService';
 import supabase from '../lib/supabaseClient';
 
 export default function Layout({ children }) {
@@ -190,21 +189,21 @@ export default function Layout({ children }) {
       });
     }
     
-// AI Strategy Hub - for all users
-analyticsItems.push({
-  path: '/business-analytics', 
-  label: 'AI Strategy Hub', 
-  icon: Brain 
-});
-
-    // Campaign Management - for enterprise_admin and business_admin
+    // AI Strategy Hub - only for admin roles
     if (['global_admin', 'enterprise_admin', 'business_admin'].includes(role)) {
       analyticsItems.push({
-        path: '/campaign-management',
-        label: 'Campaign Management',
-        icon: Megaphone
+        path: '/business-analytics', 
+        label: 'AI Strategy Hub', 
+        icon: Brain 
       });
     }
+
+    // Campaign Management - for all users now
+    analyticsItems.push({
+      path: '/campaign-management',
+      label: 'Campaign Management',
+      icon: Megaphone
+    });
 
     const endItems = [
       { path: '/settings', label: 'Settings', icon: Settings },
@@ -216,8 +215,30 @@ analyticsItems.push({
   const navItems = getNavItems();
 
   const handleLogout = async () => {
-    await signOutUser();
-    navigate('/login');
+    try {
+      console.log('🚪 Logging out...');
+      
+      // Clear local storage first
+      localStorage.removeItem('auth_token');
+      sessionStorage.removeItem('auth_token');
+      
+      // Sign out from Supabase
+      const { error } = await supabase.auth.signOut();
+      
+      if (error) {
+        console.error('❌ Logout error:', error);
+        // Even if there's an error, still navigate to login
+      }
+      
+      console.log('✅ Logout successful');
+      
+      // Navigate to login page
+      navigate('/login');
+    } catch (err) {
+      console.error('❌ Logout exception:', err);
+      // Force navigation to login even on error
+      navigate('/login');
+    }
   };
 
   // Get company initials for logo

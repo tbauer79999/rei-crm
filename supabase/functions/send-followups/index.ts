@@ -20,8 +20,7 @@ serve(async (req) => {
       .from("campaigns")
       .select("tenant_id")
       .eq("is_active", true)
-      .is("archived", false)
-      .group("tenant_id"); // Get unique tenant_ids
+      .is("archived", false); // Get unique tenant_ids
 
     if (tenantError) {
       console.error("❌ Error fetching tenants:", tenantError);
@@ -57,6 +56,8 @@ serve(async (req) => {
 
       // Parse delay settings with defaults
       const delaySettings = {
+      // Initialize follow-up stage tracking
+      // Assumes leads table has followup_stage and last_followup_sent columns
         followup_delay_1: 3,
         followup_delay_2: 7, 
         followup_delay_3: 14
@@ -75,107 +76,40 @@ serve(async (req) => {
 
       // Process each follow-up stage (1, 2, 3)
       for (let stage = 1; stage <= 3; stage++) {
+        // Prevent duplicate follow-ups: ensure leads haven't already received this stage
         const delayKey = `followup_delay_${stage}` as keyof typeof delaySettings;
         const delayDays = delaySettings[delayKey];
         const expectedCurrentStage = stage - 1; // If sending stage 1, current should be 0
 
         console.log(`📅 Finding leads ready for follow-up stage ${stage} (${delayDays} days delay)`);
 
-        // Find leads ready for this follow-up stage
-        const followupQuery = `
-          SELECT l.*, c.id as campaign_id, c.name as campaign_name
-          FROM leads l
-          JOIN campaigns c ON l.campaign_id = c.id
-          WHERE l.tenant_id = $1
-          AND l.follow_up_stage = $2
-          AND l.last_outbound_at IS NOT NULL
-          AND l.last_outbound_at <= NOW() - INTERVAL '${delayDays} days'
-          AND c.is_active = true
-          AND c.archived = false
-          AND NOT EXISTS (
-            SELECT 1 FROM messages m 
-            WHERE m.lead_id = l.id 
-            AND m.direction = 'inbound' 
-            AND m.timestamp > l.last_outbound_at
-          )
-          LIMIT 50
-        `;
+    
 
-        const { data: followupLeads, error: followupError } = await supabase
-          .rpc('execute_sql', { 
-            sql_query: followupQuery,
-            params: [tenant_id, expectedCurrentStage]
-          });
+             const { data: leads, error: leadsError } = await supabase.rpc("get_leads_ready_for_followup", {
+          tenant_id_input: tenant_id,
+          stage_input: expectedCurrentStage,
+          delay_days_input: delayDays
+        });
 
-        if (followupError) {
-          console.error(`❌ Error finding follow-up stage ${stage} leads for tenant ${tenant_id}:`, followupError);
-          
-          // Fallback to simpler query
-          const { data: fallbackLeads, error: fallbackError } = await supabase
-            .from("leads")
-            .select(`
-              *, 
-              campaigns!inner(id, name, is_active, archived)
-            `)
-            .eq("tenant_id", tenant_id)
-            .eq("follow_up_stage", expectedCurrentStage)
-            .not("last_outbound_at", "is", null)
-            .lte("last_outbound_at", new Date(Date.now() - delayDays * 24 * 60 * 60 * 1000).toISOString())
-            .eq("campaigns.is_active", true)
-            .eq("campaigns.archived", false)
-            .limit(50);
+        if (leadsError) {
+          console.error(`❌ Error fetching leads for stage ${stage}:`, leadsError);
+          continue;
+        }
 
-          if (fallbackError) {
-            console.error(`❌ Fallback query also failed for stage ${stage}:`, fallbackError);
-            continue;
-          }
+        console.log(`📋 Found ${leads?.length || 0} leads ready for follow-up stage ${stage}`);
 
-          // Check each lead for recent inbound messages manually
-          const validLeads = [];
-          for (const lead of fallbackLeads || []) {
-            const { data: recentMessages } = await supabase
-              .from("messages")
-              .select("id")
-              .eq("lead_id", lead.id)
-              .eq("direction", "inbound")
-              .gt("timestamp", lead.last_outbound_at)
-              .limit(1);
-
-            if (!recentMessages || recentMessages.length === 0) {
-              validLeads.push({
-                ...lead,
-                campaign_id: lead.campaigns.id,
-                campaign_name: lead.campaigns.name
-              });
-            }
-          }
-
-          console.log(`📋 Found ${validLeads.length} leads ready for follow-up stage ${stage} (fallback method)`);
-          
-          // Process valid leads
-          for (const lead of validLeads) {
-            await processFollowupLead(lead, stage, tenant_id);
-            tenantFollowupsProcessed++;
-          }
-
-        } else {
-          console.log(`📋 Found ${followupLeads?.length || 0} leads ready for follow-up stage ${stage}`);
-
-          // Process each follow-up lead
-          for (const lead of followupLeads || []) {
-            await processFollowupLead(lead, stage, tenant_id);
-            tenantFollowupsProcessed++;
-          }
+        for (const lead of leads || []) {
+          await processFollowupLead(lead, stage, tenant_id);
+          tenantFollowupsProcessed++;
         }
       }
-
       totalFollowupsProcessed += tenantFollowupsProcessed;
       
-      tenantResults.push({
-        tenant_id,
-        followups_processed: tenantFollowupsProcessed,
-        delay_settings: delaySettings
-      });
+tenantResults.push({
+  tenant_id: tenant_id,
+  followups_processed: tenantFollowupsProcessed,
+  delay_settings: delaySettings
+});
 
       console.log(`✅ Tenant ${tenant_id} complete: ${tenantFollowupsProcessed} follow-ups processed`);
     }

@@ -21,13 +21,11 @@ router.get('/', async (req, res) => {
     const userRole = req.user?.role;
     const userTenantId = req.user?.tenant_id;
     
-    // Check if user has admin access
-    if (!['global_admin', 'enterprise_admin', 'business_admin'].includes(userRole)) {
-      console.log('❌ Access denied for role:', userRole);
-      return res.status(403).json({ 
-        error: 'Admin access required', 
-        userRole, 
-        allowedRoles: ['global_admin', 'enterprise_admin', 'business_admin'] 
+    // Allow all authenticated users to view campaigns
+    if (!req.user) {
+      console.log('❌ No authenticated user');
+      return res.status(401).json({ 
+        error: 'Authentication required'
       });
     }
 
@@ -45,7 +43,7 @@ router.get('/', async (req, res) => {
       }
       // If no tenant_id specified, global admin sees all campaigns (no filter)
     } else {
-      // Enterprise/Business admins only see their own tenant's campaigns
+      // All other users only see their own tenant's campaigns
       if (!userTenantId) {
         return res.status(400).json({ error: 'Tenant ID is required' });
       }
@@ -89,7 +87,7 @@ router.get('/test', async (req, res) => {
   });
 });
 
-// Create new campaign
+// Create new campaign - restricted to admins only
 router.post('/', async (req, res) => {
   try {
     const { name, startDate, endDate, description, targetAudience, aiPromptTemplate, tenant_id } = req.body;
@@ -98,9 +96,9 @@ router.post('/', async (req, res) => {
 
     console.log('🔍 DEBUG - Creating campaign with data:', { name, startDate, endDate, tenant_id });
 
-    // Check if user has admin access
+    // Check if user has admin access for creating campaigns
     if (!['global_admin', 'enterprise_admin', 'business_admin'].includes(userRole)) {
-      return res.status(403).json({ error: 'Admin access required' });
+      return res.status(403).json({ error: 'Admin access required to create campaigns' });
     }
 
     // Determine which tenant to create campaign for
@@ -139,12 +137,11 @@ router.post('/', async (req, res) => {
 
     console.log('🔍 DEBUG - Inserting campaign:', newCampaign);
 
-    const { data, error } = await supabase
-  .from('campaigns')
-  .select('*, ai_archetypes(*)')
-  .eq('archived', false)
-  .eq('tenant_id', req.user.tenant_id)
-  .order('created_at', { ascending: false });
+    const { data: campaign, error } = await supabaseAdmin
+      .from('campaigns')
+      .insert([newCampaign])
+      .select()
+      .single();
 
     if (error) {
       console.error('❌ Error creating campaign:', error);
@@ -159,7 +156,7 @@ router.post('/', async (req, res) => {
   }
 });
 
-// Get campaign by ID
+// Get campaign by ID - allow all authenticated users to view
 router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params;
@@ -168,9 +165,9 @@ router.get('/:id', async (req, res) => {
 
     console.log('🔍 DEBUG - Fetching campaign by ID:', id);
 
-    // Check if user has admin access
-    if (!['global_admin', 'enterprise_admin', 'business_admin'].includes(userRole)) {
-      return res.status(403).json({ error: 'Admin access required' });
+    // Allow all authenticated users to view campaigns
+    if (!req.user) {
+      return res.status(401).json({ error: 'Authentication required' });
     }
 
     // Build query to get specific campaign
@@ -209,7 +206,7 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// Update campaign
+// Update campaign - restricted to admins
 router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
@@ -221,7 +218,7 @@ router.put('/:id', async (req, res) => {
 
     // Check if user has admin access
     if (!['global_admin', 'enterprise_admin', 'business_admin'].includes(userRole)) {
-      return res.status(403).json({ error: 'Admin access required' });
+      return res.status(403).json({ error: 'Admin access required to update campaigns' });
     }
 
     // Map frontend fields to database columns
@@ -283,7 +280,7 @@ router.put('/:id', async (req, res) => {
   }
 });
 
-// Archive campaign
+// Archive campaign - restricted to admins
 router.patch('/:id/archive', async (req, res) => {
   try {
     const { id } = req.params;
@@ -294,7 +291,7 @@ router.patch('/:id/archive', async (req, res) => {
 
     // Check if user has admin access
     if (!['global_admin', 'enterprise_admin', 'business_admin'].includes(userRole)) {
-      return res.status(403).json({ error: 'Admin access required' });
+      return res.status(403).json({ error: 'Admin access required to archive campaigns' });
     }
 
     let query = supabaseAdmin
@@ -335,7 +332,7 @@ router.patch('/:id/archive', async (req, res) => {
   }
 });
 
-// Unarchive campaign
+// Unarchive campaign - restricted to admins
 router.patch('/:id/unarchive', async (req, res) => {
   try {
     const { id } = req.params;
@@ -346,7 +343,7 @@ router.patch('/:id/unarchive', async (req, res) => {
 
     // Check if user has admin access
     if (!['global_admin', 'enterprise_admin', 'business_admin'].includes(userRole)) {
-      return res.status(403).json({ error: 'Admin access required' });
+      return res.status(403).json({ error: 'Admin access required to unarchive campaigns' });
     }
 
     let query = supabaseAdmin
@@ -387,7 +384,7 @@ router.patch('/:id/unarchive', async (req, res) => {
   }
 });
 
-// Delete campaign
+// Delete campaign - restricted to admins
 router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
@@ -398,7 +395,7 @@ router.delete('/:id', async (req, res) => {
 
     // Check if user has admin access
     if (!['global_admin', 'enterprise_admin', 'business_admin'].includes(userRole)) {
-      return res.status(403).json({ error: 'Admin access required' });
+      return res.status(403).json({ error: 'Admin access required to delete campaigns' });
     }
 
     let query = supabaseAdmin
@@ -429,7 +426,7 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
-// Toggle active status
+// Toggle active status - restricted to admins
 router.patch('/:id/toggle-active', async (req, res) => {
   try {
     const { id } = req.params;
@@ -441,7 +438,7 @@ router.patch('/:id/toggle-active', async (req, res) => {
 
     // Check if user has admin access
     if (!['global_admin', 'enterprise_admin', 'business_admin'].includes(userRole)) {
-      return res.status(403).json({ error: 'Admin access required' });
+      return res.status(403).json({ error: 'Admin access required to toggle campaign status' });
     }
 
     if (typeof is_active !== 'boolean') {
@@ -483,7 +480,8 @@ router.patch('/:id/toggle-active', async (req, res) => {
   }
 });
 
-// Toggle AI setting for campaign (call your existing endpoint)
+// Toggle AI setting for campaign - restricted to admins
+// Toggle AI setting for campaign - restricted to admins
 router.patch('/:id/ai-toggle', async (req, res) => {
   try {
     const { id } = req.params;
@@ -495,7 +493,7 @@ router.patch('/:id/ai-toggle', async (req, res) => {
 
     // Check if user has admin access
     if (!['global_admin', 'enterprise_admin', 'business_admin'].includes(userRole)) {
-      return res.status(403).json({ error: 'Admin access required' });
+      return res.status(403).json({ error: 'Admin access required to toggle AI settings' });
     }
 
     if (typeof ai_on !== 'boolean') {
@@ -530,6 +528,40 @@ router.patch('/:id/ai-toggle', async (req, res) => {
     }
 
     console.log('✅ AI setting updated successfully:', campaign.id);
+
+    // If AI was turned ON, trigger the edge function to process leads
+    if (ai_on) {
+      console.log('🚀 AI enabled - calling edge function to process leads');
+      
+      try {
+        const edgeFunctionUrl = `${process.env.SUPABASE_URL}/functions/v1/send-batch`;
+        
+        const edgeResponse = await fetch(edgeFunctionUrl, {
+          method: 'PATCH',
+          headers: {
+            'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            campaignId: id,
+            ai_on: true
+          })
+        });
+
+        if (!edgeResponse.ok) {
+          const errorText = await edgeResponse.text();
+          console.error('❌ Edge function call failed:', errorText);
+          // Don't fail the whole request, just log the error
+        } else {
+          const result = await edgeResponse.json();
+          console.log('✅ Edge function response:', result);
+        }
+      } catch (edgeError) {
+        console.error('❌ Error calling edge function:', edgeError);
+        // Don't fail the whole request, just log the error
+      }
+    }
+
     res.json(campaign);
   } catch (err) {
     console.error('❌ Server error:', err);
@@ -537,7 +569,7 @@ router.patch('/:id/ai-toggle', async (req, res) => {
   }
 });
 
-// Get campaign analytics/stats
+// Get campaign analytics/stats - allow all authenticated users to view
 router.get('/:id/analytics', async (req, res) => {
   try {
     const { id } = req.params;
@@ -546,9 +578,9 @@ router.get('/:id/analytics', async (req, res) => {
 
     console.log('🔍 DEBUG - Fetching analytics for campaign:', id);
 
-    // Check if user has admin access
-    if (!['global_admin', 'enterprise_admin', 'business_admin'].includes(userRole)) {
-      return res.status(403).json({ error: 'Admin access required' });
+    // Allow all authenticated users to view analytics
+    if (!req.user) {
+      return res.status(401).json({ error: 'Authentication required' });
     }
 
     // Verify campaign access first

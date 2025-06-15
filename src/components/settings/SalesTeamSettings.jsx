@@ -17,9 +17,12 @@ import {
   Search,
   Filter,
   Download,
-  RefreshCw
+  RefreshCw,
+  Link,
+  X
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import supabase from '../../lib/supabaseClient';
 
 export default function SalesTeamSettings() {
   const { user } = useAuth();
@@ -32,6 +35,7 @@ export default function SalesTeamSettings() {
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [invitationLink, setInvitationLink] = useState(null);
   
   const [teamStats, setTeamStats] = useState({
     totalMembers: 0,
@@ -43,19 +47,29 @@ export default function SalesTeamSettings() {
   const [teamMembers, setTeamMembers] = useState([]);
   const [pendingInvites, setPendingInvites] = useState([]);
 
-  // Centralized function to get auth token
-  const getAuthToken = () => {
-    return user?.access_token || 
-           user?.session?.access_token || 
-           localStorage.getItem('auth_token') || 
-           sessionStorage.getItem('auth_token');
+  // Updated function to get fresh auth token
+  const getAuthToken = async () => {
+    try {
+      // Get fresh session to ensure token is valid
+      const { data: { session }, error } = await supabase.auth.getSession();
+      
+      if (error) {
+        console.error('Session error:', error);
+        return null;
+      }
+      
+      return session?.access_token || null;
+    } catch (error) {
+      console.error('Error getting auth token:', error);
+      return null;
+    }
   };
 
-  // Centralized function to create headers
-  const getAuthHeaders = () => {
-    const token = getAuthToken();
+  // Updated function to create auth headers with fresh token
+  const getAuthHeaders = async () => {
+    const token = await getAuthToken();
     if (!token) {
-      throw new Error('Not authenticated - no token found');
+      throw new Error('Not authenticated - no valid token found');
     }
     return {
       'Content-Type': 'application/json',
@@ -72,57 +86,61 @@ export default function SalesTeamSettings() {
     setError('');
     
     try {
-      const headers = getAuthHeaders();
-      console.log('Making API calls with token present:', !!getAuthToken());
+      const headers = await getAuthHeaders();
+      console.log('Making API calls with fresh token');
 
-      // Load data sequentially to better handle errors
-      const statsRes = await fetch('/api/team/stats', { headers });
-      console.log('Stats response:', statsRes.status);
-      
-      if (!statsRes.ok) {
-        const errorData = await statsRes.json().catch(() => ({ error: 'Unknown error' }));
-        console.error('Stats error:', errorData);
-        throw new Error(`Failed to load team stats: ${errorData.error || statsRes.statusText}`);
+      // Load data with better error handling using Promise.allSettled
+      const [statsRes, membersRes] = await Promise.allSettled([
+        fetch('/api/team/stats', { headers }),
+        fetch('/api/team/members', { headers })
+      ]);
+
+      // Handle stats
+      if (statsRes.status === 'fulfilled' && statsRes.value.ok) {
+        const stats = await statsRes.value.json();
+        setTeamStats(stats);
+        console.log('Stats loaded successfully:', stats);
+      } else {
+        console.warn('Failed to load stats:', statsRes.reason || 'Network error');
+        setTeamStats({
+          totalMembers: 0,
+          activeUsers: 0,
+          pendingInvites: 0,
+          lastWeekLogins: 0
+        });
       }
-      
-      const stats = await statsRes.json();
-      setTeamStats(stats);
 
-      // Load members
-      const membersRes = await fetch('/api/team/members', { headers });
-      console.log('Members response:', membersRes.status);
-      
-      if (!membersRes.ok) {
-        const errorData = await membersRes.json().catch(() => ({ error: 'Unknown error' }));
-        console.error('Members error:', errorData);
-        throw new Error(`Failed to load team members: ${errorData.error || membersRes.statusText}`);
+      // Handle members
+      if (membersRes.status === 'fulfilled' && membersRes.value.ok) {
+        const members = await membersRes.value.json();
+        setTeamMembers(members);
+        console.log('Members loaded successfully:', members.length);
+      } else {
+        console.warn('Failed to load members:', membersRes.reason || 'Network error');
+        setTeamMembers([]);
       }
-      
-      const members = await membersRes.json();
-      setTeamMembers(members);
 
-      // Load invitations - handle this separately since it was failing
+      // Handle invitations separately (non-blocking)
       try {
         const invitesRes = await fetch('/api/team/invitations', { headers });
-        console.log('Invites response:', invitesRes.status);
-        
         if (invitesRes.ok) {
           const invites = await invitesRes.json();
           setPendingInvites(invites);
+          console.log('Invitations loaded successfully:', invites.length);
         } else {
           console.warn('Failed to load invitations, but continuing...');
-          setPendingInvites([]); // Set empty array instead of failing
+          setPendingInvites([]);
         }
       } catch (inviteError) {
         console.warn('Invitations endpoint error:', inviteError);
-        setPendingInvites([]); // Continue without invitations
+        setPendingInvites([]);
       }
 
       console.log('Data loaded successfully');
 
     } catch (error) {
       console.error('Error loading team data:', error);
-      setError(error.message || 'Failed to load team data. Please try again.');
+      setError('Failed to load team data. Please refresh and try again.');
     } finally {
       setLoading(false);
     }
@@ -146,27 +164,47 @@ export default function SalesTeamSettings() {
     setSuccess('');
     
     try {
-      const headers = getAuthHeaders();
+      const headers = await getAuthHeaders();
+
+      // First, get the user's tenant_id from their profile
+      const profileRes = await fetch('/api/team/stats', { headers });
+      if (!profileRes.ok) {
+        throw new Error('Failed to get user profile');
+      }
+      
+      // The tenant_id is used in the stats endpoint, so we know the user has one
 
       const response = await fetch('/api/team/invite', {
         method: 'POST',
         headers,
         body: JSON.stringify({
           email: inviteEmail,
-          role: inviteRole // Changed from inviteRole to role
+          role: inviteRole
         })
       });
 
       if (!response.ok) {
-        const data = await response.json().catch(() => ({ error: 'Unknown error' }));
-        throw new Error(data.error || `Failed to send invitation (${response.status})`);
+        const errorText = await response.text();
+        let errorData;
+        try {
+          errorData = JSON.parse(errorText);
+        } catch (e) {
+          errorData = { error: `Server error (${response.status}): ${errorText}` };
+        }
+        throw new Error(errorData.error || `Failed to send invitation (${response.status})`);
       }
       
       const data = await response.json();
-      setSuccess('Invitation sent successfully!');
+      setSuccess('Invitation created successfully!');
       setInviteEmail('');
       setInviteRole('user');
       setShowInviteModal(false);
+      
+      // Store the invitation link for display
+      setInvitationLink({
+        email: inviteEmail,
+        url: data.signupUrl
+      });
       
       // Reload data to reflect changes
       await loadTeamData();
@@ -181,16 +219,22 @@ export default function SalesTeamSettings() {
 
   const handleToggleUserStatus = async (userId, currentStatus) => {
     try {
-      const headers = getAuthHeaders();
+      const headers = await getAuthHeaders();
 
       const response = await fetch(`/api/team/members/${userId}/toggle-status`, {
-        method: 'PATCH', // Changed from POST to PATCH
+        method: 'PATCH',
         headers
       });
 
       if (!response.ok) {
-        const data = await response.json().catch(() => ({ error: 'Unknown error' }));
-        throw new Error(data.error || `Failed to update user status (${response.status})`);
+        const errorText = await response.text();
+        let errorData;
+        try {
+          errorData = JSON.parse(errorText);
+        } catch (e) {
+          errorData = { error: `Server error (${response.status}): ${errorText}` };
+        }
+        throw new Error(errorData.error || `Failed to update user status (${response.status})`);
       }
       
       const data = await response.json();
@@ -208,9 +252,9 @@ export default function SalesTeamSettings() {
   const handleResendInvite = async (invitationId) => {
     try {
       console.log('Resending invitation:', invitationId);
-      const headers = getAuthHeaders();
+      const headers = await getAuthHeaders();
 
-      const response = await fetch(`/api/team/invitations/${invitationId}/resend`, {
+      const response = await fetch(`/api/invitations/${invitationId}/resend`, {
         method: 'POST',
         headers
       });
@@ -244,9 +288,9 @@ export default function SalesTeamSettings() {
   const handleCancelInvite = async (invitationId) => {
     try {
       console.log('Canceling invitation:', invitationId);
-      const headers = getAuthHeaders();
+      const headers = await getAuthHeaders();
 
-      const response = await fetch(`/api/team/invitations/${invitationId}`, {
+      const response = await fetch(`/api/invitations/${invitationId}`, {
         method: 'DELETE',
         headers
       });
@@ -380,6 +424,76 @@ export default function SalesTeamSettings() {
           <div className="flex items-center">
             <CheckCircle className="w-5 h-5 text-green-600 mr-2" />
             <p className="text-green-800">{success}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Invitation Link Modal */}
+      {invitationLink && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-xl max-w-lg w-full mx-4">
+            <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-gray-900">Invitation Created Successfully</h3>
+              <button
+                onClick={() => setInvitationLink(null)}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="px-6 py-4">
+              <div className="space-y-4">
+                <div>
+                  <p className="text-sm text-gray-600 mb-2">
+                    Send this invitation link to <span className="font-medium text-gray-900">{invitationLink.email}</span>:
+                  </p>
+                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                    <p className="text-xs text-gray-700 break-all font-mono">
+                      {invitationLink.url}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-3">
+                  <button
+                    onClick={(e) => {
+                      navigator.clipboard.writeText(invitationLink.url);
+                      // Don't use setSuccess which shows the white bar
+                      // Instead, show a temporary tooltip or change button text
+                      const button = e.currentTarget;
+                      const originalText = button.innerHTML;
+                      button.innerHTML = '<svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>Copied!';
+                      button.classList.add('bg-green-600', 'hover:bg-green-700');
+                      button.classList.remove('bg-blue-600', 'hover:bg-blue-700');
+                      
+                      setTimeout(() => {
+                        button.innerHTML = originalText;
+                        button.classList.remove('bg-green-600', 'hover:bg-green-700');
+                        button.classList.add('bg-blue-600', 'hover:bg-blue-700');
+                      }, 2000);
+                    }}
+                    className="flex-1 inline-flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                  >
+                    <Copy className="w-4 h-4 mr-2" />
+                    Copy Link
+                  </button>
+                  <button
+                    onClick={() => setInvitationLink(null)}
+                    className="flex-1 px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors font-medium"
+                  >
+                    Close
+                  </button>
+                </div>
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <div className="flex items-start">
+                    <AlertCircle className="w-5 h-5 text-blue-600 mt-0.5 mr-3 flex-shrink-0" />
+                    <div className="text-sm text-blue-800">
+                      <p className="font-medium mb-1">Important</p>
+                      <p>This invitation link expires in 7 days. The recipient must use this exact link to sign up and join your organization.</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -562,7 +676,6 @@ export default function SalesTeamSettings() {
                         <button
                           onClick={() => {
                             console.log('Resending invite for member:', member);
-                            // For pending members, use the invitation ID if available, otherwise email
                             const inviteId = member.invitationId || member.id;
                             console.log('Using invite ID:', inviteId);
                             handleResendInvite(inviteId);
@@ -671,20 +784,20 @@ export default function SalesTeamSettings() {
                     Role
                   </label>
                   <select
-  value={inviteRole}
-  onChange={(e) => setInviteRole(e.target.value)}
-  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
->
-  <option value="business_admin">Admin</option>
-  <option value="enterprise_admin">Enterprise Admin</option>
-</select>
+                    value={inviteRole}
+                    onChange={(e) => setInviteRole(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="user">User</option>
+                    <option value="business_admin">Business Admin</option>
+                  </select>
                 </div>
                 <div className="bg-blue-50 rounded-lg p-4">
                   <div className="flex items-start">
                     <AlertCircle className="w-5 h-5 text-blue-600 mt-0.5 mr-3" />
                     <div className="text-sm text-blue-800">
                       <p className="font-medium mb-1">User Permissions</p>
-                      <p>Users can view leads, send messages, and manage conversations. Admins can also invite users and access settings.</p>
+                      <p>Users can view leads, send messages, and manage conversations. Business Admins can also invite users and access settings.</p>
                     </div>
                   </div>
                 </div>
@@ -705,12 +818,12 @@ export default function SalesTeamSettings() {
                 {inviteLoading ? (
                   <>
                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                    Sending...
+                    Creating...
                   </>
                 ) : (
                   <>
-                    <Send className="w-4 h-4 mr-2" />
-                    Send Invitation
+                    <Link className="w-4 h-4 mr-2" />
+                    Create Invitation Link
                   </>
                 )}
               </button>

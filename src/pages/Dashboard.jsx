@@ -116,7 +116,7 @@ const fetchLeads = async () => {
     // Assuming 'user.is_admin' or 'user.role === "admin"' indicates a global admin
     // You will need to ensure your user object from AuthContext contains this property
     // Example: user.user_metadata?.is_admin or user.app_metadata?.role === 'admin'
-    const isGlobalAdmin = user?.role === 'global_admin';
+    const isGlobalAdmin = user?.role === 'global_admin' || user?.user_metadata?.role === 'global_admin';
 
     if (!isGlobalAdmin) {
       // For regular tenant users, filter by their tenant_id
@@ -255,14 +255,63 @@ const fetchLeads = async () => {
 
   // Generate CSV headers based on configured fields
   const downloadSampleCSV = () => {
-    const headers = leadFields.map(field => field.field_label);
-    const csvContent = headers.join(',') + '\n';
+    if (!leadFields || leadFields.length === 0) {
+      console.error('No field configuration loaded');
+      alert('Field configuration is still loading. Please try again in a moment.');
+      return;
+    }
+
+    // Helper function to properly escape CSV values
+    const escapeCSVValue = (value) => {
+      if (value === null || value === undefined) return '';
+      const stringValue = value.toString();
+      // If the value contains comma, newline, or double quotes, wrap in quotes and escape internal quotes
+      if (stringValue.includes(',') || stringValue.includes('\n') || stringValue.includes('"')) {
+        return '"' + stringValue.replace(/"/g, '""') + '"';
+      }
+      return stringValue;
+    };
+
+    // Create headers from the configured fields
+    const headers = leadFields.map(field => field.field_label || field.field_name);
+    
+    // Create a sample row with example data for each field type
+    const sampleData = leadFields.map(field => {
+      // Provide example data based on field name
+      const exampleData = {
+        'name': 'John Doe',
+        'phone': '+1-555-123-4567',
+        'email': 'john.doe@example.com',
+        'property_address': '123 Main St, City, State 12345',
+        'company_name': 'ABC Company',
+        'current_vehicle': '2020 Toyota Camry',
+        'salary_expectations': '$50,000-$70,000',
+        'budget_range': '$200,000-$300,000',
+        'timeline': '3-6 months',
+        'status': 'Hot Lead',
+        'campaign': 'Q1 Outreach',
+        'notes': 'Interested in our services',
+        'assigned_to': 'Sales Team'
+      };
+      
+      // Return example data or a placeholder
+      return exampleData[field.field_name] || `Example ${field.field_label || field.field_name}`;
+    });
+
+    // Create CSV content with properly escaped values
+    const csvContent = [
+      headers.map(escapeCSVValue).join(','),
+      sampleData.map(escapeCSVValue).join(',')
+    ].join('\n');
+
+    // Create and download the file
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
-
+    const timestamp = new Date().toISOString().split('T')[0];
+    
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'sample_leads.csv';
+    a.download = `lead_import_template_${timestamp}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -271,22 +320,51 @@ const fetchLeads = async () => {
     const file = e.target.files[0];
     if (!file) return;
 
+    if (!leadFields || leadFields.length === 0) {
+      alert('Field configuration is still loading. Please try again.');
+      e.target.value = null;
+      return;
+    }
+
     Papa.parse(file, {
       header: true,
       skipEmptyLines: true,
       complete: (results) => {
-        const records = results.data.map(row => {
+        console.log('Parsed CSV data:', results.data);
+        
+        // Create a mapping of field labels to field names
+        const labelToFieldMap = {};
+        leadFields.forEach(field => {
+          labelToFieldMap[field.field_label] = field.field_name;
+          // Also map the field_name to itself in case CSV uses field names
+          labelToFieldMap[field.field_name] = field.field_name;
+        });
+
+        const records = results.data.map((row, index) => {
           const fields = {};
+          
+          // For each configured field, try to find matching data in the CSV
           leadFields.forEach(field => {
-            // Map CSV columns to field names
-            fields[field.field_name] = row[field.field_label] || row[field.field_name] || '';
+            // Try to match by field_label first, then field_name
+            const value = row[field.field_label] || row[field.field_name] || '';
+            fields[field.field_name] = value;
           });
+
+          // Log the mapped record for debugging
+          console.log(`Record ${index + 1} mapped:`, fields);
+          
           return { fields };
         });
+
         setParsedRecords(records);
         setFileReady(true);
-        setUploadMessage('');
+        setUploadMessage(`Ready to upload ${records.length} leads`);
         setUploadError(false);
+      },
+      error: (error) => {
+        console.error('CSV parsing error:', error);
+        setUploadMessage('Error parsing CSV file. Please check the format.');
+        setUploadError(true);
       }
     });
   };
