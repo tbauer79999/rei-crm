@@ -1,13 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { callEdgeFunction } from '../../lib/edgeFunctionAuth';
 
 // Edge Function URL - Update this with your actual Supabase project URL
 const EDGE_FUNCTION_URL = 'https://wuuqrdlfgkasnwydyvgk.supabase.co/functions/v1/overview-analytics';
 
 const MetricCard = ({ title, value, subtext, trend }) => {
-  // Debugging: Log what value each MetricCard receives
-  console.log(`MetricCard: ${title}, Value:`, value); 
-
   return (
     <div className="bg-white p-4 rounded-xl shadow border text-center">
       <h3 className="text-sm text-gray-500 mb-1">{title}</h3>
@@ -29,9 +27,6 @@ const MetricCard = ({ title, value, subtext, trend }) => {
 export default function OverviewMetrics() {
   const { user } = useAuth();
 
-  // Debugging: Log user state when component renders
-  console.log('OverviewMetrics component rendering. User:', user);
-
   const [metrics, setMetrics] = useState({
     totalLeads: 0,
     weeklyLeads: 0,
@@ -44,40 +39,9 @@ export default function OverviewMetrics() {
     trends: {},
   });
   const [loading, setLoading] = useState(true);
-
-  // Debugging: Log the metrics state every time the component renders (after state updates)
-  console.log('Current OverviewMetrics state (from render):', metrics);
-
-  // Helper function to call edge function with auth
-  const callEdgeFunction = async () => {
-    try {
-      // Get the auth token from localStorage
-      const token = localStorage.getItem('supabase.auth.token') || 
-                   JSON.parse(localStorage.getItem('sb-wuuqrdlfgkasnwydyvgk-auth-token') || '{}')?.access_token;
-      
-      const response = await fetch(EDGE_FUNCTION_URL, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      return await response.json();
-    } catch (error) {
-      console.error('Edge function call failed:', error);
-      throw error;
-    }
-  };
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    // Debugging: Log when useEffect runs
-    console.log('OverviewMetrics useEffect running. User in useEffect:', user); 
-
     // Check for active user and tenant_id
     if (!user || !user.tenant_id) { 
       console.log('No active user or tenant_id found, skipping fetch for OverviewMetrics.');
@@ -88,12 +52,10 @@ export default function OverviewMetrics() {
     const fetchData = async () => {
       try {
         setLoading(true);
-        // Debugging: Log before making the API call
+        setError(null);
+        
         console.log('Fetching overview metrics...');
-
-        const data = await callEdgeFunction();
-
-        // Debugging: Log the raw data received from the API response
+        const data = await callEdgeFunction(EDGE_FUNCTION_URL);
         console.log('API Response Data:', data);
 
         const weeklyChange = (curr, prev) => {
@@ -103,31 +65,30 @@ export default function OverviewMetrics() {
           return `${sign}${Math.abs(change).toFixed(1)}%`;
         };
 
-        const newMetrics = { // Create a new object to log before setting state
-          totalLeads: data.totalLeads,
-          weeklyLeads: data.weeklyLeads,
-          hotLeadRate: `${data.hotLeadRate.toFixed(1)}%`,
-          replyRate: `${data.replyRate.toFixed(1)}%`,
-          activeLeads: data.activeLeads,
-          completedLeads: data.completedLeads,
-          messagesSent: data.messagesSent,
-          messagesReceived: data.messagesReceived,
+        const newMetrics = {
+          totalLeads: data.totalLeads || 0,
+          weeklyLeads: data.weeklyLeads || 0,
+          hotLeadRate: data.hotLeadRate ? `${data.hotLeadRate.toFixed(1)}%` : '0%',
+          replyRate: data.replyRate ? `${data.replyRate.toFixed(1)}%` : '0%',
+          activeLeads: data.activeLeads || 0,
+          completedLeads: data.completedLeads || 0,
+          messagesSent: data.messagesSent || 0,
+          messagesReceived: data.messagesReceived || 0,
           trends: {
-            weeklyLeads: weeklyChange(data.weeklyLeads, 25),
-            hotLeadRate: weeklyChange(data.hotLeadRate, 12.0),
-            replyRate: weeklyChange(data.replyRate, 35.0),
-            completedLeads: weeklyChange(data.completedLeads, 7),
-            messagesSent: weeklyChange(data.messagesSent, 210),
-            messagesReceived: weeklyChange(data.messagesReceived, 110),
+            weeklyLeads: weeklyChange(data.weeklyLeads || 0, 25),
+            hotLeadRate: weeklyChange(data.hotLeadRate || 0, 12.0),
+            replyRate: weeklyChange(data.replyRate || 0, 35.0),
+            completedLeads: weeklyChange(data.completedLeads || 0, 7),
+            messagesSent: weeklyChange(data.messagesSent || 0, 210),
+            messagesReceived: weeklyChange(data.messagesReceived || 0, 110),
           },
         };
 
-        // Debugging: Log the object that will be used to update the state
-        console.log('Metrics object to set state with:', newMetrics);
         setMetrics(newMetrics);
       } catch (error) {
-        // Debugging: Log any errors from the API call
         console.error('Error fetching overview metrics:', error);
+        setError(error.message);
+        
         // Set default values on error
         setMetrics({
           totalLeads: 0,
@@ -146,7 +107,7 @@ export default function OverviewMetrics() {
     };
 
     fetchData();
-  }, [user]); // Depend on user to re-fetch if auth state changes
+  }, [user]);
 
   if (loading) {
     return (
@@ -176,6 +137,21 @@ export default function OverviewMetrics() {
             </div>
           ))}
         </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-center">
+        <p className="text-red-600 font-medium">Failed to load metrics</p>
+        <p className="text-red-500 text-sm mt-1">{error}</p>
+        <button 
+          onClick={() => window.location.reload()} 
+          className="mt-2 text-sm text-red-600 underline hover:text-red-700"
+        >
+          Retry
+        </button>
       </div>
     );
   }

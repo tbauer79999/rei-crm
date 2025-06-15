@@ -2,40 +2,48 @@ import supabase from './supabaseClient';
 
 // Helper function to invoke Edge Functions with proper auth
 const invokeEdgeFunction = async (functionName, options = {}) => {
-  // Try to get current session
-  let { data: { session }, error: sessionError } = await supabase.auth.getSession();
+  try {
+    // Get current session
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
 
-  // Refresh if missing or token is null
-  if (sessionError || !session || !session.access_token) {
-    const { data: refreshed, error: refreshError } = await supabase.auth.refreshSession();
+    if (sessionError || !session?.access_token) {
+      console.error('❌ No valid session found, attempting refresh...');
+      
+      // Try to refresh the session
+      const { data: { session: refreshedSession }, error: refreshError } = await supabase.auth.refreshSession();
+      
+      if (refreshError || !refreshedSession?.access_token) {
+        console.error('❌ Unable to obtain access token for edge function');
+        throw new Error('No valid session or access token');
+      }
 
-    if (refreshError || !refreshed?.session?.access_token) {
-      console.error('❌ Unable to obtain access token for edge function');
-      throw new Error('No valid session or access token');
+      console.log('🔄 Session refreshed for Edge Function call');
     }
 
-    session = refreshed.session;
-    console.log('🔄 Session refreshed for Edge Function call');
-  }
+    console.log(`🔗 Edge Function Request: ${functionName}`);
 
-  console.log(`🔗 Edge Function Request: ${functionName}`);
+    // IMPORTANT: Don't pass Authorization header manually with supabase.functions.invoke
+    // The client already handles auth internally
+    const { data, error } = await supabase.functions.invoke(functionName, {
+      method: options.method || 'GET',
+      body: options.body || undefined,
+      headers: {
+        'Content-Type': 'application/json',
+        ...options.headers,
+      },
+    });
 
-  const { data, error } = await supabase.functions.invoke(functionName, {
-    method: options.method || 'GET',
-    ...options,
-    headers: {
-      Authorization: `Bearer ${session.access_token}`,
-      ...options.headers,
-    },
-  });
+    if (error) {
+      console.error(`❌ Edge Function Error: ${functionName}`, error);
+      throw error;
+    }
 
-  if (error) {
-    console.error(`❌ Edge Function Error: ${functionName}`, error);
+    console.log(`✅ Edge Function Success: ${functionName}`, data);
+    return data;
+  } catch (error) {
+    console.error(`❌ Failed to invoke ${functionName}:`, error);
     throw error;
   }
-
-  console.log(`✅ Edge Function Success: ${functionName}`, data);
-  return data;
 };
 
 // ============= OVERVIEW & HEALTH =============
@@ -52,13 +60,9 @@ export async function fetchOverviewMetrics() {
 }
 
 export async function fetchOverviewTrendAndCost() {
-  return {
-    trend: [],
-    totalMessagesSent: 0,
-    totalHotLeads: 0,
-    previousMessagesSent: 0,
-    previousHotLeads: 0
-  };
+  return await invokeEdgeFunction('overview-analytics', {
+    body: { path: '/analytics-trend-cost' }
+  });
 }
 
 // ============= HOT LEADS & HANDOFF =============

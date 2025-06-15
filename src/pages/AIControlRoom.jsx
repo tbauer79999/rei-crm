@@ -126,32 +126,34 @@ const AIControlRoom = () => {
       setCollapsed(defaultState);
     }
 
-    const fetchOverviewStatus = async () => {
-      try {
-        const data = await fetchHealth();
+const fetchOverviewStatus = async () => {
+  try {
+    const data = await fetchHealth();
+    
+    // Transform the data to match what AIControlRoom expects
+    const status = data.totalLeads > 0 ? 'healthy' : 'attention';
+    const message = `${data.weeklyLeads} leads this week`;
+    
+    setSectionStatuses(prev => ({
+      ...prev,
+      overview: status
+    }));
 
-        setSectionStatuses(prev => ({
-          ...prev,
-          overview: data.status || 'healthy'
-        }));
+    setSectionMetrics(prev => ({
+      ...prev,
+      overview: message
+    }));
 
-        setSectionMetrics(prev => ({
-          ...prev,
-          overview: data.message || 'System operational'
-        }));
-
-        setStatusReasons(prev => ({
-          ...prev,
-          overview: data.metrics ? 
-            `Leads today: ${data.metrics.totalToday || 0}, Hot: ${data.metrics.hotToday || 0}, Last hour: ${data.metrics.lastHour || 0}` :
-            'Health check complete'
-        }));
-      } catch (err) {
-        console.error('Error fetching overview status:', err);
-        setSectionStatuses(prev => ({ ...prev, overview: 'attention' }));
-        setSectionMetrics(prev => ({ ...prev, overview: 'Unable to fetch data' }));
-      }
-    };
+    setStatusReasons(prev => ({
+      ...prev,
+      overview: `Total: ${data.totalLeads}, Active: ${data.activeLeads}, Hot rate: ${data.hotLeadRate}%`
+    }));
+  } catch (err) {
+    console.error('Error fetching overview status:', err);
+    setSectionStatuses(prev => ({ ...prev, overview: 'attention' }));
+    setSectionMetrics(prev => ({ ...prev, overview: 'Unable to fetch data' }));
+  }
+};
 
     const fetchHandoffStatus = async () => {
       try {

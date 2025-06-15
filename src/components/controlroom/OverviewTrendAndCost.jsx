@@ -9,9 +9,10 @@ import {
   CartesianGrid,
 } from 'recharts';
 import { useAuth } from '../../context/AuthContext';
+import { callEdgeFunction } from '../../lib/edgeFunctionAuth';
 
 // Edge Function URL - Update this with your actual Supabase project URL
-const EDGE_FUNCTION_URL = 'https://wuuqrdlfgkasnwydyvgk.supabase.co/functions/v1/overview-analytics';
+const EDGE_FUNCTION_URL = 'https://wuuqrdlfgkasnwydyvgk.supabase.co/functions/v1/overview-analytics/analytics-trend-cost';
 
 const MetricCard = ({ title, value, subtext, trend, empty }) => (
   <div
@@ -54,34 +55,9 @@ export default function OverviewTrendAndCost() {
   const [previousHotLeadCount, setPreviousHotLeadCount] = useState(0);
   const [previousMessageCount, setPreviousMessageCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   const COST_PER_MESSAGE = 0.01;
-
-  // Helper function to call edge function with auth
-  const callEdgeFunction = async () => {
-    try {
-      // Get the auth token from localStorage
-      const token = localStorage.getItem('supabase.auth.token') || 
-                   JSON.parse(localStorage.getItem('sb-wuuqrdlfgkasnwydyvgk-auth-token') || '{}')?.access_token;
-      
-      const response = await fetch(EDGE_FUNCTION_URL, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      return await response.json();
-    } catch (error) {
-      console.error('Edge function call failed:', error);
-      throw error;
-    }
-  };
 
   useEffect(() => {
     // Ensure there's an active user before trying to fetch data
@@ -94,7 +70,9 @@ export default function OverviewTrendAndCost() {
     const fetchData = async () => {
       try {
         setLoading(true);
-        const data = await callEdgeFunction();
+        setError(null);
+        
+        const data = await callEdgeFunction(EDGE_FUNCTION_URL);
         
         const {
           trend,
@@ -111,6 +89,8 @@ export default function OverviewTrendAndCost() {
         setPreviousHotLeadCount(previousHotLeads || 0);
       } catch (error) {
         console.error('Error fetching overview trend and cost:', error);
+        setError(error.message);
+        
         // Set default values on error
         setHotLeadTrend([]);
         setMessagesSent(0);
@@ -148,6 +128,21 @@ export default function OverviewTrendAndCost() {
             </div>
           </div>
         ))}
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-center">
+        <p className="text-red-600 font-medium">Failed to load trend data</p>
+        <p className="text-red-500 text-sm mt-1">{error}</p>
+        <button 
+          onClick={() => window.location.reload()} 
+          className="mt-2 text-sm text-red-600 underline hover:text-red-700"
+        >
+          Retry
+        </button>
       </div>
     );
   }

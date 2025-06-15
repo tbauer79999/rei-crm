@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { callEdgeFunction } from '../../lib/edgeFunctionAuth';
 
 // Edge Function URL - Update this with your actual Supabase project URL
 const EDGE_FUNCTION_URL = 'https://wuuqrdlfgkasnwydyvgk.supabase.co/functions/v1/HotLeadHandoffPanel';
@@ -9,42 +10,9 @@ const HotLeadHandoffPanel = () => {
   const [hotLeads, setHotLeads] = useState([]);
   const [stats, setStats] = useState({});
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [showOutcomeModal, setShowOutcomeModal] = useState(false);
   const [selectedLead, setSelectedLead] = useState(null);
-
-  // Helper function to call edge function with auth
-  const callEdgeFunction = async (action = '', method = 'GET', body = null) => {
-    try {
-      // Get the auth token from localStorage
-      const token = localStorage.getItem('supabase.auth.token') || 
-                   JSON.parse(localStorage.getItem('sb-wuuqrdlfgkasnwydyvgk-auth-token') || '{}')?.access_token;
-      
-      const url = action ? `${EDGE_FUNCTION_URL}?action=${action}` : EDGE_FUNCTION_URL;
-      
-      const options = {
-        method,
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      };
-
-      if (body && method !== 'GET') {
-        options.body = JSON.stringify(body);
-      }
-
-      const response = await fetch(url, options);
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      return await response.json();
-    } catch (error) {
-      console.error('Edge function call failed:', error);
-      throw error;
-    }
-  };
 
   useEffect(() => {
     if (user?.tenant_id) {
@@ -61,10 +29,11 @@ const HotLeadHandoffPanel = () => {
 
     try {
       setLoading(true);
+      setError(null);
       console.log('Fetching hot leads data for tenant:', user.tenant_id);
 
       // Single call to get all hot lead data
-      const data = await callEdgeFunction();
+      const data = await callEdgeFunction(EDGE_FUNCTION_URL);
       console.log('Hot leads response:', data);
       
       setHotLeads(data.hotLeads || []);
@@ -72,6 +41,7 @@ const HotLeadHandoffPanel = () => {
 
     } catch (error) {
       console.error('Error fetching hot leads data:', error);
+      setError(error.message);
       // Set empty states on error
       setHotLeads([]);
       setStats({});
@@ -90,8 +60,11 @@ const HotLeadHandoffPanel = () => {
       console.log('Calling lead:', leadId);
       
       // Log the call in the database
-      const response = await callEdgeFunction('log-call', 'POST', {
-        lead_id: leadId
+      const response = await callEdgeFunction(`${EDGE_FUNCTION_URL}?action=log-call`, {
+        method: 'POST',
+        body: {
+          lead_id: leadId
+        }
       });
 
       if (response.success) {
@@ -122,9 +95,12 @@ const HotLeadHandoffPanel = () => {
     if (!selectedLead || !user?.tenant_id) return;
 
     try {
-      const response = await callEdgeFunction('update-outcome', 'POST', {
-        lead_id: selectedLead.id,
-        outcome: outcome
+      const response = await callEdgeFunction(`${EDGE_FUNCTION_URL}?action=update-outcome`, {
+        method: 'POST',
+        body: {
+          lead_id: selectedLead.id,
+          outcome: outcome
+        }
       });
 
       if (response.success) {
@@ -176,6 +152,21 @@ const HotLeadHandoffPanel = () => {
             </div>
           </div>
         ))}
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-center">
+        <p className="text-red-600 font-medium">Failed to load hot leads data</p>
+        <p className="text-red-500 text-sm mt-1">{error}</p>
+        <button 
+          onClick={fetchData} 
+          className="mt-2 text-sm text-red-600 underline hover:text-red-700"
+        >
+          Retry
+        </button>
       </div>
     );
   }

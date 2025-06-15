@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { callEdgeFunction } from '../../lib/edgeFunctionAuth';
 import {
   PieChart, Pie, Cell, Tooltip, ResponsiveContainer,
   BarChart, Bar, XAxis, YAxis, LineChart, Line, Legend
@@ -19,33 +20,8 @@ export default function LeadJourneyFunnel() {
   });
   const [trendData, setTrendData] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [dateRange, setDateRange] = useState(30); // Default 30 days
-
-  // Helper function to call edge function with auth
-  const callEdgeFunction = async (days = 30) => {
-    try {
-      // Get the auth token from localStorage
-      const token = localStorage.getItem('supabase.auth.token') || 
-                   JSON.parse(localStorage.getItem('sb-wuuqrdlfgkasnwydyvgk-auth-token') || '{}')?.access_token;
-      
-      const response = await fetch(`${EDGE_FUNCTION_URL}?days=${days}`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      return await response.json();
-    } catch (error) {
-      console.error('Edge function call failed:', error);
-      throw error;
-    }
-  };
 
   useEffect(() => {
     if (user?.tenant_id) {
@@ -62,10 +38,11 @@ export default function LeadJourneyFunnel() {
 
     try {
       setLoading(true);
+      setError(null);
       console.log('Fetching lead journey data for tenant:', user.tenant_id);
 
       // Single call to get all lead journey data
-      const data = await callEdgeFunction(dateRange);
+      const data = await callEdgeFunction(`${EDGE_FUNCTION_URL}?days=${dateRange}`);
       console.log('Lead journey response:', data);
       
       // Set journey data (status distribution, funnel, transitions)
@@ -81,6 +58,8 @@ export default function LeadJourneyFunnel() {
 
     } catch (error) {
       console.error('Error fetching lead journey data:', error);
+      setError(error.message);
+      
       // Set empty states on error
       setJourneyData({
         statusDistribution: [],
@@ -116,6 +95,21 @@ export default function LeadJourneyFunnel() {
             </div>
           </div>
         ))}
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-center">
+        <p className="text-red-600 font-medium">Failed to load lead journey data</p>
+        <p className="text-red-500 text-sm mt-1">{error}</p>
+        <button 
+          onClick={fetchData} 
+          className="mt-2 text-sm text-red-600 underline hover:text-red-700"
+        >
+          Retry
+        </button>
       </div>
     );
   }

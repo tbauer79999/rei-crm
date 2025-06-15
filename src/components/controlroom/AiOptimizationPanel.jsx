@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Card } from '../ui/card';
 import { Zap, MessageSquareText, User, ArrowRight, X, Phone, Calendar } from 'lucide-react';
+import { callEdgeFunction } from '../../lib/edgeFunctionAuth';
 
 // Edge Function URL - Update this with your actual Supabase project URL
 const EDGE_FUNCTION_URL = 'https://wuuqrdlfgkasnwydyvgk.supabase.co/functions/v1/AiOptimizationPanel';
@@ -19,40 +20,16 @@ const AiOptimizationPanel = () => {
   const [hotTriggerPhrases, setHotTriggerPhrases] = useState([]);
   const [optOutReasons, setOptOutReasons] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const keywordSectionRef = useRef(null);
-
-  // Helper function to call edge function with auth
-  const callEdgeFunction = async (params = '') => {
-    try {
-      // Get the auth token from localStorage or your auth context
-      const token = localStorage.getItem('supabase.auth.token') || 
-                   JSON.parse(localStorage.getItem('sb-wuuqrdlfgkasnwydyvgk-auth-token') || '{}')?.access_token;
-      
-      const response = await fetch(`${EDGE_FUNCTION_URL}${params}`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      return await response.json();
-    } catch (error) {
-      console.error('Edge function call failed:', error);
-      throw error;
-    }
-  };
 
   // Initial data load
   useEffect(() => {
     const loadInitialData = async () => {
       try {
         setLoading(true);
-        const data = await callEdgeFunction();
+        setError(null);
+        const data = await callEdgeFunction(EDGE_FUNCTION_URL);
         
         setKeywords(data.keywords || []);
         setHotLeadMetrics(data.hotSummary?.metrics || {
@@ -65,6 +42,7 @@ const AiOptimizationPanel = () => {
         setOptOutReasons(data.hotSummary?.optOutReasons || []);
       } catch (error) {
         console.error('Error loading initial data:', error);
+        setError(error.message);
       } finally {
         setLoading(false);
       }
@@ -78,7 +56,7 @@ const AiOptimizationPanel = () => {
     const loadMessageMatches = async () => {
       if (selectedKeyword) {
         try {
-          const data = await callEdgeFunction(`?keyword=${encodeURIComponent(selectedKeyword)}`);
+          const data = await callEdgeFunction(`${EDGE_FUNCTION_URL}?keyword=${encodeURIComponent(selectedKeyword)}`);
           setMessageMatches(data.messageSearch?.matches || []);
         } catch (error) {
           console.error('Error loading message matches:', error);
@@ -136,6 +114,21 @@ const AiOptimizationPanel = () => {
             </Card>
           ))}
         </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-center">
+        <p className="text-red-600 font-medium">Failed to load AI optimization data</p>
+        <p className="text-red-500 text-sm mt-1">{error}</p>
+        <button 
+          onClick={() => window.location.reload()} 
+          className="mt-2 text-sm text-red-600 underline hover:text-red-700"
+        >
+          Retry
+        </button>
       </div>
     );
   }
@@ -291,14 +284,13 @@ const AiOptimizationPanel = () => {
         <MessageModal 
           message={selectedMessage} 
           onClose={() => setSelectedMessage(null)}
-          edgeFunctionUrl={EDGE_FUNCTION_URL}
         />
       )}
     </div>
   );
 };
 
-const MessageModal = ({ message, onClose, edgeFunctionUrl }) => {
+const MessageModal = ({ message, onClose }) => {
   const [leadDetails, setLeadDetails] = useState(null);
   const [leadMessages, setLeadMessages] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -307,23 +299,7 @@ const MessageModal = ({ message, onClose, edgeFunctionUrl }) => {
     const loadLeadData = async () => {
       if (message?.lead_id) {
         try {
-          // Get the auth token
-          const token = localStorage.getItem('supabase.auth.token') || 
-                       JSON.parse(localStorage.getItem('sb-wuuqrdlfgkasnwydyvgk-auth-token') || '{}')?.access_token;
-          
-          const response = await fetch(`${edgeFunctionUrl}?lead_id=${message.lead_id}`, {
-            method: 'GET',
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json',
-            },
-          });
-
-          if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-          }
-
-          const data = await response.json();
+          const data = await callEdgeFunction(`${EDGE_FUNCTION_URL}?lead_id=${message.lead_id}`);
           setLeadDetails(data.leadDetails);
           setLeadMessages(data.leadMessages?.messages || []);
         } catch (error) {
@@ -335,7 +311,7 @@ const MessageModal = ({ message, onClose, edgeFunctionUrl }) => {
     };
 
     loadLeadData();
-  }, [message?.lead_id, edgeFunctionUrl]);
+  }, [message?.lead_id]);
 
   if (!message) return null;
 
