@@ -28,6 +28,8 @@ export default function SalesTeamSettings() {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteFirstName, setInviteFirstName] = useState('');
+  const [inviteLastName, setInviteLastName] = useState('');
   const [inviteRole, setInviteRole] = useState('user');
   const [inviteLoading, setInviteLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -152,6 +154,11 @@ export default function SalesTeamSettings() {
       return;
     }
 
+    if (!inviteFirstName.trim() || !inviteLastName.trim()) {
+      setError('Please enter first and last name');
+      return;
+    }
+
     // Basic email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(inviteEmail)) {
@@ -179,7 +186,9 @@ export default function SalesTeamSettings() {
         headers,
         body: JSON.stringify({
           email: inviteEmail,
-          role: inviteRole
+          role: inviteRole,
+          firstName: inviteFirstName,
+          lastName: inviteLastName
         })
       });
 
@@ -197,12 +206,15 @@ export default function SalesTeamSettings() {
       const data = await response.json();
       setSuccess('Invitation created successfully!');
       setInviteEmail('');
+      setInviteFirstName('');
+      setInviteLastName('');
       setInviteRole('user');
       setShowInviteModal(false);
       
       // Store the invitation link for display
       setInvitationLink({
         email: inviteEmail,
+        name: `${inviteFirstName} ${inviteLastName}`,
         url: data.signupUrl
       });
       
@@ -445,7 +457,7 @@ export default function SalesTeamSettings() {
               <div className="space-y-4">
                 <div>
                   <p className="text-sm text-gray-600 mb-2">
-                    Send this invitation link to <span className="font-medium text-gray-900">{invitationLink.email}</span>:
+                    Send this invitation link to <span className="font-medium text-gray-900">{invitationLink.name || invitationLink.email}</span>:
                   </p>
                   <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
                     <p className="text-xs text-gray-700 break-all font-mono">
@@ -766,6 +778,33 @@ export default function SalesTeamSettings() {
             </div>
             <div className="px-6 py-4">
               <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      First Name
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="John"
+                      value={inviteFirstName}
+                      onChange={(e) => setInviteFirstName(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      autoFocus
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Last Name
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Doe"
+                      value={inviteLastName}
+                      onChange={(e) => setInviteLastName(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Email Address
@@ -776,7 +815,6 @@ export default function SalesTeamSettings() {
                     value={inviteEmail}
                     onChange={(e) => setInviteEmail(e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    autoFocus
                   />
                 </div>
                 <div>
@@ -805,14 +843,19 @@ export default function SalesTeamSettings() {
             </div>
             <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-end space-x-3">
               <button
-                onClick={() => setShowInviteModal(false)}
+                onClick={() => {
+                  setShowInviteModal(false);
+                  setInviteEmail('');
+                  setInviteFirstName('');
+                  setInviteLastName('');
+                }}
                 className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSendInvite}
-                disabled={!inviteEmail.trim() || inviteLoading}
+                disabled={!inviteEmail.trim() || !inviteFirstName.trim() || !inviteLastName.trim() || inviteLoading}
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
               >
                 {inviteLoading ? (

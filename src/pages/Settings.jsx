@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Users } from 'lucide-react';
-import SalesTeamSettings from '../components/settings/SalesTeamSettings'; // New component we'll create
+import { Users, Phone } from 'lucide-react';
+import SalesTeamSettings from '../components/settings/SalesTeamSettings';
+import PhoneNumbersSettings from '../components/settings/phonenumbersSettings';
 import { 
   Building2, 
   MessageSquare, 
@@ -71,14 +72,23 @@ const settingsCategories = [
     statusText: 'Configured'
   },
   {
-  key: 'salesteam',
-  title: 'Sales Team',
-  description: 'Invite team members, manage user access, and view your sales roster',
-  icon: Users,
-  component: SalesTeamSettings,
-  status: 'healthy',
-  statusText: 'Active Team'
-},
+    key: 'phonenumbers',
+    title: 'Phone Numbers',
+    description: 'Purchase and manage business phone numbers for your team',
+    icon: Phone,
+    component: PhoneNumbersSettings,
+    status: 'healthy',
+    statusText: 'Active'
+  },
+  {
+    key: 'salesteam',
+    title: 'Sales Team',
+    description: 'Invite team members, manage user access, and view your sales roster',
+    icon: Users,
+    component: SalesTeamSettings,
+    status: 'healthy',
+    statusText: 'Active Team'
+  },
   {
     key: 'ai',
     title: 'AI & Automation',
@@ -240,11 +250,11 @@ export default function Settings() {
         <div className="mt-8 bg-white rounded-xl border border-gray-200 p-6">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
             <div className="text-center">
-              <div className="text-2xl font-bold text-gray-900">6</div>
+              <div className="text-2xl font-bold text-gray-900">8</div>
               <div className="text-sm text-gray-600">Settings Categories</div>
             </div>
             <div className="text-center">
-              <div className="text-2xl font-bold text-green-600">4</div>
+              <div className="text-2xl font-bold text-green-600">6</div>
               <div className="text-sm text-gray-600">Healthy Systems</div>
             </div>
             <div className="text-center">
@@ -255,10 +265,6 @@ export default function Settings() {
               <div className="text-2xl font-bold text-blue-600">1</div>
               <div className="text-sm text-gray-600">Pending Review</div>
             </div>
-            <div className="text-center">
-  <div className="text-2xl font-bold text-gray-900">7</div> {/* Changed from 6 to 7 */}
-  <div className="text-sm text-gray-600">Settings Categories</div>
-</div>
           </div>
 
           {/* Debug Access Token Tool */}

@@ -98,6 +98,9 @@ router.get('/members', async (req, res) => {
       .select(`
         id,
         email,
+        first_name,
+        last_name,
+        full_name,
         role,
         created_at,
         tenant_id,
@@ -121,7 +124,7 @@ router.get('/members', async (req, res) => {
     // Transform data to match frontend expectations
     const transformedMembers = members.map(member => ({
       id: member.id, // This should be the actual user ID from users_profile.id
-      name: member.email.split('@')[0], // Extract name from email
+      name: member.full_name || `${member.first_name || ''} ${member.last_name || ''}`.trim() || member.email.split('@')[0], // Use full name if available
       email: member.email,
       role: member.role,
       status: member.is_active !== false ? 'active' : 'inactive', // Default to active if not set
@@ -164,6 +167,8 @@ router.get('/invitations', async (req, res) => {
       .select(`
         id,
         email,
+        first_name,
+        last_name,
         role,
         status,
         created_at,
@@ -193,6 +198,7 @@ router.get('/invitations', async (req, res) => {
     const transformedInvitations = (invitations || []).map(invite => ({
       id: invite.id,
       email: invite.email,
+      name: `${invite.first_name || ''} ${invite.last_name || ''}`.trim() || invite.email,
       role: invite.role,
       status: invite.status,
       invitedDate: invite.created_at,
@@ -214,11 +220,12 @@ router.get('/invitations', async (req, res) => {
 // POST /api/team/invite - Send invitation (NO SUPABASE EMAIL)
 router.post('/invite', async (req, res) => {
   const { role, tenant_id, id: user_id } = req.user || {};
-  const { email, role: inviteRole = 'user' } = req.body;
+  const { email, role: inviteRole = 'user', firstName, lastName } = req.body;
   
   try {
     console.log('=== SEND INVITATION ENDPOINT ===');
     console.log('Inviting:', email, 'as role:', inviteRole);
+    console.log('Name:', firstName, lastName);
     console.log('User tenant_id:', tenant_id);
 
     // Security checks
@@ -281,7 +288,9 @@ router.post('/invite', async (req, res) => {
         role: inviteRole,
         status: 'pending',
         expires_at: expiresAt,
-        token: token
+        token: token,
+        first_name: firstName,
+        last_name: lastName
       })
       .select()
       .single();

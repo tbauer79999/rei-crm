@@ -32,7 +32,8 @@ import {
   Palette,
   Rocket,
   Settings,
-  Clock
+  Clock,
+  UserCheck
 } from 'lucide-react';
 
 // API Base URL - Add this after imports
@@ -94,12 +95,15 @@ export default function CampaignManagement() {
   const [tenantFilter, setTenantFilter] = useState('all');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
+  const [salesTeamMembers, setSalesTeamMembers] = useState([]);
   const [campaignStats, setCampaignStats] = useState({
     totalLeads: 0,
     processedLeads: 0,
     remainingLeads: 0
   });
-
+  const [tenantNames, setTenantNames] = useState({});
+  const [tenantNamesLoaded, setTenantNamesLoaded] = useState(false);
+  
   // Campaign creation form state
   const [isCreating, setIsCreating] = useState(false);
   const [aiArchetypes, setAiArchetypes] = useState([]);
@@ -108,33 +112,23 @@ export default function CampaignManagement() {
     name: '',
     goal: '',
     aiArchetype: '',
-    phoneNumber: '',
+    phoneNumberId: '',
     aiEnabled: true,
     routingTags: [],
     color: '#3B82F6',
-    description: ''
+    description: '',
+    assignedTo: ''
   });
 
   const isGlobalAdmin = user?.role === 'global_admin';
+  const [isFetching, setIsFetching] = useState(false);
 
   // Fetch campaigns from API
-  useEffect(() => {
-    fetchCampaigns();
-    if (isGlobalAdmin) {
-      fetchTenants();
-    }
-  }, [tenantFilter, showArchived, user]);
-
-  // Load form data when create modal opens
-  useEffect(() => {
-    if (showCreateModal) {
-      fetchAiArchetypes();
-      fetchPhoneNumbers();
-    }
-  }, [showCreateModal]);
-
-  const fetchCampaigns = async () => {
+  const fetchCampaigns = React.useCallback(async () => {
+    if (isFetching) return; // Prevent multiple simultaneous fetches
+    
     try {
+      setIsFetching(true);
       setLoading(true);
       const token = localStorage.getItem('auth_token');
       
@@ -172,15 +166,142 @@ export default function CampaignManagement() {
       }
 
       const data = await response.json();
-      console.log('✅ Campaigns fetched:', data);
-      setCampaigns(data);
-      setError('');
+
+      // Fetch sales team assignments AND phone numbers for campaigns
+      const campaignIds = data.map(c => c.id);
+      if (campaignIds.length > 0) {
+        // Get campaign details with phone numbers
+        const { data: campaignDetails, error: detailError } = await supabase
+          .from('campaigns')
+          .select(`
+            id, 
+            assigned_to_sales_team_id,
+            phone_number_id,
+            phone_numbers (
+              id,
+              phone_number
+            )
+          `)
+          .in('id', campaignIds);
+        
+        if (!detailError && campaignDetails) {
+          // Get sales team member details
+          const salesTeamIds = campaignDetails
+            .filter(c => c.assigned_to_sales_team_id)
+            .map(c => c.assigned_to_sales_team_id);
+          
+          let salesTeamData = [];
+          if (salesTeamIds.length > 0) {
+            const { data: salesData } = await supabase
+              .from('sales_team_view')
+              .select('sales_team_id, full_name, email')
+              .in('sales_team_id', salesTeamIds);
+            
+            salesTeamData = salesData || [];
+          }
+          
+          // Merge all data together
+          const enhancedCampaigns = data.map(campaign => {
+            const details = campaignDetails.find(d => d.id === campaign.id);
+            const salesPerson = salesTeamData.find(s => s.sales_team_id === details?.assigned_to_sales_team_id);
+            
+            return {
+              ...campaign,
+              assigned_to_sales_team_id: details?.assigned_to_sales_team_id,
+              assigned_to_name: salesPerson?.full_name,
+              assigned_to_email: salesPerson?.email,
+              phone_number_id: details?.phone_number_id,
+              phone_number: details?.phone_numbers?.phone_number || null
+            };
+          });
+          
+          setCampaigns(enhancedCampaigns);
+        } else {
+          setCampaigns(data);
+        }
+      } else {
+        setCampaigns(data);
+      }
     } catch (err) {
       console.error('❌ Error fetching campaigns:', err);
       setError(`Failed to load campaigns: ${err.message}`);
       setCampaigns([]);
     } finally {
       setLoading(false);
+      setIsFetching(false);
+    }
+  }, [isGlobalAdmin, tenantFilter, showArchived]);
+
+  // Initial data load
+  useEffect(() => {
+    let mounted = true;
+    
+    const loadData = async () => {
+      if (user?.tenant_id && mounted) {
+        await fetchCampaigns();
+        await fetchSalesTeamMembers();
+        await fetchPhoneNumbers();
+        
+        if (isGlobalAdmin && mounted) {
+          await fetchTenants();
+          await fetchTenantNames();
+        }
+      }
+    };
+    
+    loadData();
+    
+    return () => {
+      mounted = false;
+    };
+  }, [user?.tenant_id]);
+
+  // Watch for filter changes
+  useEffect(() => {
+    if (user?.tenant_id) {
+      fetchCampaigns();
+    }
+  }, [tenantFilter, showArchived, fetchCampaigns]);
+
+  // Load form data when create modal opens
+  useEffect(() => {
+    if (showCreateModal) {
+      fetchAiArchetypes();
+      fetchPhoneNumbers();
+      fetchSalesTeamMembers();
+    }
+  }, [showCreateModal]);
+
+  const fetchSalesTeamMembers = async () => {
+    try {
+      console.log('🔍 Fetching sales team for tenant:', user?.tenant_id);
+      
+      if (!user?.tenant_id) {
+        console.log('❌ No tenant_id available yet');
+        return;
+      }
+      
+      const { data, error } = await supabase
+        .from('sales_team_view')
+        .select('*')
+        .eq('tenant_id', user.tenant_id)
+        .eq('is_available', true)
+        .order('full_name');
+
+      console.log('📊 Sales team data:', data);
+      console.log('❌ Sales team error:', error);
+
+      if (error) throw error;
+      
+      setSalesTeamMembers(data || []);
+      
+      // If only one sales person (likely the admin), auto-select them
+      if (data && data.length === 1) {
+        setCampaignForm(prev => ({ ...prev, assignedTo: data[0].sales_team_id }));
+      }
+    } catch (err) {
+      console.error('Error fetching sales team:', err);
+      setSalesTeamMembers([]);
     }
   };
 
@@ -203,12 +324,35 @@ export default function CampaignManagement() {
     }
   };
 
+  const fetchTenantNames = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('platform_settings')
+        .select('tenant_id, value')
+        .eq('key', 'company_name');
+
+      if (error) throw error;
+
+      const nameMap = {};
+      data?.forEach(setting => {
+        if (setting.tenant_id && setting.value) {
+          nameMap[setting.tenant_id] = setting.value;
+        }
+      });
+
+      setTenantNames(nameMap);
+      setTenantNamesLoaded(true);
+    } catch (err) {
+      console.error('Error fetching tenant names:', err);
+      setTenantNamesLoaded(true);
+    }
+  };
+
   const fetchAiArchetypes = async () => {
     try {
-      // Using direct Supabase call - no tenant filter since table doesn't have tenant_id
       const { data, error } = await supabase
         .from('ai_archetypes')
-        .select('id, name, persona') // Using 'persona' instead of 'description'
+        .select('id, name, persona')
         .order('name');
 
       if (error) {
@@ -223,39 +367,30 @@ export default function CampaignManagement() {
 
   const fetchPhoneNumbers = async () => {
     try {
-      console.log('🔍 DEBUG - Fetching phone numbers for tenant:', user.tenant_id);
-      console.log('🔍 DEBUG - User object:', user);
+      console.log('🔍 Fetching phone numbers for tenant:', user.tenant_id);
       
-      // First, let's see ALL phone numbers in the table
-      const { data: allPhones, error: allError } = await supabase
+      const { data: tenantPhones, error } = await supabase
         .from('phone_numbers')
-        .select('id, phone_number, status, tenant_id')
-        .limit(5);
-        
-      console.log('🔍 DEBUG - ALL phone numbers (first 5):', allPhones);
-      
-      // Now try the filtered query
-      const { data, error } = await supabase
-        .from('phone_numbers')
-        .select('id, phone_number, status, tenant_id')
+        .select('*')
         .eq('tenant_id', user.tenant_id);
-
-      console.log('🔍 DEBUG - Filtered phone numbers result:', { data, error });
-      console.log('🔍 DEBUG - Tenant ID type:', typeof user.tenant_id);
-
+        
+      console.log('📞 Phone numbers found:', tenantPhones);
+      console.log('📞 Count:', tenantPhones?.length || 0);
+      
       if (error) {
+        console.error('❌ Error fetching phone numbers:', error);
         throw error;
       }
-      setPhoneNumbers(data || []);
+      
+      setPhoneNumbers(tenantPhones || []);
     } catch (err) {
-      console.error('Error fetching phone numbers:', err);
+      console.error('❌ Error in fetchPhoneNumbers:', err);
       setPhoneNumbers([]);
     }
   };
 
   const fetchCampaignStats = async () => {
     try {
-      // Get all campaign IDs for the current view
       const campaignIds = filteredCampaigns.map(c => c.id);
       
       if (campaignIds.length === 0) {
@@ -263,7 +398,6 @@ export default function CampaignManagement() {
         return;
       }
 
-      // Fetch lead counts from Supabase
       const { data: allLeads, error: allError } = await supabase
         .from('leads')
         .select('id, ai_sent')
@@ -301,7 +435,6 @@ export default function CampaignManagement() {
       });
 
       if (response.ok) {
-        // Remove from current view (will be refetched)
         fetchCampaigns();
       } else {
         const errorData = await response.json();
@@ -329,7 +462,6 @@ export default function CampaignManagement() {
       });
 
       if (response.ok) {
-        // Refresh the view
         fetchCampaigns();
       } else {
         const errorData = await response.json();
@@ -385,12 +517,11 @@ export default function CampaignManagement() {
       if (response.ok) {
         const result = await response.json();
         
-        // Update local state
         setCampaigns(campaigns.map(c => 
           c.id === campaignId ? { ...c, ai_on: !currentAiOn } : c
         ));
         
-        setError(''); // Clear any previous errors
+        setError('');
         console.log(`AI ${!currentAiOn ? 'enabled' : 'disabled'} for campaign`);
       } else {
         const errorData = await response.json();
@@ -402,9 +533,66 @@ export default function CampaignManagement() {
     }
   };
 
+  const updateCampaignAssignment = async (campaignId, salesTeamId) => {
+    try {
+      const { error } = await supabase
+        .from('campaigns')
+        .update({ assigned_to_sales_team_id: salesTeamId })
+        .eq('id', campaignId);
+
+      if (error) throw error;
+
+      setCampaigns(campaigns.map(c => {
+        if (c.id === campaignId) {
+          const salesPerson = salesTeamMembers.find(s => s.sales_team_id === salesTeamId);
+          return {
+            ...c,
+            assigned_to_sales_team_id: salesTeamId,
+            assigned_to_name: salesPerson?.full_name,
+            assigned_to_email: salesPerson?.email
+          };
+        }
+        return c;
+      }));
+      
+      setError('');
+    } catch (err) {
+      console.error('Error updating campaign assignment:', err);
+      setError('Failed to update campaign assignment');
+    }
+  };
+
+  const updateCampaignPhoneNumber = async (campaignId, phoneNumberId) => {
+    try {
+      const { error } = await supabase
+        .from('campaigns')
+        .update({ phone_number_id: phoneNumberId })
+        .eq('id', campaignId);
+
+      if (error) throw error;
+
+      setCampaigns(campaigns.map(c => {
+        if (c.id === campaignId) {
+          const phone = phoneNumbers.find(p => p.id === phoneNumberId);
+          return {
+            ...c,
+            phone_number_id: phoneNumberId,
+            phone_number: phone?.phone_number || null
+          };
+        }
+        return c;
+      }));
+      
+      setError('');
+    } catch (err) {
+      console.error('Error updating campaign phone number:', err);
+      setError('Failed to update campaign phone number');
+    }
+  };
+
   const handleCreateCampaign = async () => {
-    if (!campaignForm.name || !campaignForm.goal) {
-      setError('Campaign name and goal are required');
+    if (!campaignForm.name || !campaignForm.goal || !campaignForm.phoneNumberId) {
+      setError('Campaign name, goal, and phone number are required');
       return;
     }
 
@@ -415,19 +603,18 @@ export default function CampaignManagement() {
       }
 
       const now = new Date().toISOString();
-      const startDate = new Date().toISOString().split('T')[0]; // Today's date in YYYY-MM-DD format
+      const startDate = new Date().toISOString().split('T')[0];
 
-      // Prepare the campaign data according to your schema
       const campaignData = {
         name: campaignForm.name.trim(),
         description: campaignForm.description?.trim() || null,
         start_date: startDate,
-        end_date: null, // Can be set later
+        end_date: null,
+        phone_number_id: campaignForm.phoneNumberId || null,
         target_audience: campaignForm.goal ? { 
           goal: campaignForm.goal,
           routingTags: campaignForm.routingTags,
-          color: campaignForm.color,
-          phoneNumber: campaignForm.phoneNumber
+          color: campaignForm.color
         } : null,
         ai_prompt_template: campaignForm.aiArchetype || null,
         created_by_email: user.email,
@@ -436,7 +623,8 @@ export default function CampaignManagement() {
         ai_outreach_enabled: campaignForm.aiEnabled,
         ai_on: campaignForm.aiEnabled,
         archived: false,
-        ai_archetype_id: campaignForm.aiArchetype || null
+        ai_archetype_id: campaignForm.aiArchetype || null,
+        assigned_to_sales_team_id: campaignForm.assignedTo || null
       };
 
       console.log('🔍 Creating campaign with data:', campaignData);
@@ -451,7 +639,6 @@ export default function CampaignManagement() {
         throw error;
       }
 
-      // Add the new campaign to the list
       setCampaigns([newCampaign, ...campaigns]);
       setShowCreateModal(false);
       resetForm();
@@ -471,11 +658,12 @@ export default function CampaignManagement() {
       name: '',
       goal: '',
       aiArchetype: '',
-      phoneNumber: '',
+      phoneNumberId: '',
       aiEnabled: true,
       routingTags: [],
       color: '#3B82F6',
-      description: ''
+      description: '',
+      assignedTo: salesTeamMembers.length === 1 ? salesTeamMembers[0].sales_team_id : ''
     });
   };
 
@@ -502,7 +690,6 @@ export default function CampaignManagement() {
   };
 
   const getStatusBadge = (campaign) => {
-    // Use is_active instead of status since there's no status column
     const isActive = campaign.is_active;
     const isArchived = campaign.archived;
     
@@ -547,14 +734,12 @@ export default function CampaignManagement() {
                          campaign.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          campaign.tenants?.name?.toLowerCase().includes(searchTerm.toLowerCase());
     
-    // Filter by active status instead of status
     let matchesStatus = true;
     if (statusFilter === 'active') {
       matchesStatus = campaign.is_active === true;
     } else if (statusFilter === 'inactive') {
       matchesStatus = campaign.is_active === false;
     }
-    // 'all' shows everything
     
     return matchesSearch && matchesStatus;
   });
@@ -568,7 +753,6 @@ export default function CampaignManagement() {
     }
   }, [filteredCampaigns]);
 
-  // Calculate stats based on actual schema
   const totalCampaigns = campaigns.length;
   const activeCampaigns = campaigns.filter(c => c.is_active === true && c.ai_on === true).length;
 
@@ -739,7 +923,7 @@ export default function CampaignManagement() {
                 <option value="all">All Tenants</option>
                 {tenants.map(tenant => (
                   <option key={tenant.id} value={tenant.id}>
-                    {tenant.name}
+                    {tenantNames[tenant.id] || tenant.name || `Tenant ${tenant.id}`}
                   </option>
                 ))}
               </select>
@@ -769,6 +953,12 @@ export default function CampaignManagement() {
                   Progress
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Assigned To
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Phone Number
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   AI Status
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -790,7 +980,7 @@ export default function CampaignManagement() {
                       <div className="flex items-center space-x-2">
                         <Building2 className="w-4 h-4 text-gray-400" />
                         <span className="text-sm text-gray-900">
-                          {campaign.tenants?.name || 'Unknown Tenant'}
+                          {tenantNames[campaign.tenant_id] || campaign.tenants?.name || 'Unknown Tenant'}
                         </span>
                       </div>
                     </td>
@@ -800,6 +990,36 @@ export default function CampaignManagement() {
                   </td>
                   <td className="px-6 py-4">
                     <CampaignProgress campaignId={campaign.id} />
+                  </td>
+                  <td className="px-6 py-4">
+                    <select
+                      value={campaign.assigned_to_sales_team_id || ''}
+                      onChange={(e) => updateCampaignAssignment(campaign.id, e.target.value || null)}
+                      className="text-sm border border-gray-300 rounded-lg px-2 py-1 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      title={campaign.assigned_to_name ? `Assigned to ${campaign.assigned_to_name}` : 'Not assigned'}
+                    >
+                      <option value="">Unassigned</option>
+                      {salesTeamMembers.map(member => (
+                        <option key={member.sales_team_id} value={member.sales_team_id}>
+                          {member.full_name || member.email}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                  <td className="px-6 py-4">
+                    <select
+                      value={campaign.phone_number_id || ''}
+                      onChange={(e) => updateCampaignPhoneNumber(campaign.id, e.target.value || null)}
+                      className="text-sm border border-gray-300 rounded-lg px-2 py-1 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      title={campaign.phone_number ? `Current: ${campaign.phone_number}` : 'Not assigned'}
+                    >
+                      <option value="">Not assigned</option>
+                      {phoneNumbers.map(phone => (
+                        <option key={phone.id} value={phone.id}>
+                          {phone.phone_number}
+                        </option>
+                      ))}
+                    </select>
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center space-x-3">
@@ -1001,6 +1221,29 @@ export default function CampaignManagement() {
                 </select>
               </div>
 
+              {/* Assigned Sales Person */}
+              <div className="transform transition-all duration-300 delay-175">
+                <label className="block text-sm font-medium text-gray-900 mb-2">
+                  <UserCheck className="w-4 h-4 inline mr-1" />
+                  Assign to Sales Person
+                </label>
+                <select
+                  value={campaignForm.assignedTo}
+                  onChange={(e) => setCampaignForm({ ...campaignForm, assignedTo: e.target.value })}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 hover:border-gray-400"
+                >
+                  <option value="">Select sales person...</option>
+                  {salesTeamMembers.map(member => (
+                    <option key={member.sales_team_id} value={member.sales_team_id}>
+                      {member.full_name || member.email}
+                    </option>
+                  ))}
+                </select>
+                {salesTeamMembers.length === 0 && (
+                  <p className="text-xs text-gray-500 mt-1">No sales team members found. Invite team members first.</p>
+                )}
+              </div>
+
               {/* AI Archetype */}
               <div className="transform transition-all duration-300 delay-200">
                 <label className="block text-sm font-medium text-gray-900 mb-2">
@@ -1030,27 +1273,29 @@ export default function CampaignManagement() {
                 )}
               </div>
 
-              {/* Phone Number - Commented out for now */}
-              {/* 
+              {/* Phone Number */}
               <div className="transform transition-all duration-300 delay-250">
                 <label className="block text-sm font-medium text-gray-900 mb-2">
                   <Phone className="w-4 h-4 inline mr-1" />
-                  Assigned Phone Number
+                  Phone Number *
                 </label>
                 <select
-                  value={campaignForm.phoneNumber}
-                  onChange={(e) => setCampaignForm({ ...campaignForm, phoneNumber: e.target.value })}
+                  value={campaignForm.phoneNumberId}
+                  onChange={(e) => setCampaignForm({ ...campaignForm, phoneNumberId: e.target.value })}
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 hover:border-gray-400"
+                  required
                 >
                   <option value="">Select phone number...</option>
                   {phoneNumbers.map(phone => (
-                    <option key={phone.id} value={phone.phone_number}>
-                      {phone.phone_number}
+                    <option key={phone.id} value={phone.id}>
+                      {phone.phone_number} {phone.status === 'assigned' ? '(Assigned)' : '(Available)'}
                     </option>
                   ))}
                 </select>
+                {phoneNumbers.length === 0 && (
+                  <p className="text-xs text-gray-500 mt-1">No phone numbers available. Purchase numbers in Settings → Phone Numbers.</p>
+                )}
               </div>
-              */}
 
               {/* AI Status Toggle */}
               <div className="transform transition-all duration-300 delay-300">
@@ -1190,7 +1435,7 @@ export default function CampaignManagement() {
                   </Button>
                   <Button 
                     onClick={handleCreateCampaign}
-                    disabled={isCreating || !campaignForm.name || !campaignForm.goal}
+                    disabled={isCreating || !campaignForm.name || !campaignForm.goal || !campaignForm.phoneNumberId}
                     className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-lg transition-all duration-200 hover:scale-105 active:scale-95 hover:shadow-xl"
                   >
                     {isCreating ? (
