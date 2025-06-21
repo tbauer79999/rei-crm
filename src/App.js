@@ -18,6 +18,7 @@ import EnterpriseRoute from './components/EnterpriseRoute';
 import OnboardingGuard from './components/OnboardingGuard';
 import InvitationSignupPage from './pages/InvitationSignupPage';
 import supabase from './lib/supabaseClient';
+import HelpCenter from './components/HelpCenter';
 
 // Component to handle root redirect with email confirmation check
 function RootRedirect() {
@@ -250,7 +251,17 @@ export default function App() {
               </OnboardingGuard>
             } 
           />
-          
+
+          <Route 
+            path="/help" 
+            element={
+              <OnboardingGuard>
+                <Layout>
+                  <HelpCenter />
+                </Layout>
+              </OnboardingGuard>
+  } 
+/>
           <Route 
             path="/settings" 
             element={

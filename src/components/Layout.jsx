@@ -28,97 +28,102 @@ export default function Layout({ children }) {
   });
 
   // Fetch company information
-  useEffect(() => {
-    const fetchCompanyInfo = async () => {
-      if (!user?.id) {
-        console.log('❌ No user ID available for company fetch');
-        return;
+// Fixed fetchCompanyInfo function for Layout.jsx
+// Replace the existing fetchCompanyInfo function with this one:
+
+useEffect(() => {
+  const fetchCompanyInfo = async () => {
+    if (!user?.tenant_id) {  // ✅ Check for tenant_id, not just id
+      console.log('❌ No tenant ID available for company fetch');
+      return;
+    }
+
+    console.log('🔍 Fetching company info for tenant:', user.tenant_id);  // ✅ Log tenant_id
+
+    try {
+      const { data: tenant, error } = await supabase
+        .from('tenants')
+        .select('*')
+        .eq('id', user.tenant_id)  // ✅ Use tenant_id instead of user.id
+        .single();
+
+      console.log('🏢 Company data:', tenant);
+      if (error) {
+        console.error('❌ Company fetch error:', error);
       }
 
-      console.log('🔍 Fetching company info for user:', user.id);
-
-      try {
-        const { data: tenant, error } = await supabase
-          .from('tenants')
-          .select('*')
-          .eq('id', user.id)
-          .single();
-
-        console.log('🏢 Company data:', tenant);
-        console.log('❌ Company fetch error:', error);
-
-        if (error) {
-          console.error('Error fetching company info:', error);
-          setCompanyInfo({
-            name: 'REI-CRM',
-            industry: 'real estate',
-            loading: false
-          });
-          return;
-        }
-
-        if (tenant) {
-          // Extract company name and determine industry
-          let companyName = tenant.name || 'REI-CRM';
-          
-          console.log('🏷️ Original company name:', companyName);
-          
-          // Clean up the company name if it has the default format
-          if (companyName.includes("'s Company")) {
-            companyName = companyName.replace("'s Company", "");
-          }
-
-          // Determine industry/business type
-          let industry = 'business';
-          if (tenant.industry) {
-            industry = tenant.industry.toLowerCase();
-          } else if (tenant.business_type) {
-            industry = tenant.business_type.toLowerCase();
-          } else if (user.email) {
-            // Try to guess from email domain or company name
-            const domain = user.email.split('@')[1]?.toLowerCase();
-            console.log('🌐 Email domain:', domain);
-            console.log('🏢 Company name lower:', companyName.toLowerCase());
-            
-            if (domain?.includes('real') || companyName.toLowerCase().includes('real') || 
-                companyName.toLowerCase().includes('rei') || companyName.toLowerCase().includes('property') ||
-                companyName.toLowerCase().includes('dream') || companyName.toLowerCase().includes('homes') ||
-                companyName.toLowerCase().includes('estate')) {
-              industry = 'real estate';
-            } else if (domain?.includes('staff') || companyName.toLowerCase().includes('staff') || 
-                       companyName.toLowerCase().includes('recruit') || companyName.toLowerCase().includes('hire') ||
-                       companyName.toLowerCase().includes('talent') || companyName.toLowerCase().includes('employment')) {
-              industry = 'staffing';
-            } else if (domain?.includes('tech') || companyName.toLowerCase().includes('tech') || 
-                       companyName.toLowerCase().includes('software') || companyName.toLowerCase().includes('app') ||
-                       companyName.toLowerCase().includes('digital') || companyName.toLowerCase().includes('dev')) {
-              industry = 'technology';
-            } else if (companyName.toLowerCase().includes('consult') || companyName.toLowerCase().includes('service') ||
-                       companyName.toLowerCase().includes('solution') || companyName.toLowerCase().includes('group')) {
-              industry = 'consulting';
-            }
-          }
-
-          console.log('✅ Final company info:', { name: companyName, industry });
-
-          setCompanyInfo({
-            name: companyName,
-            industry: industry,
-            loading: false
-          });
-        }
-      } catch (error) {
+      if (error) {
         console.error('Error fetching company info:', error);
         setCompanyInfo({
           name: 'REI-CRM',
           industry: 'real estate',
           loading: false
         });
+        return;
       }
-    };
 
-    fetchCompanyInfo();
-  }, [user?.id]);
+      if (tenant) {
+        // Extract company name and determine industry
+        let companyName = tenant.name || 'REI-CRM';
+        
+        console.log('🏷️ Original company name:', companyName);
+        
+        // Clean up the company name if it has the default format
+        if (companyName.includes("'s Company")) {
+          companyName = companyName.replace("'s Company", "");
+        }
+
+        // Determine industry/business type
+        let industry = 'business';
+        if (tenant.industry) {
+          industry = tenant.industry.toLowerCase();
+        } else if (tenant.business_type) {
+          industry = tenant.business_type.toLowerCase();
+        } else if (user.email) {
+          // Try to guess from email domain or company name
+          const domain = user.email.split('@')[1]?.toLowerCase();
+          console.log('🌐 Email domain:', domain);
+          console.log('🏢 Company name lower:', companyName.toLowerCase());
+          
+          if (domain?.includes('real') || companyName.toLowerCase().includes('real') || 
+              companyName.toLowerCase().includes('rei') || companyName.toLowerCase().includes('property') ||
+              companyName.toLowerCase().includes('dream') || companyName.toLowerCase().includes('homes') ||
+              companyName.toLowerCase().includes('estate')) {
+            industry = 'real estate';
+          } else if (domain?.includes('staff') || companyName.toLowerCase().includes('staff') || 
+                     companyName.toLowerCase().includes('recruit') || companyName.toLowerCase().includes('hire') ||
+                     companyName.toLowerCase().includes('talent') || companyName.toLowerCase().includes('employment')) {
+            industry = 'staffing';
+          } else if (domain?.includes('tech') || companyName.toLowerCase().includes('tech') || 
+                     companyName.toLowerCase().includes('software') || companyName.toLowerCase().includes('app') ||
+                     companyName.toLowerCase().includes('digital') || companyName.toLowerCase().includes('dev')) {
+            industry = 'technology';
+          } else if (companyName.toLowerCase().includes('consult') || companyName.toLowerCase().includes('service') ||
+                     companyName.toLowerCase().includes('solution') || companyName.toLowerCase().includes('group')) {
+            industry = 'consulting';
+          }
+        }
+
+        console.log('✅ Final company info:', { name: companyName, industry });
+
+        setCompanyInfo({
+          name: companyName,
+          industry: industry,
+          loading: false
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching company info:', error);
+      setCompanyInfo({
+        name: 'REI-CRM',
+        industry: 'real estate',
+        loading: false
+      });
+    }
+  };
+
+  fetchCompanyInfo();
+}, [user?.tenant_id]);  // ✅ Also update the dependency to watch tenant_id
 
   // Add click outside handler to close menus
   useEffect(() => {
@@ -206,8 +211,8 @@ export default function Layout({ children }) {
   // Dynamic navigation items based on user role
   const getNavItems = () => {
     const baseItems = [
-      { path: '/control-room', label: 'Pipeline', icon: BarChart2 },
-      { path: '/dashboard', label: 'Dashboard', icon: Home },
+      { path: '/control-room', label: 'Pipeline', icon: BarChart2, tourClass: 'tour-controlroom' },
+      { path: '/dashboard', label: 'Dashboard', icon: Home, tourClass: 'tour-dashboard' },
     ];
 
     // Add analytics based on role
@@ -218,7 +223,8 @@ export default function Layout({ children }) {
       analyticsItems.push({
         path: '/enterprise-analytics', 
         label: 'Enterprise Analytics', 
-        icon: TrendingUp 
+        icon: TrendingUp,
+        tourClass: 'tour-enterprise'
       });
     }
     
@@ -227,7 +233,8 @@ export default function Layout({ children }) {
       analyticsItems.push({
         path: '/business-analytics', 
         label: 'AI Strategy Hub', 
-        icon: Brain 
+        icon: Brain,
+        tourClass: 'tour-strategy'
       });
     }
 
@@ -235,11 +242,12 @@ export default function Layout({ children }) {
     analyticsItems.push({
       path: '/campaign-management',
       label: 'Campaign Management',
-      icon: Megaphone
+      icon: Megaphone,
+      tourClass: 'tour-campaigns'
     });
 
     const endItems = [
-      { path: '/settings', label: 'Settings', icon: Settings },
+      { path: '/settings', label: 'Settings', icon: Settings, tourClass: 'tour-settings' },
     ];
 
     return [...baseItems, ...analyticsItems, ...endItems];
@@ -377,6 +385,7 @@ export default function Layout({ children }) {
 
       {/* Sidebar */}
       <aside className={`
+        tour-sidebar
         ${collapsed ? 'w-16' : 'w-64'} 
         ${mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
         fixed lg:static inset-y-0 left-0 z-50
@@ -428,7 +437,7 @@ export default function Layout({ children }) {
 
         {/* Navigation */}
         <nav className="p-3 space-y-1">
-          {navItems.map(({ path, label, icon: Icon }) => {
+          {navItems.map(({ path, label, icon: Icon, tourClass }) => {
             const isActive = location.pathname === path;
             return (
               <Link
@@ -436,6 +445,7 @@ export default function Layout({ children }) {
                 to={path}
                 onClick={() => setMobileOpen(false)}
                 className={`
+                  ${tourClass || ''}
                   group flex items-center ${collapsed ? 'justify-center px-3' : 'px-3'} py-2.5 
                   text-sm font-medium rounded-xl transition-all duration-200
                   ${isActive 
@@ -544,7 +554,7 @@ export default function Layout({ children }) {
             
             <div className="flex items-center space-x-3">
               {/* Search Box */}
-              <div className="hidden md:flex items-center relative search-container">
+              <div className="tour-global-search hidden md:flex items-center relative search-container">
                 <Search className="absolute left-3 w-4 h-4 text-gray-400" />
                 <input
                   type="text"
@@ -678,11 +688,10 @@ export default function Layout({ children }) {
                 <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
               </button>
               
-              {/* Help */}
-              <button className="p-2 rounded-lg hover:bg-gray-100 transition-colors text-gray-600">
-                <HelpCircle size={18} />
-              </button>
-              
+{/* Help */}
+<Link to="/help" className="p-2 rounded-lg hover:bg-gray-100 transition-colors text-gray-600">
+  <HelpCircle size={18} />
+</Link> 
               {/* User menu */}
               <div className="relative user-menu-container">
                 <button
@@ -747,6 +756,8 @@ export default function Layout({ children }) {
           {children}
         </main>
       </div>
+
+
     </div>
   );
 }

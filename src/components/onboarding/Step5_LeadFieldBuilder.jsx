@@ -72,7 +72,7 @@ const industrySpecificFields = {
       options: ['Yes', 'Partial', 'No', 'Unknown'] }
   ],
 
-  'Staffing/Recruiting': [
+  'Staffing': [
     { name: 'current_role', label: 'Current Role', type: 'text', required: false, icon: 'Briefcase' },
     { name: 'years_experience', label: 'Years Experience', type: 'dropdown', required: false, icon: 'Calendar',
       options: ['0-2', '3-5', '6-10', '11-15', '15+'] },

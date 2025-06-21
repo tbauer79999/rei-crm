@@ -7,7 +7,7 @@ const AuthContext = createContext();
 const USER_ROLES = {
   'thomasbauer1008@gmail.com': {
     role: 'business_admin',
-    tenant_id: '74fa6d05-226e-4a5e-adcf-fb47cad8a288'
+    tenant_id: '6e6b03b4-6749-472b-9445-935272ef3ae3'
   },
   'info@elevateddreamhomes.com': {
     role: 'user',
@@ -178,16 +178,34 @@ const AuthProvider = ({ children }) => {
   const canAccessEnterprise = user?.role === 'global_admin' || user?.role === 'enterprise_admin';
   const canAccessAdmin = ['global_admin', 'enterprise_admin', 'business_admin'].includes(user?.role);
 
-  const value = { 
-    user, 
-    loading,
-    session,
-    getSession,
-    role: user?.role,
-    tenantId: user?.tenant_id,
-    canAccessEnterprise,
-    canAccessAdmin
-  };
+const refreshUser = async () => {
+  const { data, error } = await supabase.auth.getUser();
+  if (data?.user && !error) {
+    const userInfo = USER_ROLES[data.user.email] || {
+      role: 'user',
+      tenant_id: data.user.id
+    };
+
+    setUser({
+      ...data.user,
+      email: data.user.email,
+      role: userInfo.role,
+      tenant_id: userInfo.tenant_id
+    });
+  }
+};
+
+const value = { 
+  user, 
+  loading,
+  session,
+  getSession,
+  role: user?.role,
+  tenantId: user?.tenant_id,
+  canAccessEnterprise,
+  canAccessAdmin,
+  refreshUser // ✅ this line is critical
+};
 
   return (
     <AuthContext.Provider value={value}>

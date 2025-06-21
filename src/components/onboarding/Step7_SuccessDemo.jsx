@@ -72,6 +72,9 @@ export default function Step7_SuccessDemo({ tenantId, formData, setFormData }) {
 
       localStorage.removeItem('onboarding_step');
       localStorage.removeItem('onboarding_tenant_id');
+      
+      // Set flag to show product tour after onboarding
+      localStorage.setItem('show_product_tour', 'true');
 
       await refreshUser();
       setCompleted(true);

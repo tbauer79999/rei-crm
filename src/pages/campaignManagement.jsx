@@ -124,7 +124,7 @@ export default function CampaignManagement() {
   const [isFetching, setIsFetching] = useState(false);
 
   // Fetch campaigns from API
-  const fetchCampaigns = React.useCallback(async () => {
+  const fetchCampaigns = async () => {
     if (isFetching) return; // Prevent multiple simultaneous fetches
     
     try {
@@ -230,7 +230,7 @@ export default function CampaignManagement() {
       setLoading(false);
       setIsFetching(false);
     }
-  }, [isGlobalAdmin, tenantFilter, showArchived]);
+  };
 
   // Initial data load
   useEffect(() => {
@@ -254,14 +254,8 @@ export default function CampaignManagement() {
     return () => {
       mounted = false;
     };
-  }, [user?.tenant_id]);
+  }, [user?.tenant_id, isGlobalAdmin]);
 
-  // Watch for filter changes
-  useEffect(() => {
-    if (user?.tenant_id) {
-      fetchCampaigns();
-    }
-  }, [tenantFilter, showArchived, fetchCampaigns]);
 
   // Load form data when create modal opens
   useEffect(() => {

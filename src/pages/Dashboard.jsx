@@ -3,6 +3,7 @@ import apiClient from '../lib/apiClient';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import AddLeadForm from '../components/AddLeadForm';
+import ProductTour from '../components/ProductTour';
 import { 
   Search, 
   Plus, 
@@ -465,14 +466,14 @@ const handleBulkSubmit = async () => {
           <div className="flex items-center gap-3">
             <button 
               onClick={downloadSampleCSV}
-              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              className="tour-export flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
             >
               <Download size={16} />
               Export
             </button>
             <button
               onClick={() => setShowForm(!showForm)}
-              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+              className="tour-add-lead flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
             >
               <Plus size={16} />
               Add Lead
@@ -560,7 +561,7 @@ const handleBulkSubmit = async () => {
       {/* Main Content */}
       <div className="p-6">
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+        <div className="tour-stats grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
           <div className="bg-white rounded-xl border border-gray-200 p-6">
             <div className="flex items-center justify-between">
               <div>
@@ -620,7 +621,7 @@ const handleBulkSubmit = async () => {
         <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
             {/* Search */}
-            <div className="relative flex-1 max-w-md">
+            <div className="tour-search relative flex-1 max-w-md">
               <Search size={20} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
               <input
                 type="text"
@@ -632,7 +633,7 @@ const handleBulkSubmit = async () => {
             </div>
 
             {/* Status Filters */}
-            <div className="flex flex-wrap gap-2">
+            <div className="tour-filters flex flex-wrap gap-2">
               {actualStatuses.map((status) => {
                 const count = getStatusCount(status);
                 const isActive = (filterStatus === status || (status === 'All' && filterStatus === null));
@@ -663,7 +664,7 @@ const handleBulkSubmit = async () => {
         </div>
 
         {/* Leads Table */}
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div className="tour-leads-table bg-white rounded-xl border border-gray-200 overflow-hidden">
           {/* Table Header */}
           <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
             <div className="flex items-center justify-between">
@@ -811,6 +812,9 @@ const handleBulkSubmit = async () => {
           )}
         </div>
       </div>
+
+      {/* Product Tour Component */}
+      <ProductTour />
     </div>
   );
 }
