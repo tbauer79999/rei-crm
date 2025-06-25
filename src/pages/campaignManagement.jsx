@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import Button from '../components/ui/button';
 import supabase from '../lib/supabaseClient';
@@ -132,7 +132,7 @@ export default function CampaignManagement() {
       setLoading(true);
       const token = localStorage.getItem('auth_token');
       
-      let url = `${API_BASE}/api/campaigns`;
+      let url = `${API_BASE}/campaigns`;
       const params = new URLSearchParams();
       
       // If global admin and specific tenant selected, filter by tenant
@@ -470,7 +470,7 @@ export default function CampaignManagement() {
   const updateCampaignActiveStatus = async (campaignId, newActiveStatus) => {
     try {
       const token = localStorage.getItem('auth_token');
-      const response = await fetch(`${API_BASE}/api/campaigns/${campaignId}/toggle-active`, {
+      const response = await fetch(`${API_BASE}/campaigns/${campaignId}/toggle-active`, {
         method: 'PATCH',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -497,7 +497,7 @@ export default function CampaignManagement() {
     try {
       const token = localStorage.getItem('auth_token');
       
-      const response = await fetch(`${API_BASE}/api/campaigns/${campaignId}/ai-toggle`, {
+      const response = await fetch(`${API_BASE}/campaigns/${campaignId}/ai-toggle`, {
         method: 'PATCH',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -723,20 +723,23 @@ export default function CampaignManagement() {
     return colors[type] || 'text-gray-600';
   };
 
-  const filteredCampaigns = campaigns.filter(campaign => {
-    const matchesSearch = campaign.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         campaign.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         campaign.tenants?.name?.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    let matchesStatus = true;
-    if (statusFilter === 'active') {
-      matchesStatus = campaign.is_active === true;
-    } else if (statusFilter === 'inactive') {
-      matchesStatus = campaign.is_active === false;
-    }
-    
-    return matchesSearch && matchesStatus;
-  });
+  const filteredCampaigns = useMemo(() => {
+    return campaigns.filter(campaign => {
+      const matchesSearch =
+        campaign.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        campaign.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        campaign.tenants?.name?.toLowerCase().includes(searchTerm.toLowerCase());
+
+      let matchesStatus = true;
+      if (statusFilter === 'active') {
+        matchesStatus = campaign.is_active === true;
+      } else if (statusFilter === 'inactive') {
+        matchesStatus = campaign.is_active === false;
+      }
+
+      return matchesSearch && matchesStatus;
+    });
+  }, [campaigns, searchTerm, statusFilter]);
 
   // Fetch stats when filtered campaigns change
   useEffect(() => {

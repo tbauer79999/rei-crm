@@ -1,14 +1,23 @@
-// src/lib/supabaseClient.js  
+// src/lib/supabaseClient.js
+/* global globalThis */
 const { createClient } = require('@supabase/supabase-js');
+
+// Determine the appropriate global scope depending on the environment
+const globalScope =
+  typeof globalThis !== 'undefined'
+    ? globalThis
+    : typeof window !== 'undefined'
+      ? window
+      : global;
 
 const supabaseUrl = process.env.REACT_APP_SUPABASE_URL;
 const supabaseAnonKey = process.env.REACT_APP_SUPABASE_ANON_KEY;
 
 // Singleton pattern to ensure only one instance
-if (!global._supabaseClient) {
+if (!globalScope._supabaseClient) {
   console.log('✨ Creating new Supabase client instance');
-  
-  global._supabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
+
+  globalScope._supabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
     auth: {
       persistSession: true,
       storageKey: 'supabase.auth.token',
@@ -21,4 +30,4 @@ if (!global._supabaseClient) {
   console.log('♻️  Reusing existing Supabase client instance');
 }
 
-module.exports = global._supabaseClient;
+module.exports = globalScope._supabaseClient;

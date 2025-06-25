@@ -26,6 +26,29 @@ function getRandomDelay(): number {
   return delay;
 }
 
+// Helper function to calculate next business hour
+function getNextBusinessHour(currentTime: Date, openHour: number, officeDays: string[]): Date {
+  const nextDay = new Date(currentTime);
+  nextDay.setHours(openHour, 0, 0, 0);
+  
+  const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  const currentDayName = dayNames[currentTime.getDay()];
+  
+  // If it's still today but before opening, respond at open hour today
+  if (currentTime.getHours() < openHour && officeDays.includes(currentDayName)) {
+    return nextDay;
+  }
+  
+  // Otherwise, find next business day
+  do {
+    nextDay.setDate(nextDay.getDate() + 1);
+    const dayName = dayNames[nextDay.getDay()];
+    if (officeDays.includes(dayName)) {
+      return nextDay;
+    }
+  } while (true);
+}
+
 // Function to get sentiment from Google Natural Language API
 async function getSentiment(text: string): Promise<{score: number, magnitude: number}> {
   try {
@@ -253,7 +276,7 @@ serve(async (req) => {
 
     // ✅ NEW: Fetch lead data for injection
     console.log('📋 Fetching lead data for engagement instructions...');
-    const { data: lead, error: leadError } = await supabase
+const { data: lead, error: leadError } = await supabase
       .from('leads')
       .select('*')
       .eq('id', lead_id)
@@ -269,6 +292,13 @@ serve(async (req) => {
       phone: lead.phone,
       customFieldsCount: lead.custom_fields ? Object.keys(lead.custom_fields).length : 0
     });
+
+    // Get the lead's campaign to find the correct phone number
+    const campaignId = lead.campaign_id;
+    if (!campaignId) {
+      console.error("❌ Lead has no campaign assigned");
+      return new Response('Lead must be assigned to a campaign', { status: 400 });
+    }
 
     // ✅ NEW: Fetch field configuration for this tenant
     console.log('📋 Fetching field configuration for engagement instructions...');
@@ -445,6 +475,97 @@ console.log('🔍 CONTEXTUAL MATCH:', output.match(/Contextual Sentiment Score:\
       newStatus = 'Cold Lead';
     }
 
+    // ✅ NEW: Extract timing preferences from the conversation
+    console.log('📅 Checking for timing preferences in message...');
+// Replace the timing analysis section in processmessageai with this smarter version
+
+const timingAnalysisPrompt = `
+Analyze this message and the conversation context to determine the optimal follow-up timing.
+
+MESSAGE: ${message_body}
+LEAD STATUS: ${newStatus}
+ENGAGEMENT SCORE: ${weighted_score}
+
+Consider:
+1. Explicit timing if mentioned (e.g., "call me in 2 months")
+2. Implicit timing from context:
+   - "not interested right now" → suggest 30-60 days
+   - "too busy" → suggest 14-21 days  
+   - "not ready" → suggest 45-90 days
+   - "just looking" → suggest 7-14 days
+   - Strong rejection → suggest 90+ days or never
+3. Engagement level:
+   - High score (60+) with timing concern → shorter delay
+   - Low score (under 40) → longer delay
+   - Hot lead status → very short delay (1-3 days)
+
+Make an intelligent decision about when to follow up based on:
+- The tone and content of their message
+- Their engagement level
+- Sales psychology (not too pushy, not too distant)
+
+Return JSON with:
+{
+  "TIMING_FOUND": true/false,
+  "REQUESTED_DELAY_DAYS": number (your intelligent recommendation),
+  "TIMING_TYPE": "explicit_request" | "implicit_context" | "ai_recommendation",
+  "ORIGINAL_PHRASE": what they said,
+  "AI_REASONING": brief explanation of why you chose this timing
+}
+
+Examples:
+- "not interested right now" + low engagement → {"TIMING_FOUND": true, "REQUESTED_DELAY_DAYS": 60, "TIMING_TYPE": "implicit_context", "ORIGINAL_PHRASE": "not interested right now", "AI_REASONING": "Low interest suggests waiting 2 months before re-engaging"}
+- "super busy this month" + high engagement → {"TIMING_FOUND": true, "REQUESTED_DELAY_DAYS": 30, "TIMING_TYPE": "implicit_context", "ORIGINAL_PHRASE": "super busy this month", "AI_REASONING": "High engagement but busy - check back after their busy period"}
+`;
+
+    try {
+      const timingResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${openaiApiKey}`,
+        },
+        body: JSON.stringify({
+          model: 'gpt-4',
+          messages: [
+            { role: 'system', content: 'Extract timing information from messages. Return valid JSON only.' },
+            { role: 'user', content: timingAnalysisPrompt }
+          ],
+          temperature: 0.1,
+        }),
+      });
+
+      if (timingResponse.ok) {
+        const timingResult = await timingResponse.json();
+        const timingData = JSON.parse(timingResult.choices[0].message.content);
+
+        if (timingData.TIMING_FOUND) {
+          console.log(`📅 Lead requested specific timing: ${timingData.ORIGINAL_PHRASE} (${timingData.REQUESTED_DELAY_DAYS} days)`);
+          
+          // Calculate the requested follow-up date
+          const requestedDate = new Date(Date.now() + (timingData.REQUESTED_DELAY_DAYS * 24 * 60 * 60 * 1000));
+          
+          // Update lead record with timing preferences
+          const { error: timingUpdateError } = await supabase
+            .from('leads')
+            .update({
+              requested_followup_date: requestedDate.toISOString(),
+              requested_followup_reason: timingData.ORIGINAL_PHRASE,
+              requested_followup_type: timingData.TIMING_TYPE
+            })
+            .eq('id', lead_id);
+
+          if (timingUpdateError) {
+            console.error('❌ Error updating lead timing preferences:', timingUpdateError);
+          } else {
+            console.log('✅ Lead timing preferences saved');
+          }
+        }
+      }
+    } catch (timingError) {
+      console.error('❌ Error analyzing timing preferences:', timingError);
+    }
+
     if (newStatus) {
       const { error: updateLeadError } = await supabase
         .from('leads')
@@ -502,8 +623,89 @@ console.log('🔍 CONTEXTUAL MATCH:', output.match(/Contextual Sentiment Score:\
       return new Response('Failed to save AI response', { status: 500 });
     }
 
-    // ✅ NEW: Send AI response via Twilio (with human-like delay)
-    console.log('📤 Preparing to send AI response via Twilio...');
+    // ✅ TRIGGER LEAD SCORING
+    console.log('📊 Triggering lead scoring...');
+    try {
+      const scoreLeadUrl = `${supabaseUrl}/functions/v1/score-lead`;
+      const scoreResponse = await fetch(scoreLeadUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${supabaseKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          lead_id: lead_id,
+          tenant_id: tenant_id
+        })
+      });
+
+      if (!scoreResponse.ok) {
+        const errorText = await scoreResponse.text();
+        console.error('❌ Lead scoring failed:', scoreResponse.status, errorText);
+      } else {
+        const scoreResult = await scoreResponse.json();
+        console.log('✅ Lead scoring completed:', scoreResult);
+      }
+    } catch (scoreError) {
+      console.error('❌ Error calling lead scoring function:', scoreError);
+      // Don't fail the main request if scoring fails
+    }
+
+    // ✅ NEW: Check business hours before sending
+    console.log('🕐 Checking business hours...');
+    const { data: businessSettings } = await supabase
+      .from("platform_settings")
+      .select("key, value")
+      .eq("tenant_id", tenant_id)
+      .in("key", ["timezone", "officeOpenHour", "officeCloseHour", "officeDays"]);
+
+    const settingsMap = businessSettings?.reduce((acc, s) => ({ ...acc, [s.key]: s.value }), {}) || {};
+
+    const timezone = settingsMap.timezone === "EST" ? "America/New_York" : "America/New_York";
+    const openHour = parseInt(settingsMap.officeOpenHour || "8");
+    const closeHour = parseInt(settingsMap.officeCloseHour || "17");
+    const officeDays = (settingsMap.officeDays || "Monday,Tuesday,Wednesday,Thursday,Friday").split(",");
+
+    // Check current time in business timezone
+    const now = new Date();
+    const businessTime = new Date(now.toLocaleString("en-US", { timeZone: timezone }));
+    const hour = businessTime.getHours();
+    const dayOfWeek = businessTime.getDay();
+    const dayName = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][dayOfWeek];
+
+    // If outside business hours, save the message but don't send
+    if (hour < openHour || hour >= closeHour || !officeDays.includes(dayName)) {
+      console.log(`⏰ Outside business hours (${hour}:00 ${dayName}) - queuing message for next business day`);
+      
+      const nextBusinessHour = getNextBusinessHour(businessTime, openHour, officeDays);
+      console.log(`📅 Message will be sent at: ${nextBusinessHour.toLocaleString()}`);
+      
+      // Update the message with scheduled send time
+      await supabase.from('messages')
+        .update({
+          business_hours_hold: true,
+          scheduled_response_time: nextBusinessHour.toISOString()
+        })
+        .eq('id', insertedMessage[0].id);
+      
+      console.log('✅ Message queued for business hours delivery');
+      return new Response(
+        JSON.stringify({
+          success: true,
+          message: 'Message received and queued for business hours response',
+          scheduled_time: nextBusinessHour.toLocaleString(),
+          analysis: {
+            weighted_score,
+            status: newStatus || lead.status,
+            timing_detected: parsed.timing_detected
+          }
+        }), 
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // ✅ EXISTING: Send AI response via Twilio (with human-like delay)
+    console.log('📤 Within business hours - preparing to send AI response via Twilio...');
     
     // Add random delay to simulate human typing/thinking
     const delay = getRandomDelay();
@@ -511,17 +713,26 @@ console.log('🔍 CONTEXTUAL MATCH:', output.match(/Contextual Sentiment Score:\
     await new Promise(resolve => setTimeout(resolve, delay));
     
     // Get tenant's Twilio phone number
-    const { data: phoneNumber, error: phoneError } = await supabase
-      .from("phone_numbers")
-      .select("phone_number, twilio_sid")
+// Get campaign's assigned phone number
+    const { data: campaignPhone, error: phoneError } = await supabase
+      .from("campaigns")
+      .select(`
+        phone_number_id,
+        phone_numbers (
+          phone_number,
+          twilio_sid,
+          status
+        )
+      `)
+      .eq("id", campaignId)
       .eq("tenant_id", tenant_id)
-      .eq("status", "active")
       .single();
 
-    if (phoneError || !phoneNumber) {
-      console.error("❌ Error fetching phone number for Twilio sending:", phoneError);
+    if (phoneError || !campaignPhone || !campaignPhone.phone_numbers) {
+      console.error("❌ Error fetching campaign phone number:", phoneError);
       // Don't fail the entire request - message is saved, just not sent
     } else {
+      const phoneNumber = campaignPhone.phone_numbers;
       // Send SMS via Twilio
       const twilioSid = Deno.env.get("TWILIO_ACCOUNT_SID");
       const twilioToken = Deno.env.get("TWILIO_AUTH_TOKEN");

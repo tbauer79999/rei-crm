@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import apiClient from '../lib/apiClient';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import AddLeadForm from '../components/AddLeadForm';
+import AddLead from '../pages/AddLead';
 import ProductTour from '../components/ProductTour';
 import { 
   Search, 
@@ -22,7 +22,11 @@ import {
   MapPin,
   Building2,
   DollarSign,
-  Clock
+  Clock,
+  AlertCircle,
+  Flame,
+  Activity,
+  Zap
 } from 'lucide-react';
 import Papa from 'papaparse';
 import supabase from '../lib/supabaseClient';
@@ -40,11 +44,21 @@ export default function Dashboard() {
   const [parsedRecords, setParsedRecords] = useState([]);
   const [uploadMessage, setUploadMessage] = useState('');
   const [uploadError, setUploadError] = useState(false);
-  const [sortBy, setSortBy] = useState('created_at');
+  const [sortBy, setSortBy] = useState('hot_score'); // Changed from 'created_at'
   const [sortDirection, setSortDirection] = useState('desc');
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
   const navigate = useNavigate();
+
+  // Get leads that need immediate attention - EXCLUDE already handled leads
+  const alertLeads = leads.filter(lead => 
+    lead.requires_immediate_attention && 
+    !(lead.status === 'Hot Lead' && lead.assigned_to_sales_team_id) // Exclude hot leads that are assigned
+  );
+  
+  const criticalAlerts = alertLeads.filter(lead => 
+    lead.alert_priority === 'critical'
+  );
 
   // Icon mapping for field types
   const getFieldIcon = (fieldName) => {
@@ -70,38 +84,38 @@ export default function Dashboard() {
   }, [user]);
 
   // Fetch the dynamic field configuration for this tenant
-const fetchLeadFields = async () => {
-  if (!user?.tenant_id) return;
+  const fetchLeadFields = async () => {
+    if (!user?.tenant_id) return;
 
-  try {
-    const { data, error } = await supabase
-      .from('lead_field_config')
-      .select('*')
-      .eq('tenant_id', user.tenant_id)
-      .order('field_name');
+    try {
+      const { data, error } = await supabase
+        .from('lead_field_config')
+        .select('*')
+        .eq('tenant_id', user.tenant_id)
+        .order('field_name');
 
-    if (error) {
-      console.error('Error fetching lead fields:', error);
-      return;
-    }
-
-    // ✅ Remove duplicates by field_name
-    const uniqueFields = data?.reduce((acc, field) => {
-      const exists = acc.find(f => f.field_name === field.field_name);
-      if (!exists) {
-        acc.push(field);
+      if (error) {
+        console.error('Error fetching lead fields:', error);
+        return;
       }
-      return acc;
-    }, []) || [];
 
-    console.log(`Loaded ${data?.length} total fields, ${uniqueFields.length} unique fields`);
-    setLeadFields(uniqueFields);
-  } catch (err) {
-    console.error('Error fetching lead fields:', err);
-  }
-};
+      // ✅ Remove duplicates by field_name
+      const uniqueFields = data?.reduce((acc, field) => {
+        const exists = acc.find(f => f.field_name === field.field_name);
+        if (!exists) {
+          acc.push(field);
+        }
+        return acc;
+      }, []) || [];
 
-const fetchLeads = async () => {
+      console.log(`Loaded ${data?.length} total fields, ${uniqueFields.length} unique fields`);
+      setLeadFields(uniqueFields);
+    } catch (err) {
+      console.error('Error fetching lead fields:', err);
+    }
+  };
+
+  const fetchLeads = async () => {
     // Check if user is logged in
     if (!user) return; // Only proceed if user object exists
 
@@ -111,12 +125,9 @@ const fetchLeads = async () => {
         *,
         campaigns(name)
       `)
-      .order(sortBy, { ascending: sortDirection === 'asc' });
+      .order(sortBy === 'hot_score' ? 'created_at' : sortBy, { ascending: sortDirection === 'asc' });
 
     // --- MODIFIED LOGIC FOR GLOBAL ADMIN ACCESS ---
-    // Assuming 'user.is_admin' or 'user.role === "admin"' indicates a global admin
-    // You will need to ensure your user object from AuthContext contains this property
-    // Example: user.user_metadata?.is_admin or user.app_metadata?.role === 'admin'
     const isGlobalAdmin = user?.role === 'global_admin' || user?.user_metadata?.role === 'global_admin';
 
     if (!isGlobalAdmin) {
@@ -139,22 +150,69 @@ const fetchLeads = async () => {
       return;
     }
 
-    // Transform the data to include campaign name
-    const transformedData = data?.map(lead => ({
-  ...lead,
-  campaign: lead.campaigns?.name || 'No Campaign'  // ← NEW LINE
-})) || [];
+    // Fetch lead scores separately
+    const leadIds = data?.map(lead => lead.id) || [];
+    
+    if (leadIds.length > 0) {
+      const { data: leadScores, error: scoresError } = await supabase
+        .from('lead_scores')
+        .select('*')
+        .in('lead_id', leadIds);
 
-    setLeads(transformedData);
-    setFilteredLeads(transformedData);
+      if (scoresError) {
+        console.error('Error fetching lead scores:', scoresError);
+      }
+
+      // Create a map for quick lookup
+      const scoresMap = {};
+      leadScores?.forEach(score => {
+        scoresMap[score.lead_id] = score;
+      });
+
+      // Transform the data to include campaign name and lead scores
+      const transformedData = data?.map(lead => ({
+        ...lead,
+        campaign: lead.campaigns?.name || 'No Campaign',
+        // Merge all score data if it exists
+        ...(scoresMap[lead.id] || {}),
+        // Ensure hot_score has a default value
+        hot_score: scoresMap[lead.id]?.hot_score || 0,
+        requires_immediate_attention: scoresMap[lead.id]?.requires_immediate_attention || false,
+        alert_priority: scoresMap[lead.id]?.alert_priority || 'none',
+        alert_triggers: scoresMap[lead.id]?.alert_triggers || {},
+        attention_reasons: scoresMap[lead.id]?.attention_reasons || [],
+        funnel_stage: scoresMap[lead.id]?.funnel_stage || lead.status
+      })) || [];
+
+      setLeads(transformedData);
+      setFilteredLeads(transformedData);
+    } else {
+      // No leads found
+      setLeads([]);
+      setFilteredLeads([]);
+    }
   };
 
   useEffect(() => {
     let updated = [...leads];
     
     // Apply status filter
-    if (filterStatus && filterStatus !== 'All') {
-      updated = updated.filter(lead => lead.status === filterStatus);
+    if (filterStatus) {
+      if (filterStatus === 'All') {
+        // Show all
+      } else if (filterStatus === 'Alerts') {
+        // Only show alerts that aren't hot leads assigned to sales
+        updated = updated.filter(lead => 
+          lead.requires_immediate_attention && 
+          !(lead.status === 'Hot Lead' && lead.assigned_to_sales_team_id)
+        );
+      } else if (filterStatus === 'Hot (80+)') {
+        updated = updated.filter(lead => lead.hot_score >= 80);
+      } else if (filterStatus === 'Active (60+)') {
+        updated = updated.filter(lead => lead.hot_score >= 60);
+      } else if (filterStatus === 'Cold (<60)') {
+        updated = updated.filter(lead => lead.hot_score < 60);
+      }
     }
     
     // Apply search filter across all configured fields
@@ -172,6 +230,10 @@ const fetchLeads = async () => {
     updated.sort((a, b) => {
       let aVal = a[sortBy];
       let bVal = b[sortBy];
+      
+      // Handle null/undefined values
+      if (aVal === null || aVal === undefined) aVal = 0;
+      if (bVal === null || bVal === undefined) bVal = 0;
       
       if (sortBy === 'created_at') {
         aVal = new Date(aVal);
@@ -199,28 +261,87 @@ const fetchLeads = async () => {
     navigate(`/lead/${id}`);
   };
 
+  // Updated status options - SIMPLIFIED
   const actualStatuses = [
     'All',
-    'Hot Lead',
-    'Engaging', 
-    'Responding',
-    'Cold Lead',
-    'Unsubscribed'
+    'Alerts',
+    'Hot (80+)',
+    'Active (60+)',
+    'Cold (<60)'
   ];
 
   const getStatusCount = (status) => {
     if (status === 'All') return leads.length;
-    return leads.filter(lead => lead.status === status).length;
+    if (status === 'Alerts') {
+      // Only count alerts that aren't hot leads assigned to sales
+      return leads.filter(lead => 
+        lead.requires_immediate_attention && 
+        !(lead.status === 'Hot Lead' && lead.assigned_to_sales_team_id)
+      ).length;
+    }
+    if (status === 'Hot (80+)') return leads.filter(lead => lead.hot_score >= 80).length;
+    if (status === 'Active (60+)') return leads.filter(lead => lead.hot_score >= 60).length;
+    if (status === 'Cold (<60)') return leads.filter(lead => lead.hot_score < 60).length;
+    return 0;
   };
 
   const getStatusConfig = (status) => {
     const configs = {
+      'Alerts': {
+        color: 'bg-red-600',
+        bgColor: 'bg-red-50',
+        textColor: 'text-red-700',
+        borderColor: 'border-red-300',
+        icon: '🚨'
+      },
+      'Hot (80+)': {
+        color: 'bg-red-500',
+        bgColor: 'bg-red-50',
+        textColor: 'text-red-700',
+        borderColor: 'border-red-200',
+        icon: '🔥'
+      },
+      'Active (60+)': {
+        color: 'bg-orange-500',
+        bgColor: 'bg-orange-50',
+        textColor: 'text-orange-700',
+        borderColor: 'border-orange-200',
+        icon: '⚡'
+      },
+      'Cold (<60)': {
+        color: 'bg-blue-500',
+        bgColor: 'bg-blue-50',
+        textColor: 'text-blue-700',
+        borderColor: 'border-blue-200',
+        icon: '❄️'
+      },
       'Hot Lead': { 
         color: 'bg-red-500', 
         bgColor: 'bg-red-50', 
         textColor: 'text-red-700',
         borderColor: 'border-red-200',
         icon: '🔥'
+      },
+      'Hot': { 
+        color: 'bg-red-500', 
+        bgColor: 'bg-red-50', 
+        textColor: 'text-red-700',
+        borderColor: 'border-red-200',
+        icon: '🔥'
+      },
+      'Engaged': {
+        color: 'bg-orange-500',
+        bgColor: 'bg-orange-50',
+        textColor: 'text-orange-700',
+        borderColor: 'border-orange-200',
+        icon: '💬'
+      },
+      'Warm': {
+        color: 'bg-yellow-500',
+        bgColor: 'bg-yellow-50',
+        textColor: 'text-yellow-700',
+        borderColor: 'border-yellow-200',
+        icon: '☀️'
       },
       'Engaging': { 
         color: 'bg-orange-500', 
@@ -237,6 +358,13 @@ const fetchLeads = async () => {
         icon: '↩️'
       },
       'Cold Lead': { 
+        color: 'bg-blue-500', 
+        bgColor: 'bg-blue-50', 
+        textColor: 'text-blue-700',
+        borderColor: 'border-blue-200',
+        icon: '❄️'
+      },
+      'Cold': { 
         color: 'bg-blue-500', 
         bgColor: 'bg-blue-50', 
         textColor: 'text-blue-700',
@@ -370,27 +498,26 @@ const fetchLeads = async () => {
     });
   };
 
-const handleBulkSubmit = async () => {
-  try {
-    const res = await apiClient.post('/leads/bulk', { records: parsedRecords });
-    const { uploaded = 0, skipped = 0, added = 0 } = res.data;
-    setUploadMessage(`${uploaded} uploaded. ${skipped} failed. ${added} added.`);
-    setUploadError(skipped > 0);
-    setFileReady(false);
-    setParsedRecords([]);
-    await fetchLeads();
-  } catch (err) {
-    const data = err.response?.data;
-    if (data?.uploaded !== undefined) {
-      setUploadMessage(`${data.uploaded} uploaded. ${data.skipped} failed. ${data.added} added.`);
-      setUploadError(true);
-    } else {
-      setUploadMessage('Bulk upload failed.');
-      setUploadError(true);
+  const handleBulkSubmit = async () => {
+    try {
+      const res = await apiClient.post('/leads/bulk', { records: parsedRecords });
+      const { uploaded = 0, skipped = 0, added = 0 } = res.data;
+      setUploadMessage(`${uploaded} uploaded. ${skipped} failed. ${added} added.`);
+      setUploadError(skipped > 0);
+      setFileReady(false);
+      setParsedRecords([]);
+      await fetchLeads();
+    } catch (err) {
+      const data = err.response?.data;
+      if (data?.uploaded !== undefined) {
+        setUploadMessage(`${data.uploaded} uploaded. ${data.skipped} failed. ${data.added} added.`);
+        setUploadError(true);
+      } else {
+        setUploadMessage('Bulk upload failed.');
+        setUploadError(true);
+      }
     }
-  }
-};
-
+  };
 
   // Get the primary display fields (first few most important ones)
   const getDisplayFields = () => {
@@ -411,7 +538,7 @@ const handleBulkSubmit = async () => {
     });
     
     // Return first 3-4 most important fields for table display
-    return sorted.slice(0, 4);
+    return sorted.slice(0, 3); // Reduced to 3 to make room for hot score
   };
 
   const displayFields = getDisplayFields();
@@ -487,131 +614,128 @@ const handleBulkSubmit = async () => {
         <div className="bg-white border-b border-gray-200 px-6 py-6">
           <div className="max-w-4xl">
             <div className="flex items-center gap-4 mb-6">
-              <button
-                onClick={() => setTab('single')}
-                className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-                  tab === 'single' 
-                    ? 'bg-blue-100 text-blue-700' 
-                    : 'text-gray-500 hover:text-gray-700'
-                }`}
-              >
-                Single Entry
-              </button>
-              <button
-                onClick={() => setTab('bulk')}
-                className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-                  tab === 'bulk' 
-                    ? 'bg-blue-100 text-blue-700' 
-                    : 'text-gray-500 hover:text-gray-700'
-                }`}
-              >
-                Bulk Upload
-              </button>
+             
             </div>
-
-            {tab === 'single' && (
-              <AddLeadForm 
-                onSuccess={() => {
-                  fetchLeads();
-                  setShowForm(false);
-                }} 
-                onCancel={() => setShowForm(false)}
-              />
-            )}
-
-            {tab === 'bulk' && (
-              <div className="space-y-4">
-                <div className="flex items-center gap-4">
-                  <input 
-                    type="file" 
-                    accept=".csv" 
-                    onChange={handleFileChange}
-                    className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-                  />
-                  <button 
-                    onClick={downloadSampleCSV}
-                    className="flex items-center gap-2 px-4 py-2 text-sm text-blue-600 border border-blue-300 rounded-lg hover:bg-blue-50"
-                  >
-                    <FileText size={16} />
-                    Sample CSV
-                  </button>
-                </div>
-                {fileReady && (
-                  <button 
-                    onClick={handleBulkSubmit}
-                    className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
-                  >
-                    <Upload size={16} />
-                    Upload {parsedRecords.length} Leads
-                  </button>
-                )}
-                {uploadMessage && (
-                  <div className={`p-3 rounded-lg text-sm ${
-                    uploadError ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'
-                  }`}>
-                    {uploadMessage}
-                  </div>
-                )}
-              </div>
-            )}
+            <AddLead 
+              onSuccess={() => {
+                fetchLeads();
+                setShowForm(false);
+              }} 
+              onCancel={() => setShowForm(false)}
+            />
           </div>
         </div>
       )}
 
       {/* Main Content */}
       <div className="p-6">
-        {/* Stats Cards */}
+
+        {/* Stats Cards - UPDATED */}
         <div className="tour-stats grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+          {/* Critical Alerts */}
+          <div className="bg-red-50 border border-red-200 rounded-xl p-6 relative group">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-red-600 flex items-center gap-1">
+                  Critical Alerts
+                  <span className="text-xs text-red-500">ⓘ</span>
+                </p>
+                <p className="text-2xl font-semibold text-red-900">
+                  {criticalAlerts.length}
+                </p>
+                <p className="text-xs text-red-600 mt-1">Need immediate action</p>
+              </div>
+              <div className="p-3 bg-red-100 rounded-full">
+                <AlertCircle size={20} className="text-red-600 animate-pulse" />
+              </div>
+            </div>
+            {/* Tooltip */}
+            <div className="absolute bottom-full left-0 mb-2 w-64 p-3 bg-gray-900 text-white text-xs rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10">
+              <p className="font-semibold mb-1">What are Critical Alerts?</p>
+              <p>Leads who have explicitly requested contact:</p>
+              <ul className="mt-1 space-y-0.5 text-xs">
+                <li>• Agreed to a meeting/call</li>
+                <li>• Asked to be contacted</li>
+                <li>• Showed buying intent</li>
+              </ul>
+              <p className="mt-2 font-semibold">Action: Call immediately!</p>
+              <div className="absolute top-full left-8 w-0 h-0 border-l-8 border-l-transparent border-r-8 border-r-transparent border-t-8 border-t-gray-900"></div>
+            </div>
+          </div>
+          
+          {/* Hot Leads */}
+          <div className="bg-white rounded-xl border border-gray-200 p-6 relative group">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-500 flex items-center gap-1">
+                  Hot Leads (80+)
+                  <span className="text-xs text-gray-400">ⓘ</span>
+                </p>
+                <p className="text-2xl font-semibold text-gray-900">
+                  {leads.filter(l => l.hot_score >= 80).length}
+                </p>
+                <p className="text-xs text-gray-500 mt-1">Highest quality prospects</p>
+              </div>
+              <div className="p-3 bg-orange-50 rounded-full">
+                <Flame size={20} className="text-orange-600" />
+              </div>
+            </div>
+            {/* Tooltip */}
+            <div className="absolute bottom-full left-0 mb-2 w-64 p-3 bg-gray-900 text-white text-xs rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10">
+              <p className="font-semibold mb-1">What is a Hot Lead?</p>
+              <p>Leads with engagement scores of 80-100 based on:</p>
+              <ul className="mt-1 space-y-0.5 text-xs">
+                <li>• Response speed & frequency</li>
+                <li>• Positive sentiment</li>
+                <li>• Low hesitation</li>
+                <li>• Clear intent</li>
+              </ul>
+              <p className="mt-2">High quality but may not need immediate action.</p>
+              <div className="absolute top-full left-8 w-0 h-0 border-l-8 border-l-transparent border-r-8 border-r-transparent border-t-8 border-t-gray-900"></div>
+            </div>
+          </div>
+
+          {/* Active Leads */}
+          <div className="bg-white rounded-xl border border-gray-200 p-6 relative group">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-500 flex items-center gap-1">
+                  Active (60+)
+                  <span className="text-xs text-gray-400">ⓘ</span>
+                </p>
+                <p className="text-2xl font-semibold text-gray-900">
+                  {leads.filter(l => l.hot_score >= 60).length}
+                </p>
+                <p className="text-xs text-gray-500 mt-1">Engaged & responding</p>
+              </div>
+              <div className="p-3 bg-green-50 rounded-full">
+                <Activity size={20} className="text-green-600" />
+              </div>
+            </div>
+            {/* Tooltip */}
+            <div className="absolute bottom-full left-0 mb-2 w-64 p-3 bg-gray-900 text-white text-xs rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10">
+              <p className="font-semibold mb-1">What is an Active Lead?</p>
+              <p>Leads with scores 60+ showing good engagement:</p>
+              <ul className="mt-1 space-y-0.5 text-xs">
+                <li>• Regular responses</li>
+                <li>• Asking questions</li>
+                <li>• Positive interactions</li>
+              </ul>
+              <p className="mt-2">Worth prioritizing for follow-up.</p>
+              <div className="absolute top-full left-8 w-0 h-0 border-l-8 border-l-transparent border-r-8 border-r-transparent border-t-8 border-t-gray-900"></div>
+            </div>
+          </div>
+
+          {/* Total Leads */}
           <div className="bg-white rounded-xl border border-gray-200 p-6">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-500">Total Leads</p>
                 <p className="text-2xl font-semibold text-gray-900">{leads.length}</p>
+                <p className="text-xs text-gray-500 mt-1">All conversations</p>
               </div>
               <div className="p-3 bg-blue-50 rounded-full">
                 <Users size={20} className="text-blue-600" />
-              </div>
-            </div>
-          </div>
-          
-          <div className="bg-white rounded-xl border border-gray-200 p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-500">Hot Leads</p>
-                <p className="text-2xl font-semibold text-gray-900">{getStatusCount('Hot Lead')}</p>
-              </div>
-              <div className="p-3 bg-red-50 rounded-full">
-                <TrendingUp size={20} className="text-red-600" />
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl border border-gray-200 p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-500">Responding</p>
-                <p className="text-2xl font-semibold text-gray-900">{getStatusCount('Responding')}</p>
-              </div>
-              <div className="p-3 bg-green-50 rounded-full">
-                <Phone size={20} className="text-green-600" />
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl border border-gray-200 p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-500">This Month</p>
-                <p className="text-2xl font-semibold text-gray-900">
-                  {leads.filter(lead => {
-                    const leadDate = new Date(lead.created_at);
-                    const now = new Date();
-                    return leadDate.getMonth() === now.getMonth() && leadDate.getFullYear() === now.getFullYear();
-                  }).length}
-                </p>
-              </div>
-              <div className="p-3 bg-purple-50 rounded-full">
-                <Calendar size={20} className="text-purple-600" />
               </div>
             </div>
           </div>
@@ -632,7 +756,7 @@ const handleBulkSubmit = async () => {
               />
             </div>
 
-            {/* Status Filters */}
+            {/* Status Filters - UPDATED */}
             <div className="tour-filters flex flex-wrap gap-2">
               {actualStatuses.map((status) => {
                 const count = getStatusCount(status);
@@ -663,7 +787,7 @@ const handleBulkSubmit = async () => {
           </div>
         </div>
 
-        {/* Leads Table */}
+        {/* Leads Table - UPDATED */}
         <div className="tour-leads-table bg-white rounded-xl border border-gray-200 overflow-hidden">
           {/* Table Header */}
           <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
@@ -692,6 +816,9 @@ const handleBulkSubmit = async () => {
             <table className="w-full">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Alert
+                  </th>
                   {/* Dynamic headers based on configured fields */}
                   {displayFields.map((field) => (
                     <th 
@@ -701,6 +828,9 @@ const handleBulkSubmit = async () => {
                       {field.field_label}
                     </th>
                   ))}
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Hot Score
+                  </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Status
                   </th>
@@ -718,7 +848,7 @@ const handleBulkSubmit = async () => {
               <tbody className="bg-white divide-y divide-gray-200">
                 {currentLeads.length === 0 ? (
                   <tr>
-                    <td colSpan={displayFields.length + 4} className="px-6 py-12 text-center">
+                    <td colSpan={displayFields.length + 6} className="px-6 py-12 text-center">
                       <div className="flex flex-col items-center">
                         <Users size={48} className="text-gray-300 mb-4" />
                         <p className="text-lg font-medium text-gray-900">No leads found</p>
@@ -733,45 +863,102 @@ const handleBulkSubmit = async () => {
                   </tr>
                 ) : (
                   currentLeads.map((lead) => {
-                    const statusConfig = getStatusConfig(lead.status);
+                    const displayStatus = lead.funnel_stage || lead.status;
+                    const statusConfig = getStatusConfig(displayStatus);
                     return (
                       <tr 
                         key={lead.id} 
                         className="hover:bg-gray-50 cursor-pointer transition-colors"
                         onClick={() => handleRowClick(lead.id)}
                       >
+                        {/* Alert Indicator */}
+                        <td className="px-6 py-4">
+                          {lead.requires_immediate_attention && !(lead.status === 'Hot Lead' && lead.assigned_to_sales_team_id) ? (
+                            <div className="flex items-center gap-2">
+                              <span className="flex h-2 w-2">
+                                <span className="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-red-400 opacity-75"></span>
+                                <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                              </span>
+                              {lead.alert_priority === 'critical' && (
+                                <span className="text-xs text-red-600 font-medium">!</span>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-gray-300">—</span>
+                          )}
+                        </td>
+                        
                         {/* Dynamic columns based on configured fields */}
                         {displayFields.map((field) => (
                           <td key={field.field_name} className="px-6 py-4">
                             {renderFieldValue(lead, field)}
                           </td>
                         ))}
+                        
+                        {/* Hot Score */}
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium">{lead.hot_score || 0}</span>
+                            <div className="w-16 bg-gray-200 rounded-full h-2">
+                              <div 
+                                className={`h-2 rounded-full transition-all ${
+                                  lead.hot_score >= 80 ? 'bg-red-500' :
+                                  lead.hot_score >= 60 ? 'bg-orange-500' :
+                                  lead.hot_score >= 40 ? 'bg-yellow-500' : 'bg-blue-500'
+                                }`}
+                                style={{ width: `${Math.min(lead.hot_score || 0, 100)}%` }}
+                              />
+                            </div>
+                          </div>
+                        </td>
+                        
+                        {/* Status */}
                         <td className="px-6 py-4">
                           <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium border ${statusConfig.bgColor} ${statusConfig.textColor} ${statusConfig.borderColor}`}>
                             <span>{statusConfig.icon}</span>
-                            {lead.status}
+                            {displayStatus}
                           </span>
                         </td>
+                        
+                        {/* Campaign */}
                         <td className="px-6 py-4">
                           <span className="text-sm text-gray-900">
                             {lead.campaign || '—'}
                           </span>
                         </td>
+                        
+                        {/* Created */}
                         <td className="px-6 py-4">
                           <span className="text-sm text-gray-500">
                             {new Date(lead.created_at).toLocaleDateString()}
                           </span>
                         </td>
+                        
+                        {/* Actions */}
                         <td className="px-6 py-4 text-right">
-                          <button 
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleRowClick(lead.id);
-                            }}
-                            className="text-gray-400 hover:text-gray-600"
-                          >
-                            <Eye size={16} />
-                          </button>
+                          <div className="flex items-center justify-end gap-2">
+                            {lead.requires_immediate_attention && !(lead.status === 'Hot Lead' && lead.assigned_to_sales_team_id) && lead.phone && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  window.location.href = `tel:${lead.phone}`;
+                                }}
+                                className="p-1 bg-green-100 text-green-600 rounded hover:bg-green-200"
+                                title="Call Now"
+                              >
+                                <Phone size={14} />
+                              </button>
+                            )}
+                            <button 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleRowClick(lead.id);
+                              }}
+                              className="text-gray-400 hover:text-gray-600"
+                            >
+                              <Eye size={16} />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );

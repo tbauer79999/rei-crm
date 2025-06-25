@@ -211,8 +211,8 @@ useEffect(() => {
   // Dynamic navigation items based on user role
   const getNavItems = () => {
     const baseItems = [
-      { path: '/control-room', label: 'Pipeline', icon: BarChart2, tourClass: 'tour-controlroom' },
-      { path: '/dashboard', label: 'Dashboard', icon: Home, tourClass: 'tour-dashboard' },
+      { path: '/control-room', label: 'Intelligence Center', icon: BarChart2, tourClass: 'tour-controlroom' },
+      { path: '/dashboard', label: 'Leads', icon: Home, tourClass: 'tour-dashboard' },
     ];
 
     // Add analytics based on role
@@ -465,66 +465,7 @@ useEffect(() => {
         </nav>
 
         {/* Bottom spacing */}
-        <div className="flex-1" />
-
-        {/* User section at bottom */}
-        {!collapsed && user && (
-          <div className="p-3 border-t border-gray-100 user-menu-container">
-            <button
-              onClick={() => setShowUserMenu(!showUserMenu)}
-              className="w-full flex items-center space-x-3 p-3 rounded-xl hover:bg-gray-50 transition-all duration-200 group"
-            >
-              <div className="relative">
-                <div className="w-10 h-10 bg-gradient-to-br from-indigo-400 via-purple-400 to-pink-400 rounded-full flex items-center justify-center shadow-sm">
-                  <span className="text-white text-sm font-semibold">
-                    {user?.email?.substring(0, 2).toUpperCase() || 'US'}
-                  </span>
-                </div>
-                <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white rounded-full"></div>
-              </div>
-              <div className="flex-1 text-left">
-                <p className="text-sm font-semibold text-gray-900 truncate">
-                  {user?.email?.split('@')[0] || 'User'}
-                </p>
-                <p className="text-xs text-gray-500 flex items-center gap-1">
-                  <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${
-                    role === 'global_admin' ? 'bg-red-100 text-red-700' :
-                    role === 'enterprise_admin' ? 'bg-purple-100 text-purple-700' :
-                    role === 'business_admin' ? 'bg-blue-100 text-blue-700' :
-                    'bg-gray-100 text-gray-700'
-                  }`}>
-                    {role?.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()) || 'User'}
-                  </span>
-                  <span className="text-gray-400">•</span>
-                  <span className="truncate">{companyInfo.name}</span>
-                </p>
-              </div>
-              <ChevronUp className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${showUserMenu ? 'rotate-180' : ''}`} />
-            </button>
-            
-            {/* Dropdown menu */}
-            {showUserMenu && (
-              <div className="mt-2 py-2 bg-white rounded-xl border border-gray-200 shadow-lg">
-                <Link to="/profile" className="flex items-center px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">
-                  <User className="w-4 h-4 mr-3 text-gray-400" />
-                  My Profile
-                </Link>
-                <Link to="/settings" className="flex items-center px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">
-                  <Settings className="w-4 h-4 mr-3 text-gray-400" />
-                  Settings
-                </Link>
-                <hr className="my-2 border-gray-100" />
-                <button 
-                  onClick={handleLogout}
-                  className="w-full flex items-center px-3 py-2 text-sm text-red-600 hover:bg-red-50"
-                >
-                  <LogOut className="w-4 h-4 mr-3" />
-                  Sign Out
-                </button>
-              </div>
-            )}
-          </div>
-        )}
+  
       </aside>
 
       {/* Main content */}

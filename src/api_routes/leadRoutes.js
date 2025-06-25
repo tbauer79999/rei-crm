@@ -20,7 +20,7 @@ router.get('/', async (req, res) => {
     // Security check
     if (!tenant_id && role !== 'global_admin') {
       return res.status(403).json({ error: 'No tenant access configured' });
-    }
+    } // This closing brace was missing!
 
     // Build query based on role
     let query = supabase
@@ -177,61 +177,117 @@ router.post('/bulk', async (req, res) => {
       return res.status(403).json({ error: 'No tenant access configured' });
     }
 
-    // Get platform settings with tenant filtering
-    let settingsQuery = supabase
-      .from('platform_settings')
-      .select('value')
-      .eq('key', 'Campaigns');
+    // Get the lead field configuration for this tenant
+    let fieldConfigQuery = supabase
+      .from('lead_field_config')
+      .select('*')
+      .eq('is_required', true);
 
-    // Apply tenant filtering for settings
     if (role !== 'global_admin') {
-      settingsQuery = settingsQuery.eq('tenant_id', tenant_id);
+      fieldConfigQuery = fieldConfigQuery.eq('tenant_id', tenant_id);
     }
 
-    const { data: settingsData, error: settingsError } = await settingsQuery.single();
+    const { data: fieldConfig, error: fieldError } = await fieldConfigQuery;
 
-    if (settingsError || !settingsData?.value) {
-      throw new Error('Failed to retrieve allowed campaigns');
+    if (fieldError) {
+      throw new Error('Failed to retrieve field configuration');
     }
 
-    const allowedCampaigns = settingsData.value
-      .split('\n')
-      .map(s => s.trim())
-      .filter(Boolean);
+    // Get list of required field names
+    const requiredFields = fieldConfig.map(f => f.field_name);
+    console.log('Required fields for tenant:', requiredFields);
 
-    const validRecords = records.filter(r =>
-      r.fields?.["Owner Name"] &&
-      r.fields?.["Property Address"] &&
-      r.fields?.["Campaign"]
-    );
+    // Get campaigns for validation and ID mapping (if campaign field exists)
+    let allowedCampaigns = [];
+    let campaignNameToId = {};
+    
+    if (fieldConfig.some(f => f.field_name === 'campaign')) {
+      let campaignsQuery = supabase
+        .from('campaigns')
+        .select('id, name')
+        .eq('is_active', true);
+
+      if (role !== 'global_admin') {
+        campaignsQuery = campaignsQuery.eq('tenant_id', tenant_id);
+      }
+
+      const { data: campaignsData, error: campaignsError } = await campaignsQuery;
+      
+      if (!campaignsError && campaignsData) {
+        campaignsData.forEach(c => {
+          allowedCampaigns.push(c.name);
+          campaignNameToId[c.name] = c.id;
+        });
+        console.log('Allowed campaigns:', allowedCampaigns);
+        console.log('Campaign name to ID mapping:', campaignNameToId);
+      }
+    }
+
+    console.log('Campaign mapping setup:', {
+      allowedCampaigns,
+      campaignNameToId,
+      hasCampaignField: fieldConfig.some(f => f.field_name === 'campaign')
+    });
+
+    // Validate records based on dynamic field configuration
+    const validRecords = records.filter(r => {
+      // Check if all required fields are present
+      const hasRequiredFields = requiredFields.every(fieldName => {
+        const value = r.fields?.[fieldName];
+        return value !== undefined && value !== null && value !== '';
+      });
+      
+      if (!hasRequiredFields) {
+        console.log('Record missing required fields:', r.fields);
+      }
+      
+      return hasRequiredFields;
+    });
 
     if (validRecords.length === 0) {
       return res.status(400).json({
-        error: 'No valid records with Campaign provided.',
+        error: `No valid records. Required fields: ${requiredFields.join(', ')}`,
         uploaded: records.length,
         skipped: records.length,
-        added: 0
+        added: 0,
+        requiredFields
       });
     }
 
-    const invalidCampaigns = validRecords.filter(r =>
-      !allowedCampaigns.includes(r.fields["Campaign"])
-    );
-
-    if (invalidCampaigns.length > 0) {
-      return res.status(422).json({
-        error: 'One or more records use invalid Campaign values.',
-        allowedCampaigns,
-        uploaded: records.length,
-        skipped: records.length,
-        added: 0
+    // Validate campaigns if applicable
+    if (allowedCampaigns.length > 0) {
+      const invalidCampaigns = validRecords.filter(r => {
+        const campaign = r.fields?.campaign;
+        return campaign && !allowedCampaigns.includes(campaign);
       });
+
+      if (invalidCampaigns.length > 0) {
+        return res.status(422).json({
+          error: 'One or more records use invalid Campaign values.',
+          allowedCampaigns,
+          uploaded: records.length,
+          skipped: records.length,
+          added: 0
+        });
+      }
     }
 
-    // Check for existing records with tenant filtering
+    // Check for existing records (deduplication)
+    // Determine which fields to use for deduplication
+    const dedupeFields = fieldConfig
+      .filter(f => f.is_unique || ['name', 'email', 'property_address'].includes(f.field_name))
+      .map(f => f.field_name);
+
+    // If no dedupe fields configured, use name as default
+    if (dedupeFields.length === 0) {
+      dedupeFields.push('name');
+    }
+
+    console.log('Using fields for deduplication:', dedupeFields);
+
     let existingQuery = supabase
       .from('leads')
-      .select('owner_name, property_address');
+      .select(dedupeFields.join(', '));
 
     if (role !== 'global_admin') {
       existingQuery = existingQuery.eq('tenant_id', tenant_id);
@@ -243,42 +299,64 @@ router.post('/bulk', async (req, res) => {
       throw existingError;
     }
 
+    // Create deduplication key based on available fields
+    const createDedupeKey = (record) => {
+      return dedupeFields
+        .map(field => record[field]?.toLowerCase()?.trim() || '')
+        .filter(v => v)
+        .join('|');
+    };
+
     const existingSet = new Set(
-      existingData.map(e =>
-        `${e.owner_name?.toLowerCase().trim()}|${e.property_address?.toLowerCase().trim()}`
-      )
+      existingData.map(e => createDedupeKey(e))
     );
 
     const deduplicated = validRecords.filter(r => {
-      const key = `${r.fields["Owner Name"].toLowerCase().trim()}|${r.fields["Property Address"].toLowerCase().trim()}`;
-      return !existingSet.has(key);
+      const key = createDedupeKey(r.fields);
+      return key && !existingSet.has(key);
     });
 
+    console.log(`Deduplication: ${validRecords.length} valid, ${deduplicated.length} after deduplication`);
+
+    // Prepare records for insertion
+    const today = new Date().toISOString().split('T')[0];
     const enrichedRecords = deduplicated.map(r => {
-      const f = r.fields;
-      const today = new Date().toISOString().split('T')[0];
+      console.log('Processing record with fields:', r.fields);
+      
       const record = {
-        owner_name: f["Owner Name"],
-        property_address: f["Property Address"],
-        city: f.City || '',
-        state: f.State || '',
-        zip_code: f["Zip Code"] || '',
-        phone: f.Phone || '',
-        email: f.Email || '',
-        bedrooms: f.Bedrooms || '',
-        bathrooms: f.Bathrooms || '',
-        square_footage: f["Square Footage"] || '',
-        notes: f.Notes || '',
-        campaign: f.Campaign,
-        status: f.Status || 'New Lead',
-        status_history: `${today}: ${f.Status || 'New Lead'}`
+        ...r.fields, // Include all fields as-is
+        created_at: new Date().toISOString()
       };
 
-      // Add tenant_id unless global admin (for global records)
+      // Convert campaign name to campaign_id if campaign field exists
+      if (r.fields.campaign && campaignNameToId[r.fields.campaign]) {
+        record.campaign_id = campaignNameToId[r.fields.campaign];
+        delete record.campaign; // Remove the campaign name field
+        console.log('Mapped campaign name to campaign_id:', record.campaign_id);
+      }
+      
+      // If campaign_id is directly provided, use it
+      if (r.fields.campaign_id) {
+        record.campaign_id = r.fields.campaign_id;
+        delete record.campaign; // Remove campaign name if both exist
+        console.log('Using provided campaign_id:', record.campaign_id);
+      }
+
+      // Add status history if status field exists
+      if (r.fields.status) {
+        record.status_history = `${today}: ${r.fields.status}`;
+      } else if (fieldConfig.some(f => f.field_name === 'status')) {
+        // If status field is configured but not provided, set default
+        record.status = 'New Lead';
+        record.status_history = `${today}: New Lead`;
+      }
+
+      // Add tenant_id unless global admin
       if (role !== 'global_admin') {
         record.tenant_id = tenant_id;
       }
 
+      console.log('Final record to insert:', record);
       return record;
     });
 
@@ -291,11 +369,14 @@ router.post('/bulk', async (req, res) => {
       });
     }
 
+    console.log(`Inserting ${enrichedRecords.length} records`);
+
     const { error: insertError } = await supabase
       .from('leads')
       .insert(enrichedRecords);
 
     if (insertError) {
+      console.error('Insert error:', insertError);
       throw insertError;
     }
 
@@ -308,7 +389,7 @@ router.post('/bulk', async (req, res) => {
     });
   } catch (err) {
     console.error('Bulk upload failed:', err.message);
-    res.status(500).json({ error: 'Bulk upload failed' });
+    res.status(500).json({ error: 'Bulk upload failed: ' + err.message });
   }
 });
 

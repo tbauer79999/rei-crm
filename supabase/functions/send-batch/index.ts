@@ -18,10 +18,21 @@ serve(async (req) => {
   try {
     let campaigns = [];
     let isManualToggle = false;
+    let requestBody: any = null;
     
-    // For scheduled batch mode, check business hours first
+    // Read the body ONCE and store it
+    if (req.method === "PATCH" || req.method === "POST") {
+      try {
+        requestBody = await req.json();
+      } catch (e) {
+        // No body or invalid JSON
+        requestBody = null;
+      }
+    }
+    
+    // Now check if it's a scheduled batch or manual toggle
     const isScheduledBatch = !(req.method === "PATCH" || req.method === "POST") || 
-                           !(await req.json().then(body => body.campaignId && body.hasOwnProperty('ai_on')).catch(() => false));
+                           !(requestBody?.campaignId && requestBody.hasOwnProperty('ai_on'));
     
     if (isScheduledBatch) {
       // Get business hours settings from platform_settings
@@ -61,97 +72,54 @@ serve(async (req) => {
         );
       }
     }
-    let campaigns = [];
-    let isManualToggle = false;
 
     // Check if this is a single campaign toggle or batch processing
-    if (req.method === "PATCH" || req.method === "POST") {
-      const requestBody = await req.json();
+    if (requestBody && requestBody.campaignId && requestBody.hasOwnProperty('ai_on')) {
+      // Manual campaign toggle
+      isManualToggle = true;
+      const { campaignId, ai_on } = requestBody;
       
-      if (requestBody.campaignId && requestBody.hasOwnProperty('ai_on')) {
-        // Manual campaign toggle
-        isManualToggle = true;
-        const { campaignId, ai_on } = requestBody;
-        
-        console.log(`🎯 Manual campaign toggle: ${campaignId} → ai_on=${ai_on}`);
-        
-        // Update the specific campaign's ai_on status
-        const { data: updatedCampaign, error: updateErr } = await supabase
-          .from("campaigns")
-          .update({ ai_on, updated_at: new Date().toISOString() })
-          .eq("id", campaignId)
-          .select("*")
-          .single();
+      console.log(`🎯 Manual campaign toggle: ${campaignId} → ai_on=${ai_on}`);
+      
+      // Update the specific campaign's ai_on status
+      const { data: updatedCampaign, error: updateErr } = await supabase
+        .from("campaigns")
+        .update({ ai_on, updated_at: new Date().toISOString() })
+        .eq("id", campaignId)
+        .select("*")
+        .single();
 
-        if (updateErr) {
-          console.error("❌ Error updating campaign:", updateErr);
-          return new Response(
-            JSON.stringify({ error: "Error updating campaign" }), 
-            { 
-              status: 500,
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-            }
-          );
-        }
+      if (updateErr) {
+        console.error("❌ Error updating campaign:", updateErr);
+        return new Response(
+          JSON.stringify({ error: "Error updating campaign" }), 
+          { 
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          }
+        );
+      }
 
-        // If AI was turned ON, process this campaign immediately
-        if (ai_on) {
-          campaigns = [updatedCampaign];
-          console.log(`✅ Campaign ${campaignId} AI enabled - will process NEW leads immediately`);
-        } else {
-          // AI turned OFF, just return success
-          console.log(`⛔ Campaign ${campaignId} AI disabled - no processing needed`);
-          return new Response(JSON.stringify({
-            success: true,
-            message: "Campaign AI disabled successfully",
-            campaign: updatedCampaign
-          }), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          });
-        }
+      // If AI was turned ON, process this campaign immediately
+      if (ai_on) {
+        campaigns = [updatedCampaign];
+        console.log(`✅ Campaign ${campaignId} AI enabled - will process NEW leads immediately`);
+      } else {
+        // AI turned OFF, just return success
+        console.log(`⛔ Campaign ${campaignId} AI disabled - no processing needed`);
+        return new Response(JSON.stringify({
+          success: true,
+          message: "Campaign AI disabled successfully",
+          campaign: updatedCampaign
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
       }
     }
 
     // If no specific campaign provided, get all campaigns with ai_on = true (scheduled batch mode)
     if (campaigns.length === 0) {
       console.log("🔄 Scheduled batch mode - processing all campaigns with ai_on=true");
-      
-      // For scheduled batch mode, check business hours
-      const { data: settings } = await supabase
-        .from("platform_settings")
-        .select("key, value")
-        .in("key", ["timezone", "officeOpenHour", "officeCloseHour", "officeDays"]);
-      
-      const settingsMap = settings?.reduce((acc, s) => ({ ...acc, [s.key]: s.value }), {}) || {};
-      
-      const timezone = settingsMap.timezone === "EST" ? "America/New_York" : "America/New_York";
-      const openHour = parseInt(settingsMap.officeOpenHour || "8");
-      const closeHour = parseInt(settingsMap.officeCloseHour || "17");
-      const officeDays = (settingsMap.officeDays || "Monday,Tuesday,Wednesday,Thursday,Friday").split(",");
-      
-      // Check current time in business timezone
-      const now = new Date();
-      const businessTime = new Date(now.toLocaleString("en-US", { timeZone: timezone }));
-      const hour = businessTime.getHours();
-      const dayOfWeek = businessTime.getDay(); // 0 = Sunday, 6 = Saturday
-      const dayName = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][dayOfWeek];
-      
-      // Check if outside business hours
-      if (hour < openHour || hour >= closeHour || !officeDays.includes(dayName)) {
-        console.log(`⏰ Outside business hours (${timezone}: ${businessTime.toLocaleString()}). Skipping batch processing.`);
-        return new Response(
-          JSON.stringify({
-            success: true,
-            message: "Outside business hours - batch processing skipped",
-            current_time: businessTime.toLocaleString(),
-            business_hours: `${openHour}:00 - ${closeHour}:00 ${timezone}`,
-            business_days: officeDays.join(", ")
-          }), 
-          {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          }
-        );
-      }
       
       const { data: allCampaigns, error: campaignErr } = await supabase
         .from("campaigns")

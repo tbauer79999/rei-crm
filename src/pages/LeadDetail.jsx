@@ -12,7 +12,8 @@ import {
   Eye,
   MoreHorizontal,
   Sparkles,
-  Activity
+  Activity,
+  Calendar
 } from 'lucide-react';
 import {
   LineChart,
@@ -44,7 +45,20 @@ export default function LeadDetail() {
           .single();
 
         if (leadError) throw leadError;
-        setLead(leadData);
+        
+        // Fetch lead scores to get enterprise alert data
+        const { data: leadScores } = await supabase
+          .from('lead_scores')
+          .select('*')
+          .eq('lead_id', id)
+          .single();
+
+        // Merge lead data with scores
+        if (leadScores) {
+          setLead({ ...leadData, ...leadScores });
+        } else {
+          setLead(leadData);
+        }
 
         // Updated query to fetch messages for this specific lead
         const { data: msgData, error: msgError } = await supabase
@@ -74,59 +88,72 @@ export default function LeadDetail() {
     fetchLeadAndMessages();
   }, [id]);
 
-useEffect(() => {
-  // Smart refresh - only when user is actively viewing this page
-  const interval = setInterval(() => {
-    // Only refresh if tab is visible (user isn't on another tab/app)
-    if (!document.hidden) {
-      console.log('🔄 Auto-refreshing conversation data...');
-      
-      // Re-fetch the data (same function as initial load, but without loading state)
-      const refreshData = async () => {
-        try {
-          const { data: leadData, error: leadError } = await supabase
-            .from('leads')
-            .select('*')
-            .eq('id', id)
-            .single();
+  useEffect(() => {
+    // Smart refresh - only when user is actively viewing this page
+    const interval = setInterval(() => {
+      // Only refresh if tab is visible (user isn't on another tab/app)
+      if (!document.hidden) {
+        console.log('🔄 Auto-refreshing conversation data...');
+        
+        // Re-fetch the data (same function as initial load, but without loading state)
+        const refreshData = async () => {
+          try {
+            const { data: leadData, error: leadError } = await supabase
+              .from('leads')
+              .select('*')
+              .eq('id', id)
+              .single();
 
-          if (leadError) throw leadError;
-          setLead(leadData);
+            if (leadError) throw leadError;
+            
+            // Fetch lead scores to get enterprise alert data
+            const { data: leadScores } = await supabase
+              .from('lead_scores')
+              .select('*')
+              .eq('lead_id', id)
+              .single();
 
-          const { data: msgData, error: msgError } = await supabase
-            .from('messages')
-            .select(`
-              *,
-              sentiment_score,
-              sentiment_magnitude,
-              openai_qualification_score,
-              hesitation_score,
-              urgency_score,
-              weighted_score,
-              response_score
-            `)
-            .eq('lead_id', id)
-            .order('timestamp', { ascending: true });
+            // Merge lead data with scores
+            if (leadScores) {
+              setLead({ ...leadData, ...leadScores });
+            } else {
+              setLead(leadData);
+            }
 
-          if (msgError) throw msgError;
-          setMessages(msgData);
-          
-          console.log('✅ Auto-refresh complete');
-        } catch (err) {
-          console.error('❌ Auto-refresh failed:', err.message);
-        }
-      };
+            const { data: msgData, error: msgError } = await supabase
+              .from('messages')
+              .select(`
+                *,
+                sentiment_score,
+                sentiment_magnitude,
+                openai_qualification_score,
+                hesitation_score,
+                urgency_score,
+                weighted_score,
+                response_score
+              `)
+              .eq('lead_id', id)
+              .order('timestamp', { ascending: true });
 
-      refreshData();
-    }
-  }, 30000); // 30 seconds
+            if (msgError) throw msgError;
+            setMessages(msgData);
+            
+            console.log('✅ Auto-refresh complete');
+          } catch (err) {
+            console.error('❌ Auto-refresh failed:', err.message);
+          }
+        };
 
-  // Cleanup interval when component unmounts or id changes
-  return () => {
-    console.log('🛑 Stopping auto-refresh');
-    clearInterval(interval);
-  };
-}, [id]); // Restart interval if lead ID changes
+        refreshData();
+      }
+    }, 30000); // 30 seconds
+
+    // Cleanup interval when component unmounts or id changes
+    return () => {
+      console.log('🛑 Stopping auto-refresh');
+      clearInterval(interval);
+    };
+  }, [id]); // Restart interval if lead ID changes
 
   const getStatusConfig = (status) => {
     const configs = {
@@ -136,6 +163,27 @@ useEffect(() => {
         textColor: 'text-red-700',
         borderColor: 'border-red-200',
         icon: '🔥',
+      },
+      'Hot': {
+        color: 'bg-red-500',
+        bgColor: 'bg-red-50',
+        textColor: 'text-red-700',
+        borderColor: 'border-red-200',
+        icon: '🔥',
+      },
+      'Engaged': {
+        color: 'bg-orange-500',
+        bgColor: 'bg-orange-50',
+        textColor: 'text-orange-700',
+        borderColor: 'border-orange-200',
+        icon: '💬',
+      },
+      'Warm': {
+        color: 'bg-yellow-500',
+        bgColor: 'bg-yellow-50',
+        textColor: 'text-yellow-700',
+        borderColor: 'border-yellow-200',
+        icon: '☀️',
       },
       Engaging: {
         color: 'bg-orange-500',
@@ -152,6 +200,13 @@ useEffect(() => {
         icon: '↩️',
       },
       'Cold Lead': {
+        color: 'bg-blue-500',
+        bgColor: 'bg-blue-50',
+        textColor: 'text-blue-700',
+        borderColor: 'border-blue-200',
+        icon: '❄️',
+      },
+      'Cold': {
         color: 'bg-blue-500',
         bgColor: 'bg-blue-50',
         textColor: 'text-blue-700',
@@ -433,10 +488,13 @@ useEffect(() => {
     );
   }
 
-  const statusConfig = getStatusConfig(lead.status);
+  // Use funnel_stage if available, otherwise fall back to status
+  const displayStatus = lead.funnel_stage || lead.status;
+  const statusConfig = getStatusConfig(displayStatus);
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Header */}
       <div className="bg-white border-b border-gray-200 px-6 py-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
@@ -481,7 +539,12 @@ useEffect(() => {
               className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm font-medium border ${statusConfig.bgColor} ${statusConfig.textColor} ${statusConfig.borderColor}`}
             >
               <span>{statusConfig.icon}</span>
-              {lead.status}
+              {displayStatus}
+              {lead.stage_override_reason && (
+                <span className="text-xs opacity-75">
+                  (auto)
+                </span>
+              )}
             </span>
             {lead.phone && (
               <a
@@ -495,6 +558,49 @@ useEffect(() => {
           </div>
         </div>
       </div>
+
+      {/* Alert Banner */}
+      {lead.requires_immediate_attention && (
+        <div className="bg-red-50 border-y border-red-200 px-6 py-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="flex-shrink-0">
+                {lead.alert_priority === 'critical' ? (
+                  <AlertCircle className="h-5 w-5 text-red-600 animate-pulse" />
+                ) : (
+                  <AlertCircle className="h-5 w-5 text-orange-600" />
+                )}
+              </div>
+              <div>
+                <h3 className="text-sm font-medium text-red-900">
+                  Immediate Attention Required - {lead.alert_priority?.toUpperCase()} Priority
+                </h3>
+                <div className="mt-1 text-sm text-red-700">
+                  {lead.attention_reasons?.map((reason, idx) => (
+                    <span key={reason}>
+                      {idx > 0 && ' • '}
+                      {reason === 'agreed_to_meeting' && '✅ Lead agreed to schedule a call'}
+                      {reason === 'requested_callback' && '📞 Lead requested phone contact'}
+                      {reason === 'buying_signal' && '💰 Strong buying signal detected'}
+                      {reason === 'timeline_urgent' && '⏰ Urgent timeline mentioned'}
+                      {reason === 'high_interest_question' && '❓ Multiple questions showing high interest'}
+                      {reason === 'explicit_timeline' && '📅 Specific timeline mentioned'}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-500">
+                Triggered {lead.alert_details?.triggered_at && new Date(lead.alert_details.triggered_at).toLocaleTimeString()}
+              </span>
+              <button className="px-3 py-1 bg-red-600 text-white text-sm rounded-md hover:bg-red-700">
+                Take Action
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="flex h-[calc(100vh-80px)]">
         <div className="flex-1 flex flex-col bg-white">
@@ -701,6 +807,15 @@ useEffect(() => {
                             </>
                           )}
                         </div>
+                        
+                        {/* Show if this message triggered an alert */}
+                        {lead.alert_details?.last_message && 
+                         msg.message_body?.toLowerCase().includes(lead.alert_details.last_message.toLowerCase()) && (
+                          <div className="mt-2 flex items-center gap-2 text-xs text-orange-600">
+                            <AlertCircle size={12} />
+                            <span>This message triggered an alert</span>
+                          </div>
+                        )}
                       </div>
 
                       {!isInbound && (
@@ -745,14 +860,86 @@ useEffect(() => {
         {/* Sidebar */}
         <div className="w-80 bg-gray-50 border-l border-gray-200 overflow-y-auto">
           <div className="p-6 space-y-6">
+            {/* Quick Actions for Alerts */}
+            {lead.requires_immediate_attention && (
+              <div className="bg-yellow-50 rounded-xl border border-yellow-200 p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <AlertCircle size={18} className="text-yellow-600" />
+                  <h3 className="text-sm font-semibold text-gray-900">Recommended Actions</h3>
+                </div>
+                
+                <div className="space-y-2">
+                  {lead.attention_reasons?.includes('agreed_to_meeting') && (
+                    <button className="w-full flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200 hover:border-blue-300 hover:shadow-sm transition-all">
+                      <div className="flex items-center gap-3">
+                        <Phone className="h-4 w-4 text-blue-600" />
+                        <span className="text-sm font-medium">Call Now</span>
+                      </div>
+                      <span className="text-xs text-gray-500">Lead is expecting your call</span>
+                    </button>
+                  )}
+                  
+                  {lead.attention_reasons?.includes('requested_callback') && (
+                    <button className="w-full flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200 hover:border-green-300 hover:shadow-sm transition-all">
+                      <div className="flex items-center gap-3">
+                        <Calendar className="h-4 w-4 text-green-600" />
+                        <span className="text-sm font-medium">Schedule Call</span>
+                      </div>
+                      <span className="text-xs text-gray-500">Set up callback time</span>
+                    </button>
+                  )}
+                  
+                  {lead.attention_reasons?.includes('timeline_urgent') && (
+                    <button className="w-full flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200 hover:border-orange-300 hover:shadow-sm transition-all">
+                      <div className="flex items-center gap-3">
+                        <MessageCircle className="h-4 w-4 text-orange-600" />
+                        <span className="text-sm font-medium">Send Proposal</span>
+                      </div>
+                      <span className="text-xs text-gray-500">Urgent timeline detected</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* Updated AI Insights Card */}
             <div className="bg-white rounded-xl border border-gray-200 p-4">
               <div className="flex items-center gap-2 mb-4">
                 <Sparkles size={18} className="text-purple-600" />
                 <h3 className="text-sm font-semibold text-gray-900">AI Insights</h3>
+                {lead.requires_immediate_attention && (
+                  <span className="ml-auto">
+                    <span className="flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-red-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                    </span>
+                  </span>
+                )}
               </div>
 
               <div className="space-y-4">
+                {/* Hot Score if available */}
+                {lead.hot_score !== undefined && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-600">Hot Score</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-semibold text-gray-900">
+                        {lead.hot_score}
+                      </span>
+                      <div className="w-16 bg-gray-200 rounded-full h-2">
+                        <div 
+                          className={`h-2 rounded-full ${
+                            lead.hot_score >= 80 ? 'bg-red-500' :
+                            lead.hot_score >= 60 ? 'bg-orange-500' :
+                            lead.hot_score >= 40 ? 'bg-yellow-500' : 'bg-blue-500'
+                          }`}
+                          style={{ width: `${lead.hot_score || 0}%` }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-gray-600">Lead Score</span>
                   <div className="flex items-center gap-2">
@@ -789,6 +976,25 @@ useEffect(() => {
                     {aiInsights.lastActivity}
                   </span>
                 </div>
+
+                {/* Show Alert Triggers if any */}
+                {lead.alert_triggers && Object.entries(lead.alert_triggers).some(([_, v]) => v) && (
+                  <div className="pt-3 border-t border-gray-100">
+                    <div className="text-xs font-medium text-gray-700 mb-2">Active Triggers:</div>
+                    <div className="space-y-1">
+                      {Object.entries(lead.alert_triggers)
+                        .filter(([_, triggered]) => triggered)
+                        .map(([trigger, _]) => (
+                          <div key={trigger} className="flex items-center gap-2 text-xs">
+                            <div className="w-1.5 h-1.5 bg-green-500 rounded-full"></div>
+                            <span className="text-gray-600">
+                              {trigger.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                            </span>
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -857,6 +1063,15 @@ useEffect(() => {
                   <div>
                     <span className="text-gray-600">Last Active:</span>
                     <p className="text-gray-900 mt-1">{formatDate(lead.last_interaction)}</p>
+                  </div>
+                )}
+
+                {lead.stage_override_reason && (
+                  <div>
+                    <span className="text-gray-600">Stage Override:</span>
+                    <p className="text-gray-900 mt-1 text-xs">
+                      {lead.stage_override_reason.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                    </p>
                   </div>
                 )}
               </div>

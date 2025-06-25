@@ -131,12 +131,34 @@ serve(async (req) => {
     }
 
     // 4. Get tenant's Twilio phone number
-    const { data: phoneNumber, error: phoneError } = await supabase
-      .from("phone_numbers")
-      .select("phone_number, twilio_sid")
-      .eq("tenant_id", tenant_id)
-      .eq("status", "active")
-      .single();
+    // 4. Get campaign's assigned phone number
+const { data: phoneNumber, error: phoneError } = await supabase
+  .from("campaigns")
+  .select(`
+    phone_number_id,
+    phone_numbers (
+      phone_number,
+      twilio_sid,
+      status
+    )
+  `)
+  .eq("id", campaign_id)
+  .eq("tenant_id", tenant_id)
+  .single();
+
+if (phoneError || !phoneNumber || !phoneNumber.phone_numbers) {
+  console.error("❌ Error fetching campaign phone number:", phoneError);
+  return new Response(
+    JSON.stringify({ error: "No phone number assigned to campaign" }),
+    { 
+      status: 400, 
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    }
+  );
+}
+
+// Extract the actual phone number
+const campaignPhoneNumber = phoneNumber.phone_numbers.phone_number;
 
     if (phoneError || !phoneNumber) {
       console.error("❌ Error fetching phone number:", phoneError);
@@ -241,7 +263,7 @@ Generate a personalized initial outreach message for this lead based on the inst
         "Content-Type": "application/x-www-form-urlencoded",
       },
       body: new URLSearchParams({
-        From: phoneNumber.phone_number,
+        From: campaignPhoneNumber,
         To: lead.phone,
         Body: aiMessage,
       }),
@@ -264,7 +286,7 @@ Generate a personalized initial outreach message for this lead based on the inst
         message_id: twilioData.sid,
         direction: "outbound",
         message_body: aiMessage,
-        sender: phoneNumber.phone_number,
+        sender: campaignPhoneNumber,
         channel: "sms",
         timestamp: new Date().toISOString(),
         phone: lead.phone,

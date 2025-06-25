@@ -116,6 +116,16 @@ serve(async (req) => {
       );
     }
 
+    // ✅ NEW: Check if this lead has ever responded
+    const { data: messageHistory } = await supabase
+      .from("messages")
+      .select("direction")
+      .eq("lead_id", lead_id)
+      .eq("direction", "inbound");
+
+    const hasEverResponded = messageHistory && messageHistory.length > 0;
+    console.log(`📊 Lead engagement history: ${hasEverResponded ? `${messageHistory.length} responses` : 'Never responded'}`);
+
     // 3. Get campaign details for AI context
     const { data: campaign, error: campaignError } = await supabase
       .from("campaigns")
@@ -136,23 +146,33 @@ serve(async (req) => {
     }
 
     // 4. Get tenant's Twilio phone number
-    const { data: phoneNumber, error: phoneError } = await supabase
-      .from("phone_numbers")
-      .select("phone_number, twilio_sid")
-      .eq("tenant_id", tenant_id)
-      .eq("status", "active")
-      .single();
+// 4. Get campaign's assigned phone number
+const { data: campaignPhone, error: phoneError } = await supabase
+  .from("campaigns")
+  .select(`
+    phone_number_id,
+    phone_numbers (
+      phone_number,
+      twilio_sid,
+      status
+    )
+  `)
+  .eq("id", campaign_id)
+  .eq("tenant_id", tenant_id)
+  .single();
 
-    if (phoneError || !phoneNumber) {
-      console.error("❌ Error fetching phone number:", phoneError);
-      return new Response(
-        JSON.stringify({ error: "No active phone number found for tenant" }),
-        { 
-          status: 400, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
-      );
+if (phoneError || !campaignPhone || !campaignPhone.phone_numbers) {
+  console.error("❌ Error fetching campaign phone number:", phoneError);
+  return new Response(
+    JSON.stringify({ error: "No phone number assigned to campaign" }),
+    { 
+      status: 400, 
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     }
+  );
+}
+
+const phoneNumber = campaignPhone.phone_numbers;
 
     // 5. Get follow-up AI instruction template
     const instructionKey = `ai_instruction_followup_${follow_up_stage}`;
@@ -174,6 +194,33 @@ serve(async (req) => {
       );
     }
 
+    // ✅ NEW: Modify instructions based on engagement history
+    let modifiedInstructions = aiInstructions.value;
+
+    if (hasEverResponded) {
+      // Add context for re-engagement
+      const reengagementPrefix = `IMPORTANT CONTEXT: This lead has previously engaged with us in conversation but has gone silent. 
+  
+Adjust your approach accordingly:
+- Reference that we've been in touch before (but don't be specific about dates/times)
+- Use a warmer, more familiar tone as if continuing a conversation
+- Show understanding that they might be busy or priorities might have changed
+- Avoid sounding like this is a cold first-time outreach
+- Keep the message brief and friendly
+- Consider asking if their situation or needs have changed
+
+Remember: This is follow-up #${follow_up_stage} to someone who WAS engaged but stopped responding.
+
+Now, follow these instructions with the above context in mind:
+
+`;
+
+      modifiedInstructions = reengagementPrefix + modifiedInstructions;
+      console.log(`🔄 Using re-engagement approach for lead ${lead_id} (${lead.name}) who previously responded`);
+    } else {
+      console.log(`📤 Using standard follow-up approach for lead ${lead_id} (${lead.name}) who never responded`);
+    }
+
     // 6. Get field configuration for this tenant
     const { data: fieldConfig, error: fieldError } = await supabase
       .from("lead_field_config")
@@ -185,14 +232,14 @@ serve(async (req) => {
     }
 
     // 7. Inject this lead's data into the follow-up template
-    const genericTemplate = aiInstructions.value;
+    const genericTemplate = modifiedInstructions; // Now using the modified version
     const personalizedInstructions = injectLeadDataIntoTemplate(
       genericTemplate,
       lead,
       fieldConfig || []
     );
 
-    console.log(`📋 Personalized follow-up ${follow_up_stage} instructions for ${lead.name}:`, personalizedInstructions);
+    console.log(`📋 Personalized follow-up ${follow_up_stage} instructions for ${lead.name}:`, personalizedInstructions.substring(0, 200) + '...');
 
     // 8. Generate AI message using OpenAI with personalized instructions
     const openaiApiKey = Deno.env.get("OPENAI_API_KEY");
@@ -321,6 +368,7 @@ This is follow-up message #${follow_up_stage}. Generate a personalized follow-up
         ai_message: aiMessage,
         follow_up_stage: follow_up_stage,
         sequence_complete: follow_up_stage === 3,
+        was_reengagement: hasEverResponded,
         personalized_instructions: personalizedInstructions // For debugging
       }),
       {

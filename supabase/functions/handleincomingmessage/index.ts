@@ -178,6 +178,19 @@ serve(async (req) => {
       })
       .select('id');
 
+      if (!insertError) {
+  console.log(`📊 Triggering lead scoring for ${lead_id}`);
+  await fetch("https://wuuqrdlfgkasnwydyvgk.supabase.co/functions/v1/score-lead", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`
+    },
+    body: JSON.stringify({ lead_id })
+  });
+}
+
+
     if (insertError || !insertedMessage || insertedMessage.length === 0) {
       console.error('❌ Failed to insert message:', insertError);
       return new Response(`<Response><Message>Error saving message. Please try again.</Message></Response>`, {

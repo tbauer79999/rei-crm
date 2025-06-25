@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ScatterChart, Scatter } from 'recharts';
 import { TrendingUp, Users, Target, DollarSign, Calendar, Filter, Download, RefreshCw, BarChart3, Brain, Settings, Plus, Eye, ArrowRight, Award, TestTube, Database, Activity, MessageSquare } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
@@ -12,6 +12,11 @@ export default function BusinessAnalytics() {
   const [selectedCampaign, setSelectedCampaign] = useState('all');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [pipelineValue, setPipelineValue] = useState(0);
+  
+  // Use refs to prevent multiple initializations
+  const isInitialized = useRef(false);
+  const isLoadingData = useRef(false);
 
   // Real data state
   const [dashboardData, setDashboardData] = useState({
@@ -24,37 +29,19 @@ export default function BusinessAnalytics() {
     salesRepPerformance: []
   });
 
-  // Initialize analytics service and load data
-  useEffect(() => {
-    const initializeAndLoadData = async () => {
-      if (!user) return;
-
-      try {
-        setLoading(true);
-        await analyticsService.initialize(user);
-        await loadAllData();
-      } catch (err) {
-        console.error('Error initializing analytics:', err);
-        setError('Failed to load analytics data');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    initializeAndLoadData();
-  }, [user]);
-
-  // Reload data when date range changes
-  useEffect(() => {
-    if (user) {
-      analyticsService.setDateRange(dateRange);
-      loadAllData();
+  // Memoized load function to prevent recreation
+  const loadAllData = useCallback(async () => {
+    // Prevent concurrent loads
+    if (isLoadingData.current) {
+      console.log('⚠️ Already loading data, skipping...');
+      return;
     }
-  }, [dateRange, user]);
 
-  const loadAllData = async () => {
+    isLoadingData.current = true;
+    
     try {
       setLoading(true);
+      console.log('📊 Loading all analytics data...');
       
       const [
         campaigns,
@@ -63,7 +50,8 @@ export default function BusinessAnalytics() {
         aiInsights,
         leadSourceROI,
         historicalTrends,
-        salesRepPerformance
+        salesRepPerformance,
+        totalPipelineValue
       ] = await Promise.all([
         analyticsService.getCampaignOverview(),
         analyticsService.getPerformanceMetrics(),
@@ -71,7 +59,8 @@ export default function BusinessAnalytics() {
         analyticsService.getAIPerformanceInsights(),
         analyticsService.getLeadSourceROI(),
         analyticsService.getHistoricalTrends(),
-        analyticsService.getSalesRepPerformance()
+        analyticsService.getSalesRepPerformance(),
+        analyticsService.getTotalPipelineValue()
       ]);
 
       setDashboardData({
@@ -84,14 +73,55 @@ export default function BusinessAnalytics() {
         salesRepPerformance
       });
 
+      setPipelineValue(totalPipelineValue);
+
       setError('');
+      console.log('✅ Analytics data loaded successfully');
     } catch (err) {
       console.error('Error loading analytics data:', err);
       setError('Failed to load analytics data');
     } finally {
       setLoading(false);
+      isLoadingData.current = false;
     }
-  };
+  }, []); // Empty deps, function never changes
+
+  // Initialize analytics service only once
+  useEffect(() => {
+    const initializeAndLoadData = async () => {
+      if (!user || isInitialized.current) return;
+
+      isInitialized.current = true;
+      
+      try {
+        console.log('🔧 Initializing analytics service...');
+        await analyticsService.initialize(user);
+        await loadAllData();
+      } catch (err) {
+        console.error('Error initializing analytics:', err);
+        setError('Failed to load analytics data');
+        setLoading(false);
+      }
+    };
+
+    initializeAndLoadData();
+  }, [user, loadAllData]);
+
+  // Handle date range changes
+  useEffect(() => {
+    if (!user || !isInitialized.current || loading) return;
+    
+    console.log('📅 Date range changed to:', dateRange);
+    analyticsService.setDateRange(dateRange);
+    loadAllData();
+  }, [dateRange, loadAllData]);
+
+  // Prevent data reload on tab change
+  const handleViewChange = useCallback((newView) => {
+    console.log('🔄 Switching view to:', newView);
+    setActiveView(newView);
+    // Don't reload data when switching tabs
+  }, []);
 
   const GlobalFilterBar = () => (
     <div className="bg-white border-b border-gray-200 px-6 py-4 sticky top-0 z-50">
@@ -125,7 +155,7 @@ export default function BusinessAnalytics() {
         <div className="ml-auto flex items-center space-x-3">
           <button 
             onClick={loadAllData}
-            disabled={loading}
+            disabled={loading || isLoadingData.current}
             className="flex items-center px-3 py-2 text-gray-600 hover:text-gray-900 text-sm disabled:opacity-50"
           >
             <RefreshCw className={`w-4 h-4 mr-1 ${loading ? 'animate-spin' : ''}`} />
@@ -147,7 +177,7 @@ export default function BusinessAnalytics() {
       { id: 'ai-performance', name: 'AI Performance', icon: Brain },
       { id: 'performance-analytics', name: 'Performance Analytics', icon: Activity },
       { id: 'abtesting', name: 'A/B Testing', icon: TestTube },
-      { id: 'sales-outcomes', name: 'Sales Outcomes', icon: DollarSign },
+      { id: 'sales-outcomes', name: 'Team Performance', icon: Award },
       { id: 'custom-reports', name: 'Custom Reports', icon: Settings }
     ];
 
@@ -177,8 +207,6 @@ export default function BusinessAnalytics() {
       </div>
     );
   };
-
-
 
   const OverviewReports = () => {
     if (loading) {
@@ -630,33 +658,51 @@ export default function BusinessAnalytics() {
       <div className="space-y-6">
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
           <div className="px-6 py-4 border-b border-gray-100">
-            <h3 className="text-lg font-semibold text-gray-900">Sales Rep Performance</h3>
+            <h3 className="text-lg font-semibold text-gray-900">Lead Qualification Performance</h3>
+            <p className="text-sm text-gray-600 mt-1">Team performance in converting leads to hot status</p>
           </div>
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sales Rep</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Hot Leads</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Won</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Revenue</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Win Rate</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Team Member</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Leads Assigned</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Hot Leads Generated</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Pipeline Value</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Conversion Rate</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {salesRepPerformance.map((rep, index) => (
-                  <tr key={index} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 text-sm font-medium text-gray-900">{rep.rep}</td>
-                    <td className="px-6 py-4 text-sm text-gray-900">{rep.hotLeadsReceived}</td>
-                    <td className="px-6 py-4 text-sm text-gray-900">{rep.won}</td>
-                    <td className="px-6 py-4 text-sm text-gray-900">${rep.revenue?.toLocaleString() || 0}</td>
-                    <td className="px-6 py-4">
-                      <span className="text-sm font-semibold text-gray-900">
-                        {rep.hotLeadsReceived > 0 ? ((rep.won/rep.hotLeadsReceived)*100).toFixed(1) : 0}%
-                      </span>
+                {salesRepPerformance && salesRepPerformance.length > 0 ? (
+                  salesRepPerformance.map((rep, index) => (
+                    <tr key={index} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 text-sm font-medium text-gray-900">{rep.rep}</td>
+                      <td className="px-6 py-4 text-sm text-gray-900">{rep.totalLeadsAssigned || 0}</td>
+                      <td className="px-6 py-4 text-sm text-gray-900">
+                        <span className="font-semibold text-green-600">{rep.hotLeadsGenerated || 0}</span>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-900">
+                        ${(rep.pipelineValue || 0).toLocaleString()}
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className={`inline-flex px-3 py-1 text-xs font-semibold rounded-full ${
+                          rep.conversionRate >= 75 ? 'bg-green-100 text-green-800' :
+                          rep.conversionRate >= 50 ? 'bg-yellow-100 text-yellow-800' :
+                          rep.conversionRate > 0 ? 'bg-orange-100 text-orange-800' :
+                          'bg-gray-100 text-gray-800'
+                        }`}>
+                          {rep.conversionRate || 0}%
+                        </span>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan="5" className="px-6 py-8 text-center text-sm text-gray-500">
+                      No team data available. Add team members in the Sales Team section.
                     </td>
                   </tr>
-                ))}
+                )}
               </tbody>
             </table>
           </div>
@@ -664,32 +710,42 @@ export default function BusinessAnalytics() {
 
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
           <div className="px-6 py-4 border-b border-gray-100">
-            <h3 className="text-lg font-semibold text-gray-900">Revenue Summary</h3>
+            <h3 className="text-lg font-semibold text-gray-900">Lead Qualification Summary</h3>
           </div>
           <div className="p-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
               <div className="text-center p-4 bg-blue-50 rounded-lg">
-                <DollarSign className="w-8 h-8 mx-auto text-blue-600 mb-2" />
+                <Users className="w-8 h-8 mx-auto text-blue-600 mb-2" />
                 <span className="text-2xl font-bold text-blue-600">
-                  ${(salesRepPerformance.reduce((acc, rep) => acc + (rep.revenue || 0), 0)/1000).toFixed(0)}K
+                  {salesRepPerformance.reduce((acc, rep) => acc + (rep.totalLeadsAssigned || 0), 0)}
                 </span>
-                <p className="text-sm text-gray-600">Total Revenue</p>
+                <p className="text-sm text-gray-600">Total Leads Assigned</p>
               </div>
               <div className="text-center p-4 bg-green-50 rounded-lg">
-                <Award className="w-8 h-8 mx-auto text-green-600 mb-2" />
+                <Target className="w-8 h-8 mx-auto text-green-600 mb-2" />
                 <span className="text-2xl font-bold text-green-600">
-                  {salesRepPerformance.reduce((acc, rep) => acc + (rep.won || 0), 0)}
+                  {salesRepPerformance.reduce((acc, rep) => acc + (rep.hotLeadsGenerated || 0), 0)}
                 </span>
-                <p className="text-sm text-gray-600">Deals Won</p>
+                <p className="text-sm text-gray-600">Hot Leads Generated</p>
               </div>
               <div className="text-center p-4 bg-purple-50 rounded-lg">
                 <TrendingUp className="w-8 h-8 mx-auto text-purple-600 mb-2" />
                 <span className="text-2xl font-bold text-purple-600">
-                  {salesRepPerformance.length > 0 ? 
-                    ((salesRepPerformance.reduce((acc, rep) => acc + rep.won, 0) / 
-                      salesRepPerformance.reduce((acc, rep) => acc + rep.hotLeadsReceived, 0)) * 100).toFixed(1) : 0}%
+                  {(() => {
+                    const totalAssigned = salesRepPerformance.reduce((acc, rep) => acc + (rep.totalLeadsAssigned || 0), 0);
+                    const totalHot = salesRepPerformance.reduce((acc, rep) => acc + (rep.hotLeadsGenerated || 0), 0);
+                    if (totalAssigned === 0) return '0%';
+                    return `${((totalHot / totalAssigned) * 100).toFixed(1)}%`;
+                  })()}
                 </span>
-                <p className="text-sm text-gray-600">Win Rate</p>
+                <p className="text-sm text-gray-600">Overall Conversion Rate</p>
+              </div>
+              <div className="text-center p-4 bg-orange-50 rounded-lg">
+                <DollarSign className="w-8 h-8 mx-auto text-orange-600 mb-2" />
+                <span className="text-2xl font-bold text-orange-600">
+                  ${(pipelineValue/1000).toFixed(0)}K
+                </span>
+                <p className="text-sm text-gray-600">Total Pipeline Value</p>
               </div>
             </div>
           </div>
@@ -760,7 +816,7 @@ export default function BusinessAnalytics() {
   return (
     <div className="min-h-screen bg-gray-50">
       <GlobalFilterBar />
-      <NavigationTabs activeView={activeView} setActiveView={setActiveView} />
+      <NavigationTabs activeView={activeView} setActiveView={handleViewChange} />
       <div className="px-6 py-8">
         {renderActiveView()}
       </div>

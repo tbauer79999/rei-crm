@@ -21,7 +21,7 @@ router.get('/', async (req, res) => {
       return res.status(403).json({ error: 'No tenant access configured' });
     }
 
-    // Build query based on role
+    // Get ALL leads with their lead_scores
     let query = supabase
       .from('leads')
       .select(`
@@ -31,9 +31,13 @@ router.get('/', async (req, res) => {
         marked_hot_at,
         call_logged,
         created_at,
-        campaign
+        campaign,
+        lead_scores (
+          hot_score,
+          requires_immediate_attention,
+          alert_priority
+        )
       `)
-      .eq('status', 'Hot Lead')
       .order('marked_hot_at', { ascending: false });
 
     // Apply tenant filtering
@@ -41,18 +45,41 @@ router.get('/', async (req, res) => {
       query = query.eq('tenant_id', tenant_id);
     }
 
-    const { data: hotLeads, error: leadsError } = await query;
+    const { data: allLeads, error: leadsError } = await query;
 
     if (leadsError) {
-      console.error('Error fetching hot leads:', leadsError);
+      console.error('Error fetching leads:', leadsError);
       throw leadsError;
     }
 
-    console.log('Found hot leads:', hotLeads?.length || 0);
+    // Filter in JavaScript to get leads that are EITHER:
+    // 1. Critical (requires_immediate_attention = true) regardless of status/score
+    // 2. Have status = 'Hot Lead'
+    const hotLeads = (allLeads || []).filter(lead => 
+      lead.lead_scores?.requires_immediate_attention === true || 
+      lead.status === 'Hot Lead'
+    ).sort((a, b) => {
+      // Sort critical leads first
+      const aCritical = a.lead_scores?.requires_immediate_attention || false;
+      const bCritical = b.lead_scores?.requires_immediate_attention || false;
+      
+      if (aCritical && !bCritical) return -1;
+      if (!aCritical && bCritical) return 1;
+      
+      // Then by hot score
+      const aScore = a.lead_scores?.hot_score || 0;
+      const bScore = b.lead_scores?.hot_score || 0;
+      return bScore - aScore;
+    });
 
-    // For each hot lead, get their latest message for context
+    console.log('Total leads fetched:', allLeads?.length || 0);
+    console.log('Filtered hot/critical leads:', hotLeads.length);
+    console.log('Critical leads:', hotLeads.filter(l => l.lead_scores?.requires_immediate_attention).length);
+    console.log('Hot status leads:', hotLeads.filter(l => l.status === 'Hot Lead').length);
+
+    // For each hot/critical lead, get their latest message for context
     const leadsWithMessages = await Promise.all(
-      (hotLeads || []).map(async (lead) => {
+      hotLeads.map(async (lead) => {
         // Get latest message for this lead
         const { data: messages } = await supabase
           .from('messages')
@@ -63,7 +90,7 @@ router.get('/', async (req, res) => {
 
         const latestMessage = messages?.[0];
 
-        // Calculate time since marked hot
+        // Calculate time since marked hot or became critical
         let marked_hot_time_ago = '—';
         if (lead.marked_hot_at) {
           const markedTime = new Date(lead.marked_hot_at);
@@ -77,6 +104,19 @@ router.get('/', async (req, res) => {
           } else {
             marked_hot_time_ago = `${Math.floor(diffMinutes / 1440)}d ago`;
           }
+        } else if (lead.lead_scores?.requires_immediate_attention) {
+          // If no marked_hot_at but is critical, use created_at
+          const createdTime = new Date(lead.created_at);
+          const now = new Date();
+          const diffMinutes = Math.floor((now - createdTime) / (1000 * 60));
+          
+          if (diffMinutes < 60) {
+            marked_hot_time_ago = `${diffMinutes}m ago (critical)`;
+          } else if (diffMinutes < 1440) {
+            marked_hot_time_ago = `${Math.floor(diffMinutes / 60)}h ago (critical)`;
+          } else {
+            marked_hot_time_ago = `${Math.floor(diffMinutes / 1440)}d ago (critical)`;
+          }
         }
 
         return {
@@ -85,16 +125,31 @@ router.get('/', async (req, res) => {
           marked_hot_time_ago,
           snippet: latestMessage?.message_body?.slice(0, 80) + '...' || 'No recent messages',
           call_logged: lead.call_logged || false,
-          campaign: lead.campaign
+          campaign: lead.campaign,
+          status: lead.status,
+          // Include lead_scores data
+          hot_score: lead.lead_scores?.hot_score || 0,
+          requires_immediate_attention: lead.lead_scores?.requires_immediate_attention || false,
+          alert_priority: lead.lead_scores?.alert_priority || 'none'
         };
       })
     );
 
-    console.log('Hot leads with messages:', leadsWithMessages.length);
+    console.log('Hot/critical leads with messages:', leadsWithMessages.length);
+
+    // Count different types of leads
+    const criticalCount = leadsWithMessages.filter(l => l.requires_immediate_attention).length;
+    const hotCount = leadsWithMessages.filter(l => !l.requires_immediate_attention && l.status === 'Hot Lead').length;
 
     res.json({ 
       hotLeads: leadsWithMessages,
-      meta: { role, tenant_id, hot_leads_count: leadsWithMessages.length }
+      meta: { 
+        role, 
+        tenant_id, 
+        total_count: leadsWithMessages.length,
+        hot_leads_count: hotCount,
+        critical_leads_count: criticalCount
+      }
     });
 
   } catch (err) {
