@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { useAuth } from '../context/AuthContext';
 import Button from '../components/ui/button';
 import supabase from '../lib/supabaseClient';
@@ -38,6 +39,83 @@ import {
 
 // API Base URL - Add this after imports
 const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+
+// Knowledge Assets Dropdown Component
+const KnowledgeAssetsDropdown = ({ campaign, knowledgeAssets, selectedAssets, onUpdate, isOpen, onToggle }) => {
+  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0, width: 0 });
+  const [openUpward, setOpenUpward] = useState(false);
+  
+  useEffect(() => {
+    if (isOpen) {
+      const button = document.getElementById(`knowledge-dropdown-${campaign.id}`);
+      if (button) {
+        const rect = button.getBoundingClientRect();
+        const spaceBelow = window.innerHeight - rect.bottom;
+        const dropdownHeight = 240;
+        
+        setOpenUpward(spaceBelow < dropdownHeight);
+        setDropdownPosition({
+          top: openUpward ? rect.top - dropdownHeight - 4 : rect.bottom + 4,
+          left: rect.left,
+          width: rect.width
+        });
+      }
+    }
+  }, [isOpen, campaign.id, openUpward]);
+  
+  if (!isOpen) return null;
+  
+  return createPortal(
+    <div
+      className="fixed z-50"
+      style={{
+        top: `${dropdownPosition.top}px`,
+        left: `${dropdownPosition.left}px`,
+        minWidth: `${Math.max(dropdownPosition.width, 256)}px`
+      }}
+    >
+      <div className="w-64 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-auto">
+        {knowledgeAssets.length === 0 ? (
+          <div className="px-3 py-2 text-sm text-gray-500">No knowledge assets available</div>
+        ) : (
+          <div className="py-1">
+            {knowledgeAssets.map((asset) => {
+              const isSelected = selectedAssets?.includes(asset.id);
+              const icon = asset.source_type === 'pdf' ? '📄' : '🌐';
+              const displayText = asset.source_type === 'pdf' 
+                ? asset.title || asset.file_name || 'Untitled PDF'
+                : asset.website_url || 'Untitled Website';
+              
+              return (
+                <label
+                  key={asset.id}
+                  className="flex items-center px-3 py-2 hover:bg-gray-50 cursor-pointer"
+                >
+                  <input
+                    type="checkbox"
+                    checked={isSelected}
+                    onChange={(e) => onUpdate(asset.id, e.target.checked)}
+                    className="mr-2 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  />
+                  <span className="text-sm flex items-center flex-1 min-w-0">
+                    <span className="mr-2">{icon}</span>
+                    <span className="truncate" title={displayText}>
+                      {displayText}
+                    </span>
+                  </span>
+                  <span className="ml-2 text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
+                    {asset.source_type}
+                  </span>
+                </label>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>,
+    document.body
+  );
+};
 
 // Campaign Progress Component
 const CampaignProgress = ({ campaignId }) => {
@@ -103,6 +181,10 @@ export default function CampaignManagement() {
   });
   const [tenantNames, setTenantNames] = useState({});
   const [tenantNamesLoaded, setTenantNamesLoaded] = useState(false);
+  const [tenantIndustry, setTenantIndustry] = useState('');
+  const [knowledgeAssets, setKnowledgeAssets] = useState([]);
+  const [selectedKnowledgeAssets, setSelectedKnowledgeAssets] = useState({});
+  const [knowledgeDropdownOpen, setKnowledgeDropdownOpen] = useState({});
   
   // Campaign creation form state
   const [isCreating, setIsCreating] = useState(false);
@@ -122,6 +204,193 @@ export default function CampaignManagement() {
 
   const isGlobalAdmin = user?.role === 'global_admin';
   const [isFetching, setIsFetching] = useState(false);
+
+  // Fetch tenant industry
+  const fetchTenantIndustry = async () => {
+    try {
+      if (!user?.tenant_id) return;
+      
+      const { data, error } = await supabase
+        .from('tenants')
+        .select('industry')
+        .eq('id', user.tenant_id)
+        .single();
+      
+      if (error) throw error;
+      
+      setTenantIndustry(data?.industry || '');
+      console.log('Tenant industry:', data?.industry);
+    } catch (err) {
+      console.error('Error fetching tenant industry:', err);
+    }
+  };
+
+  // Fetch knowledge assets
+  const fetchKnowledgeAssets = async () => {
+    try {
+      if (!user?.tenant_id) return;
+      
+      const { data, error } = await supabase
+        .from('knowledge_base')
+        .select('id, title, source_type, file_url, website_url, created_at')
+        .eq('tenant_id', user.tenant_id)
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      
+      setKnowledgeAssets(data || []);
+      console.log('Knowledge assets:', data);
+    } catch (err) {
+      console.error('Error fetching knowledge assets:', err);
+    }
+  };
+
+  // Fetch campaign knowledge links
+  const fetchCampaignKnowledgeLinks = async (campaignId) => {
+    try {
+      const { data: links, error } = await supabase
+        .from('campaign_knowledge_links')
+        .select('knowledge_id')
+        .eq('campaign_id', campaignId);
+      
+      if (error) throw error;
+      
+      return links?.map(link => link.knowledge_id) || [];
+    } catch (err) {
+      console.error('Error fetching campaign knowledge links:', err);
+      return [];
+    }
+  };
+
+  // Update campaign knowledge links
+  const updateCampaignKnowledgeLinks = async (campaignId, selectedIds) => {
+    try {
+      // Delete existing links
+      const { error: deleteError } = await supabase
+        .from('campaign_knowledge_links')
+        .delete()
+        .eq('campaign_id', campaignId);
+      
+      if (deleteError) throw deleteError;
+      
+      // Insert new links if any
+      if (selectedIds.length > 0) {
+        const newLinks = selectedIds.map((knowledge_id) => ({
+          campaign_id: campaignId,
+          knowledge_id: knowledge_id
+        }));
+        
+        const { error: insertError } = await supabase
+          .from('campaign_knowledge_links')
+          .insert(newLinks);
+        
+        if (insertError) throw insertError;
+      }
+      
+      console.log('Successfully updated knowledge links for campaign:', campaignId);
+    } catch (err) {
+      console.error('Error updating campaign knowledge links:', err);
+      setError('Failed to update knowledge assets');
+    }
+  };
+
+  // Get the dynamic column header based on industry
+  const getDynamicColumnHeader = () => {
+    switch (tenantIndustry) {
+      case 'Staffing':
+        return 'Talk Track';
+      case 'Home Services':
+      case 'Financial Services':
+      case 'Mortgage Lending':
+        return 'Service Type';
+      case 'Auto Sales':
+        return 'Vehicle Type';
+      default:
+        return null;
+    }
+  };
+
+  // Get the dynamic dropdown options based on industry
+  const getDynamicDropdownOptions = () => {
+    switch (tenantIndustry) {
+      case 'Staffing':
+        return [
+          { value: 'recruiting_candidates', label: 'Recruiting Candidates (B2C)' },
+          { value: 'acquiring_clients', label: 'Acquiring Clients (B2B)' }
+        ];
+      case 'Home Services':
+        return [
+          { value: 'hvac', label: 'HVAC' },
+          { value: 'roofing', label: 'Roofing' },
+          { value: 'solar', label: 'Solar' },
+          { value: 'lawn_care', label: 'Lawn Care' },
+          { value: 'plumbing', label: 'Plumbing' },
+          { value: 'other', label: 'Other' }
+        ];
+      case 'Financial Services':
+        return [
+          { value: 'mortgage_lending', label: 'Mortgage Lending' },
+          { value: 'insurance', label: 'Insurance' },
+          { value: 'credit_repair', label: 'Credit Repair' },
+          { value: 'tax_relief', label: 'Tax Relief' }
+        ];
+      case 'Auto Sales':
+        return [
+          { value: 'new_cars', label: 'New Cars' },
+          { value: 'used_cars', label: 'Used Cars' },
+          { value: 'lease_offers', label: 'Lease Offers' },
+          { value: 'trade_in_leads', label: 'Trade-In Leads' }
+        ];
+      case 'Mortgage Lending':
+        return [
+          { value: 'purchase', label: 'Purchase' },
+          { value: 'refinance', label: 'Refinance' },
+          { value: 'heloc', label: 'HELOC' },
+          { value: 'pre_approval', label: 'Pre-Approval' }
+        ];
+      default:
+        return [];
+    }
+  };
+
+  // Update campaign dynamic field (generic function for all industry-specific fields)
+  const updateCampaignDynamicField = async (campaignId, value) => {
+    try {
+      // Determine which field to update based on industry
+      let fieldName = '';
+      switch (tenantIndustry) {
+        case 'Staffing':
+          fieldName = 'talk_track';
+          break;
+        case 'Home Services':
+        case 'Financial Services':
+        case 'Mortgage Lending':
+          fieldName = 'service_type';
+          break;
+        case 'Auto Sales':
+          fieldName = 'vehicle_type';
+          break;
+        default:
+          return;
+      }
+
+      const { error } = await supabase
+        .from('campaigns')
+        .update({ [fieldName]: value })
+        .eq('id', campaignId);
+
+      if (error) throw error;
+
+      setCampaigns(campaigns.map(c => 
+        c.id === campaignId ? { ...c, [fieldName]: value } : c
+      ));
+      
+      setError('');
+    } catch (err) {
+      console.error('Error updating campaign dynamic field:', err);
+      setError('Failed to update campaign');
+    }
+  };
 
   // Fetch campaigns from API
   const fetchCampaigns = async () => {
@@ -170,13 +439,16 @@ export default function CampaignManagement() {
       // Fetch sales team assignments AND phone numbers for campaigns
       const campaignIds = data.map(c => c.id);
       if (campaignIds.length > 0) {
-        // Get campaign details with phone numbers
+        // Get campaign details with phone numbers and dynamic fields
         const { data: campaignDetails, error: detailError } = await supabase
           .from('campaigns')
           .select(`
             id, 
             assigned_to_sales_team_id,
             phone_number_id,
+            talk_track,
+            service_type,
+            vehicle_type,
             phone_numbers (
               id,
               phone_number
@@ -211,7 +483,10 @@ export default function CampaignManagement() {
               assigned_to_name: salesPerson?.full_name,
               assigned_to_email: salesPerson?.email,
               phone_number_id: details?.phone_number_id,
-              phone_number: details?.phone_numbers?.phone_number || null
+              phone_number: details?.phone_numbers?.phone_number || null,
+              talk_track: details?.talk_track,
+              service_type: details?.service_type,
+              vehicle_type: details?.vehicle_type
             };
           });
           
@@ -238,9 +513,11 @@ export default function CampaignManagement() {
     
     const loadData = async () => {
       if (user?.tenant_id && mounted) {
+        await fetchTenantIndustry();
         await fetchCampaigns();
         await fetchSalesTeamMembers();
         await fetchPhoneNumbers();
+        await fetchKnowledgeAssets();
         
         if (isGlobalAdmin && mounted) {
           await fetchTenants();
@@ -256,6 +533,38 @@ export default function CampaignManagement() {
     };
   }, [user?.tenant_id, isGlobalAdmin]);
 
+  // Load campaign knowledge links
+  useEffect(() => {
+    const loadKnowledgeLinks = async () => {
+      for (const campaign of campaigns) {
+        const linkedIds = await fetchCampaignKnowledgeLinks(campaign.id);
+        setSelectedKnowledgeAssets(prev => ({
+          ...prev,
+          [campaign.id]: linkedIds
+        }));
+      }
+    };
+    
+    if (campaigns.length > 0) {
+      loadKnowledgeLinks();
+    }
+  }, [campaigns]);
+
+  // Close knowledge dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      // Check if click is outside of any knowledge dropdown button or portal content
+      const isClickInsideButton = event.target.closest('[id^="knowledge-dropdown-"]');
+      const isClickInsidePortal = event.target.closest('.fixed.z-50');
+      
+      if (!isClickInsideButton && !isClickInsidePortal) {
+        setKnowledgeDropdownOpen({});
+      }
+    };
+    
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, []);
 
   // Load form data when create modal opens
   useEffect(() => {
@@ -585,8 +894,8 @@ export default function CampaignManagement() {
   };
 
   const handleCreateCampaign = async () => {
-    if (!campaignForm.name || !campaignForm.goal || !campaignForm.phoneNumberId) {
-      setError('Campaign name, goal, and phone number are required');
+    if (!campaignForm.name.trim()) {
+      setError('Campaign name is required');
       return;
     }
 
@@ -601,24 +910,20 @@ export default function CampaignManagement() {
 
       const campaignData = {
         name: campaignForm.name.trim(),
-        description: campaignForm.description?.trim() || null,
+        description: null,
         start_date: startDate,
         end_date: null,
-        phone_number_id: campaignForm.phoneNumberId || null,
-        target_audience: campaignForm.goal ? { 
-          goal: campaignForm.goal,
-          routingTags: campaignForm.routingTags,
-          color: campaignForm.color
-        } : null,
-        ai_prompt_template: campaignForm.aiArchetype || null,
+        phone_number_id: null,
+        target_audience: null,
+        ai_prompt_template: null,
         created_by_email: user.email,
         tenant_id: user.tenant_id,
         is_active: true,
-        ai_outreach_enabled: campaignForm.aiEnabled,
-        ai_on: campaignForm.aiEnabled,
+        ai_outreach_enabled: false,
+        ai_on: false,
         archived: false,
-        ai_archetype_id: campaignForm.aiArchetype || null,
-        assigned_to_sales_team_id: campaignForm.assignedTo || null
+        ai_archetype_id: null,
+        assigned_to_sales_team_id: null
       };
 
       console.log('🔍 Creating campaign with data:', campaignData);
@@ -753,6 +1058,9 @@ export default function CampaignManagement() {
   const totalCampaigns = campaigns.length;
   const activeCampaigns = campaigns.filter(c => c.is_active === true && c.ai_on === true).length;
 
+  // Check if we should show the dynamic column
+  const showDynamicColumn = ['Staffing', 'Home Services', 'Financial Services', 'Auto Sales', 'Mortgage Lending'].includes(tenantIndustry);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -834,7 +1142,7 @@ export default function CampaignManagement() {
               <CheckCircle className="w-5 h-5 text-green-600" />
             </div>
             <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Leads Processed</p>
+              <p className="text-sm font-medium text-gray-600">Leads Analyzed</p>
               <p className="text-2xl font-bold text-gray-900">{campaignStats.processedLeads.toLocaleString()}</p>
               <p className="text-xs text-gray-500 mt-1">
                 {campaignStats.totalLeads > 0 
@@ -870,7 +1178,7 @@ export default function CampaignManagement() {
               <TrendingUp className="w-5 h-5 text-purple-600" />
             </div>
             <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Processing Rate</p>
+              <p className="text-sm font-medium text-gray-600">AI Analysis Speed</p>
               <p className="text-2xl font-bold text-gray-900">
                 {activeCampaigns > 0 ? `${activeCampaigns * 120}` : '0'}
               </p>
@@ -955,8 +1263,17 @@ export default function CampaignManagement() {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Phone Number
                 </th>
+                {/* Dynamic Column Header */}
+                {showDynamicColumn && (
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    {getDynamicColumnHeader()}
+                  </th>
+                )}
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  AI Status
+                  Knowledge Assets
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  AI Activation
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Actions
@@ -1018,6 +1335,79 @@ export default function CampaignManagement() {
                       ))}
                     </select>
                   </td>
+                  {/* Dynamic Dropdown Cell */}
+                  {showDynamicColumn && (
+                    <td className="px-6 py-4">
+                      <select
+                        value={
+                          campaign.talk_track || 
+                          campaign.service_type || 
+                          campaign.vehicle_type || 
+                          ''
+                        }
+                        onChange={(e) => updateCampaignDynamicField(campaign.id, e.target.value || null)}
+                        className="text-sm border border-gray-300 rounded-lg px-2 py-1 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      >
+                        <option value="">Select {getDynamicColumnHeader().toLowerCase()}...</option>
+                        {getDynamicDropdownOptions().map(option => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                  )}
+                  {/* Knowledge Assets Multi-Select */}
+                  <td className="px-6 py-4">
+                    <div className="relative">
+                      <button
+                        id={`knowledge-dropdown-${campaign.id}`}
+                        onClick={() => setKnowledgeDropdownOpen({
+                          ...knowledgeDropdownOpen,
+                          [campaign.id]: !knowledgeDropdownOpen[campaign.id]
+                        })}
+                        className="text-sm border border-gray-300 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 flex items-center justify-between min-w-[140px] bg-white hover:bg-gray-50"
+                      >
+                        <span className="truncate">
+                          {selectedKnowledgeAssets[campaign.id]?.length > 0
+                            ? `${selectedKnowledgeAssets[campaign.id].length} selected`
+                            : 'Select assets...'}
+                        </span>
+                        <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </button>
+                      
+                      <KnowledgeAssetsDropdown
+                        campaign={campaign}
+                        knowledgeAssets={knowledgeAssets}
+                        selectedAssets={selectedKnowledgeAssets[campaign.id]}
+                        isOpen={knowledgeDropdownOpen[campaign.id]}
+                        onToggle={() => setKnowledgeDropdownOpen({
+                          ...knowledgeDropdownOpen,
+                          [campaign.id]: !knowledgeDropdownOpen[campaign.id]
+                        })}
+                        onUpdate={async (assetId, checked) => {
+                          const currentSelected = selectedKnowledgeAssets[campaign.id] || [];
+                          let newSelected;
+                          
+                          if (checked) {
+                            newSelected = [...currentSelected, assetId];
+                          } else {
+                            newSelected = currentSelected.filter(id => id !== assetId);
+                          }
+                          
+                          setSelectedKnowledgeAssets({
+                            ...selectedKnowledgeAssets,
+                            [campaign.id]: newSelected
+                          });
+                          
+                          // Update in database
+                          await updateCampaignKnowledgeLinks(campaign.id, newSelected);
+                        }}
+                      />
+                    </div>
+                  </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center space-x-3">
                       {/* AI Toggle Switch */}
@@ -1042,12 +1432,12 @@ export default function CampaignManagement() {
                         {campaign.ai_on ? (
                           <>
                             <Zap className="w-4 h-4 text-blue-600" />
-                            <span className="text-sm font-medium text-blue-600">AI ON</span>
+                            <span className="text-sm font-medium text-blue-600">AI Engaged</span>
                           </>
                         ) : (
                           <>
                             <ZapOff className="w-4 h-4 text-gray-400" />
-                            <span className="text-sm text-gray-500">AI OFF</span>
+                            <span className="text-sm text-gray-500">AI Inactive</span>
                           </>
                         )}
                       </div>
@@ -1157,283 +1547,58 @@ export default function CampaignManagement() {
           ></div>
           
           {/* Sliding Drawer */}
-          <div className={`fixed right-0 top-0 h-full w-full max-w-lg bg-white shadow-2xl z-50 transform transition-all duration-500 ease-out overflow-y-auto ${
+          <div className={`fixed right-0 top-0 h-full w-full max-w-lg bg-white shadow-2xl z-50 transform transition-all duration-500 ease-out ${
             showCreateModal ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0'
           }`}>
-            {/* Header */}
-            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 backdrop-blur-sm bg-white/95">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center shadow-lg">
-                    <Rocket className="w-5 h-5 text-white" />
-                  </div>
-                  <div>
-                    <h2 className="text-xl font-bold text-gray-900">Create Campaign</h2>
-                    <p className="text-sm text-gray-600">Configure your AI-powered outreach</p>
-                  </div>
+            <div className="p-6">
+              {/* Header */}
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h2 className="text-xl font-bold text-gray-900">Create Campaign</h2>
+                  <p className="text-sm text-gray-600">Start your AI-powered outreach</p>
                 </div>
                 <button
                   onClick={handleCloseModal}
-                  className="p-2 hover:bg-gray-100 rounded-lg transition-all duration-200 hover:scale-105 active:scale-95"
+                  className="p-2 hover:bg-gray-100 rounded-lg transition-all duration-200"
                 >
                   <X className="w-5 h-5 text-gray-500" />
                 </button>
               </div>
-            </div>
 
-            {/* Form Content */}
-            <div className="p-6 space-y-6">
-              {/* Campaign Name */}
-              <div className="transform transition-all duration-300 delay-100">
-                <label className="block text-sm font-medium text-gray-900 mb-2">
-                  Campaign Name *
-                </label>
-                <input
-                  type="text"
-                  value={campaignForm.name}
-                  onChange={(e) => setCampaignForm({ ...campaignForm, name: e.target.value })}
-                  placeholder="e.g. Buyer Follow-Up, B2B BD Outreach"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 hover:border-gray-400"
-                />
-              </div>
-
-              {/* Campaign Goal */}
-              <div className="transform transition-all duration-300 delay-150">
-                <label className="block text-sm font-medium text-gray-900 mb-2">
-                  <Target className="w-4 h-4 inline mr-1" />
-                  Campaign Goal *
-                </label>
-                <select
-                  value={campaignForm.goal}
-                  onChange={(e) => setCampaignForm({ ...campaignForm, goal: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 hover:border-gray-400"
-                >
-                  <option value="">Select campaign objective...</option>
-                  <option value="qualify-sellers">Qualify Sellers</option>
-                  <option value="recruit-candidates">Recruit Candidates</option>
-                  <option value="book-demos">Book Demos</option>
-                  <option value="lead-nurture">Lead Nurture</option>
-                  <option value="follow-up">Follow-Up Sequence</option>
-                  <option value="appointment-setting">Appointment Setting</option>
-                </select>
-              </div>
-
-              {/* Assigned Sales Person */}
-              <div className="transform transition-all duration-300 delay-175">
-                <label className="block text-sm font-medium text-gray-900 mb-2">
-                  <UserCheck className="w-4 h-4 inline mr-1" />
-                  Assign to Sales Person
-                </label>
-                <select
-                  value={campaignForm.assignedTo}
-                  onChange={(e) => setCampaignForm({ ...campaignForm, assignedTo: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 hover:border-gray-400"
-                >
-                  <option value="">Select sales person...</option>
-                  {salesTeamMembers.map(member => (
-                    <option key={member.sales_team_id} value={member.sales_team_id}>
-                      {member.full_name || member.email}
-                    </option>
-                  ))}
-                </select>
-                {salesTeamMembers.length === 0 && (
-                  <p className="text-xs text-gray-500 mt-1">No sales team members found. Invite team members first.</p>
-                )}
-              </div>
-
-              {/* AI Archetype */}
-              <div className="transform transition-all duration-300 delay-200">
-                <label className="block text-sm font-medium text-gray-900 mb-2">
-                  <Bot className="w-4 h-4 inline mr-1" />
-                  AI Personality
-                </label>
-                {aiArchetypes.length > 0 ? (
-                  <select
-                    value={campaignForm.aiArchetype}
-                    onChange={(e) => setCampaignForm({ ...campaignForm, aiArchetype: e.target.value })}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 hover:border-gray-400"
-                  >
-                    <option value="">Choose AI personality...</option>
-                    {aiArchetypes.map(archetype => (
-                      <option key={archetype.id} value={archetype.id}>
-                        {archetype.name}
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  <div className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-gray-50 text-gray-500 cursor-not-allowed transition-all duration-200">
-                    <div className="flex items-center space-x-2">
-                      <Settings className="w-4 h-4" />
-                      <span>No personalities available yet. Configure in AI Settings.</span>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Phone Number */}
-              <div className="transform transition-all duration-300 delay-250">
-                <label className="block text-sm font-medium text-gray-900 mb-2">
-                  <Phone className="w-4 h-4 inline mr-1" />
-                  Phone Number *
-                </label>
-                <select
-                  value={campaignForm.phoneNumberId}
-                  onChange={(e) => setCampaignForm({ ...campaignForm, phoneNumberId: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 hover:border-gray-400"
-                  required
-                >
-                  <option value="">Select phone number...</option>
-                  {phoneNumbers.map(phone => (
-                    <option key={phone.id} value={phone.id}>
-                      {phone.phone_number} {phone.status === 'assigned' ? '(Assigned)' : '(Available)'}
-                    </option>
-                  ))}
-                </select>
-                {phoneNumbers.length === 0 && (
-                  <p className="text-xs text-gray-500 mt-1">No phone numbers available. Purchase numbers in Settings → Phone Numbers.</p>
-                )}
-              </div>
-
-              {/* AI Status Toggle */}
-              <div className="transform transition-all duration-300 delay-300">
-                <label className="block text-sm font-medium text-gray-900 mb-3">
-                  <Zap className="w-4 h-4 inline mr-1" />
-                  AI Status
-                </label>
-                <div className="flex items-center justify-between p-4 bg-gradient-to-r from-gray-50 to-blue-50 rounded-lg border border-gray-200 hover:border-blue-300 transition-all duration-200">
-                  <div>
-                    <div className="font-medium text-gray-900">AI-Powered Responses</div>
-                    <div className="text-sm text-gray-600">Enable intelligent auto-responses</div>
-                  </div>
-                  <button
-                    onClick={() => setCampaignForm({ ...campaignForm, aiEnabled: !campaignForm.aiEnabled })}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transform hover:scale-105 active:scale-95 ${
-                      campaignForm.aiEnabled ? 'bg-blue-600 shadow-lg' : 'bg-gray-200'
-                    }`}
-                  >
-                    <span
-                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-all duration-300 shadow-lg ${
-                        campaignForm.aiEnabled ? 'translate-x-6' : 'translate-x-1'
-                      }`}
-                    />
-                  </button>
-                </div>
-              </div>
-
-              {/* Routing Tags */}
-              <div className="transform transition-all duration-300 delay-350">
-                <label className="block text-sm font-medium text-gray-900 mb-2">
-                  <Tag className="w-4 h-4 inline mr-1" />
-                  Routing Tags
-                </label>
-                <div className="space-y-3">
-                  <div className="flex flex-wrap gap-2">
-                    {campaignForm.routingTags.map((tag, index) => (
-                      <span
-                        key={tag}
-                        className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-blue-100 text-blue-800 transform transition-all duration-200 hover:scale-105"
-                      >
-                        {tag}
-                        <button
-                          onClick={() => removeRoutingTag(tag)}
-                          className="ml-2 hover:text-blue-600 transition-colors duration-150"
-                        >
-                          <X className="w-3 h-3" />
-                        </button>
-                      </span>
-                    ))}
-                  </div>
+              {/* Form Content */}
+              <div className="space-y-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-900 mb-2">
+                    Campaign Name
+                  </label>
                   <input
                     type="text"
-                    placeholder="Add routing tag (press Enter)"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 hover:border-gray-400"
+                    value={campaignForm.name}
+                    onChange={(e) => setCampaignForm({ ...campaignForm, name: e.target.value })}
+                    placeholder="e.g. Summer Promotion, Q4 Outreach"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     onKeyPress={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        addRoutingTag(e.target.value.trim());
-                        e.target.value = '';
+                      if (e.key === 'Enter' && campaignForm.name.trim()) {
+                        handleCreateCampaign();
                       }
                     }}
+                    autoFocus
                   />
-                  <p className="text-xs text-gray-500">Tags help route leads to specific campaigns automatically</p>
                 </div>
-              </div>
 
-              {/* Color Picker */}
-              <div className="transform transition-all duration-300 delay-400">
-                <label className="block text-sm font-medium text-gray-900 mb-2">
-                  <Palette className="w-4 h-4 inline mr-1" />
-                  Campaign Color
-                </label>
-                <div className="flex items-center space-x-3">
-                  <div className="relative">
-                    <input
-                      type="color"
-                      value={campaignForm.color}
-                      onChange={(e) => setCampaignForm({ ...campaignForm, color: e.target.value })}
-                      className="w-12 h-12 rounded-lg border-2 border-gray-300 cursor-pointer transition-all duration-200 hover:border-gray-400 hover:scale-105 active:scale-95"
-                    />
-                    <div 
-                      className="absolute inset-0 rounded-lg shadow-inner pointer-events-none"
-                      style={{ backgroundColor: campaignForm.color, opacity: 0.1 }}
-                    ></div>
-                  </div>
-                  <div className="flex-1">
-                    <input
-                      type="text"
-                      value={campaignForm.color}
-                      onChange={(e) => setCampaignForm({ ...campaignForm, color: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono text-sm transition-all duration-200 hover:border-gray-400"
-                    />
-                  </div>
-                </div>
-                <p className="text-xs text-gray-500 mt-1">Used for dashboard visualization and organization</p>
-              </div>
-
-              {/* Description */}
-              <div className="transform transition-all duration-300 delay-450">
-                <label className="block text-sm font-medium text-gray-900 mb-2">
-                  Campaign Description
-                </label>
-                <textarea
-                  value={campaignForm.description}
-                  onChange={(e) => setCampaignForm({ ...campaignForm, description: e.target.value })}
-                  placeholder="Describe the campaign strategy and target audience..."
-                  rows={3}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none transition-all duration-200 hover:border-gray-400"
-                />
-              </div>
-            </div>
-
-            {/* Footer */}
-            <div className="sticky bottom-0 bg-white/95 backdrop-blur-sm border-t border-gray-200 px-6 py-4">
-              <div className="flex items-center justify-between">
-                <div className="text-sm text-gray-600">
-                  {campaignForm.aiEnabled ? (
-                    <span className="flex items-center text-green-600 animate-pulse">
-                      <Zap className="w-4 h-4 mr-1" />
-                      AI Ready to Deploy
-                    </span>
-                  ) : (
-                    <span className="flex items-center text-gray-500">
-                      <ZapOff className="w-4 h-4 mr-1" />
-                      Manual Mode
-                    </span>
-                  )}
-                </div>
-                <div className="flex space-x-3">
+                {/* Buttons */}
+                <div className="flex justify-end space-x-3 pt-2">
                   <Button 
                     variant="outline" 
                     onClick={handleCloseModal}
                     disabled={isCreating}
-                    className="transition-all duration-200 hover:scale-105 active:scale-95"
                   >
                     Cancel
                   </Button>
                   <Button 
                     onClick={handleCreateCampaign}
-                    disabled={isCreating || !campaignForm.name || !campaignForm.goal || !campaignForm.phoneNumberId}
-                    className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-lg transition-all duration-200 hover:scale-105 active:scale-95 hover:shadow-xl"
+                    disabled={isCreating || !campaignForm.name.trim()}
+                    className="bg-blue-600 hover:bg-blue-700"
                   >
                     {isCreating ? (
                       <>
@@ -1441,10 +1606,7 @@ export default function CampaignManagement() {
                         Creating...
                       </>
                     ) : (
-                      <>
-                        <Rocket className="w-4 h-4 mr-2" />
-                        Launch Campaign
-                      </>
+                      'Create Campaign'
                     )}
                   </Button>
                 </div>

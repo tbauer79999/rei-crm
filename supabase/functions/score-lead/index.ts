@@ -181,18 +181,47 @@ serve(async (req) => {
     
     // ========== CALCULATE ALL INDIVIDUAL SCORES FIRST ==========
     
-    // Analyze motivation
+    // FIXED: Use OpenAI's motivation scores (stored as response_score) instead of keyword matching
+    const openAiMotivationScores = responseScores; // These are the motivation scores from OpenAI
+    const avgOpenAiMotivation = getAvg(openAiMotivationScores);
+
+    // Enhanced motivation keywords for fallback
     const motivationKeywords = [
+      // Enthusiasm keywords (original)
       'excited', 'eager', 'ready', 'can\'t wait', 'looking forward',
-      'interested', 'love', 'great', 'awesome', 'perfect'
+      'interested', 'love', 'great', 'awesome', 'perfect',
+      // Business intent keywords
+      'need', 'looking for', 'help', 'solution', 'problem',
+      'challenging', 'difficult', 'tough', 'struggling',
+      // Buying signals
+      'price', 'cost', 'charge', 'pricing', 'how much',
+      'budget', 'invest', 'pay', 'fee', 'rate',
+      'quote', 'estimate', 'proposal',
+      // Exploratory intent
+      'maybe', 'possibly', 'considering', 'thinking about',
+      'exploring', 'options', 'tell me more', 'information',
+      'details', 'explain', 'how does', 'what about'
     ];
-    const motivationScore = analyzeMessageContent(inboundMessages, motivationKeywords);
+
+    const keywordMotivationScore = analyzeMessageContent(inboundMessages, motivationKeywords);
+
+    // Use OpenAI's evaluation if available, otherwise use enhanced keyword analysis
+    const motivationScore = avgOpenAiMotivation !== null && avgOpenAiMotivation > 0 
+      ? avgOpenAiMotivation 
+      : keywordMotivationScore;
+
+    console.log('🎯 Motivation Score Calculation:', {
+      openAiMotivationScores,
+      avgOpenAiMotivation,
+      keywordMotivationScore,
+      finalMotivationScore: motivationScore
+    });
 
     // Analyze objections
     const objectionKeywords = [
-      'expensive', 'cost', 'price', 'budget', 'afford', 'cheap',
+      'expensive', 'cost too much', 'price too high', 'budget', 'afford', 'cheap',
       'competitor', 'alternative', 'not interested', 'no thanks',
-      'don\'t need', 'already have'
+      'don\'t need', 'already have', 'not ready', 'not now'
     ];
     const objectionScore = analyzeMessageContent(inboundMessages, objectionKeywords);
 
@@ -327,10 +356,10 @@ serve(async (req) => {
       Math.min(100, messageLength / 2)     // Message effort/length
     ].filter(x => x !== null)) || 0;
 
-    // 2. Emotional State (their mindset)
+    // 2. Emotional State (their mindset) - NOW USING CORRECT MOTIVATION
     const emotionalScore = getAvg([
       100 - avgHesitation,     // Less hesitation is better
-      motivationScore,         // Excitement/eagerness
+      motivationScore,         // NOW USING OPENAI SCORES! 
       avgUrgency,             // Sense of urgency
       100 - skepticism        // Less skepticism is better
     ].filter(x => x !== null)) || 0;
@@ -390,7 +419,13 @@ serve(async (req) => {
       conversationQualityScore,
       aiIntelligenceScore,
       recencyBonus,
-      finalHotScore: hotScore
+      finalHotScore: hotScore,
+      motivationBreakdown: {
+        openAiScores: openAiMotivationScores,
+        avgOpenAi: avgOpenAiMotivation,
+        keywordScore: keywordMotivationScore,
+        finalMotivation: motivationScore
+      }
     });
 
     // Calculate interest level using the already calculated scores
@@ -434,10 +469,12 @@ serve(async (req) => {
       agreed_to_meeting: followupAcceptance > 20 || 
         /sounds good|yes|sure|okay|thay sounds good|let's|agree|perfect|works for me/i.test(lastInboundMessage),
       requested_callback: /call me|phone|speak|talk|call you|contact me/i.test(conversationText),
-      buying_signal: /ready to buy|purchase|get started|sign up|proceed/i.test(conversationText),
+      buying_signal: /ready to buy|purchase|get started|sign up|proceed/i.test(conversationText) ||
+        /what.*(cost|price|charge|fee|rate|pricing)/i.test(conversationText), // ENHANCED
       timeline_urgent: /asap|today|tomorrow|this week|urgent|immediately/i.test(conversationText),
       high_interest_question: questionDensity > 30 && inboundMessages.length > 2,
-      explicit_timeline: /3 to 6 months|next month|this year|timeline|when/i.test(conversationText)
+      explicit_timeline: /3 to 6 months|next month|this year|timeline|when/i.test(conversationText),
+      pricing_inquiry: /what.*(cost|price|charge|fee|rate|pricing)|how much/i.test(conversationText) // NEW
     };
     
     // Calculate if immediate attention is required
@@ -456,7 +493,10 @@ serve(async (req) => {
     
     // Override funnel stage based on business rules
     let stageOverrideReason = null;
-    if (criticalTriggers.agreed_to_meeting || criticalTriggers.requested_callback) {
+    if (criticalTriggers.pricing_inquiry && motivationScore > 50) {
+      funnelStage = 'Hot';
+      stageOverrideReason = 'pricing_inquiry_with_high_motivation';
+    } else if (criticalTriggers.agreed_to_meeting || criticalTriggers.requested_callback) {
       if (hotScore > 40) {
         funnelStage = 'Hot';
         stageOverrideReason = 'lead_agreed_to_next_step';
@@ -472,7 +512,7 @@ serve(async (req) => {
     // Calculate alert priority
     let alertPriority = 'none';
     if (requiresImmediateAttention) {
-      if (criticalTriggers.agreed_to_meeting || criticalTriggers.buying_signal) {
+      if (criticalTriggers.pricing_inquiry || criticalTriggers.agreed_to_meeting || criticalTriggers.buying_signal) {
         alertPriority = 'critical';
       } else if (criticalTriggers.requested_callback || criticalTriggers.timeline_urgent) {
         alertPriority = 'high';
@@ -527,7 +567,7 @@ serve(async (req) => {
       tone_consistency_score: toneConsistency,
       polarity_score: polarityScore,
       urgency_score: getAvg(urgencyScores),
-      motivation_score: motivationScore,
+      motivation_score: motivationScore, // NOW USING CORRECTED SCORE
       hesitation_score: getAvg(hesitationScores),
       objection_score: objectionScore,
       escalation_keywords_score: escalationScore,
@@ -571,6 +611,293 @@ serve(async (req) => {
       .upsert(leadScores, { onConflict: 'lead_id' });
     
     if (upsertError) throw upsertError;
+
+    // 🚨 REAL-TIME NOTIFICATION SYSTEM
+    if (requiresImmediateAttention) {
+      console.log('🚨 Lead requires immediate attention! Sending notifications...');
+      console.log('Alert Priority:', alertPriority);
+      console.log('Alert Reasons:', attentionReasons);
+
+      try {
+        // Fetch notification preferences
+        const { data: notificationSettings } = await supabase
+          .from('platform_settings')
+          .select('value')
+          .eq('key', 'ai_escalation_method')
+          .eq('tenant_id', tenant_id)
+          .maybeSingle();
+
+        const notificationMethod = notificationSettings?.value || 'All';
+        console.log('Notification method preference:', notificationMethod);
+
+        // Fetch lead details for notifications
+        const { data: lead } = await supabase
+          .from('leads')
+          .select('name, phone, email, assigned_to_sales_team_id, campaign_id')
+          .eq('id', lead_id)
+          .single();
+
+        // Fetch tenant details
+        const { data: tenant } = await supabase
+          .from('tenants')
+          .select('name, notification_email, notification_phone')
+          .eq('id', tenant_id)
+          .single();
+
+        // Build notification message
+        const priorityEmoji = {
+          'critical': '🔴',
+          'high': '🟡',
+          'medium': '🟢'
+        }[alertPriority] || '⚪';
+
+        const reasonDescriptions = {
+          'agreed_to_meeting': 'Lead agreed to meeting',
+          'requested_callback': 'Lead requested callback',
+          'buying_signal': 'Strong buying signal detected',
+          'timeline_urgent': 'Urgent timeline mentioned',
+          'high_interest_question': 'Multiple high-interest questions',
+          'explicit_timeline': 'Specific timeline mentioned',
+          'pricing_inquiry': 'Asked about pricing'
+        };
+
+        const primaryReason = reasonDescriptions[attentionReasons[0]] || attentionReasons[0];
+        
+        const notificationTitle = `${priorityEmoji} ${alertPriority.toUpperCase()} Lead Alert`;
+        const notificationBody = `
+Lead: ${lead?.name || 'Unknown'} (${lead?.phone})
+Score: ${hotScore}/100 (${funnelStage})
+Reason: ${primaryReason}
+Last Message: "${lastInboundMessage.substring(0, 100)}..."
+        `.trim();
+
+        const dashboardUrl = `${Deno.env.get('SUPABASE_URL')}/dashboard/leads/${lead_id}`;
+
+        // Send notifications based on preference
+        if (notificationMethod === 'All' || notificationMethod === 'SMS') {
+          // SMS Notification via Twilio
+          if (tenant?.notification_phone || lead?.assigned_to_sales_team_id) {
+            const twilioSid = Deno.env.get('TWILIO_ACCOUNT_SID');
+            const twilioToken = Deno.env.get('TWILIO_AUTH_TOKEN');
+            const twilioFromNumber = Deno.env.get('TWILIO_PHONE_NUMBER');
+
+            if (twilioSid && twilioToken && twilioFromNumber) {
+              // Get assigned sales rep's phone if available
+              let recipientPhone = tenant?.notification_phone;
+              
+              if (lead?.assigned_to_sales_team_id) {
+                const { data: salesRep } = await supabase
+                  .from('users')
+                  .select('phone')
+                  .eq('id', lead.assigned_to_sales_team_id)
+                  .single();
+                
+                if (salesRep?.phone) {
+                  recipientPhone = salesRep.phone;
+                }
+              }
+
+              if (recipientPhone) {
+                const smsBody = `${notificationTitle}\n\n${notificationBody}\n\nView: ${dashboardUrl}`;
+                
+                try {
+                  const twilioResponse = await fetch(
+                    `https://api.twilio.com/2010-04-01/Accounts/${twilioSid}/Messages.json`,
+                    {
+                      method: 'POST',
+                      headers: {
+                        'Authorization': `Basic ${btoa(`${twilioSid}:${twilioToken}`)}`,
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                      },
+                      body: new URLSearchParams({
+                        From: twilioFromNumber,
+                        To: recipientPhone,
+                        Body: smsBody.substring(0, 1600) // SMS character limit
+                      }),
+                    }
+                  );
+
+                  if (twilioResponse.ok) {
+                    console.log('✅ SMS notification sent to:', recipientPhone);
+                  } else {
+                    console.error('❌ SMS notification failed:', await twilioResponse.text());
+                  }
+                } catch (smsError) {
+                  console.error('❌ SMS notification error:', smsError);
+                }
+              }
+            }
+          }
+        }
+
+        if (notificationMethod === 'All' || notificationMethod === 'Email') {
+          // Email Notification
+          const recipientEmail = tenant?.notification_email || Deno.env.get('DEFAULT_NOTIFICATION_EMAIL');
+          
+          if (recipientEmail) {
+            // Using Resend API
+            const resendApiKey = Deno.env.get('RESEND_API_KEY');
+            
+            if (resendApiKey) {
+              const emailHtml = `
+                <h2>${notificationTitle}</h2>
+                <p><strong>Lead:</strong> ${lead?.name || 'Unknown'} (${lead?.phone})</p>
+                <p><strong>Score:</strong> ${hotScore}/100 (${funnelStage})</p>
+                <p><strong>Reason:</strong> ${primaryReason}</p>
+                <p><strong>Additional Triggers:</strong> ${attentionReasons.join(', ')}</p>
+                <p><strong>Last Message:</strong> "${lastInboundMessage}"</p>
+                <br>
+                <p><a href="${dashboardUrl}" style="background-color: #0066cc; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">View Lead in Dashboard</a></p>
+              `;
+
+              try {
+                const emailResponse = await fetch('https://api.resend.com/emails', {
+                  method: 'POST',
+                  headers: {
+                    'Authorization': `Bearer ${resendApiKey}`,
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({
+                    from: 'onboarding@resend.dev',
+                    to: recipientEmail,
+                    subject: notificationTitle,
+                    html: emailHtml,
+                    text: notificationBody + `\n\nView: ${dashboardUrl}`
+                  }),
+                });
+
+                if (emailResponse.ok) {
+                  console.log('✅ Email notification sent to:', recipientEmail);
+                } else {
+                  console.error('❌ Email notification failed:', await emailResponse.text());
+                }
+              } catch (emailError) {
+                console.error('❌ Email notification error:', emailError);
+              }
+            }
+          }
+        }
+
+        // Always log to notifications table for dashboard visibility
+        const { error: notifError } = await supabase
+          .from('notifications')
+          .insert({
+            tenant_id,
+            lead_id,
+            type: 'lead_escalation',
+            priority: alertPriority,
+            title: notificationTitle,
+            message: notificationBody,
+            data: {
+              hot_score: hotScore,
+              funnel_stage: funnelStage,
+              alert_triggers: criticalTriggers,
+              attention_reasons: attentionReasons,
+              last_message: lastInboundMessage
+            },
+            read: false,
+            created_at: new Date().toISOString()
+          });
+
+        if (notifError) {
+          console.error('❌ Failed to log notification:', notifError);
+        } else {
+          console.log('✅ Notification logged to dashboard');
+        }
+
+        // Slack Integration (if configured)
+        if (notificationMethod === 'All') {
+          const slackWebhookUrl = Deno.env.get('SLACK_WEBHOOK_URL');
+          
+          if (slackWebhookUrl) {
+            const slackMessage = {
+              text: notificationTitle,
+              blocks: [
+                {
+                  type: "header",
+                  text: {
+                    type: "plain_text",
+                    text: notificationTitle
+                  }
+                },
+                {
+                  type: "section",
+                  fields: [
+                    {
+                      type: "mrkdwn",
+                      text: `*Lead:*\n${lead?.name || 'Unknown'}`
+                    },
+                    {
+                      type: "mrkdwn",
+                      text: `*Phone:*\n${lead?.phone || 'N/A'}`
+                    },
+                    {
+                      type: "mrkdwn",
+                      text: `*Score:*\n${hotScore}/100`
+                    },
+                    {
+                      type: "mrkdwn",
+                      text: `*Stage:*\n${funnelStage}`
+                    }
+                  ]
+                },
+                {
+                  type: "section",
+                  text: {
+                    type: "mrkdwn",
+                    text: `*Reason:* ${primaryReason}\n*Last Message:* "${lastInboundMessage.substring(0, 200)}..."`
+                  }
+                },
+                {
+                  type: "actions",
+                  elements: [
+                    {
+                      type: "button",
+                      text: {
+                        type: "plain_text",
+                        text: "View in Dashboard"
+                      },
+                      url: dashboardUrl,
+                      style: "primary"
+                    }
+                  ]
+                }
+              ]
+            };
+
+            try {
+              const slackResponse = await fetch(slackWebhookUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(slackMessage)
+              });
+
+              if (slackResponse.ok) {
+                console.log('✅ Slack notification sent');
+              } else {
+                console.error('❌ Slack notification failed');
+              }
+            } catch (slackError) {
+              console.error('❌ Slack notification error:', slackError);
+            }
+          }
+        }
+
+        // Update lead with escalation timestamp
+        await supabase
+          .from('leads')
+          .update({
+            last_escalated_at: new Date().toISOString(),
+            escalation_reason: primaryReason,
+            escalation_priority: alertPriority
+          })
+          .eq('id', lead_id);
+
+      } catch (notificationError) {
+        console.error('❌ Error in notification system:', notificationError);
+        // Don't fail the whole scoring process if notifications fail
+      }
+    }
 
     return new Response(JSON.stringify({ success: true, leadScores }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

@@ -501,12 +501,14 @@ const EnterpriseAIStrategyHub = () => {
         }
 
         // Build instruction bundles
-        const initialBundle = buildInitialInstruction({
-          tone: strategyConfig.initialTone,
-          persona: strategyConfig.initialPersona,
-          industry: strategyConfig.industry,
-          role: strategyConfig.role,
-          businessName: strategyConfig.businessName
+const initialBundle = buildInitialInstruction({
+  tone: strategyConfig.initialTone,
+  persona: strategyConfig.initialPersona,
+  industry: strategyConfig.industry,
+  role: strategyConfig.role,
+  leadDetails: strategyConfig.leadDetails || {},
+  knowledgeBase: strategyConfig.knowledgeBase || '',
+  campaignMetadata: strategyConfig.campaignMetadata || {}
         });
 
         const engagementBundle = buildInstructionBundle({

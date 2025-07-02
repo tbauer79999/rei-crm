@@ -145,34 +145,33 @@ serve(async (req) => {
       );
     }
 
-    // 4. Get tenant's Twilio phone number
-// 4. Get campaign's assigned phone number
-const { data: campaignPhone, error: phoneError } = await supabase
-  .from("campaigns")
-  .select(`
-    phone_number_id,
-    phone_numbers (
-      phone_number,
-      twilio_sid,
-      status
-    )
-  `)
-  .eq("id", campaign_id)
-  .eq("tenant_id", tenant_id)
-  .single();
+    // 4. Get campaign's assigned phone number
+    const { data: campaignPhone, error: phoneError } = await supabase
+      .from("campaigns")
+      .select(`
+        phone_number_id,
+        phone_numbers (
+          phone_number,
+          twilio_sid,
+          status
+        )
+      `)
+      .eq("id", campaign_id)
+      .eq("tenant_id", tenant_id)
+      .single();
 
-if (phoneError || !campaignPhone || !campaignPhone.phone_numbers) {
-  console.error("❌ Error fetching campaign phone number:", phoneError);
-  return new Response(
-    JSON.stringify({ error: "No phone number assigned to campaign" }),
-    { 
-      status: 400, 
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    if (phoneError || !campaignPhone || !campaignPhone.phone_numbers) {
+      console.error("❌ Error fetching campaign phone number:", phoneError);
+      return new Response(
+        JSON.stringify({ error: "No phone number assigned to campaign" }),
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
     }
-  );
-}
 
-const phoneNumber = campaignPhone.phone_numbers;
+    const phoneNumber = campaignPhone.phone_numbers;
 
     // 5. Get follow-up AI instruction template
     const instructionKey = `ai_instruction_followup_${follow_up_stage}`;
@@ -282,7 +281,22 @@ This is follow-up message #${follow_up_stage}. Generate a personalized follow-up
     }
 
     const openaiData = await openaiResponse.json();
-    const aiMessage = openaiData.choices[0]?.message?.content?.trim();
+    const aiOutput = openaiData.choices[0]?.message?.content?.trim();
+
+    // ✅ FIXED: Parse the response to extract just the message part
+    let aiMessage = aiOutput;
+    
+    // Check if the output contains the structured format
+    if (aiOutput?.includes('Response:')) {
+      const responseMatch = aiOutput.match(/Response:\s*([\s\S]*)/);
+      aiMessage = responseMatch?.[1]?.trim() || aiOutput;
+      console.log(`📝 Extracted response from structured output`);
+    } else if (aiOutput?.includes('Initial Message:')) {
+      // Handle initial message format
+      const initialMatch = aiOutput.match(/Initial Message:\s*([\s\S]*)/);
+      aiMessage = initialMatch?.[1]?.trim() || aiOutput;
+      console.log(`📝 Extracted initial message from structured output`);
+    }
 
     if (!aiMessage) {
       throw new Error("Failed to generate AI follow-up message");
@@ -368,8 +382,7 @@ This is follow-up message #${follow_up_stage}. Generate a personalized follow-up
         ai_message: aiMessage,
         follow_up_stage: follow_up_stage,
         sequence_complete: follow_up_stage === 3,
-        was_reengagement: hasEverResponded,
-        personalized_instructions: personalizedInstructions // For debugging
+        was_reengagement: hasEverResponded
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

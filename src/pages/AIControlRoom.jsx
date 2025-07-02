@@ -5,9 +5,7 @@ import {
   Activity, 
   Users, 
   TrendingUp, 
-  Brain, 
-  Server, 
-  Settings,
+  Brain,
   CheckCircle,
   AlertTriangle,
   Clock
@@ -18,8 +16,6 @@ import OverviewTrendAndCost from '../components/controlroom/OverviewTrendAndCost
 import LeadJourneyFunnel from '../components/controlroom/LeadJourneyFunnel';
 import AiOptimizationPanel from '../components/controlroom/AiOptimizationPanel';
 import HotLeadHandoffPanel from '../components/controlroom/HotLeadHandoffPanel';
-import SystemMetricsPanel from '../components/controlroom/SystemMetricsPanel';
-import CustomizationPanel from '../components/controlroom/CustomizationPanel';
 import { fetchHealth, fetchHotSummary } from '../lib/api'; // Import your API helper
 import supabase from '../lib/supabaseClient';
 
@@ -55,22 +51,6 @@ const SECTIONS = [
     icon: Brain,
     status: 'healthy',
     metrics: '89% AI accuracy'
-  },
-  { 
-    id: 'system', 
-    label: 'System Metrics',
-    description: 'API uptime, message delivery, and infrastructure health',
-    icon: Server,
-    status: 'healthy',
-    metrics: '99.9% uptime'
-  },
-  { 
-    id: 'customization', 
-    label: 'Customization & Control',
-    description: 'AI prompts, escalation rules, and system configuration',
-    icon: Settings,
-    status: 'review',
-    metrics: '3 pending updates'
   },
 ];
 
@@ -299,8 +279,6 @@ const fetchOverviewStatus = async () => {
                   {ready && label === 'Lead Journey & Funnel' && (<LeadJourneyFunnel />)}
                   {ready && label === 'AI Optimization' && (<AiOptimizationPanel />)}
                   {ready && label === 'Hot Lead Handoff' && (<HotLeadHandoffPanel />)}
-                  {ready && label === 'System Metrics' && (<SystemMetricsPanel />)}
-                  {ready && label === 'Customization & Control' && (<CustomizationPanel />)}
                 </div>
               </div>
             </div>

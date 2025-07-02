@@ -4,7 +4,7 @@ import supabase from '../../lib/supabaseClient';
 import { Input } from '../ui/input.jsx';
 import Button from '../ui/button.jsx';
 import { Card } from '../ui/card.jsx';
-import { FileText, Trash2, AlertCircle, CheckCircle } from 'lucide-react';
+import { FileText, Trash2, AlertCircle, CheckCircle, Globe, Plus, RefreshCw } from 'lucide-react';
 
 const AIKnowledgeBase = () => {
   const [selectedFile, setSelectedFile] = useState(null);
@@ -12,28 +12,74 @@ const AIKnowledgeBase = () => {
   const [documents, setDocuments] = useState([]);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  
+  // New state for websites
+  const [activeTab, setActiveTab] = useState('documents'); // 'documents' or 'websites'
+  const [websiteUrl, setWebsiteUrl] = useState('');
+  const [websiteTitle, setWebsiteTitle] = useState('');
+  const [addingWebsite, setAddingWebsite] = useState(false);
+  const [websites, setWebsites] = useState([]);
+  const [processingWebsites, setProcessingWebsites] = useState(new Set());
 
   useEffect(() => {
     fetchKnowledgeBase();
-  }, []);
+    if (activeTab === 'websites') {
+      fetchWebsites();
+    }
+  }, [activeTab]);
 
-  const fetchKnowledgeBase = async () => {
+const fetchKnowledgeBase = async () => {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token;
+
+    if (!token) return console.error('No auth token found');
+
+    const res = await axios.get('http://localhost:5000/api/knowledge/docs', {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+
+    const docsData = Array.isArray(res.data) ? res.data : res.data.data || [];
+    
+    // Filter out websites - only show actual documents
+    const documentsOnly = docsData.filter(doc => 
+      !doc.website_url && doc.source_type !== 'website'
+    );
+    
+    setDocuments(documentsOnly);
+
+  } catch (err) {
+    console.error('Failed to load documents:', err);
+    setError('Failed to load documents');
+  }
+};
+
+  const fetchWebsites = async () => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       const token = session?.access_token;
+      if (!token) return;
 
-      if (!token) return console.error('No auth token found');
+      const { data: profile } = await supabase
+        .from('users_profile')
+        .select('tenant_id')
+        .eq('id', session.user.id)
+        .single();
 
-      const res = await axios.get('http://localhost:5000/api/knowledge/docs', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      if (!profile?.tenant_id) return;
 
-      const docsData = Array.isArray(res.data) ? res.data : res.data.data || [];
-      setDocuments(docsData);
+      const { data: websiteData, error: fetchError } = await supabase
+        .from('knowledge_base')
+        .select('*')
+        .eq('tenant_id', profile.tenant_id)
+        .eq('source_type', 'website')
+        .order('created_at', { ascending: false });
 
+      if (!fetchError && websiteData) {
+        setWebsites(websiteData);
+      }
     } catch (err) {
-      console.error('Failed to load documents:', err);
-      setError('Failed to load documents');
+      console.error('Failed to fetch websites:', err);
     }
   };
 
@@ -130,6 +176,132 @@ const AIKnowledgeBase = () => {
     }
   };
 
+  const handleAddWebsite = async () => {
+    if (!websiteUrl || !websiteUrl.startsWith('http')) {
+      setError('Please enter a valid URL starting with http:// or https://');
+      return;
+    }
+
+    setAddingWebsite(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('No authentication found');
+
+      const { data: profile } = await supabase
+        .from('users_profile')
+        .select('tenant_id')
+        .eq('id', session.user.id)
+        .single();
+
+      if (!profile?.tenant_id) throw new Error('Could not retrieve tenant information');
+
+      // Insert website into knowledge_base
+      const { data: insertData, error: insertError } = await supabase
+        .from('knowledge_base')
+        .insert({
+          tenant_id: profile.tenant_id,
+          source_type: 'website',
+          website_url: websiteUrl,
+          title: websiteTitle || new URL(websiteUrl).hostname,
+          ingestion_status: 'pending'
+        })
+        .select()
+        .single();
+
+      if (insertError) throw insertError;
+
+      setSuccess('Website added successfully! It will be processed shortly.');
+      setWebsiteUrl('');
+      setWebsiteTitle('');
+      fetchWebsites();
+      
+      // Start processing indicator
+      setProcessingWebsites(prev => new Set(prev).add(insertData.id));
+      
+      setTimeout(() => {
+        setSuccess('');
+        // Poll for status updates
+        pollWebsiteStatus(insertData.id);
+      }, 3000);
+
+    } catch (err) {
+      console.error('Failed to add website:', err);
+      setError(err.message || 'Failed to add website');
+    } finally {
+      setAddingWebsite(false);
+    }
+  };
+
+const pollWebsiteStatus = async (websiteId) => {
+  const maxAttempts = 180; // 15 minutes total
+  let attempts = 0;
+  
+  const interval = setInterval(async () => {
+    attempts++;
+    
+    try {
+      const { data, error } = await supabase
+        .from('knowledge_base')
+        .select('ingestion_status')
+        .eq('id', websiteId)
+        .single();
+
+      if (data?.ingestion_status === 'complete' || data?.ingestion_status === 'failed') {
+        clearInterval(interval);
+        setProcessingWebsites(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(websiteId);
+          return newSet;
+        });
+        fetchWebsites();
+        
+        if (data.ingestion_status === 'complete') {
+          setSuccess('Website processed successfully!');
+          setTimeout(() => setSuccess(''), 3000);
+        } else {
+          setError('Website processing failed. Please try again.');
+          setTimeout(() => setError(''), 5000);
+        }
+      }
+      
+      if (attempts >= maxAttempts) {
+        clearInterval(interval);
+        setProcessingWebsites(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(websiteId);
+          return newSet;
+        });
+      }
+    } catch (err) {
+      console.error('Error polling status:', err);
+    }
+  }, 5000); // Check every 5 seconds
+};
+
+  const handleDeleteWebsite = async (websiteId) => {
+    if (!window.confirm('Are you sure you want to delete this website and all its content?')) return;
+
+    try {
+      // Delete website and its chunks
+      const { error: deleteError } = await supabase
+        .from('knowledge_base')
+        .delete()
+        .eq('id', websiteId);
+
+      if (deleteError) throw deleteError;
+
+      setSuccess('Website deleted successfully!');
+      fetchWebsites();
+      setTimeout(() => setSuccess(''), 3000);
+
+    } catch (err) {
+      setError(err.message || 'Failed to delete website');
+    }
+  };
+
   const handleDelete = async (docId) => {
     if (!window.confirm('Are you sure you want to delete this document?')) return;
 
@@ -152,6 +324,19 @@ const AIKnowledgeBase = () => {
     }
   };
 
+  const getStatusBadge = (status) => {
+    switch (status) {
+      case 'complete':
+        return <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">Complete</span>;
+      case 'pending':
+        return <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-1 rounded">Processing</span>;
+      case 'failed':
+        return <span className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded">Failed</span>;
+      default:
+        return null;
+    }
+  };
+
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center space-x-3">
@@ -159,7 +344,7 @@ const AIKnowledgeBase = () => {
         <div>
           <h2 className="text-xl font-semibold">AI Knowledge Base</h2>
           <p className="text-sm text-gray-500">
-            Upload documents and training materials for AI context
+            Upload documents and add websites for AI context
           </p>
         </div>
       </div>
@@ -178,81 +363,215 @@ const AIKnowledgeBase = () => {
         </div>
       )}
 
-      <Card className="p-5 space-y-4">
-        <div className="flex items-center space-x-3">
-          <Input 
-            type="file" 
-            accept=".pdf" 
-            onChange={handleFileChange}
-            className="flex-1"
-          />
-          <Button 
-            onClick={handleUpload} 
-            disabled={uploading || !selectedFile}
-            className="px-6"
-          >
-            {uploading ? (
-              <div className="flex items-center space-x-2">
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                <span>Uploading...</span>
-              </div>
-            ) : (
-              'Upload PDF'
-            )}
-          </Button>
-        </div>
+      {/* Tab Navigation */}
+      <div className="flex space-x-1 bg-gray-100 p-1 rounded-lg">
+        <button
+          onClick={() => setActiveTab('documents')}
+          className={`flex-1 flex items-center justify-center space-x-2 px-4 py-2 rounded-md transition-colors ${
+            activeTab === 'documents'
+              ? 'bg-white text-gray-900 shadow-sm'
+              : 'text-gray-600 hover:text-gray-900'
+          }`}
+        >
+          <FileText className="w-4 h-4" />
+          <span className="font-medium">Documents</span>
+        </button>
+        <button
+          onClick={() => setActiveTab('websites')}
+          className={`flex-1 flex items-center justify-center space-x-2 px-4 py-2 rounded-md transition-colors ${
+            activeTab === 'websites'
+              ? 'bg-white text-gray-900 shadow-sm'
+              : 'text-gray-600 hover:text-gray-900'
+          }`}
+        >
+          <Globe className="w-4 h-4" />
+          <span className="font-medium">Websites</span>
+        </button>
+      </div>
 
-        {documents.length > 0 ? (
-          <div className="pt-4">
-            <h3 className="font-medium mb-3 text-gray-900">Uploaded Documents ({documents.length})</h3>
-            <ul className="space-y-3">
-              {documents.map((doc) => (
-                <li key={doc.id} className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-                  <div className="flex justify-between items-start">
-                    <div className="flex-1">
-                      <p className="font-semibold text-gray-900 mb-1">{doc.title || doc.file_name}</p>
-                      <p className="text-xs text-gray-500 mb-2">{doc.file_name}</p>
-                      {doc.content && (
-                        <p className="text-gray-600 text-sm line-clamp-2">
-                          {doc.content.slice(0, 200)}...
-                        </p>
-                      )}
-                      {doc.created_at && (
-                        <p className="text-xs text-gray-400 mt-2">
-                          Uploaded: {new Date(doc.created_at).toLocaleDateString()}
-                        </p>
-                      )}
+      {/* Documents Tab - UNCHANGED */}
+      {activeTab === 'documents' && (
+        <Card className="p-5 space-y-4">
+          <div className="flex items-center space-x-3">
+            <Input 
+              type="file" 
+              accept=".pdf" 
+              onChange={handleFileChange}
+              className="flex-1"
+            />
+            <Button 
+              onClick={handleUpload} 
+              disabled={uploading || !selectedFile}
+              className="px-6"
+            >
+              {uploading ? (
+                <div className="flex items-center space-x-2">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                  <span>Uploading...</span>
+                </div>
+              ) : (
+                'Upload PDF'
+              )}
+            </Button>
+          </div>
+
+          {documents.length > 0 ? (
+            <div className="pt-4">
+              <h3 className="font-medium mb-3 text-gray-900">Uploaded Documents ({documents.length})</h3>
+              <ul className="space-y-3">
+                {documents.map((doc) => (
+                  <li key={doc.id} className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1">
+                        <p className="font-semibold text-gray-900 mb-1">{doc.title || doc.file_name}</p>
+                        <p className="text-xs text-gray-500 mb-2">{doc.file_name}</p>
+                        {doc.content && (
+                          <p className="text-gray-600 text-sm line-clamp-2">
+                            {doc.content.slice(0, 200)}...
+                          </p>
+                        )}
+                        {doc.created_at && (
+                          <p className="text-xs text-gray-400 mt-2">
+                            Uploaded: {new Date(doc.created_at).toLocaleDateString()}
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex items-center space-x-2 ml-4">
+                        <a
+                          href={doc.file_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-600 hover:text-blue-800 text-sm font-medium px-2 py-1 rounded hover:bg-blue-50"
+                        >
+                          View
+                        </a>
+                        <button
+                          onClick={() => handleDelete(doc.id)}
+                          className="text-red-600 hover:text-red-800 p-1 rounded hover:bg-red-50"
+                          title="Delete document"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
-                    <div className="flex items-center space-x-2 ml-4">
-                      <a
-                        href={doc.file_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-blue-600 hover:text-blue-800 text-sm font-medium px-2 py-1 rounded hover:bg-blue-50"
-                      >
-                        View
-                      </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : (
+            <div className="pt-4 text-center py-8">
+              <FileText className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+              <p className="text-gray-500 text-sm mb-1">No documents uploaded yet.</p>
+              <p className="text-gray-400 text-xs">Upload PDFs to provide context for AI responses.</p>
+            </div>
+          )}
+        </Card>
+      )}
+
+      {/* Websites Tab - NEW */}
+      {activeTab === 'websites' && (
+        <Card className="p-5 space-y-4">
+          <div className="space-y-3">
+            <div className="flex items-end space-x-3">
+              <div className="flex-1">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Website URL</label>
+                <Input
+                  type="url"
+                  placeholder="https://example.com"
+                  value={websiteUrl}
+                  onChange={(e) => setWebsiteUrl(e.target.value)}
+                  className="w-full"
+                />
+              </div>
+              <div className="flex-1">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Title (optional)</label>
+                <Input
+                  type="text"
+                  placeholder="Website name"
+                  value={websiteTitle}
+                  onChange={(e) => setWebsiteTitle(e.target.value)}
+                  className="w-full"
+                />
+              </div>
+              <Button
+                onClick={handleAddWebsite}
+                disabled={addingWebsite || !websiteUrl}
+                className="px-6 flex items-center space-x-2"
+              >
+                {addingWebsite ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    <span>Adding...</span>
+                  </>
+                ) : (
+                  <>
+                    <Plus className="w-4 h-4" />
+                    <span>Add Website</span>
+                  </>
+                )}
+              </Button>
+            </div>
+            <p className="text-xs text-gray-500">
+              The website and its main navigation pages will be automatically scraped and indexed.
+            </p>
+          </div>
+
+          {websites.length > 0 ? (
+            <div className="pt-4">
+              <h3 className="font-medium mb-3 text-gray-900">Added Websites ({websites.length})</h3>
+              <ul className="space-y-3">
+                {websites.map((website) => (
+                  <li key={website.id} className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-3 mb-1">
+                          <p className="font-semibold text-gray-900">{website.title}</p>
+                          {getStatusBadge(website.ingestion_status)}
+                          {processingWebsites.has(website.id) && (
+                            <RefreshCw className="w-4 h-4 text-blue-600 animate-spin" />
+                          )}
+                        </div>
+                        <a 
+                          href={website.website_url} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="text-sm text-blue-600 hover:underline"
+                        >
+                          {website.website_url}
+                        </a>
+                        {website.created_at && (
+                          <p className="text-xs text-gray-400 mt-2">
+                            Added: {new Date(website.created_at).toLocaleDateString()}
+                          </p>
+                        )}
+                        {website.metadata?.pages_scraped && (
+                          <p className="text-xs text-gray-500 mt-1">
+                            {website.metadata.pages_scraped} pages • {website.metadata.total_chunks} chunks indexed
+                          </p>
+                        )}
+                      </div>
                       <button
-                        onClick={() => handleDelete(doc.id)}
-                        className="text-red-600 hover:text-red-800 p-1 rounded hover:bg-red-50"
-                        title="Delete document"
+                        onClick={() => handleDeleteWebsite(website.id)}
+                        className="text-red-600 hover:text-red-800 p-1 rounded hover:bg-red-50 ml-4"
+                        title="Delete website"
+                        disabled={processingWebsites.has(website.id)}
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </div>
-        ) : (
-          <div className="pt-4 text-center py-8">
-            <FileText className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-            <p className="text-gray-500 text-sm mb-1">No documents uploaded yet.</p>
-            <p className="text-gray-400 text-xs">Upload PDFs to provide context for AI responses.</p>
-          </div>
-        )}
-      </Card>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : (
+            <div className="pt-4 text-center py-8">
+              <Globe className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+              <p className="text-gray-500 text-sm mb-1">No websites added yet.</p>
+              <p className="text-gray-400 text-xs">Add websites to index their content for AI context.</p>
+            </div>
+          )}
+        </Card>
+      )}
     </div>
   );
 };

@@ -41,7 +41,8 @@ const userRoutes = require('./src/api_routes/user'); // ADD THIS LINE
 const app = express();
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use('/api/hot-summary', hotSummaryRoutes);
 app.use('/api/leads', leadsRouter);
 app.use('/api/settings', settingsApiRouter);
@@ -64,125 +65,6 @@ app.use('/api/campaigns', campaignsRouter);
 app.use('/api/team', teamRoutes);
 app.use('/api/invitations', invitationsRoutes);
 app.use('/api/user', userRoutes); // ADD THIS LINE
-
-app.post('/api/leads/bulk', async (req, res) => {
-  try {
-    const records = req.body.records || [];
-
-    // Pull allowed campaign values from Supabase settings
-    const { data: settingsData, error: settingsError } = await supabase
-      .from('platform_settings')
-      .select('*')
-      .eq('key', 'Campaigns')
-      .single();
-
-    if (settingsError || !settingsData?.value) {
-      throw new Error('Failed to retrieve allowed campaigns');
-    }
-
-    const allowedCampaigns = settingsData.value
-      .split('\n')
-      .map(s => s.trim())
-      .filter(Boolean);
-
-    const validRecords = records.filter(r =>
-      r.fields?.["Owner Name"] &&
-      r.fields?.["Property Address"] &&
-      r.fields?.["Campaign"]
-    );
-
-    if (validRecords.length === 0) {
-      return res.status(400).json({
-        error: 'No valid records with Campaign provided.',
-        uploaded: records.length,
-        skipped: records.length,
-        added: 0
-      });
-    }
-
-    const invalidCampaigns = validRecords.filter(r =>
-      !allowedCampaigns.includes(r.fields["Campaign"])
-    );
-
-    if (invalidCampaigns.length > 0) {
-      return res.status(422).json({
-        error: 'One or more records use invalid Campaign values.',
-        allowedCampaigns,
-        uploaded: records.length,
-        skipped: records.length,
-        added: 0
-      });
-    }
-
-    // Fetch existing leads for deduplication
-    const { data: existingData, error: existingError } = await supabase
-      .from('leads')
-      .select('owner_name, property_address');
-
-    if (existingError) {
-      throw existingError;
-    }
-
-    const existingSet = new Set(
-      existingData.map(e =>
-        `${e.owner_name?.toLowerCase().trim()}|${e.property_address?.toLowerCase().trim()}`
-      )
-    );
-
-    const deduplicated = validRecords.filter(r => {
-      const key = `${r.fields["Owner Name"].toLowerCase().trim()}|${r.fields["Property Address"].toLowerCase().trim()}`;
-      return !existingSet.has(key);
-    });
-
-    const enrichedRecords = deduplicated.map(r => {
-      const f = r.fields;
-      const today = new Date().toISOString().split('T')[0];
-      return {
-        owner_name: f["Owner Name"],
-        property_address: f["Property Address"],
-        city: f.City || '',
-        state: f.State || '',
-        zip_code: f["Zip Code"] || '',
-        phone: f.Phone || '',
-        email: f.Email || '',
-        bedrooms: f.Bedrooms || '',
-        bathrooms: f.Bathrooms || '',
-        square_footage: f["Square Footage"] || '',
-        notes: f.Notes || '',
-        campaign: f.Campaign,
-        status: f.Status || 'New Lead',
-        status_history: `${today}: ${f.Status || 'New Lead'}`
-      };
-    });
-
-    if (enrichedRecords.length === 0) {
-      return res.status(409).json({
-        error: 'All records are duplicates or missing required fields.',
-        uploaded: records.length,
-        skipped: records.length,
-        added: 0
-      });
-    }
-
-    const { error: insertError } = await supabase
-      .from('leads')
-      .insert(enrichedRecords);
-
-    if (insertError) {
-      throw insertError;
-    }
-
-    res.status(200).json({
-      message: 'Upload successful',
-      uploaded: records.length,
-      skipped: records.length - enrichedRecords.length,
-      added: enrichedRecords.length
-    });
-  } catch (err) {
-    console.error('Bulk upload failed:', err.message);
-    res.status(500).json({ error: 'Bulk upload failed' });
-  }
-});
 
 app.post('/api/settings/instructions', async (req, res) => {
   const { tone, persona, industry, role } = req.body;
@@ -328,7 +210,6 @@ app.get('/api/knowledge-bundle', async (req, res) => {
     res.status(500).json({ error: 'Failed to generate bundle' });
   }
 });
-
 app.get('/', (req, res) => {
   res.send('REI-CRM server running.');
 });
@@ -337,6 +218,15 @@ const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
 });
+
+// Run website scraper every 2 minutes
+setInterval(() => {
+  const { exec } = require('child_process');
+  exec('node workers/scrapeAndEmbedPendingWebsites.js', (error, stdout) => {
+    if (error) console.error('Scraper error:', error);
+    else console.log('Website scraper ran:', new Date().toISOString());
+  });
+}, 2 * 60 * 1000); // 2 minutes
 
 // Export shared utilities and Supabase client
 module.exports = {

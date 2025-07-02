@@ -47,6 +47,36 @@ const injectLeadDataIntoTemplate = (template: string, lead: any = {}, fieldConfi
   return template.replace('{{LEAD_DETAILS_PLACEHOLDER}}', leadDetailsBlock);
 };
 
+// Helper function to generate campaign strategy based on metadata
+const getCampaignStrategy = (industry: string, metadata: any) => {
+  if (industry === 'Staffing') {
+    if (metadata.talk_track === 'recruiting_candidates' || metadata.talk_track === 'Recruiting Candidates (B2C)') {
+      return "This campaign is focused on recruiting candidates for open roles. Messages should check for interest, qualifications, and timing.";
+    }
+    if (metadata.talk_track === 'acquiring_clients' || metadata.talk_track === 'Acquiring Clients (B2B)') {
+      return "This campaign is focused on signing new business clients who need staffing help. Messaging should build credibility and invite a call.";
+    }
+  }
+
+  if (industry === 'Home Services' && metadata.service_type) {
+    return `This campaign is for ${metadata.service_type} services. Help the lead feel it's fast and easy to get a quote or inspection.`;
+  }
+
+  if (industry === 'Financial Services' && metadata.service_type) {
+    return `This campaign is focused on ${metadata.service_type}. Messaging should build trust and offer a clear next step without pressure.`;
+  }
+
+  if (industry === 'Auto Sales' && metadata.vehicle_type) {
+    return `This campaign targets ${metadata.vehicle_type} leads. Messages should be friendly, helpful, and guide them toward the lot or a quote.`;
+  }
+
+  if (industry === 'Mortgage Lending' && metadata.service_type) {
+    return `This campaign is for ${metadata.service_type} mortgage leads. Be clear and approachable — help them take the next step easily.`;
+  }
+
+  return '';
+};
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -111,10 +141,10 @@ serve(async (req) => {
       );
     }
 
-    // 3. Get campaign details for AI context
+    // 3. Get campaign details for AI context - INCLUDING METADATA
     const { data: campaign, error: campaignError } = await supabase
       .from("campaigns")
-      .select("*")
+      .select("*, talk_track, service_type, vehicle_type")
       .eq("id", campaign_id)
       .eq("tenant_id", tenant_id)
       .single();
@@ -130,40 +160,34 @@ serve(async (req) => {
       );
     }
 
-    // 4. Get tenant's Twilio phone number
+    // Extract campaign metadata
+    const campaignMetadata = {
+      talk_track: campaign.talk_track,
+      service_type: campaign.service_type,
+      vehicle_type: campaign.vehicle_type
+    };
+
+    console.log(`📊 Campaign metadata:`, campaignMetadata);
+
     // 4. Get campaign's assigned phone number
-const { data: phoneNumber, error: phoneError } = await supabase
-  .from("campaigns")
-  .select(`
-    phone_number_id,
-    phone_numbers (
-      phone_number,
-      twilio_sid,
-      status
-    )
-  `)
-  .eq("id", campaign_id)
-  .eq("tenant_id", tenant_id)
-  .single();
+    const { data: phoneNumber, error: phoneError } = await supabase
+      .from("campaigns")
+      .select(`
+        phone_number_id,
+        phone_numbers (
+          phone_number,
+          twilio_sid,
+          status
+        )
+      `)
+      .eq("id", campaign_id)
+      .eq("tenant_id", tenant_id)
+      .single();
 
-if (phoneError || !phoneNumber || !phoneNumber.phone_numbers) {
-  console.error("❌ Error fetching campaign phone number:", phoneError);
-  return new Response(
-    JSON.stringify({ error: "No phone number assigned to campaign" }),
-    { 
-      status: 400, 
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    }
-  );
-}
-
-// Extract the actual phone number
-const campaignPhoneNumber = phoneNumber.phone_numbers.phone_number;
-
-    if (phoneError || !phoneNumber) {
-      console.error("❌ Error fetching phone number:", phoneError);
+    if (phoneError || !phoneNumber || !phoneNumber.phone_numbers) {
+      console.error("❌ Error fetching campaign phone number:", phoneError);
       return new Response(
-        JSON.stringify({ error: "No active phone number found for tenant" }),
+        JSON.stringify({ error: "No phone number assigned to campaign" }),
         { 
           status: 400, 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -171,7 +195,19 @@ const campaignPhoneNumber = phoneNumber.phone_numbers.phone_number;
       );
     }
 
-    // 5. ✅ GET GENERIC AI INSTRUCTION TEMPLATE
+    // Extract the actual phone number
+    const campaignPhoneNumber = phoneNumber.phone_numbers.phone_number;
+
+    // 5. Get tenant's industry setting
+    const { data: tenantSettings } = await supabase
+      .from("tenants")
+      .select("industry")
+      .eq("id", tenant_id)
+      .single();
+
+    const tenantIndustry = tenantSettings?.industry || '';
+
+    // 6. GET AI INSTRUCTION TEMPLATE
     const { data: aiInstructions, error: aiError } = await supabase
       .from("platform_settings")
       .select("value")
@@ -179,7 +215,7 @@ const campaignPhoneNumber = phoneNumber.phone_numbers.phone_number;
       .eq("tenant_id", tenant_id)
       .single();
 
-    // 6. ✅ GET FIELD CONFIGURATION FOR THIS TENANT
+    // 7. GET FIELD CONFIGURATION FOR THIS TENANT
     const { data: fieldConfig, error: fieldError } = await supabase
       .from("lead_field_config")
       .select("field_name, field_label")
@@ -189,17 +225,35 @@ const campaignPhoneNumber = phoneNumber.phone_numbers.phone_number;
       console.error("❌ Error fetching field config:", fieldError);
     }
 
-    // 7. ✅ INJECT THIS LEAD'S DATA INTO THE GENERIC TEMPLATE
+    // 8. INJECT LEAD DATA AND CAMPAIGN STRATEGY INTO TEMPLATE
     const genericTemplate = aiInstructions?.value || "You are a helpful sales assistant.";
-    const personalizedInstructions = injectLeadDataIntoTemplate(
+    
+    // First inject lead details
+    let personalizedInstructions = injectLeadDataIntoTemplate(
       genericTemplate,
       lead,
       fieldConfig || []
     );
 
-    console.log(`📋 Personalized instructions for ${lead.name}:`, personalizedInstructions);
+    // Generate campaign strategy based on metadata
+    const campaignStrategy = getCampaignStrategy(tenantIndustry, campaignMetadata);
+    
+    // Add campaign strategy section if we have one
+    if (campaignStrategy) {
+      personalizedInstructions = personalizedInstructions.replace(
+        '=== CAMPAIGN STRATEGY ===',
+        `=== CAMPAIGN STRATEGY ===\n${campaignStrategy}`
+      );
+      
+      // If the template doesn't have a campaign strategy section, add it
+      if (!personalizedInstructions.includes('=== CAMPAIGN STRATEGY ===')) {
+        personalizedInstructions += `\n\n=== CAMPAIGN STRATEGY ===\n${campaignStrategy}`;
+      }
+    }
 
-    // 8. Generate AI message using OpenAI with personalized instructions
+    console.log(`📋 Personalized instructions with campaign strategy for ${lead.name}:`, personalizedInstructions);
+
+    // 9. Generate AI message using OpenAI with personalized instructions
     const openaiApiKey = Deno.env.get("OPENAI_API_KEY");
     if (!openaiApiKey) {
       throw new Error("OpenAI API key not configured");
@@ -209,6 +263,7 @@ const campaignPhoneNumber = phoneNumber.phone_numbers.phone_number;
 
 Campaign: ${campaign.name}
 Campaign Description: ${campaign.description || ""}
+${campaignStrategy ? `Campaign Strategy: ${campaignStrategy}` : ''}
 
 Generate a personalized initial outreach message for this lead based on the instructions above.`;
 
@@ -223,7 +278,7 @@ Generate a personalized initial outreach message for this lead based on the inst
         messages: [
           {
             role: "system",
-            content: "You are an AI assistant that generates personalized sales outreach messages."
+            content: "You are an AI assistant that generates personalized sales outreach messages. Follow the campaign strategy and instructions provided."
           },
           {
             role: "user",
@@ -248,7 +303,7 @@ Generate a personalized initial outreach message for this lead based on the inst
 
     console.log(`📝 Generated AI message: ${aiMessage}`);
 
-    // 9. Send SMS via Twilio
+    // 10. Send SMS via Twilio
     const twilioSid = Deno.env.get("TWILIO_ACCOUNT_SID");
     const twilioToken = Deno.env.get("TWILIO_AUTH_TOKEN");
 
@@ -277,7 +332,7 @@ Generate a personalized initial outreach message for this lead based on the inst
     const twilioData = await twilioResponse.json();
     console.log(`📤 SMS sent successfully. Twilio SID: ${twilioData.sid}`);
 
-    // 10. Log message in database
+    // 11. Log message in database
     const { error: messageError } = await supabase
       .from("messages")
       .insert({
@@ -296,7 +351,7 @@ Generate a personalized initial outreach message for this lead based on the inst
       console.error("❌ Error logging message:", messageError);
     }
 
-    // 11. Update lead's last_contacted timestamp
+    // 12. Update lead's last_contacted timestamp
     await supabase
       .from("leads")
       .update({ 
@@ -311,6 +366,7 @@ Generate a personalized initial outreach message for this lead based on the inst
         message: "AI outreach sent successfully",
         twilio_sid: twilioData.sid,
         ai_message: aiMessage,
+        campaign_strategy: campaignStrategy,
         personalized_instructions: personalizedInstructions // For debugging
       }),
       {

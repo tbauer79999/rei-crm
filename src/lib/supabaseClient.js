@@ -1,5 +1,7 @@
 // src/lib/supabaseClient.js
 /* global globalThis */
+
+
 const { createClient } = require('@supabase/supabase-js');
 
 // Determine the appropriate global scope depending on the environment

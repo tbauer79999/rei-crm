@@ -581,14 +581,34 @@ export default function Dashboard() {
     return <span className="text-sm text-gray-900">{value}</span>;
   };
 
+  // Get row styling based on hot score
+  const getRowStyling = (lead) => {
+    if (lead.hot_score >= 80) {
+      return 'border-l-4 border-orange-400 bg-gradient-to-r from-orange-50 to-transparent';
+    } else if (lead.hot_score >= 60) {
+      return 'border-l-4 border-green-400 bg-gradient-to-r from-green-50 to-transparent';
+    } else {
+      return 'border-l-4 border-blue-400 bg-gradient-to-r from-blue-50 to-transparent';
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-white border-b border-gray-200 px-6 py-4">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-semibold text-gray-800">Lead Management</h1>
-            <p className="text-sm text-gray-500 mt-1">Monitor and manage your lead pipeline</p>
+            <h1 className="text-2xl font-semibold text-gray-800 flex items-center gap-3">
+              Surfox Radar
+              <div className="flex items-center gap-1">
+                <span className="flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-green-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                </span>
+                <span className="text-gray-400 text-xs animate-pulse">• • •</span>
+              </div>
+            </h1>
+            <p className="text-sm text-gray-500 mt-1">Real-time signal prioritization. No manual CRM nonsense.</p>
           </div>
           <div className="flex items-center gap-3">
             <button 
@@ -598,13 +618,18 @@ export default function Dashboard() {
               <Download size={16} />
               Export
             </button>
-            <button
-              onClick={() => setShowForm(!showForm)}
-              className="tour-add-lead flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              <Plus size={16} />
-              Add Lead
-            </button>
+            <div className="relative group">
+              <button
+                onClick={() => setShowForm(!showForm)}
+                className="tour-add-lead w-10 h-10 flex items-center justify-center text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                <Plus size={20} />
+              </button>
+              <div className="absolute bottom-full right-0 mb-2 px-3 py-1 bg-gray-900 text-white text-xs rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all whitespace-nowrap">
+                Start Manual Engagement
+                <div className="absolute top-full right-3 w-0 h-0 border-l-4 border-l-transparent border-r-4 border-r-transparent border-t-4 border-t-gray-900"></div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -636,9 +661,13 @@ export default function Dashboard() {
           <div className="bg-red-50 border border-red-200 rounded-xl p-6 relative group">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-red-600 flex items-center gap-1">
+                <p className="text-sm font-medium text-red-600 flex items-center gap-2">
                   Critical Alerts
                   <span className="text-xs text-red-500">ⓘ</span>
+                  <span className="flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-red-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                  </span>
                 </p>
                 <p className="text-2xl font-semibold text-red-900">
                   {criticalAlerts.length}
@@ -865,10 +894,11 @@ export default function Dashboard() {
                   currentLeads.map((lead) => {
                     const displayStatus = lead.funnel_stage || lead.status;
                     const statusConfig = getStatusConfig(displayStatus);
+                    const rowStyling = getRowStyling(lead);
                     return (
                       <tr 
                         key={lead.id} 
-                        className="hover:bg-gray-50 cursor-pointer transition-colors"
+                        className={`hover:bg-gray-50 cursor-pointer transition-colors ${rowStyling}`}
                         onClick={() => handleRowClick(lead.id)}
                       >
                         {/* Alert Indicator */}

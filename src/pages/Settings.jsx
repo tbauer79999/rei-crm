@@ -65,7 +65,7 @@ const settingsCategories = [
   {
     key: 'messaging',
     title: 'Messaging & Communication',
-    description: 'AI reply settings, throttling, and response modes',
+    description: 'Configure AI message pacing, tone rules, and throttle settings',
     icon: MessageSquare,
     component: MessagingSettings,
     status: 'healthy',
@@ -92,11 +92,11 @@ const settingsCategories = [
   {
     key: 'ai',
     title: 'AI & Automation',
-    description: 'Escalation controls, scoring thresholds, and automation rules',
+    description: 'Control AI escalation behavior, scoring rules, and automated follow-up timing',
     icon: Brain,
     component: AISettings,
     status: 'attention',
-    statusText: 'Review Settings'
+    statusText: 'Needs Configuration'
   },
   {
     key: 'instruction',
@@ -110,7 +110,7 @@ const settingsCategories = [
   {
     key: 'knowledge',
     title: 'AI Knowledge Base',
-    description: 'Upload documents and training materials for AI context',
+    description: 'Upload business documents to train AI on your company’s language, process, and terminology',
     icon: Database,
     component: AIKnowledgeBase,
     status: 'review',
@@ -119,7 +119,7 @@ const settingsCategories = [
   {
     key: 'systemtools',
     title: 'System Tools & Export',
-    description: 'Data export, backups, and system maintenance utilities',
+    description: 'Download settings, export message logs, or restore platform defaults',
     icon: SettingsIcon,
     component: SystemTools,
     status: 'healthy',
@@ -200,7 +200,7 @@ export default function Settings() {
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-2xl font-bold text-gray-900 mb-2">Settings & Configuration</h1>
-          <p className="text-gray-600">Manage your REI-CRM system preferences and AI automation settings</p>
+          <p className="text-gray-600">Manage your SurFox system preferences and AI automation settings</p>
         </div>
 
         {/* Settings Categories Grid */}
@@ -255,7 +255,7 @@ export default function Settings() {
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold text-green-600">6</div>
-              <div className="text-sm text-gray-600">Healthy Systems</div>
+              <div className="text-sm text-gray-600">✔️ Fully Configured</div>
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold text-orange-600">1</div>
@@ -263,7 +263,7 @@ export default function Settings() {
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold text-blue-600">1</div>
-              <div className="text-sm text-gray-600">Pending Review</div>
+              <div className="text-sm text-gray-600">🕗 Awaiting Changes</div>
             </div>
           </div>
 

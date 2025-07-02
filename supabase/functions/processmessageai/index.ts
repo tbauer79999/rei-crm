@@ -138,6 +138,36 @@ function calculateWeightedScore(
     return Math.round(Math.max(1, Math.min(100, score)));
 }
 
+// Helper function to generate campaign strategy based on metadata
+const getCampaignStrategy = (industry: string, metadata: any) => {
+  if (industry === 'Staffing') {
+    if (metadata.talk_track === 'recruiting_candidates' || metadata.talk_track === 'Recruiting Candidates (B2C)') {
+      return "This campaign is focused on recruiting candidates for open roles. Messages should check for interest, qualifications, and timing.";
+    }
+    if (metadata.talk_track === 'acquiring_clients' || metadata.talk_track === 'Acquiring Clients (B2B)') {
+      return "This campaign is focused on signing new business clients who need staffing help. Messaging should build credibility and invite a call.";
+    }
+  }
+
+  if (industry === 'Home Services' && metadata.service_type) {
+    return `This campaign is for ${metadata.service_type} services. Help the lead feel it's fast and easy to get a quote or inspection.`;
+  }
+
+  if (industry === 'Financial Services' && metadata.service_type) {
+    return `This campaign is focused on ${metadata.service_type}. Messaging should build trust and offer a clear next step without pressure.`;
+  }
+
+  if (industry === 'Auto Sales' && metadata.vehicle_type) {
+    return `This campaign targets ${metadata.vehicle_type} leads. Messages should be friendly, helpful, and guide them toward the lot or a quote.`;
+  }
+
+  if (industry === 'Mortgage Lending' && metadata.service_type) {
+    return `This campaign is for ${metadata.service_type} mortgage leads. Be clear and approachable — help them take the next step easily.`;
+  }
+
+  return '';
+};
+
 // ✅ NEW: Runtime function to inject lead data into template
 const generateLeadDetailsBlock = (lead: any = {}, fieldConfig: any[] = []) => {
   console.log('🔍 generateLeadDetailsBlock called with:');
@@ -276,7 +306,7 @@ serve(async (req) => {
 
     // ✅ NEW: Fetch lead data for injection
     console.log('📋 Fetching lead data for engagement instructions...');
-const { data: lead, error: leadError } = await supabase
+    const { data: lead, error: leadError } = await supabase
       .from('leads')
       .select('*')
       .eq('id', lead_id)
@@ -299,6 +329,36 @@ const { data: lead, error: leadError } = await supabase
       console.error("❌ Lead has no campaign assigned");
       return new Response('Lead must be assigned to a campaign', { status: 400 });
     }
+
+    // ✅ NEW: Fetch campaign metadata
+    console.log('📊 Fetching campaign metadata...');
+    const { data: campaign, error: campaignError } = await supabase
+      .from("campaigns")
+      .select("talk_track, service_type, vehicle_type")
+      .eq("id", campaignId)
+      .single();
+
+    if (campaignError) {
+      console.error('❌ Error fetching campaign metadata:', campaignError);
+    }
+
+    const campaignMetadata = {
+      talk_track: campaign?.talk_track,
+      service_type: campaign?.service_type,
+      vehicle_type: campaign?.vehicle_type
+    };
+
+    console.log('📊 Campaign metadata:', campaignMetadata);
+
+    // ✅ NEW: Get tenant's industry setting
+    const { data: tenantSettings } = await supabase
+      .from("tenants")
+      .select("industry")
+      .eq("id", tenant_id)
+      .single();
+
+    const tenantIndustry = tenantSettings?.industry || '';
+    console.log('🏢 Tenant industry:', tenantIndustry);
 
     // ✅ NEW: Fetch field configuration for this tenant
     console.log('📋 Fetching field configuration for engagement instructions...');
@@ -360,7 +420,79 @@ const { data: lead, error: leadError } = await supabase
     }
 
     console.log('✅ Engagement instruction bundle fetched successfully');
-    const systemInstructions = settings.value; // Raw instructions for system message
+    let systemInstructions = settings.value; // Raw instructions for system message
+
+    // ✅ NEW: Generate campaign strategy based on metadata
+    const campaignStrategy = getCampaignStrategy(tenantIndustry, campaignMetadata);
+    
+    // Add campaign strategy section if we have one
+    if (campaignStrategy) {
+      systemInstructions = systemInstructions.replace(
+        '=== CAMPAIGN STRATEGY ===',
+        `=== CAMPAIGN STRATEGY ===\n${campaignStrategy}`
+      );
+      
+      // If the template doesn't have a campaign strategy section, add it
+      if (!systemInstructions.includes('=== CAMPAIGN STRATEGY ===')) {
+        systemInstructions += `\n\n=== CAMPAIGN STRATEGY ===\n${campaignStrategy}`;
+      }
+    }
+
+    console.log('📋 Campaign strategy injected:', campaignStrategy);
+
+    // ✅ CALL VECTOR SEARCH EDGE FUNCTION
+    console.log('🔍 Searching for relevant knowledge chunks...');
+
+    let knowledgeContext = '';
+    try {
+      const vectorSearchUrl = `${supabaseUrl}/functions/v1/vector-search`;
+      const vectorResponse = await fetch(vectorSearchUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${supabaseKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          query: message_body,
+          campaign_id: campaignId,
+          tenant_id: tenant_id,
+          match_count: 5
+        })
+      });
+
+      if (vectorResponse.ok) {
+        const vectorData = await vectorResponse.json();
+        const chunks = vectorData.chunks || vectorData.data || [];
+        
+        if (chunks && chunks.length > 0) {
+          console.log(`✅ Found ${chunks.length} relevant knowledge chunks`);
+          
+          // Format chunks for context
+          knowledgeContext = '\n' + chunks
+            .map((chunk: any, idx: number) => `Context ${idx + 1} (${Math.round(chunk.similarity * 100)}% relevant):\n${chunk.chunk_text}`)
+            .join('\n\n');
+        } else {
+          console.log('⚠️ No relevant knowledge chunks found');
+        }
+      } else {
+        const errorText = await vectorResponse.text();
+        console.error('❌ Vector search failed:', vectorResponse.status, errorText);
+      }
+    } catch (vectorError) {
+      console.error('❌ Error calling vector search:', vectorError);
+      // Continue without knowledge context rather than failing
+    }
+
+    // Inject knowledge into system instructions if found
+    if (knowledgeContext) {
+      systemInstructions = systemInstructions.replace(
+        '=== KNOWLEDGE BASE ===',
+        `=== KNOWLEDGE BASE ===\n${knowledgeContext}`
+      );
+      console.log('✅ Knowledge context injected into system instructions');
+    } else {
+      console.log('⚠️ No knowledge context added to system instructions');
+    }
 
     // ✅ NEW: Create lead details block for USER message
     console.log('📋 Building lead details for user context...');
@@ -371,7 +503,7 @@ const { data: lead, error: leadError } = await supabase
     // ✅ NEW: Separate SYSTEM and USER messages
     const systemMessage = `NEVER use the lead's name. NEVER say "folks". NEVER start with "Hey [name]".
 
-${settings.value.replace('{{LEAD_DETAILS_PLACEHOLDER}}', '')}
+${systemInstructions.replace('{{LEAD_DETAILS_PLACEHOLDER}}', '')}
 
 FINAL REMINDER: Your response must NOT contain the lead's name anywhere.`; // Pure instructions
 
@@ -382,13 +514,9 @@ ${leadDetailsBlock}
 
 CURRENT MESSAGE: ${message_body}`;
 
-console.log('🔍 SYSTEM MESSAGE CONTENT (first 500 chars):', systemMessage.substring(0, 500));
-console.log('🔍 SYSTEM MESSAGE CONTENT (last 500 chars):', systemMessage.substring(systemMessage.length - 500));
-console.log('🔍 System message contains LEAD_DETAILS_PLACEHOLDER:', systemMessage.includes('{{LEAD_DETAILS_PLACEHOLDER}}'));
-console.log('🔍 System message total length:', systemMessage.length);
-console.log('🔍 After placeholder removal, system message length:', systemMessage.length);
-console.log('🔍 System message now contains "Closer":', systemMessage.includes('Closer'));
-console.log('🔍 System message now contains "Never use the name":', systemMessage.includes('Never use the name'));
+    console.log('🔍 SYSTEM MESSAGE CONTENT (first 500 chars):', systemMessage.substring(0, 500));
+    console.log('🔍 System message contains campaign strategy:', systemMessage.includes(campaignStrategy));
+    console.log('🔍 System message total length:', systemMessage.length);
 
     if (!openaiApiKey) {
       console.error('❌ OpenAI API key not available');
@@ -431,9 +559,9 @@ console.log('🔍 System message now contains "Never use the name":', systemMess
     const output = result.choices?.[0]?.message?.content || '';
     console.log('🧠 Raw AI Output:', output);
     console.log('🔍 MOTIVATION MATCH:', output.match(/Motivation Score:\s*(\d+)/));
-console.log('🔍 HESITATION MATCH:', output.match(/Hesitation Score:\s*(\d+)/));
-console.log('🔍 URGENCY MATCH:', output.match(/Urgency Score:\s*(\d+)/));
-console.log('🔍 CONTEXTUAL MATCH:', output.match(/Contextual Sentiment Score:\s*(\d+)/));
+    console.log('🔍 HESITATION MATCH:', output.match(/Hesitation Score:\s*(\d+)/));
+    console.log('🔍 URGENCY MATCH:', output.match(/Urgency Score:\s*(\d+)/));
+    console.log('🔍 CONTEXTUAL MATCH:', output.match(/Contextual Sentiment Score:\s*(\d+)/));
 
     const parsed = {
       motivation: parseInt(output.match(/Motivation Score:\s*(\d+)/)?.[1] || '0'),
@@ -477,9 +605,7 @@ console.log('🔍 CONTEXTUAL MATCH:', output.match(/Contextual Sentiment Score:\
 
     // ✅ NEW: Extract timing preferences from the conversation
     console.log('📅 Checking for timing preferences in message...');
-// Replace the timing analysis section in processmessageai with this smarter version
-
-const timingAnalysisPrompt = `
+    const timingAnalysisPrompt = `
 Analyze this message and the conversation context to determine the optimal follow-up timing.
 
 MESSAGE: ${message_body}
@@ -712,8 +838,7 @@ Examples:
     console.log(`⏳ Waiting ${delay / 1000} seconds before sending to appear more human...`);
     await new Promise(resolve => setTimeout(resolve, delay));
     
-    // Get tenant's Twilio phone number
-// Get campaign's assigned phone number
+    // Get campaign's assigned phone number
     const { data: campaignPhone, error: phoneError } = await supabase
       .from("campaigns")
       .select(`

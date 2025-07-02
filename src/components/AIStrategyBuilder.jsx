@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext.jsx';
 import supabase from '../lib/supabaseClient.js';
 import { buildInstructionBundle, buildInitialInstruction } from '../lib/instructionBuilder.js';
+
 import { 
   Brain,
   Save,
@@ -259,21 +260,27 @@ const AIStrategyBuilder = () => {
       }
 
       // Build instruction bundles
-      const initialBundle = buildInitialInstruction({
-        tone: strategyConfig.initialTone,
-        persona: strategyConfig.initialPersona,
-        industry: strategyConfig.industry,
-        role: strategyConfig.role,
-        businessName: strategyConfig.businessName
-      });
+const initialBundle = buildInitialInstruction({
+  tone: strategyConfig.initialTone,
+  persona: strategyConfig.initialPersona,
+  industry: strategyConfig.industry,
+  role: strategyConfig.role,
+  leadDetails: strategyConfig.leadDetails || {},
+  knowledgeBase: strategyConfig.knowledgeBase || '',
+  campaignMetadata: strategyConfig.campaignMetadata || {}
+});
 
-      const engagementBundle = buildInstructionBundle({
-        tone: strategyConfig.engagementTone,
-        persona: strategyConfig.engagementPersona,
-        industry: strategyConfig.industry,
-        role: strategyConfig.role,
-        businessName: strategyConfig.businessName
-      });
+
+const engagementBundle = buildInstructionBundle({
+  tone: strategyConfig.engagementTone,
+  persona: strategyConfig.engagementPersona,
+  industry: strategyConfig.industry,
+  role: strategyConfig.role,
+  leadDetails: strategyConfig.leadDetails || {},
+  knowledgeBase: strategyConfig.knowledgeBase || '',
+  campaignMetadata: strategyConfig.campaignMetadata || {}
+});
+
 
       // Build follow-up bundles
       const followupBundles = strategyConfig.followups.map(followup => 

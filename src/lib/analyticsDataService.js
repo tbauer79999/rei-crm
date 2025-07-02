@@ -251,19 +251,20 @@ export class AnalyticsDataService {
   }
 
   /**
-   * Campaign Performance Breakdown for Table - OPTIMIZED
+   * Campaign Performance Breakdown for Table - SHOWS ALL CAMPAIGNS
    */
   async getCampaignPerformanceData() {
     const tenantFilter = this.getTenantFilter();
     const dateFilter = this.getDateFilter();
 
     try {
-      // Get all campaigns
+      // Get all campaigns with additional fields for better display
       const { data: campaigns, error } = await supabase
         .from('campaigns')
-        .select('id, name')
+        .select('id, name, is_active, created_at')
         .eq('archived', false)
-        .match(tenantFilter);
+        .match(tenantFilter)
+        .order('created_at', { ascending: false });
 
       if (error) throw error;
 
@@ -318,15 +319,31 @@ export class AnalyticsDataService {
 
         return {
           campaign: campaign.name,
+          campaignId: campaign.id,
           sent,
           opened: Math.floor(sent * 0.7), // Estimate since we don't track opens
           replied,
           converted,
-          rate: parseFloat(rate)
+          rate: parseFloat(rate),
+          status: campaign.is_active ? 'active' : 'paused',
+          created_at: campaign.created_at,
+          totalLeads: campaignLeads.length // Add total leads in campaign
         };
       });
 
-      return performanceData.filter(p => p.sent > 0); // Only return campaigns with activity
+      // Return ALL campaigns, not just those with activity
+      // Sort by activity (campaigns with messages first, then by creation date)
+      return performanceData.sort((a, b) => {
+        // First sort by whether they have activity
+        if (a.sent > 0 && b.sent === 0) return -1;
+        if (a.sent === 0 && b.sent > 0) return 1;
+        
+        // Then by creation date (newest first)
+        if (a.created_at && b.created_at) {
+          return new Date(b.created_at) - new Date(a.created_at);
+        }
+        return 0;
+      });
     } catch (error) {
       console.error('Error fetching campaign performance data:', error);
       return [];
@@ -334,13 +351,25 @@ export class AnalyticsDataService {
   }
 
   /**
-   * Calculate REAL follow-up timing analysis from message data
+   * Calculate REAL follow-up timing analysis from message data with dynamic days
    */
   async getFollowupTimingAnalysis() {
     const tenantFilter = this.getTenantFilter();
     const dateFilter = this.getDateFilter();
 
     try {
+      // First, get the platform settings to know which days to analyze
+      const { data: platformSettings } = await supabase
+        .from('platform_settings')
+        .select('followup_delay_1, followup_delay_2, followup_delay_3')
+        .match(tenantFilter)
+        .single();
+
+      // Use platform settings or defaults
+      const day1 = platformSettings?.followup_delay_1 || 3;
+      const day2 = platformSettings?.followup_delay_2 || 7;
+      const day3 = platformSettings?.followup_delay_3 || 14;
+
       // Get conversations with multiple messages
       const { data: conversations } = await supabase
         .from('conversations')
@@ -360,17 +389,17 @@ export class AnalyticsDataService {
 
       if (!conversations || conversations.length === 0) {
         return [
-          { day: 1, responseRate: 0 },
-          { day: 3, responseRate: 0 },
-          { day: 7, responseRate: 0 }
+          { day: day1, responseRate: 0 },
+          { day: day2, responseRate: 0 },
+          { day: day3, responseRate: 0 }
         ];
       }
 
-      // Analyze follow-up effectiveness
+      // Analyze follow-up effectiveness for the configured days
       const followupStats = {
-        day1: { sent: 0, responses: 0 },
-        day3: { sent: 0, responses: 0 },
-        day7: { sent: 0, responses: 0 }
+        [day1]: { sent: 0, responses: 0 },
+        [day2]: { sent: 0, responses: 0 },
+        [day3]: { sent: 0, responses: 0 }
       };
 
       conversations.forEach(conv => {
@@ -390,15 +419,16 @@ export class AnalyticsDataService {
               new Date(msg.timestamp) - new Date(outbound[i].timestamp) < (3 * 24 * 60 * 60 * 1000) // Within 3 days
             );
 
-            if (daysDiff === 1) {
-              followupStats.day1.sent++;
-              if (responseAfter) followupStats.day1.responses++;
-            } else if (daysDiff >= 2 && daysDiff <= 4) {
-              followupStats.day3.sent++;
-              if (responseAfter) followupStats.day3.responses++;
-            } else if (daysDiff >= 6 && daysDiff <= 8) {
-              followupStats.day7.sent++;
-              if (responseAfter) followupStats.day7.responses++;
+            // Check against each configured day with a tolerance of +/- 1 day
+            if (Math.abs(daysDiff - day1) <= 1) {
+              followupStats[day1].sent++;
+              if (responseAfter) followupStats[day1].responses++;
+            } else if (Math.abs(daysDiff - day2) <= 1) {
+              followupStats[day2].sent++;
+              if (responseAfter) followupStats[day2].responses++;
+            } else if (Math.abs(daysDiff - day3) <= 1) {
+              followupStats[day3].sent++;
+              if (responseAfter) followupStats[day3].responses++;
             }
           }
         }
@@ -406,21 +436,21 @@ export class AnalyticsDataService {
 
       return [
         {
-          day: 1,
-          responseRate: followupStats.day1.sent > 0 
-            ? parseFloat(((followupStats.day1.responses / followupStats.day1.sent) * 100).toFixed(1))
+          day: day1,
+          responseRate: followupStats[day1].sent > 0 
+            ? parseFloat(((followupStats[day1].responses / followupStats[day1].sent) * 100).toFixed(1))
             : 0
         },
         {
-          day: 3,
-          responseRate: followupStats.day3.sent > 0 
-            ? parseFloat(((followupStats.day3.responses / followupStats.day3.sent) * 100).toFixed(1))
+          day: day2,
+          responseRate: followupStats[day2].sent > 0 
+            ? parseFloat(((followupStats[day2].responses / followupStats[day2].sent) * 100).toFixed(1))
             : 0
         },
         {
-          day: 7,
-          responseRate: followupStats.day7.sent > 0 
-            ? parseFloat(((followupStats.day7.responses / followupStats.day7.sent) * 100).toFixed(1))
+          day: day3,
+          responseRate: followupStats[day3].sent > 0 
+            ? parseFloat(((followupStats[day3].responses / followupStats[day3].sent) * 100).toFixed(1))
             : 0
         }
       ];
@@ -432,13 +462,25 @@ export class AnalyticsDataService {
   }
 
   /**
-   * Fallback method using messages table directly
+   * Fallback method using messages table directly with dynamic days
    */
   async getFollowupTimingFromMessages() {
     const tenantFilter = this.getTenantFilter();
     const dateFilter = this.getDateFilter();
 
     try {
+      // First, get the platform settings to know which days to analyze
+      const { data: platformSettings } = await supabase
+        .from('platform_settings')
+        .select('followup_delay_1, followup_delay_2, followup_delay_3')
+        .match(tenantFilter)
+        .single();
+
+      // Use platform settings or defaults
+      const day1 = platformSettings?.followup_delay_1 || 3;
+      const day2 = platformSettings?.followup_delay_2 || 7;
+      const day3 = platformSettings?.followup_delay_3 || 14;
+
       // Get all messages grouped by lead
       const { data: messages } = await supabase
         .from('messages')
@@ -458,8 +500,12 @@ export class AnalyticsDataService {
         leadMessages.get(msg.lead_id).push(msg);
       });
 
-      // Analyze timing
-      const stats = { day1: { sent: 0, resp: 0 }, day3: { sent: 0, resp: 0 }, day7: { sent: 0, resp: 0 } };
+      // Analyze timing for the configured days
+      const stats = {
+        [day1]: { sent: 0, resp: 0 },
+        [day2]: { sent: 0, resp: 0 },
+        [day3]: { sent: 0, resp: 0 }
+      };
 
       leadMessages.forEach(messages => {
         const outbound = messages.filter(m => m.direction === 'outbound');
@@ -470,37 +516,39 @@ export class AnalyticsDataService {
             const daysDiff = Math.floor((new Date(outbound[i].timestamp) - new Date(outbound[0].timestamp)) / (1000 * 60 * 60 * 24));
             const hasResponse = inbound.some(m => new Date(m.timestamp) > new Date(outbound[i].timestamp));
 
-            if (daysDiff === 1) {
-              stats.day1.sent++;
-              if (hasResponse) stats.day1.resp++;
-            } else if (daysDiff >= 2 && daysDiff <= 4) {
-              stats.day3.sent++;
-              if (hasResponse) stats.day3.resp++;
-            } else if (daysDiff >= 6 && daysDiff <= 8) {
-              stats.day7.sent++;
-              if (hasResponse) stats.day7.resp++;
+            // Check against each configured day with a tolerance of +/- 1 day
+            if (Math.abs(daysDiff - day1) <= 1) {
+              stats[day1].sent++;
+              if (hasResponse) stats[day1].resp++;
+            } else if (Math.abs(daysDiff - day2) <= 1) {
+              stats[day2].sent++;
+              if (hasResponse) stats[day2].resp++;
+            } else if (Math.abs(daysDiff - day3) <= 1) {
+              stats[day3].sent++;
+              if (hasResponse) stats[day3].resp++;
             }
           }
         }
       });
 
       return [
-        { day: 1, responseRate: stats.day1.sent > 0 ? parseFloat(((stats.day1.resp / stats.day1.sent) * 100).toFixed(1)) : 0 },
-        { day: 3, responseRate: stats.day3.sent > 0 ? parseFloat(((stats.day3.resp / stats.day3.sent) * 100).toFixed(1)) : 0 },
-        { day: 7, responseRate: stats.day7.sent > 0 ? parseFloat(((stats.day7.resp / stats.day7.sent) * 100).toFixed(1)) : 0 }
+        { day: day1, responseRate: stats[day1].sent > 0 ? parseFloat(((stats[day1].resp / stats[day1].sent) * 100).toFixed(1)) : 0 },
+        { day: day2, responseRate: stats[day2].sent > 0 ? parseFloat(((stats[day2].resp / stats[day2].sent) * 100).toFixed(1)) : 0 },
+        { day: day3, responseRate: stats[day3].sent > 0 ? parseFloat(((stats[day3].resp / stats[day3].sent) * 100).toFixed(1)) : 0 }
       ];
     } catch (error) {
       console.error('Error in fallback timing analysis:', error);
+      // Return with default days if all else fails
       return [
-        { day: 1, responseRate: 32 },
-        { day: 3, responseRate: 28 },
-        { day: 7, responseRate: 15 }
+        { day: 3, responseRate: 32 },
+        { day: 7, responseRate: 28 },
+        { day: 14, responseRate: 15 }
       ];
     }
   }
 
   /**
-   * AI Performance Insights with REAL data
+   * AI Performance Insights with REAL data and platform settings
    */
   async getAIPerformanceInsights() {
     const tenantFilter = this.getTenantFilter();
@@ -532,7 +580,14 @@ export class AnalyticsDataService {
         actualHot: hotLeadIds.has(record.lead_id) ? 1 : 0
       }));
 
-      // Get real follow-up timing
+      // Get platform settings for follow-up delays
+      const { data: platformSettings } = await supabase
+        .from('platform_settings')
+        .select('followup_delay_1, followup_delay_2, followup_delay_3')
+        .match(tenantFilter)
+        .single();
+
+      // Get real follow-up timing (this now uses the dynamic days internally)
       const followupTiming = await this.getFollowupTimingAnalysis();
 
       // Get AI archetype performance from actual data
@@ -541,14 +596,24 @@ export class AnalyticsDataService {
       return {
         confidenceData,
         topPerformingPersonas,
-        followupTiming
+        followupTiming,
+        followupSettings: platformSettings || {
+          followup_delay_1: 3,
+          followup_delay_2: 7,
+          followup_delay_3: 14
+        }
       };
     } catch (error) {
       console.error('Error fetching AI performance insights:', error);
       return {
         confidenceData: [],
         topPerformingPersonas: [],
-        followupTiming: []
+        followupTiming: [],
+        followupSettings: {
+          followup_delay_1: 3,
+          followup_delay_2: 7,
+          followup_delay_3: 14
+        }
       };
     }
   }

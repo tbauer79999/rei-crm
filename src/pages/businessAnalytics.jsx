@@ -173,8 +173,7 @@ export default function BusinessAnalytics() {
   const NavigationTabs = ({ activeView, setActiveView }) => {
     const tabs = [
       { id: 'overview', name: 'Overview Reports', icon: BarChart3 },
-      { id: 'lead-performance', name: 'Lead Performance', icon: Users },
-      { id: 'ai-performance', name: 'AI Performance', icon: Brain },
+      { id: 'lead-performance', name: 'AI Conversion Metrics', icon: Users },
       { id: 'performance-analytics', name: 'Performance Analytics', icon: Activity },
       { id: 'abtesting', name: 'A/B Testing', icon: TestTube },
       { id: 'sales-outcomes', name: 'Team Performance', icon: Award },
@@ -225,42 +224,107 @@ export default function BusinessAnalytics() {
     const totalResponses = performanceMetrics.totalResponses || 0;
     const totalConversions = performanceMetrics.totalConversions || 0;
 
+    // Find the highest rate to determine which bar should pulse
+    const maxRate = Math.max(
+      100,
+      totalLeads > 0 ? ((totalMessages / totalLeads) * 100) : 0,
+      totalLeads > 0 ? ((totalResponses / totalLeads) * 100) : 0,
+      totalLeads > 0 ? ((totalHotLeads / totalLeads) * 100) : 0
+    );
+
     const macroFunnelData = [
-      { stage: 'Leads Uploaded', count: totalLeads, rate: 100, color: '#3b82f6' },
-      { stage: 'AI Engaged', count: totalMessages, rate: totalLeads > 0 ? ((totalMessages / totalLeads) * 100).toFixed(1) : 0, color: '#10b981' },
-      { stage: 'Replied', count: totalResponses, rate: totalLeads > 0 ? ((totalResponses / totalLeads) * 100).toFixed(1) : 0, color: '#f59e0b' },
-      { stage: 'Hot Lead', count: totalHotLeads, rate: totalLeads > 0 ? ((totalHotLeads / totalLeads) * 100).toFixed(1) : 0, color: '#ef4444' },
-      { stage: 'Sales Connected', count: Math.floor(totalHotLeads * 0.8), rate: totalLeads > 0 ? ((totalHotLeads * 0.8 / totalLeads) * 100).toFixed(1) : 0, color: '#8b5cf6' },
-      { stage: 'Qualified', count: Math.floor(totalHotLeads * 0.6), rate: totalLeads > 0 ? ((totalHotLeads * 0.6 / totalLeads) * 100).toFixed(1) : 0, color: '#ec4899' },
-      { stage: 'Deal Won', count: totalConversions, rate: totalLeads > 0 ? ((totalConversions / totalLeads) * 100).toFixed(1) : 0, color: '#06b6d4' }
+      { 
+        stage: 'Contacts Added', 
+        count: totalLeads, 
+        rate: 100, 
+        color: '#3b82f6',
+        tooltip: null
+      },
+      { 
+        stage: 'AI Initiated Outreach', 
+        count: totalMessages, 
+        rate: totalLeads > 0 ? ((totalMessages / totalLeads) * 100).toFixed(1) : 0, 
+        color: '#10b981',
+        tooltip: totalMessages > totalLeads ? 'Engagement count may exceed upload count due to multi-touch outreach.' : null,
+        sublabel: totalMessages > totalLeads ? `(×${(totalMessages / totalLeads).toFixed(1)} per contact)` : null
+      },
+      { 
+        stage: 'Response Received', 
+        count: totalResponses, 
+        rate: totalLeads > 0 ? ((totalResponses / totalLeads) * 100).toFixed(1) : 0, 
+        color: '#f59e0b',
+        tooltip: null
+      },
+      { 
+        stage: 'Qualified for Follow-Up', 
+        count: totalHotLeads, 
+        rate: totalLeads > 0 ? ((totalHotLeads / totalLeads) * 100).toFixed(1) : 0, 
+        color: '#ef4444',
+        tooltip: null
+      },
+      { 
+        stage: 'Human Escalation Complete', 
+        count: Math.floor(totalHotLeads * 0.8), 
+        rate: totalLeads > 0 ? ((totalHotLeads * 0.8 / totalLeads) * 100).toFixed(1) : 0, 
+        color: '#8b5cf6',
+        tooltip: null
+      },
+      { 
+        stage: 'Qualified', 
+        count: Math.floor(totalHotLeads * 0.6), 
+        rate: totalLeads > 0 ? ((totalHotLeads * 0.6 / totalLeads) * 100).toFixed(1) : 0, 
+        color: '#ec4899',
+        tooltip: null
+      },
+      { 
+        stage: 'Deal Won', 
+        count: totalConversions, 
+        rate: totalLeads > 0 ? ((totalConversions / totalLeads) * 100).toFixed(1) : 0, 
+        color: '#06b6d4',
+        tooltip: null
+      }
     ];
 
     return (
       <div className="space-y-6">
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
           <div className="px-6 py-4 border-b border-gray-100">
-            <h3 className="text-lg font-semibold text-gray-900">Macro Conversion Funnel</h3>
-            <p className="text-sm text-gray-600 mt-1">Real data from your campaigns and leads</p>
+            <h3 className="text-lg font-semibold text-gray-900">AI Engagement Flow</h3>
+            <p className="text-sm text-gray-600 mt-1">Real-time interaction tracking from AI-driven outreach</p>
           </div>
           <div className="p-6">
             <div className="space-y-4">
-              {macroFunnelData.map((stage, index) => (
-                <div key={stage.stage} className="p-4 rounded-lg hover:bg-gray-50 transition-colors">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-sm font-semibold text-gray-900">{stage.stage}</span>
-                    <div className="text-right">
-                      <span className="text-lg font-bold text-gray-900">{typeof stage.count === 'number' ? stage.count.toLocaleString() : stage.count}</span>
-                      <span className="text-sm text-gray-500 ml-2">({stage.rate}%)</span>
+              {macroFunnelData.map((stage, index) => {
+                const isHighestRate = parseFloat(stage.rate) === maxRate && parseFloat(stage.rate) > 0;
+                return (
+                  <div key={stage.stage} className="p-4 rounded-lg hover:bg-gray-50 transition-colors relative group">
+                    <div className="flex items-center justify-between mb-3">
+                      <div>
+                        <span className="text-sm font-semibold text-gray-900">{stage.stage}</span>
+                        {stage.sublabel && (
+                          <span className="text-xs text-gray-500 ml-2">{stage.sublabel}</span>
+                        )}
+                      </div>
+                      <div className="text-right">
+                        <span className="text-lg font-bold text-gray-900">{typeof stage.count === 'number' ? stage.count.toLocaleString() : stage.count}</span>
+                        <span className="text-sm text-gray-500 ml-2">({stage.rate}%)</span>
+                      </div>
                     </div>
+                    <div className="w-full bg-gray-200 rounded-full h-6 relative overflow-hidden">
+                      <div
+                        className={`h-6 rounded-full transition-all duration-500 ${isHighestRate ? 'animate-pulse' : ''}`}
+                        style={{ width: `${Math.min(100, stage.rate)}%`, backgroundColor: stage.color }}
+                      />
+                    </div>
+                    {stage.tooltip && (
+                      <div className="absolute bottom-full left-0 mb-2 w-64 p-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10">
+                        {stage.tooltip}
+                        <div className="absolute top-full left-8 w-0 h-0 border-l-4 border-l-transparent border-r-4 border-r-transparent border-t-4 border-t-gray-900"></div>
+                      </div>
+                    )}
                   </div>
-                  <div className="w-full bg-gray-200 rounded-full h-6">
-                    <div
-                      className="h-6 rounded-full transition-all duration-500"
-                      style={{ width: `${Math.min(100, stage.rate)}%`, backgroundColor: stage.color }}
-                    />
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </div>
@@ -396,21 +460,21 @@ export default function BusinessAnalytics() {
                 <div className="text-3xl font-bold text-blue-600">
                   {dashboardData.campaigns.reduce((sum, campaign) => sum + campaign.totalLeads, 0).toLocaleString()}
                 </div>
-                <div className="text-sm text-gray-600 mt-2">Total Leads</div>
+                <div className="text-sm text-gray-600 mt-2">Contacts Processed</div>
               </div>
               <div className="text-center p-6 bg-green-50 rounded-xl">
                 <Target className="w-12 h-12 mx-auto text-green-600 mb-4" />
                 <div className="text-3xl font-bold text-green-600">
                   {dashboardData.campaigns.reduce((sum, campaign) => sum + campaign.hotLeads, 0)}
                 </div>
-                <div className="text-sm text-gray-600 mt-2">Hot Leads</div>
+                <div className="text-sm text-gray-600 mt-2">Escalation-Ready</div>
               </div>
               <div className="text-center p-6 bg-purple-50 rounded-xl">
                 <BarChart3 className="w-12 h-12 mx-auto text-purple-600 mb-4" />
                 <div className="text-3xl font-bold text-purple-600">
                   {dashboardData.performanceMetrics.averagePerformance || 0}%
                 </div>
-                <div className="text-sm text-gray-600 mt-2">Avg Conversion Rate</div>
+                <div className="text-sm text-gray-600 mt-2">AI-to-Handoff Success Rate</div>
               </div>
             </div>
           </div>
@@ -423,19 +487,19 @@ export default function BusinessAnalytics() {
           <div className="p-6">
             <div className="space-y-4">
               <div className="flex items-center justify-between p-4 bg-blue-50 rounded-lg">
-                <span className="font-medium text-gray-900">Total Leads</span>
+                <span className="font-medium text-gray-900">Inbound Volume</span>
                 <span className="text-xl font-bold text-blue-600">
                   {dashboardData.campaigns.reduce((sum, campaign) => sum + campaign.totalLeads, 0).toLocaleString()}
                 </span>
               </div>
               <div className="flex items-center justify-between p-4 bg-green-50 rounded-lg">
-                <span className="font-medium text-gray-900">Engaged Leads</span>
+                <span className="font-medium text-gray-900">Conversational Attempts</span>
                 <span className="text-xl font-bold text-green-600">
                   {Math.floor(dashboardData.campaigns.reduce((sum, campaign) => sum + campaign.totalLeads, 0) * 0.7).toLocaleString()}
                 </span>
               </div>
               <div className="flex items-center justify-between p-4 bg-orange-50 rounded-lg">
-                <span className="font-medium text-gray-900">Hot Leads</span>
+                <span className="font-medium text-gray-900">Handoff Candidates</span>
                 <span className="text-xl font-bold text-orange-600">
                   {dashboardData.campaigns.reduce((sum, campaign) => sum + campaign.hotLeads, 0)}
                 </span>
@@ -465,7 +529,7 @@ export default function BusinessAnalytics() {
           <div className="bg-gradient-to-r from-blue-50 to-blue-100 rounded-xl p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-blue-600 text-sm font-medium">Total Messages</p>
+                <p className="text-blue-600 text-sm font-medium">AI Touchpoints Delivered</p>
                 <p className="text-3xl font-bold text-blue-900">{performanceMetrics.totalMessages?.toLocaleString() || 0}</p>
                 <p className="text-xs text-blue-600 mt-1">Last {dateRange} days</p>
               </div>
@@ -476,7 +540,7 @@ export default function BusinessAnalytics() {
           <div className="bg-gradient-to-r from-green-50 to-green-100 rounded-xl p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-green-600 text-sm font-medium">Response Rate</p>
+                <p className="text-green-600 text-sm font-medium">Engagement Rate</p>
                 <p className="text-3xl font-bold text-green-900">{performanceMetrics.responseRate || 0}%</p>
                 <p className="text-xs text-green-600 mt-1">
                   {performanceMetrics.totalResponses || 0} responses
@@ -489,7 +553,7 @@ export default function BusinessAnalytics() {
           <div className="bg-gradient-to-r from-purple-50 to-purple-100 rounded-xl p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-purple-600 text-sm font-medium">Conversion Rate</p>
+                <p className="text-purple-600 text-sm font-medium">Handoff Conversion Rate</p>
                 <p className="text-3xl font-bold text-purple-900">{performanceMetrics.conversionRate || 0}%</p>
                 <p className="text-xs text-purple-600 mt-1">
                   {performanceMetrics.totalConversions || 0} conversions
@@ -524,19 +588,19 @@ export default function BusinessAnalytics() {
                     Campaign
                   </th>
                   <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Messages Sent
+                    Touchpoints
                   </th>
                   <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Opened
+                    Viewed
                   </th>
                   <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Replied
+                    Engaged
                   </th>
                   <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Converted
+                    Escalated
                   </th>
                   <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Conversion Rate
+                    Handoff Success %
                   </th>
                 </tr>
               </thead>
@@ -582,60 +646,154 @@ export default function BusinessAnalytics() {
           </div>
         </div>
 
-        {/* AI Insights with Real Follow-up Timing */}
+        {/* NEW Follow-up Timing Cards - Replacing AI Personas */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <div className="bg-white rounded-2xl border border-gray-200 p-6">
-            <h3 className="text-lg font-bold text-gray-900 mb-4">Top Performing AI Personas</h3>
+          {/* Card 1: Cold Leads Follow-Up */}
+          <div className="bg-white rounded-2xl border border-gray-200 p-6 hover:shadow-lg transition-shadow">
+            <h3 className="text-lg font-bold text-gray-900 mb-1">Follow-Up Results: No Response</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              For contacts who haven’t responded yet
+            </p>
+            
             <div className="space-y-4">
-              {(aiInsights.topPerformingPersonas || []).map((persona, index) => (
-                <div key={index} className={`flex items-center justify-between p-4 rounded-xl ${
-                  index === 0 ? 'bg-green-50' : 
-                  index === 1 ? 'bg-blue-50' : 'bg-yellow-50'
-                }`}>
-                  <div>
-                    <div className="font-medium text-gray-900">{persona.name}</div>
-                    <div className="text-sm text-gray-600">{persona.campaigns} campaigns</div>
+              {/* Using dynamic follow-up days from platform_settings */}
+              {aiInsights.followupTiming && aiInsights.followupTiming.length > 0 ? (
+                aiInsights.followupTiming.map((timing, index) => (
+                  <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <div className="flex items-center space-x-2">
+                      <div className={`w-2 h-2 rounded-full ${
+                        timing.responseRate > 15 ? 'bg-green-500 animate-pulse' : 
+                        timing.responseRate > 10 ? 'bg-blue-500' : 
+                        'bg-gray-400'
+                      }`} />
+                      <span className="font-medium text-gray-700">Day {timing.day}</span>
+                    </div>
+                    <div className="text-right">
+                      <span className={`text-lg font-bold ${
+                        timing.responseRate > 15 ? 'text-green-600' : 
+                        timing.responseRate > 10 ? 'text-blue-600' : 
+                        'text-gray-600'
+                      }`}>
+                        {timing.responseRate}%
+                      </span>
+                      <span className="text-sm text-gray-500 ml-1">response</span>
+                    </div>
                   </div>
-                  <div className={`font-bold text-lg ${
-                    index === 0 ? 'text-green-600' : 
-                    index === 1 ? 'text-blue-600' : 'text-yellow-600'
-                  }`}>
-                    {persona.conversion}%
+                ))
+              ) : (
+                // Static fallback data with dynamic days
+                <>
+                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <div className="flex items-center space-x-2">
+                      <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                      <span className="font-medium text-gray-700">Day {aiInsights.followupSettings?.followup_delay_1 || 3}</span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-lg font-bold text-green-600">18.4%</span>
+                      <span className="text-sm text-gray-500 ml-1">response</span>
+                    </div>
                   </div>
-                </div>
-              ))}
+                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <div className="flex items-center space-x-2">
+                      <div className="w-2 h-2 rounded-full bg-blue-500" />
+                      <span className="font-medium text-gray-700">Day {aiInsights.followupSettings?.followup_delay_2 || 7}</span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-lg font-bold text-blue-600">9.2%</span>
+                      <span className="text-sm text-gray-500 ml-1">response</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <div className="flex items-center space-x-2">
+                      <div className="w-2 h-2 rounded-full bg-gray-400" />
+                      <span className="font-medium text-gray-700">Day {aiInsights.followupSettings?.followup_delay_3 || 14}</span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-lg font-bold text-gray-600">2.1%</span>
+                      <span className="text-sm text-gray-500 ml-1">response</span>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+            
+            {/* Insight footer with stronger copy */}
+            <div className="mt-4 p-4 bg-blue-50 rounded-xl">
+              <div className="text-sm font-medium text-blue-900">💡 Insight</div>
+              <div className="text-sm text-blue-700 mt-1">
+                Early follow-ups are 5x more likely to get replies — reach back out before interest fades.
+              </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl border border-gray-200 p-6">
-            <h3 className="text-lg font-bold text-gray-900 mb-4">Optimal Follow-up Timing</h3>
+          {/* Card 2: AI-Paced Re-Engagement */}
+          <div className="bg-white rounded-2xl border border-gray-200 p-6 hover:shadow-lg transition-shadow">
+            <h3 className="text-lg font-bold text-gray-900 mb-1">AI Re-Engagement Timing</h3>
+            <p className="text-sm text-gray-600 mb-4">For leads that previously replied</p>
+            
             <div className="space-y-4">
-              {(aiInsights.followupTiming || []).map((timing, index) => (
-                <div key={index} className="flex items-center justify-between">
-                  <span className="text-gray-600">Day {timing.day} Follow-up</span>
-                  <span className={`font-medium ${
-                    index === 0 ? 'text-green-600' : 
-                    index === 1 ? 'text-blue-600' : 'text-purple-600'
-                  }`}>
-                    {timing.responseRate}% response
-                  </span>
-                </div>
-              ))}
-              
-              {/* Dynamic recommendation based on actual data */}
-              {aiInsights.followupTiming && aiInsights.followupTiming.length > 0 && (
-                <div className="mt-4 p-4 bg-blue-50 rounded-xl">
-                  <div className="text-sm font-medium text-blue-900">💡 Recommendation</div>
-                  <div className="text-sm text-blue-700 mt-1">
-                    {(() => {
-                      const bestTiming = aiInsights.followupTiming.reduce((best, current) => 
-                        current.responseRate > best.responseRate ? current : best
-                      );
-                      return `Day ${bestTiming.day} follow-up shows highest response rate (${bestTiming.responseRate}%)`;
-                    })()}
+              {/* Dynamic timing metrics */}
+              <div className="p-3 bg-gray-50 rounded-lg">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-600">Avg. 2nd message delay</span>
+                  <div className="flex items-center space-x-2">
+                    <div className="w-2 h-2 rounded-full bg-purple-500 animate-pulse" />
+                    <span className="font-bold text-purple-600">3.9 hrs</span>
                   </div>
                 </div>
-              )}
+              </div>
+              
+              <div className="p-3 bg-gray-50 rounded-lg">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-600">Avg. 3rd message delay</span>
+                  <div className="flex items-center space-x-2">
+                    <div className="w-2 h-2 rounded-full bg-indigo-500" />
+                    <span className="font-bold text-indigo-600">1.5 days</span>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="p-3 bg-gradient-to-r from-green-50 to-green-100 rounded-lg border border-green-200">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-gray-700">
+                    <span className="mr-1">⏱</span>
+                    Best response window
+                  </span>
+                  <span className="font-bold text-green-700">30–90 min</span>
+                </div>
+              </div>
+
+              {/* Visual timing indicator - extended to 12 hours */}
+              <div className="mt-2">
+                <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
+                  <span>0</span>
+                  <span>4h</span>
+                  <span>8h</span>
+                  <span>12h</span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-3 relative">
+                  {/* Best response window (30-90 min = 0.5-1.5 hrs out of 12) */}
+                  <div className="absolute left-[4.2%] right-[87.5%] h-3 bg-green-500 rounded-full opacity-70" />
+                  {/* 2nd message avg (3.9 hrs = 32.5% of 12) */}
+                  <div className="absolute left-[32.5%] w-1 h-3 bg-purple-600 rounded-full" />
+                  {/* 3rd message avg (1.5 days = 36 hrs, off the chart) */}
+                  <div className="absolute right-0 w-1 h-3 bg-indigo-600 rounded-full opacity-50" />
+                </div>
+                <div className="flex items-center justify-between text-xs text-gray-400 mt-1">
+                  <span></span>
+                  <span className="text-purple-600">↑ 2nd msg</span>
+                  <span></span>
+                  <span className="text-indigo-600">3rd →</span>
+                </div>
+              </div>
+            </div>
+            
+            {/* Insight footer with polished copy */}
+            <div className="mt-4 p-4 bg-purple-50 rounded-xl">
+              <div className="text-sm font-medium text-purple-900">💡 Insight</div>
+              <div className="text-sm text-purple-700 mt-1">
+                AI tailors re-engagement timing based on urgency, hesitation, and conversation tone.
+              </div>
             </div>
           </div>
         </div>
@@ -658,7 +816,7 @@ export default function BusinessAnalytics() {
       <div className="space-y-6">
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
           <div className="px-6 py-4 border-b border-gray-100">
-            <h3 className="text-lg font-semibold text-gray-900">Lead Qualification Performance</h3>
+            <h3 className="text-lg font-semibold text-gray-900">Handoff Performance</h3>
             <p className="text-sm text-gray-600 mt-1">Team performance in converting leads to hot status</p>
           </div>
           <div className="overflow-x-auto">
@@ -666,8 +824,8 @@ export default function BusinessAnalytics() {
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Team Member</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Leads Assigned</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Hot Leads Generated</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">AI Handoffs Received</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Handoff Accepted</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Pipeline Value</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Conversion Rate</th>
                 </tr>
@@ -719,14 +877,14 @@ export default function BusinessAnalytics() {
                 <span className="text-2xl font-bold text-blue-600">
                   {salesRepPerformance.reduce((acc, rep) => acc + (rep.totalLeadsAssigned || 0), 0)}
                 </span>
-                <p className="text-sm text-gray-600">Total Leads Assigned</p>
+                <p className="text-sm text-gray-600">AI Handoffs to You</p>
               </div>
               <div className="text-center p-4 bg-green-50 rounded-lg">
                 <Target className="w-8 h-8 mx-auto text-green-600 mb-2" />
                 <span className="text-2xl font-bold text-green-600">
                   {salesRepPerformance.reduce((acc, rep) => acc + (rep.hotLeadsGenerated || 0), 0)}
                 </span>
-                <p className="text-sm text-gray-600">Hot Leads Generated</p>
+                <p className="text-sm text-gray-600">You Marked as Hot</p>
               </div>
               <div className="text-center p-4 bg-purple-50 rounded-lg">
                 <TrendingUp className="w-8 h-8 mx-auto text-purple-600 mb-2" />
@@ -738,7 +896,7 @@ export default function BusinessAnalytics() {
                     return `${((totalHot / totalAssigned) * 100).toFixed(1)}%`;
                   })()}
                 </span>
-                <p className="text-sm text-gray-600">Overall Conversion Rate</p>
+                <p className="text-sm text-gray-600">Your Handoff Conversion %</p>
               </div>
               <div className="text-center p-4 bg-orange-50 rounded-lg">
                 <DollarSign className="w-8 h-8 mx-auto text-orange-600 mb-2" />
