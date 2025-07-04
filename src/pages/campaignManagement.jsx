@@ -928,15 +928,27 @@ export default function CampaignManagement() {
 
       console.log('🔍 Creating campaign with data:', campaignData);
 
-      const { data: newCampaign, error } = await supabase
-        .from('campaigns')
-        .insert([campaignData])
-        .select()
-        .single();
+const token = localStorage.getItem('auth_token');
+const response = await fetch(`${API_BASE}/campaigns`, {
+  method: 'POST',
+  headers: {
+    'Authorization': `Bearer ${token}`,
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    name: campaignData.name,
+    startDate: campaignData.start_date,
+    description: campaignData.description,
+    tenant_id: campaignData.tenant_id
+  })
+});
 
-      if (error) {
-        throw error;
-      }
+if (!response.ok) {
+  const errorData = await response.json();
+  throw new Error(errorData.error || 'Failed to create campaign');
+}
+
+const newCampaign = await response.json();
 
       setCampaigns([newCampaign, ...campaigns]);
       setShowCreateModal(false);

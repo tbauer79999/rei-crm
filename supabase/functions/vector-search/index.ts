@@ -125,13 +125,34 @@ serve(async (req) => {
       campaign_id
     });
 
-    // Perform vector similarity search with optional campaign filter
+// Look up knowledge bases linked to this campaign if filtering
+    let allowedKbIds: string[] = [];
+    if (campaign_id) {
+      const { data: links } = await supabase
+        .from('campaign_knowledge_links')
+        .select('knowledge_id')
+        .eq('campaign_id', campaign_id);
+
+      if (!links || links.length === 0) {
+        return new Response(JSON.stringify({
+          matches: [],
+          message: 'No knowledge assets linked to this campaign'
+        }), {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      allowedKbIds = links.map((l: any) => l.knowledge_id);
+    }
+
+    // Perform vector similarity search
     const { data, error } = await supabase.rpc('match_chunks', {
       match_embedding: queryEmbedding,
       match_tenant_id: tenant_id,
       match_count: match_count,
       match_threshold: match_threshold,
-      filter_campaign_id: campaign_id || null  // Pass campaign_id to the function
+      filter_campaign_id: campaign_id || null
     });
 
     console.log('RPC result:', {
@@ -147,26 +168,11 @@ serve(async (req) => {
       });
     }
 
-    let matches = data || [];
+   let matches = data || [];
 
-    // If no matches and campaign filtering was used, provide informative response
-    if (matches.length === 0 && campaign_id) {
-      // Check if campaign has any linked knowledge
-      const { data: links } = await supabase
-        .from('campaign_knowledge_links')
-        .select('knowledge_id')
-        .eq('campaign_id', campaign_id)
-        .limit(1);
-      
-      if (!links || links.length === 0) {
-        return new Response(JSON.stringify({ 
-          matches: [],
-          message: 'No knowledge assets linked to this campaign'
-        }), {
-          status: 200,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
+    // Filter matches by the campaign's linked knowledge bases if provided
+    if (allowedKbIds.length > 0) {
+      matches = matches.filter((m: any) => allowedKbIds.includes(m.knowledge_base_id));
     }
 
     // Enhance results with source information

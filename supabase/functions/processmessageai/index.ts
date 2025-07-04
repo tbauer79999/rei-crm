@@ -466,13 +466,17 @@ serve(async (req) => {
         
         if (chunks && chunks.length > 0) {
           console.log(`✅ Found ${chunks.length} relevant knowledge chunks`);
-          
+
           // Format chunks for context
           knowledgeContext = '\n' + chunks
             .map((chunk: any, idx: number) => `Context ${idx + 1} (${Math.round(chunk.similarity * 100)}% relevant):\n${chunk.chunk_text}`)
             .join('\n\n');
         } else {
-          console.log('⚠️ No relevant knowledge chunks found');
+          if (vectorData.message) {
+            console.log(`⚠️ No relevant knowledge chunks found - message from vector-search: ${vectorData.message}`);
+          } else {
+            console.log('⚠️ No relevant knowledge chunks found');
+          }
         }
       } else {
         const errorText = await vectorResponse.text();

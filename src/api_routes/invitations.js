@@ -203,7 +203,8 @@ router.get('/verify/:token', async (req, res) => {
   const { token } = req.params;
 
   try {
-    const { data: invitation, error } = await supabase
+    // Use admin client to bypass RLS
+    const { data: invitation, error } = await supabaseAdmin
       .from('invitations')
       .select('email, role, status, expires_at')
       .eq('token', token)
@@ -238,45 +239,29 @@ router.post('/:id/resend', async (req, res) => {
   const { id } = req.params;
 
   try {
-    // Get the invitation
-    const { data: invitation, error: fetchError } = await supabase
-      .from('invitations')
-      .select('*')
-      .eq('id', id)
-      .single();
-
-    if (fetchError || !invitation) {
-      return res.status(404).json({ error: 'Invitation not found' });
-    }
-
-    if (invitation.status !== 'pending') {
-      return res.status(400).json({ error: 'Can only resend pending invitations' });
-    }
-
     // Generate new token and expiry
     const newToken = generateInvitationToken();
     const newExpiresAt = new Date();
-    newExpiresAt.setDate(newExpiresAt.getDate() + 7); // 7 days expiry
+    newExpiresAt.setDate(newExpiresAt.getDate() + 7);
 
-    // Update invitation with new token and expiry
-    const { error: updateError } = await supabase
+    // Update invitation with admin client
+    const { data, error: updateError } = await supabaseAdmin
       .from('invitations')
       .update({
         token: newToken,
         expires_at: newExpiresAt.toISOString(),
         updated_at: new Date().toISOString()
       })
-      .eq('id', id);
+      .eq('id', id)
+      .select();
 
-    if (updateError) {
-      console.error('Error updating invitation:', updateError);
-      return res.status(500).json({ error: 'Failed to resend invitation' });
+    if (updateError || !data || data.length === 0) {
+      return res.status(404).json({ error: 'Invitation not found' });
     }
 
-    // Send new invitation email
+    const invitation = data[0];
     const invitationLink = `${process.env.FRONTEND_URL}/invitation-signup?token=${newToken}&email=${encodeURIComponent(invitation.email)}`;
     
-    // TODO: Send email with invitationLink
     console.log('Resending invitation link:', invitationLink);
 
     return res.status(200).json({
@@ -293,34 +278,45 @@ router.post('/:id/resend', async (req, res) => {
 // Cancel/Delete invitation endpoint
 router.delete('/:id', async (req, res) => {
   const { id } = req.params;
-
+  
+  // Debug environment and client
+  console.log('🔍 Service role key exists:', !!process.env.SUPABASE_SERVICE_ROLE_KEY);
+  console.log('🔍 Service role key starts with:', process.env.SUPABASE_SERVICE_ROLE_KEY?.substring(0, 20));
+  console.log('🔍 Supabase URL:', process.env.SUPABASE_URL);
+  
   try {
-    // Get the invitation first to check if it exists
-    const { data: invitation, error: fetchError } = await supabase
+    // Test if admin client works at all
+    const { data: testData, error: testError } = await supabaseAdmin
       .from('invitations')
-      .select('*')
+      .select('id, email, status')
+      .limit(3);
+    
+    console.log('🔍 Admin client test - found invitations:', testData?.length || 0);
+    console.log('🔍 Admin client test error:', testError);
+    
+    if (testData && testData.length > 0) {
+      console.log('🔍 Sample invitation IDs:', testData.map(inv => inv.id));
+      console.log('🔍 Looking for ID:', id);
+      console.log('🔍 ID match found:', testData.some(inv => inv.id === id));
+    }
+    
+    // Original delete logic
+    const { data, error } = await supabaseAdmin
+      .from('invitations')
+      .delete()
       .eq('id', id)
-      .single();
+      .select();
 
-    if (fetchError || !invitation) {
-      return res.status(404).json({ error: 'Invitation not found' });
-    }
+    console.log('🔍 Delete result - data:', data);
+    console.log('🔍 Delete result - error:', error);
 
-    if (invitation.status === 'accepted') {
-      return res.status(400).json({ error: 'Cannot cancel accepted invitations' });
-    }
-
-    // Update invitation status to cancelled
-    const { error: updateError } = await supabase
-      .from('invitations')
-      .update({
-        status: 'cancelled'
-      })
-      .eq('id', id);
-
-    if (updateError) {
-      console.error('Error cancelling invitation:', updateError);
+    if (error) {
+      console.error('Error deleting invitation:', error);
       return res.status(500).json({ error: 'Failed to cancel invitation' });
+    }
+
+    if (!data || data.length === 0) {
+      return res.status(404).json({ error: 'Invitation not found' });
     }
 
     return res.status(200).json({

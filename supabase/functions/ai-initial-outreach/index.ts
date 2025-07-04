@@ -77,6 +77,39 @@ const getCampaignStrategy = (industry: string, metadata: any) => {
   return '';
 };
 
+// Helper function to clean AI response and remove unwanted prefixes
+const cleanAIMessage = (message: string): string => {
+  if (!message) return '';
+  
+  // Remove common prefixes that AI might add
+  const prefixesToRemove = [
+    'Initial message:',
+    'initial message:',
+    'Initial Message:',
+    'INITIAL MESSAGE:',
+    'Message:',
+    'message:',
+    'Text:',
+    'text:',
+    'SMS:',
+    'sms:',
+    'Response:',
+    'response:'
+  ];
+  
+  let cleanedMessage = message.trim();
+  
+  // Check if message starts with any of these prefixes
+  for (const prefix of prefixesToRemove) {
+    if (cleanedMessage.toLowerCase().startsWith(prefix.toLowerCase())) {
+      cleanedMessage = cleanedMessage.substring(prefix.length).trim();
+      break; // Remove only the first matching prefix
+    }
+  }
+  
+  return cleanedMessage;
+};
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -265,7 +298,7 @@ Campaign: ${campaign.name}
 Campaign Description: ${campaign.description || ""}
 ${campaignStrategy ? `Campaign Strategy: ${campaignStrategy}` : ''}
 
-Generate a personalized initial outreach message for this lead based on the instructions above.`;
+Generate a personalized outreach message for this lead. Return ONLY the message text that should be sent to the customer - no labels, prefixes, or formatting.`;
 
     const openaiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
@@ -278,7 +311,7 @@ Generate a personalized initial outreach message for this lead based on the inst
         messages: [
           {
             role: "system",
-            content: "You are an AI assistant that generates personalized sales outreach messages. Follow the campaign strategy and instructions provided."
+            content: "You are an AI assistant that generates personalized sales outreach messages. Return ONLY the message text that should be sent to the customer. Do not include any labels, prefixes like 'Initial message:', or formatting. Just return the plain message text."
           },
           {
             role: "user",
@@ -295,11 +328,14 @@ Generate a personalized initial outreach message for this lead based on the inst
     }
 
     const openaiData = await openaiResponse.json();
-    const aiMessage = openaiData.choices[0]?.message?.content?.trim();
+    let aiMessage = openaiData.choices[0]?.message?.content?.trim();
 
     if (!aiMessage) {
       throw new Error("Failed to generate AI message");
     }
+
+    // Clean the AI message to remove any unwanted prefixes
+    aiMessage = cleanAIMessage(aiMessage);
 
     console.log(`📝 Generated AI message: ${aiMessage}`);
 
