@@ -34,10 +34,11 @@ import {
   ArrowRight,
   RefreshCw,
 } from 'lucide-react';
-import {
+const {
   buildInstructionBundle,
   buildInitialInstruction
-} from '../../lib/instructionBuilder.js';
+} = require('../../lib/instructionBuilder.js');
+
 
 
 
