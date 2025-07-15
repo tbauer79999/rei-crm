@@ -21,7 +21,8 @@ router.get('/health-check', async (req, res) => {
     let query = supabase
       .from('leads')
       .select('id, status, created_at')
-      .gte('created_at', new Date().toISOString().split('T')[0]); // Today
+      .gte('created_at', new Date().toISOString().split('T')[0]) // Today
+      .limit(null); // Remove the 1000 row limit - fetch all results
 
     // Apply tenant filtering
     if (role !== 'global_admin') {
@@ -95,7 +96,8 @@ router.get('/funnel-health', async (req, res) => {
     let query = supabase
       .from('leads')
       .select('id, status, created_at')
-      .gte('created_at', thirtyDaysAgo);
+      .gte('created_at', thirtyDaysAgo)
+      .limit(null); // Remove the 1000 row limit - fetch all results
 
     // Apply tenant filtering
     if (role !== 'global_admin') {
@@ -166,7 +168,8 @@ router.get('/ai-optimization-health', async (req, res) => {
     let query = supabase
       .from('messages')
       .select('id, timestamp, direction')
-      .gte('timestamp', last24Hours);
+      .gte('timestamp', last24Hours)
+      .limit(null); // Remove the 1000 row limit - fetch all results
 
     // Apply tenant filtering
     if (role !== 'global_admin') {
@@ -259,7 +262,8 @@ router.get('/system-metrics-health', async (req, res) => {
     let activityQuery = supabase
       .from('messages')
       .select('id')
-      .gte('timestamp', lastHour);
+      .gte('timestamp', lastHour)
+      .limit(null); // Remove the 1000 row limit - fetch all results
 
     // Apply tenant filtering
     if (role !== 'global_admin') {

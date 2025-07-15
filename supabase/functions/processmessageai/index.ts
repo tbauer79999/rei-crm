@@ -27,16 +27,70 @@ function getRandomDelay(): number {
 }
 
 // Helper function to calculate next business hour
-function getNextBusinessHour(currentTime: Date, openHour: number, officeDays: string[]): Date {
+function getNextBusinessHour(currentTime: Date, openHour: number, officeDays: string[], tenantTimezone: string): Date {
+  // Create a proper date for the next business day in the business timezone
   const nextDay = new Date(currentTime);
-  nextDay.setHours(openHour, 0, 0, 0);
   
   const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
   const currentDayName = dayNames[currentTime.getDay()];
   
+  // Map tenant timezone setting to UTC offset hours
+  let offsetHours = 5; // Default to EST offset
+  
+  if (tenantTimezone === "EST") {
+    // EST is always UTC-5
+    offsetHours = 5;
+  } else if (tenantTimezone === "EDT") {
+    // EDT is always UTC-4  
+    offsetHours = 4;
+  } else if (tenantTimezone === "CST") {
+    // CST is always UTC-6
+    offsetHours = 6;
+  } else if (tenantTimezone === "CDT") {
+    // CDT is always UTC-5
+    offsetHours = 5;
+  } else if (tenantTimezone === "MST") {
+    // MST is always UTC-7
+    offsetHours = 7;
+  } else if (tenantTimezone === "MDT") {
+    // MDT is always UTC-6
+    offsetHours = 6;
+  } else if (tenantTimezone === "PST") {
+    // PST is always UTC-8
+    offsetHours = 8;
+  } else if (tenantTimezone === "PDT") {
+    // PDT is always UTC-7
+    offsetHours = 7;
+  } else if (tenantTimezone === "America/New_York") {
+    // Auto-adjust for daylight saving time (Eastern)
+    const month = new Date().getMonth();
+    offsetHours = (month >= 2 && month <= 10) ? 4 : 5; // EDT (Mar-Nov) vs EST (Dec-Feb)
+  } else if (tenantTimezone === "America/Chicago") {
+    // Auto-adjust for daylight saving time (Central)
+    const month = new Date().getMonth();
+    offsetHours = (month >= 2 && month <= 10) ? 5 : 6; // CDT vs CST
+  } else if (tenantTimezone === "America/Denver") {
+    // Auto-adjust for daylight saving time (Mountain)
+    const month = new Date().getMonth();
+    offsetHours = (month >= 2 && month <= 10) ? 6 : 7; // MDT vs MST
+  } else if (tenantTimezone === "America/Los_Angeles") {
+    // Auto-adjust for daylight saving time (Pacific)
+    const month = new Date().getMonth();
+    offsetHours = (month >= 2 && month <= 10) ? 7 : 8; // PDT vs PST
+  } else {
+    // Unknown timezone - default to EST
+    console.warn(`⚠️ Unknown timezone "${tenantTimezone}" - defaulting to EST (UTC-5)`);
+    offsetHours = 5;
+  }
+  
   // If it's still today but before opening, respond at open hour today
   if (currentTime.getHours() < openHour && officeDays.includes(currentDayName)) {
-    return nextDay;
+    // Create date string in business timezone and convert properly to UTC
+    const todayString = currentTime.toISOString().split('T')[0]; // Get YYYY-MM-DD
+    const businessDateTime = `${todayString}T${openHour.toString().padStart(2, '0')}:00:00`;
+    
+    const localDate = new Date(businessDateTime);
+    return new Date(localDate.getTime() + (offsetHours * 60 * 60 * 1000));
   }
   
   // Otherwise, find next business day
@@ -44,7 +98,12 @@ function getNextBusinessHour(currentTime: Date, openHour: number, officeDays: st
     nextDay.setDate(nextDay.getDate() + 1);
     const dayName = dayNames[nextDay.getDay()];
     if (officeDays.includes(dayName)) {
-      return nextDay;
+      // Create proper date string for next business day
+      const nextDayString = nextDay.toISOString().split('T')[0];
+      const businessDateTime = `${nextDayString}T${openHour.toString().padStart(2, '0')}:00:00`;
+      
+      const localDate = new Date(businessDateTime);
+      return new Date(localDate.getTime() + (offsetHours * 60 * 60 * 1000));
     }
   } while (true);
 }
@@ -709,6 +768,32 @@ Examples:
       }
     }
 
+    // ===== A/B TESTING OUTCOME TRACKING =====
+// Track experiment outcomes when leads become "Hot Lead"
+if (newStatus === 'Hot Lead') {
+  console.log('🧪 Hot Lead conversion detected - checking for experiment assignment...');
+  
+  try {
+    const { error: outcomeError } = await supabase
+      .from('experiment_results')
+      .update({
+        outcome_type: 'conversion',
+        metric_value: 1,
+        recorded_at: new Date()
+      })
+      .eq('lead_id', lead_id)
+      .is('recorded_at', null); // Only update if not already recorded
+
+    if (outcomeError) {
+      console.error('❌ Error recording experiment outcome:', outcomeError);
+    } else {
+      console.log('✅ Experiment conversion outcome recorded');
+    }
+  } catch (expError) {
+    console.error('❌ Error in experiment outcome tracking:', expError);
+  }
+}
+
     // Update the inbound message with AI analysis
     const { error: updateError } = await supabase.from('messages')
       .update({
@@ -807,7 +892,7 @@ Examples:
     if (hour < openHour || hour >= closeHour || !officeDays.includes(dayName)) {
       console.log(`⏰ Outside business hours (${hour}:00 ${dayName}) - queuing message for next business day`);
       
-      const nextBusinessHour = getNextBusinessHour(businessTime, openHour, officeDays);
+      const nextBusinessHour = getNextBusinessHour(businessTime, openHour, officeDays, settingsMap.timezone);
       console.log(`📅 Message will be sent at: ${nextBusinessHour.toLocaleString()}`);
       
       // Update the message with scheduled send time

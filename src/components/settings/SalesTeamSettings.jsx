@@ -302,7 +302,7 @@ export default function SalesTeamSettings() {
       console.log('Canceling invitation:', invitationId);
       const headers = await getAuthHeaders();
 
-      const response = await fetch(`/api/invitations/${invitationId}`, {
+      const response = await fetch(`/api/team/invitations/${invitationId}`, {
         method: 'DELETE',
         headers
       });

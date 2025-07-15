@@ -156,6 +156,155 @@ router.post('/', async (req, res) => {
   }
 });
 
+// Add this endpoint to your existing campaigns.js file
+// Insert this after the existing router.post('/', ...) endpoint
+
+// POST /api/campaigns/resolve-or-create - for extension use
+router.post('/resolve-or-create', async (req, res) => {
+  try {
+    const { campaign_name, tenant_id, created_by_email } = req.body;
+    const userRole = req.user?.role;
+    const userTenantId = req.user?.tenant_id;
+
+    console.log('🔍 DEBUG - Extension user details:', { userRole, userTenantId, email: req.user?.email });
+    console.log('🔍 DEBUG - Resolving/creating campaign:', campaign_name);
+
+    // Input validation
+    if (!campaign_name || typeof campaign_name !== 'string') {
+      return res.status(400).json({ error: 'campaign_name is required and must be a string' });
+    }
+
+    const trimmedName = campaign_name.trim();
+    if (trimmedName.length === 0) {
+      return res.status(400).json({ error: 'campaign_name cannot be empty' });
+    }
+
+    if (trimmedName.length > 100) {
+      return res.status(400).json({ error: 'campaign_name cannot exceed 100 characters' });
+    }
+
+    // Determine which tenant to use
+    let campaignTenantId;
+    if (userRole === 'global_admin') {
+      campaignTenantId = tenant_id || userTenantId;
+    } else {
+      // Non-global admins use their own tenant
+      campaignTenantId = userTenantId;
+    }
+
+    if (!campaignTenantId) {
+      return res.status(400).json({ error: 'Tenant ID is required for campaign creation' });
+    }
+
+    // Sanitize campaign name (basic XSS prevention)
+    const sanitizedName = trimmedName.replace(/[<>"']/g, '');
+
+    console.log('🔍 DEBUG - Searching for existing campaign with name:', sanitizedName, 'tenant:', campaignTenantId);
+
+    // First, try to find existing campaign (case-insensitive search)
+    let query = supabaseAdmin
+      .from('campaigns')
+      .select('id, name, is_active, archived')
+      .ilike('name', sanitizedName)
+      .eq('tenant_id', campaignTenantId);
+
+    const { data: existingCampaigns, error: searchError } = await query;
+
+    if (searchError) {
+      console.error('❌ Campaign search error:', searchError);
+      throw searchError;
+    }
+
+    console.log('🔍 DEBUG - Search results:', existingCampaigns);
+
+    // If campaign exists, return its ID (and reactivate if needed)
+    if (existingCampaigns && existingCampaigns.length > 0) {
+      const existing = existingCampaigns[0];
+      
+      // If campaign is inactive or archived, reactivate it
+      if (!existing.is_active || existing.archived) {
+        const { error: updateError } = await supabaseAdmin
+          .from('campaigns')
+          .update({ 
+            is_active: true, 
+            archived: false,
+            archived_at: null
+          })
+          .eq('id', existing.id);
+
+        if (updateError) {
+          console.error('❌ Campaign reactivation error:', updateError);
+        }
+      }
+
+      console.log('✅ Found existing campaign:', existing.id);
+      return res.json({
+        campaign_id: existing.id,
+        name: existing.name,
+        created: false,
+        reactivated: !existing.is_active || existing.archived
+      });
+    }
+
+    // Campaign doesn't exist, create it
+    const today = new Date().toISOString().split('T')[0];
+    
+    const newCampaign = {
+      name: sanitizedName, // This satisfies the "name" requirement
+      start_date: today,   // This satisfies the "start date" requirement  
+      end_date: null,
+      description: `Auto-created from extension by ${created_by_email || req.user?.email || 'system'}`,
+      target_audience: null,
+      ai_prompt_template: null,
+      tenant_id: campaignTenantId,
+      created_by_email: created_by_email || req.user?.email || 'extension@system',
+      is_active: true,
+      ai_outreach_enabled: false,
+      archived: false
+    };
+
+    console.log('🔍 DEBUG - Creating new campaign with data:', newCampaign);
+
+    const { data: createdCampaign, error: createError } = await supabaseAdmin
+      .from('campaigns')
+      .insert([newCampaign])
+      .select()
+      .single();
+
+    if (createError) {
+      console.error('❌ Campaign creation error:', createError);
+      
+      // Handle duplicate name errors gracefully
+      if (createError.code === '23505') {
+        return res.status(409).json({ 
+          error: 'Campaign name already exists',
+          code: 'DUPLICATE_CAMPAIGN'
+        });
+      }
+      
+      throw createError;
+    }
+
+    // Log campaign creation for audit
+    console.log(`✅ Campaign created: ${createdCampaign.name} (ID: ${createdCampaign.id}) by ${req.user?.email || 'system'}`);
+
+    res.status(201).json({
+      campaign_id: createdCampaign.id,
+      name: createdCampaign.name,
+      created: true,
+      reactivated: false
+    });
+
+  } catch (err) {
+    console.error('❌ Campaign resolve/create error:', err.message);
+    res.status(500).json({ 
+      error: 'Failed to resolve or create campaign',
+      message: err.message 
+    });
+  }
+});
+
+
 // Get campaign by ID - allow all authenticated users to view
 router.get('/:id', async (req, res) => {
   try {

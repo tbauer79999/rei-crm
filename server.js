@@ -38,6 +38,7 @@ const teamRoutes = require('./src/api_routes/team');
 const invitationsRoutes = require('./src/api_routes/invitations');
 const userRoutes = require('./src/api_routes/user'); // ADD THIS LINE
 
+
 const app = express();
 
 app.use(cors());

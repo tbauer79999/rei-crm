@@ -32,7 +32,8 @@ router.get('/', async (req, res) => {
       .from('leads')
       .select('created_at')
       .gte('created_at', daysAgo)
-      .order('created_at', { ascending: true });
+      .order('created_at', { ascending: true })
+      .limit(null); // Remove the 1000 row limit - fetch all results
 
     // Apply tenant filtering
     if (role !== 'global_admin') {

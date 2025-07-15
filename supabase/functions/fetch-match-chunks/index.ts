@@ -17,16 +17,49 @@ serve(async (req) => {
       return new Response('ok', { headers: corsHeaders });
     }
 
-    const { user, tenant_id, error, status } = await authenticateAndAuthorize(req);
+    // Check if this is an internal call from database function
+    const isInternalCall = req.headers.get('x-internal-call') === 'true';
+    
+    let user, tenant_id, error, status;
+    let query, match_count = 5, match_threshold = 0.8;
+    
+    if (isInternalCall) {
+      // For internal calls, get tenant_id from request body
+      const body = await req.json();
+      tenant_id = body.tenant_id;
+      query = body.query;
+      match_count = body.match_count || 5;
+      match_threshold = body.match_threshold || 0.8;
+      
+      if (!tenant_id) {
+        return new Response(JSON.stringify({ error: 'Missing tenant_id for internal call' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+      
+      console.log('Debug - Internal call - tenant_id:', tenant_id);
+      
+    } else {
+      // Normal user authentication
+      const result = await authenticateAndAuthorize(req);
+      user = result.user;
+      tenant_id = result.tenant_id;
+      error = result.error;
+      status = result.status;
 
-    if (error || !user || !tenant_id) {
-      return new Response(JSON.stringify({ error }), {
-        status: status || 403,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+      if (error || !user || !tenant_id) {
+        return new Response(JSON.stringify({ error }), {
+          status: status || 403,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+
+      const body = await req.json();
+      query = body.query;
+      match_count = body.match_count || 5;
+      match_threshold = body.match_threshold || 0.8;
     }
-
-    const { query, match_count = 5, match_threshold = 0.8 } = await req.json();
 
     // DEBUG: Log authentication and query info
     console.log('Debug - tenant_id:', tenant_id);

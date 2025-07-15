@@ -9,108 +9,173 @@ import {
   Calendar, Filter, Download, MoreVertical, Eye, 
   StopCircle, Award, Zap, MessageSquare, TrendingUp as TrendUp
 } from 'lucide-react';
+import { analyticsService } from '../lib/analyticsDataService';
+import { useAuth } from '../context/AuthContext';
 
 const ABTestingDashboard = () => {
-  const [activeView, setActiveView] = useState('overview'); // overview, create, details
+  const { user } = useAuth();
+  const [activeView, setActiveView] = useState('overview');
   const [selectedTest, setSelectedTest] = useState(null);
   const [createStep, setCreateStep] = useState(1);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  
+  // Real data states
+  const [activeExperiments, setActiveExperiments] = useState([]);
+  const [pastExperiments, setPastExperiments] = useState([]);
+  const [availableCampaigns, setAvailableCampaigns] = useState([]);
+  const [performanceData, setPerformanceData] = useState([]);
+  
   const [newExperiment, setNewExperiment] = useState({
     name: '',
     testType: '',
     metric: '',
     trafficSplit: 50,
-    audience: [],
+    experimentType: 'campaign', // campaign or global
+    campaignId: '',
     variantA: { config: '' },
     variantB: { config: '' }
   });
 
-  // Mock data
-  const activeExperiments = [
-    {
-      id: 1,
-      name: "Q2 Opening Line Test",
-      status: "running",
-      startDate: "2025-05-25",
-      endDate: "2025-06-08",
-      participants: 1247,
-      confidence: 95,
-      leader: { variant: "B", improvement: 7 },
-      metric: "Hot Lead Conversion",
-      variants: { a: 12.3, b: 13.2 }
-    },
-    {
-      id: 2,
-      name: "Professional vs Friendly Tone",
-      status: "running", 
-      startDate: "2025-05-20",
-      endDate: "2025-06-10",
-      participants: 892,
-      confidence: 78,
-      leader: { variant: "A", improvement: 3 },
-      metric: "Reply Rate",
-      variants: { a: 24.1, b: 23.4 }
-    },
-    {
-      id: 3,
-      name: "Follow-up Timing Test",
-      status: "paused",
-      startDate: "2025-05-15",
-      endDate: "2025-06-05",
-      participants: 543,
-      confidence: 45,
-      leader: null,
-      metric: "Response Time",
-      variants: { a: 18.2, b: 19.1 }
-    }
-  ];
+  // Load all experiment data
+  const loadExperimentData = async () => {
+    try {
+      setLoading(true);
+      console.log('🧪 Loading A/B testing data...');
 
-  const pastExperiments = [
-    {
-      id: 4,
-      name: "Subject Line A/B Test",
-      status: "completed",
-      winner: "B",
-      improvement: 15,
-      metric: "Open Rate",
-      participants: 2134
-    },
-    {
-      id: 5,
-      name: "CTA Button Color Test", 
-      status: "completed",
-      winner: "A",
-      improvement: 8,
-      metric: "Click Rate",
-      participants: 1876
-    }
-  ];
+      const [activeExp, completedExp, campaigns] = await Promise.all([
+        analyticsService.getActiveExperiments(),
+        analyticsService.getCompletedExperiments(),
+        analyticsService.getCampaignsForABTesting()
+      ]);
 
-  const performanceData = [
-    { day: 'Day 1', variantA: 12.1, variantB: 11.8 },
-    { day: 'Day 2', variantA: 12.5, variantB: 12.3 },
-    { day: 'Day 3', variantA: 11.9, variantB: 12.8 },
-    { day: 'Day 4', variantA: 12.3, variantB: 13.1 },
-    { day: 'Day 5', variantA: 12.0, variantB: 13.5 },
-    { day: 'Day 6', variantA: 12.4, variantB: 13.2 },
-    { day: 'Day 7', variantA: 12.3, variantB: 13.2 }
-  ];
+      setActiveExperiments(activeExp);
+      setPastExperiments(completedExp);
+      setAvailableCampaigns(campaigns);
+
+      console.log('✅ A/B testing data loaded:', { 
+        active: activeExp.length, 
+        completed: completedExp.length,
+        campaigns: campaigns.length 
+      });
+    } catch (err) {
+      console.error('Error loading A/B testing data:', err);
+      setError('Failed to load experiment data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Initialize on component mount
+  useEffect(() => {
+    if (user) {
+      loadExperimentData();
+    }
+  }, [user]);
+
+  // Handle experiment creation
+  const handleCreateExperiment = async () => {
+    try {
+      setLoading(true);
+      console.log('Creating experiment:', newExperiment);
+
+      const result = await analyticsService.createExperiment({
+        name: newExperiment.name,
+        testType: newExperiment.testType,
+        metric: newExperiment.metric,
+        trafficSplit: newExperiment.trafficSplit,
+        experimentType: newExperiment.experimentType,
+        campaignId: newExperiment.campaignId,
+        variantA: newExperiment.variantA,
+        variantB: newExperiment.variantB
+      });
+
+      if (result.success) {
+        console.log('✅ Experiment created successfully');
+        // Reset form
+        setActiveView('overview');
+        setCreateStep(1);
+        setNewExperiment({
+          name: '',
+          testType: '',
+          metric: '',
+          trafficSplit: 50,
+          experimentType: 'campaign',
+          campaignId: '',
+          variantA: { config: '' },
+          variantB: { config: '' }
+        });
+        // Reload data
+        await loadExperimentData();
+      } else {
+        setError(`Failed to create experiment: ${result.error}`);
+      }
+    } catch (err) {
+      console.error('Error creating experiment:', err);
+      setError('Failed to create experiment');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle experiment status updates
+  const handleUpdateExperimentStatus = async (experimentId, newStatus) => {
+    try {
+      const result = await analyticsService.updateExperimentStatus(experimentId, newStatus);
+      if (result.success) {
+        console.log(`✅ Experiment ${experimentId} ${newStatus}`);
+        await loadExperimentData(); // Refresh data
+      } else {
+        setError(`Failed to ${newStatus} experiment`);
+      }
+    } catch (err) {
+      console.error(`Error updating experiment status:`, err);
+      setError(`Failed to ${newStatus} experiment`);
+    }
+  };
+
+  // Load experiment details for details view
+  const handleViewDetails = async (experiment) => {
+    try {
+      setLoading(true);
+      const details = await analyticsService.getExperimentDetails(experiment.id);
+      if (details) {
+        setSelectedTest({
+          ...experiment,
+          ...details,
+          performanceOverTime: details.performanceOverTime || []
+        });
+        setPerformanceData(details.performanceOverTime || []);
+        setActiveView('details');
+      } else {
+        setError('Failed to load experiment details');
+      }
+    } catch (err) {
+      console.error('Error loading experiment details:', err);
+      setError('Failed to load experiment details');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const StatusPill = ({ status }) => {
     const colors = {
+      active: 'bg-green-100 text-green-800 border-green-200',
       running: 'bg-green-100 text-green-800 border-green-200',
       paused: 'bg-orange-100 text-orange-800 border-orange-200', 
       completed: 'bg-gray-100 text-gray-800 border-gray-200'
     };
     
     const icons = {
+      active: <Play className="w-3 h-3" />,
       running: <Play className="w-3 h-3" />,
       paused: <Pause className="w-3 h-3" />,
       completed: <CheckCircle className="w-3 h-3" />
     };
 
     return (
-      <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium border ${colors[status]}`}>
-        {icons[status]}
+      <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium border ${colors[status] || colors.active}`}>
+        {icons[status] || icons.active}
         {status.charAt(0).toUpperCase() + status.slice(1)}
       </span>
     );
@@ -147,6 +212,9 @@ const ABTestingDashboard = () => {
         <div>
           <h3 className="font-semibold text-gray-900 mb-1">{experiment.name}</h3>
           <p className="text-sm text-gray-600">Testing: {experiment.metric}</p>
+          <p className="text-xs text-gray-500 mt-1">
+            {experiment.experimentType === 'global' ? 'Global Test' : `Campaign: ${experiment.campaignName}`}
+          </p>
         </div>
         <div className="flex items-center gap-2">
           <StatusPill status={experiment.status} />
@@ -170,18 +238,18 @@ const ABTestingDashboard = () => {
       <div className="grid grid-cols-3 gap-4 mb-4">
         <div>
           <p className="text-xs text-gray-500 mb-1">Participants</p>
-          <p className="font-semibold">{experiment.participants.toLocaleString()}</p>
+          <p className="font-semibold">{experiment.participants?.toLocaleString() || 0}</p>
         </div>
         <div>
           <p className="text-xs text-gray-500 mb-1">Confidence</p>
-          <ConfidenceIndicator confidence={experiment.confidence} />
+          <ConfidenceIndicator confidence={experiment.confidence || 0} />
         </div>
         <div>
           <p className="text-xs text-gray-500 mb-1">Progress</p>
           <div className="w-full bg-gray-200 rounded-full h-2">
             <div 
               className="bg-blue-600 h-2 rounded-full" 
-              style={{ width: `${Math.min(experiment.confidence, 100)}%` }}
+              style={{ width: `${Math.min(experiment.confidence || 0, 100)}%` }}
             ></div>
           </div>
         </div>
@@ -190,24 +258,34 @@ const ABTestingDashboard = () => {
       <div className="flex items-center justify-between">
         <div className="flex gap-2">
           <button 
-            onClick={() => {
-              setSelectedTest(experiment);
-              setActiveView('details');
-            }}
+            onClick={() => handleViewDetails(experiment)}
             className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
           >
             <Eye className="w-3 h-3 inline mr-1" />
             View Details
           </button>
-          {experiment.status === 'running' && (
-            <button className="px-3 py-1 bg-gray-100 text-gray-700 rounded text-sm hover:bg-gray-200">
+          {(experiment.status === 'running' || experiment.status === 'active') && (
+            <button 
+              onClick={() => handleUpdateExperimentStatus(experiment.id, 'paused')}
+              className="px-3 py-1 bg-gray-100 text-gray-700 rounded text-sm hover:bg-gray-200"
+            >
               <Pause className="w-3 h-3 inline mr-1" />
               Pause
             </button>
           )}
+          {experiment.status === 'paused' && (
+            <button 
+              onClick={() => handleUpdateExperimentStatus(experiment.id, 'active')}
+              className="px-3 py-1 bg-green-100 text-green-700 rounded text-sm hover:bg-green-200"
+            >
+              <Play className="w-3 h-3 inline mr-1" />
+              Resume
+            </button>
+          )}
         </div>
         <span className="text-xs text-gray-500">
-          {new Date(experiment.startDate).toLocaleDateString()} - {new Date(experiment.endDate).toLocaleDateString()}
+          {experiment.startDate && new Date(experiment.startDate).toLocaleDateString()} - 
+          {experiment.endDate && new Date(experiment.endDate).toLocaleDateString()}
         </span>
       </div>
     </div>
@@ -229,7 +307,8 @@ const ABTestingDashboard = () => {
                   testType: '',
                   metric: '',
                   trafficSplit: 50,
-                  audience: [],
+                  experimentType: 'campaign',
+                  campaignId: '',
                   variantA: { config: '' },
                   variantB: { config: '' }
                 });
@@ -277,6 +356,62 @@ const ABTestingDashboard = () => {
                   onChange={(e) => setNewExperiment({...newExperiment, name: e.target.value})}
                 />
               </div>
+
+              {/* Experiment Type - Only show for business_admin */}
+              {user?.role === 'business_admin' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-3">
+                    Experiment Scope
+                  </label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      onClick={() => setNewExperiment({...newExperiment, experimentType: 'campaign', campaignId: ''})}
+                      className={`p-4 border-2 rounded-lg text-left transition-colors ${
+                        newExperiment.experimentType === 'campaign'
+                          ? 'border-blue-500 bg-blue-50' 
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <Target className="w-5 h-5 mb-2 text-blue-600" />
+                      <div className="font-medium">Campaign-Specific</div>
+                      <div className="text-sm text-gray-500">Test within a specific campaign</div>
+                    </button>
+                    <button
+                      onClick={() => setNewExperiment({...newExperiment, experimentType: 'global', campaignId: ''})}
+                      className={`p-4 border-2 rounded-lg text-left transition-colors ${
+                        newExperiment.experimentType === 'global'
+                          ? 'border-blue-500 bg-blue-50' 
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <Users className="w-5 h-5 mb-2 text-blue-600" />
+                      <div className="font-medium">Global</div>
+                      <div className="text-sm text-gray-500">Test across all active campaigns</div>
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Campaign Selection */}
+              {newExperiment.experimentType === 'campaign' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Select Campaign
+                  </label>
+                  <select 
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    value={newExperiment.campaignId}
+                    onChange={(e) => setNewExperiment({...newExperiment, campaignId: e.target.value})}
+                  >
+                    <option value="">Choose a campaign...</option>
+                    {availableCampaigns.map(campaign => (
+                      <option key={campaign.id} value={campaign.id}>
+                        {campaign.name} {campaign.is_active ? '(Active)' : '(Inactive)'}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-3">
@@ -483,6 +618,9 @@ const ABTestingDashboard = () => {
                     <span className="text-gray-600">Name:</span> <span className="font-medium">{newExperiment.name}</span>
                   </div>
                   <div>
+                    <span className="text-gray-600">Scope:</span> <span className="font-medium">{newExperiment.experimentType}</span>
+                  </div>
+                  <div>
                     <span className="text-gray-600">Testing:</span> <span className="font-medium">{newExperiment.testType}</span>
                   </div>
                   <div>
@@ -491,6 +629,14 @@ const ABTestingDashboard = () => {
                   <div>
                     <span className="text-gray-600">Split:</span> <span className="font-medium">{newExperiment.trafficSplit}% / {100 - newExperiment.trafficSplit}%</span>
                   </div>
+                  {newExperiment.campaignId && (
+                    <div>
+                      <span className="text-gray-600">Campaign:</span> 
+                      <span className="font-medium">
+                        {availableCampaigns.find(c => c.id === newExperiment.campaignId)?.name || 'Unknown'}
+                      </span>
+                    </div>
+                  )}
                 </div>
                 
                 <div className="mt-6 grid grid-cols-2 gap-4">
@@ -537,32 +683,20 @@ const ABTestingDashboard = () => {
           {createStep < 3 ? (
             <button
               onClick={() => setCreateStep(createStep + 1)}
-              disabled={!newExperiment.name || !newExperiment.testType || !newExperiment.metric}
+              disabled={!newExperiment.name || !newExperiment.testType || !newExperiment.metric || 
+                       (newExperiment.experimentType === 'campaign' && !newExperiment.campaignId)}
               className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Next Step
             </button>
           ) : (
             <button
-              onClick={() => {
-                // Here you would call your API to create the experiment
-                console.log('Creating experiment:', newExperiment);
-                setActiveView('overview');
-                setCreateStep(1);
-                setNewExperiment({
-                  name: '',
-                  testType: '',
-                  metric: '',
-                  trafficSplit: 50,
-                  audience: [],
-                  variantA: { config: '' },
-                  variantB: { config: '' }
-                });
-              }}
-              className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+              onClick={handleCreateExperiment}
+              disabled={loading}
+              className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50"
             >
               <Play className="w-4 h-4 inline mr-2" />
-              Launch Experiment
+              {loading ? 'Creating...' : 'Launch Experiment'}
             </button>
           )}
         </div>
@@ -592,17 +726,26 @@ const ABTestingDashboard = () => {
               Declare Winner
             </button>
           )}
-          <button className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50">
+          <button 
+            onClick={() => handleUpdateExperimentStatus(selectedTest?.id, 'completed')}
+            className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+          >
             <StopCircle className="w-4 h-4 inline mr-2" />
             End Test
           </button>
-          {selectedTest?.status === 'running' ? (
-            <button className="px-4 py-2 border border-orange-300 text-orange-700 rounded-md hover:bg-orange-50">
+          {(selectedTest?.status === 'running' || selectedTest?.status === 'active') ? (
+            <button 
+              onClick={() => handleUpdateExperimentStatus(selectedTest?.id, 'paused')}
+              className="px-4 py-2 border border-orange-300 text-orange-700 rounded-md hover:bg-orange-50"
+            >
               <Pause className="w-4 h-4 inline mr-2" />
               Pause Test
             </button>
           ) : (
-            <button className="px-4 py-2 border border-green-300 text-green-700 rounded-md hover:bg-green-50">
+            <button 
+              onClick={() => handleUpdateExperimentStatus(selectedTest?.id, 'active')}
+              className="px-4 py-2 border border-green-300 text-green-700 rounded-md hover:bg-green-50"
+            >
               <Play className="w-4 h-4 inline mr-2" />
               Resume Test
             </button>
@@ -623,13 +766,13 @@ const ABTestingDashboard = () => {
           </div>
           <div>
             <p className="text-sm text-gray-600">Participants</p>
-            <p className="font-semibold">{selectedTest?.participants?.toLocaleString()}</p>
+            <p className="font-semibold">{selectedTest?.participants?.toLocaleString() || 0}</p>
           </div>
           <div>
             <p className="text-sm text-gray-600">Confidence Level</p>
             <div className="flex items-center gap-2">
-              <ConfidenceIndicator confidence={selectedTest?.confidence} />
-              <span className="text-sm font-medium">{selectedTest?.confidence}%</span>
+              <ConfidenceIndicator confidence={selectedTest?.confidence || 0} />
+              <span className="text-sm font-medium">{selectedTest?.confidence || 0}%</span>
             </div>
           </div>
           <div>
@@ -671,11 +814,11 @@ const ABTestingDashboard = () => {
             <XAxis dataKey="day" />
             <YAxis />
             <Tooltip 
-  formatter={(value, dataKey) => [
-    `${value}%`, 
-    dataKey === 'variantA' ? 'Variant A' : 'Variant B'
-  ]}
-/>
+              formatter={(value, dataKey) => [
+                `${value}%`, 
+                dataKey === 'variantA' ? 'Variant A' : 'Variant B'
+              ]}
+            />
             <Line 
               type="monotone" 
               dataKey="variantA" 
@@ -700,27 +843,24 @@ const ABTestingDashboard = () => {
           <h4 className="font-semibold mb-4">Variant Comparison</h4>
           <div className="space-y-4">
             <div className="flex justify-between items-center">
-              <span>Reply Rate</span>
-              <div className="flex items-center gap-4">
-                <span className="text-blue-600 font-medium">24.1%</span>
-                <span className="text-green-600 font-medium">23.4%</span>
-                <span className="text-sm text-red-500">-0.7%</span>
-              </div>
-            </div>
-            <div className="flex justify-between items-center">
-              <span>Avg Response Time</span>
-              <div className="flex items-center gap-4">
-                <span className="text-blue-600 font-medium">2.3h</span>
-                <span className="text-green-600 font-medium">1.8h</span>
-                <span className="text-sm text-green-500">+21.7%</span>
-              </div>
-            </div>
-            <div className="flex justify-between items-center">
               <span>Conversion Rate</span>
               <div className="flex items-center gap-4">
-                <span className="text-blue-600 font-medium">12.3%</span>
-                <span className="text-green-600 font-medium">13.2%</span>
-                <span className="text-sm text-green-500">+7.3%</span>
+                <span className="text-blue-600 font-medium">
+                  {selectedTest?.variants?.a?.toFixed(1) || '0.0'}%
+                </span>
+                <span className="text-green-600 font-medium">
+                  {selectedTest?.variants?.b?.toFixed(1) || '0.0'}%
+                </span>
+                <span className={`text-sm ${
+                  (selectedTest?.variants?.b || 0) > (selectedTest?.variants?.a || 0) 
+                    ? 'text-green-500' 
+                    : 'text-red-500'
+                }`}>
+                  {selectedTest?.variants?.a && selectedTest?.variants?.b
+                    ? ((selectedTest.variants.b - selectedTest.variants.a) / selectedTest.variants.a * 100).toFixed(1)
+                    : '0.0'
+                  }%
+                </span>
               </div>
             </div>
           </div>
@@ -732,14 +872,16 @@ const ABTestingDashboard = () => {
             <div>
               <h5 className="font-medium text-blue-600 mb-2">Variant A (Control)</h5>
               <div className="bg-blue-50 p-3 rounded text-sm">
-  "Hi &#123;name&#125;, I noticed your property listing on the market. I specialize in helping homeowners..."
-</div>
+                {selectedTest?.experiment_variants?.find(v => v.variant_name === 'A')?.configuration?.config || 
+                 'Current live settings'}
+              </div>
             </div>
             <div>
               <h5 className="font-medium text-green-600 mb-2">Variant B (Test)</h5>
               <div className="bg-green-50 p-3 rounded text-sm">
-  "Hey &#123;name&#125;! Saw your listing and wanted to reach out personally. As a local investor..."
-</div>
+                {selectedTest?.experiment_variants?.find(v => v.variant_name === 'B')?.configuration?.config || 
+                 'Test configuration'}
+              </div>
             </div>
           </div>
         </div>
@@ -753,6 +895,9 @@ const ABTestingDashboard = () => {
         <div>
           <h4 className="font-medium text-gray-900">{experiment.name}</h4>
           <p className="text-sm text-gray-600">Testing: {experiment.metric}</p>
+          <p className="text-xs text-gray-500 mt-1">
+            {experiment.campaignName || 'Global Test'}
+          </p>
         </div>
         <StatusPill status={experiment.status} />
       </div>
@@ -767,11 +912,48 @@ const ABTestingDashboard = () => {
       </div>
       
       <div className="flex items-center justify-between text-sm text-gray-500">
-        <span>{experiment.participants.toLocaleString()} participants</span>
-        <button className="text-blue-600 hover:text-blue-700">View Results</button>
+        <span>{experiment.participants?.toLocaleString() || 0} participants</span>
+        <button 
+          onClick={() => handleViewDetails(experiment)}
+          className="text-blue-600 hover:text-blue-700"
+        >
+          View Results
+        </button>
       </div>
     </div>
   );
+
+  // Loading state
+  if (loading && activeView === 'overview') {
+    return (
+      <div className="p-6">
+        <div className="flex items-center justify-center py-12">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="p-6">
+        <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
+          <h3 className="text-lg font-medium text-red-900 mb-2">Error Loading A/B Tests</h3>
+          <p className="text-red-700 mb-4">{error}</p>
+          <button 
+            onClick={() => {
+              setError('');
+              loadExperimentData();
+            }}
+            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+          >
+            Try Again
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   // Main render logic based on activeView
   if (activeView === 'create') {

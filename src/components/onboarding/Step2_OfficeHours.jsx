@@ -1,4 +1,4 @@
-// src/components/onboarding/Step3_OfficeHours.jsx
+// src/components/onboarding/Step2_OfficeHours.jsx
 import { useState } from 'react';
 import { Clock, Calendar, Shield } from 'lucide-react';
 import supabase from '../../lib/supabaseClient';
@@ -10,7 +10,7 @@ const dayOptions = [
   { value: 'Everyday', label: 'Every Day' }
 ];
 
-export default function Step3_OfficeHours({ tenantId, formData, setFormData, onNext }) {
+export default function Step2_OfficeHours({ tenantId, formData, setFormData, onNext }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -18,7 +18,7 @@ export default function Step3_OfficeHours({ tenantId, formData, setFormData, onN
     setLoading(true);
     setError(null);
     try {
-      console.log('=== Step3 Auth Debug ===');
+      console.log('=== Step2 Auth Debug ===');
       
       // Check session first
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
@@ -73,7 +73,7 @@ export default function Step3_OfficeHours({ tenantId, formData, setFormData, onN
       console.log('Platform settings saved successfully');
       onNext();
     } catch (err) {
-      console.error('Step3 error:', err);
+      console.error('Step2 error:', err);
       setError(err.message);
     } finally {
       setLoading(false);
@@ -169,7 +169,7 @@ export default function Step3_OfficeHours({ tenantId, formData, setFormData, onN
               : 'bg-gray-200 text-gray-400 cursor-not-allowed'}
           `}
         >
-          {loading ? 'Saving...' : 'Continue to Step 4'}
+          {loading ? 'Saving...' : 'Continue to Step 3'}
         </button>
       </div>
     </div>

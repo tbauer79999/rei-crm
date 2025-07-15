@@ -3,22 +3,6 @@ import supabase from '../lib/supabaseClient';
 
 const AuthContext = createContext();
 
-// Hardcoded roles as immediate fallback
-const USER_ROLES = {
-  'thomasbauer1008@gmail.com': {
-    role: 'business_admin',
-    tenant_id: '6e6b03b4-6749-472b-9445-935272ef3ae3'
-  },
-  'info@elevateddreamhomes.com': {
-    role: 'user',
-    tenant_id: '74fa6d05-226e-4a5e-adcf-fb47cad8a288'
-  },
-  'thomasbauer799@gmail.com': {
-    role: 'global_admin',
-    tenant_id: '46f58bba-b709-4460-8df1-ee61f0d42c57'
-  }
-};
-
 const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -63,18 +47,8 @@ const AuthProvider = ({ children }) => {
             localStorage.setItem('auth_token', session.access_token);
           }
           
-          // Get user info from hardcoded list
-          const userInfo = USER_ROLES[session.user.email] || {
-            role: 'user',
-            tenant_id: session.user.id
-          };
-          
-          setUser({
-            ...session.user,
-            email: session.user.email,
-            role: userInfo.role,
-            tenant_id: userInfo.tenant_id
-          });
+          // Get user info dynamically from database
+          await loadUserInfo(session.user);
           
         } else {
           console.log('❌ No session found');
@@ -95,6 +69,116 @@ const AuthProvider = ({ children }) => {
       }
     };
 
+    // Function to load user info from database
+    const loadUserInfo = async (authUser) => {
+      try {
+        console.log('📊 Loading user profile for:', authUser.email);
+        
+        // Try to get role and tenant_id from auth metadata first (fastest)
+        let role = authUser.app_metadata?.role;
+        let tenant_id = authUser.app_metadata?.tenant_id;
+        
+        console.log('🔍 Auth metadata - role:', role, 'tenant_id:', tenant_id);
+        
+        // If we have both from metadata, use them but still verify with database
+        if (role && tenant_id) {
+          setUser({
+            ...authUser,
+            email: authUser.email,
+            role: role,
+            tenant_id: tenant_id
+          });
+          
+          // Optionally verify in background (don't wait for this)
+          verifyUserProfile(authUser.id, role, tenant_id);
+          return;
+        }
+        
+        // If metadata is missing, get from database
+        console.log('🔍 Fetching from users_profile table...');
+        const { data: profile, error: profileError } = await supabase
+          .from('users_profile')
+          .select('role, tenant_id')
+          .eq('id', authUser.id)
+          .single();
+
+        if (profileError) {
+          console.error('❌ Profile fetch error:', profileError);
+          
+          // Fallback: If profile doesn't exist, assume it's a new business admin
+          console.log('⚡ Using fallback: business_admin role');
+          setUser({
+            ...authUser,
+            email: authUser.email,
+            role: 'business_admin',
+            tenant_id: authUser.id // Use user ID as tenant ID for new business admins
+          });
+          return;
+        }
+
+        if (profile) {
+          console.log('✅ Profile loaded:', profile);
+          setUser({
+            ...authUser,
+            email: authUser.email,
+            role: profile.role || 'business_admin',
+            tenant_id: profile.tenant_id || authUser.id
+          });
+          
+          // Update auth metadata if it's missing
+          if (!role || !tenant_id) {
+            updateAuthMetadata(authUser.id, profile.role, profile.tenant_id);
+          }
+        }
+        
+      } catch (error) {
+        console.error('❌ Error loading user info:', error);
+        
+        // Ultimate fallback
+        setUser({
+          ...authUser,
+          email: authUser.email,
+          role: 'business_admin',
+          tenant_id: authUser.id
+        });
+      }
+    };
+
+    // Background verification of user profile
+    const verifyUserProfile = async (userId, currentRole, currentTenantId) => {
+      try {
+        const { data: profile } = await supabase
+          .from('users_profile')
+          .select('role, tenant_id')
+          .eq('id', userId)
+          .single();
+          
+        // If database differs from metadata, update user state
+        if (profile && (profile.role !== currentRole || profile.tenant_id !== currentTenantId)) {
+          console.log('🔄 Profile changed, updating user...');
+          setUser(prev => ({
+            ...prev,
+            role: profile.role,
+            tenant_id: profile.tenant_id
+          }));
+        }
+      } catch (error) {
+        console.log('⚠️ Background verification failed:', error);
+      }
+    };
+
+    // Update auth metadata to sync with database
+    const updateAuthMetadata = async (userId, role, tenantId) => {
+      try {
+        await supabase.auth.updateUser({
+          data: { role, tenant_id: tenantId }
+        });
+        console.log('✅ Auth metadata updated');
+      } catch (error) {
+        console.log('⚠️ Failed to update auth metadata:', error);
+      }
+    };
+
     // Initialize immediately
     initializeAuth();
 
@@ -107,9 +191,13 @@ const AuthProvider = ({ children }) => {
       if (event === 'SIGNED_OUT') {
         setUser(null);
         setSession(null);
+        localStorage.removeItem('auth_token');
       } else if (event === 'TOKEN_REFRESHED') {
         console.log('🔄 Token refreshed');
         setSession(newSession);
+        if (newSession?.access_token) {
+          localStorage.setItem('auth_token', newSession.access_token);
+        }
       } else if (newSession?.user) {
         setSession(newSession);
         
@@ -118,17 +206,8 @@ const AuthProvider = ({ children }) => {
           localStorage.setItem('auth_token', newSession.access_token);
         }
         
-        const userInfo = USER_ROLES[newSession.user.email] || {
-          role: 'user',
-          tenant_id: newSession.user.id
-        };
-        
-        setUser({
-          ...newSession.user,
-          email: newSession.user.email,
-          role: userInfo.role,
-          tenant_id: userInfo.tenant_id
-        });
+        // Load user info dynamically
+        await loadUserInfo(newSession.user);
       }
     });
 
@@ -178,34 +257,53 @@ const AuthProvider = ({ children }) => {
   const canAccessEnterprise = user?.role === 'global_admin' || user?.role === 'enterprise_admin';
   const canAccessAdmin = ['global_admin', 'enterprise_admin', 'business_admin'].includes(user?.role);
 
-const refreshUser = async () => {
-  const { data, error } = await supabase.auth.getUser();
-  if (data?.user && !error) {
-    const userInfo = USER_ROLES[data.user.email] || {
-      role: 'user',
-      tenant_id: data.user.id
-    };
+  const refreshUser = async () => {
+    try {
+      console.log('🔄 Refreshing user data...');
+      const { data, error } = await supabase.auth.getUser();
+      
+      if (data?.user && !error) {
+        // Re-fetch user profile from database
+        const { data: profile, error: profileError } = await supabase
+          .from('users_profile')
+          .select('role, tenant_id')
+          .eq('id', data.user.id)
+          .single();
 
-    setUser({
-      ...data.user,
-      email: data.user.email,
-      role: userInfo.role,
-      tenant_id: userInfo.tenant_id
-    });
-  }
-};
+        if (profile && !profileError) {
+          setUser({
+            ...data.user,
+            email: data.user.email,
+            role: profile.role || 'business_admin',
+            tenant_id: profile.tenant_id || data.user.id
+          });
+          console.log('✅ User refreshed with role:', profile.role);
+        } else {
+          console.log('⚠️ Profile refresh failed, using fallback');
+          setUser({
+            ...data.user,
+            email: data.user.email,
+            role: 'business_admin',
+            tenant_id: data.user.id
+          });
+        }
+      }
+    } catch (error) {
+      console.error('❌ Error refreshing user:', error);
+    }
+  };
 
-const value = { 
-  user, 
-  loading,
-  session,
-  getSession,
-  role: user?.role,
-  tenantId: user?.tenant_id,
-  canAccessEnterprise,
-  canAccessAdmin,
-  refreshUser // ✅ this line is critical
-};
+  const value = { 
+    user, 
+    loading,
+    session,
+    getSession,
+    role: user?.role,
+    tenantId: user?.tenant_id,
+    canAccessEnterprise,
+    canAccessAdmin,
+    refreshUser
+  };
 
   return (
     <AuthContext.Provider value={value}>

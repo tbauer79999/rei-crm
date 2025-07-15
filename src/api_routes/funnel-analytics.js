@@ -27,7 +27,8 @@ router.get('/', async (req, res) => {
     // Build leads query based on role
     let leadsQuery = supabase
       .from('leads')
-      .select('id, status, status_history, created_at, campaign');
+      .select('id, status, status_history, created_at, campaign')
+      .limit(null); // Remove the 1000 row limit - fetch all results
 
     // Apply tenant filtering based on role
     if (role === 'global_admin') {

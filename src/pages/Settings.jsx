@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { Users, Phone } from 'lucide-react';
+import { Users, Phone, Shield } from 'lucide-react';
 import SalesTeamSettings from '../components/settings/SalesTeamSettings';
 import PhoneNumbersSettings from '../components/settings/phonenumbersSettings';
+import A2PCompliance from '../components/settings/a2pcompliance';
 import { 
   Building2, 
   MessageSquare, 
@@ -81,6 +82,15 @@ const settingsCategories = [
     statusText: 'Active'
   },
   {
+    key: 'a2pcompliance',
+    title: 'A2P Compliance',
+    description: 'Register your business brand and campaigns for SMS messaging compliance',
+    icon: Shield,
+    component: A2PCompliance,
+    status: 'attention',
+    statusText: 'Setup Required'
+  },
+  {
     key: 'salesteam',
     title: 'Sales Team',
     description: 'Invite team members, manage user access, and view your sales roster',
@@ -110,7 +120,7 @@ const settingsCategories = [
   {
     key: 'knowledge',
     title: 'AI Knowledge Base',
-    description: 'Upload business documents to train AI on your company’s language, process, and terminology',
+    description: 'Upload business documents to train AI on your company language, process, and terminology',
     icon: Database,
     component: AIKnowledgeBase,
     status: 'review',
@@ -250,7 +260,7 @@ export default function Settings() {
         <div className="mt-8 bg-white rounded-xl border border-gray-200 p-6">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
             <div className="text-center">
-              <div className="text-2xl font-bold text-gray-900">8</div>
+              <div className="text-2xl font-bold text-gray-900">9</div>
               <div className="text-sm text-gray-600">Settings Categories</div>
             </div>
             <div className="text-center">
@@ -258,7 +268,7 @@ export default function Settings() {
               <div className="text-sm text-gray-600">✔️ Fully Configured</div>
             </div>
             <div className="text-center">
-              <div className="text-2xl font-bold text-orange-600">1</div>
+              <div className="text-2xl font-bold text-orange-600">2</div>
               <div className="text-sm text-gray-600">Needs Attention</div>
             </div>
             <div className="text-center">

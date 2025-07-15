@@ -1,14 +1,10 @@
 // src/components/onboarding/WizardLayout.jsx
 import { useState, useEffect } from 'react';
-import { ChevronRight, ChevronLeft, Building2, MessageCircle, Clock, Settings, Zap, CheckCircle, Phone } from 'lucide-react';
+import { ChevronRight, ChevronLeft, Building2, Clock, CheckCircle } from 'lucide-react';
 import supabase from '../../lib/supabaseClient';
 import Step1_CompanyInfo from './Step1_CompanyInfo';
-import Step2_PhoneNumber from './Step2_PhoneNumber'; // New import
-import Step3_AIStyle from './Step3_AIStyle'; // Renamed from Step2
-import Step4_OfficeHours from './Step4_OfficeHours'; // Renamed from Step3
-import Step5_LeadFieldBuilder from './Step5_LeadFieldBuilder'; // Renamed from Step4
-import Step6_AutomationPreferences from './Step6_AutomationPreferences'; // Renamed from Step5
-import Step7_SuccessDemo from './Step7_SuccessDemo'; // Renamed from Step6
+import Step2_OfficeHours from './Step2_OfficeHours';
+import Step3_SuccessDemo from './Step3_SuccessDemo';
 
 export default function WizardLayout() {
   const [step, setStep] = useState(1); // Always start at step 1
@@ -22,67 +18,34 @@ export default function WizardLayout() {
     industry_id: '',
     description: '',
     areaCode: '',
-    phoneNumber: '', // New field
-    phoneConfigured: false, // New field
-    phoneSkipped: false, // New field
     tone: '',
     persona: '',
+    archetype: '',
     openHour: '9',
     closeHour: '17',
     days: 'M–F',
-    selectedFields: ['name', 'phone', 'email', 'status'], // Default selected fields
-    aiEnabled: true,
-    reengagement: true,
     loadDemo: true
   });
 
-  const totalSteps = 7; // Updated from 6 to 7
+  const totalSteps = 3; // Updated to 3 steps
 
   const steps = [
     { 
       id: 1, 
-      title: "Company Info", 
+      title: "Company & AI Setup", 
       icon: Building2, 
-      description: "Tell us about your business",
+      description: "Company info and AI configuration",
       color: "from-blue-500 to-purple-600"
     },
     { 
       id: 2, 
-      title: "Phone Number", 
-      icon: Phone, 
-      description: "Choose your business number",
-      color: "from-purple-500 to-pink-600"
-    },
-    { 
-      id: 3, 
-      title: "AI Style", 
-      icon: MessageCircle, 
-      description: "Configure your AI assistant",
-      color: "from-pink-500 to-red-600"
-    },
-    { 
-      id: 4, 
       title: "Office Hours", 
       icon: Clock, 
       description: "Set your availability",
-      color: "from-red-500 to-orange-600"
+      color: "from-pink-500 to-red-600"
     },
     { 
-      id: 5, 
-      title: "Lead Fields", 
-      icon: Settings, 
-      description: "Customize lead tracking",
-      color: "from-orange-500 to-yellow-600"
-    },
-    { 
-      id: 6, 
-      title: "Automation", 
-      icon: Zap, 
-      description: "Enable smart features",
-      color: "from-yellow-500 to-green-600"
-    },
-    { 
-      id: 7, 
+      id: 3, 
       title: "Complete", 
       icon: CheckCircle, 
       description: "You're all set!",
@@ -131,7 +94,7 @@ export default function WizardLayout() {
         // Check tenant's onboarding status
         const { data: tenant, error: tenantError } = await supabase
           .from('tenants')
-          .select('onboarding_complete, name, industry, preferred_area_code')
+          .select('onboarding_complete, name, industry_id, preferred_area_code')
           .eq('id', profile.tenant_id)
           .single();
 
@@ -152,11 +115,11 @@ export default function WizardLayout() {
         }
 
         // Pre-fill form data if tenant has existing info
-        if (tenant.name || tenant.industry || tenant.preferred_area_code) {
+        if (tenant.name || tenant.industry_id || tenant.preferred_area_code) {
           setFormData(prev => ({
             ...prev,
             companyName: tenant.name || '',
-            industry: tenant.industry || '',
+            industry_id: tenant.industry_id || '',
             areaCode: tenant.preferred_area_code || ''
           }));
         }
@@ -239,17 +202,9 @@ export default function WizardLayout() {
       case 1:
         return <Step1_CompanyInfo {...commonProps} />;
       case 2:
-        return <Step2_PhoneNumber {...commonProps} />;
+        return <Step2_OfficeHours {...commonProps} />;
       case 3:
-        return <Step3_AIStyle {...commonProps} />;
-      case 4:
-        return <Step4_OfficeHours {...commonProps} />;
-      case 5:
-        return <Step5_LeadFieldBuilder {...commonProps} />;
-      case 6:
-        return <Step6_AutomationPreferences {...commonProps} />;
-      case 7:
-        return <Step7_SuccessDemo tenantId={tenantId} formData={formData} setFormData={setFormData} />;
+        return <Step3_SuccessDemo tenantId={tenantId} formData={formData} setFormData={setFormData} />;
       default:
         return <Step1_CompanyInfo {...commonProps} />;
     }
@@ -257,13 +212,9 @@ export default function WizardLayout() {
 
   const canProceed = () => {
     switch(step) {
-      case 1: return formData.companyName && formData.industry;
-      case 2: return formData.phoneConfigured || formData.phoneSkipped; // Can proceed if phone configured OR skipped
-      case 3: return formData.tone && formData.persona;
-      case 4: return true;
-      case 5: return formData.selectedFields.length > 0;
-      case 6: return true;
-      case 7: return true;
+      case 1: return formData.companyName && formData.industry_id && formData.tone && formData.persona;
+      case 2: return true;
+      case 3: return true;
       default: return false;
     }
   };
@@ -313,9 +264,9 @@ export default function WizardLayout() {
         <div className="max-w-4xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-sm">R</span>
+              <span className="text-white font-bold text-sm">S</span>
             </div>
-            <span className="font-semibold text-gray-800">REI-CRM Setup</span>
+            <span className="font-semibold text-gray-800">SurFox AI Setup</span>
           </div>
           <div className="text-sm text-gray-500">
             Step {step} of {totalSteps}
@@ -347,8 +298,8 @@ export default function WizardLayout() {
             Previous
           </button>
 
-          {/* Only show Next button for steps 1-6, step 7 has its own finish button */}
-          {step < 7 && (
+          {/* Only show Next button for steps 1-2, step 3 has its own finish button */}
+          {step < 3 && (
             <button
               onClick={goToNext}
               disabled={!canProceed()}

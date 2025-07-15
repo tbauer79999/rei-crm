@@ -31,6 +31,38 @@ const fetchRecordById = async (table, id) => {
   return data;
 };
 
+const getRecommendedToneFromScores = async (tenantId) => {
+  const { data: recentScores, error } = await supabase
+    .from('lead_scores')
+    .select('motivation_score, hesitation_score, urgency_score, interest_level_score')
+    .eq('tenant_id', tenantId)
+    .order('updated_at', { ascending: false })
+    .limit(100);
+
+  if (error || !recentScores || recentScores.length === 0) {
+    console.warn('No lead_scores data found or error occurred:', error);
+    return 'Friendly & Casual'; // fallback tone
+  }
+
+  const highPerformers = recentScores.filter(
+    (row) =>
+      row.interest_level_score >= 7 &&
+      row.motivation_score >= 70 &&
+      row.hesitation_score <= 50
+  );
+
+  if (highPerformers.length === 0) return 'Friendly & Casual';
+
+  const avgUrgency = highPerformers.reduce((sum, r) => sum + (r.urgency_score || 0), 0) / highPerformers.length;
+  const avgHesitation = highPerformers.reduce((sum, r) => sum + (r.hesitation_score || 0), 0) / highPerformers.length;
+
+  if (avgUrgency > 75 && avgHesitation < 30) return 'Direct Closer';
+  if (avgHesitation > 60) return 'Soft & Trust-Building';
+  return 'Friendly & Casual';
+};
+
+
+
 const fetchSettingValue = async (key) => {
   const { data, error } = await supabase
     .from('platform_settings')
@@ -94,5 +126,6 @@ module.exports = {
   fetchRecordById,
   fetchSettingValue,
   fetchTenantSetting,
-  callEdgeFunction  
+  callEdgeFunction,
+  getRecommendedToneFromScores 
 };

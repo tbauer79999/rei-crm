@@ -248,6 +248,13 @@ export default function CompanySettings() {
 
   const dayOptions = ["M–F", "M–Sat", "Everyday"];
 
+  const timezoneOptions = [
+    { label: "Eastern Standard Time (EST)", value: "EST" },
+    { label: "Central Standard Time (CST)", value: "CST" },
+    { label: "Mountain Standard Time (MST)", value: "MST" },
+    { label: "Pacific Standard Time (PST)", value: "PST" },
+  ];
+
   if (authLoading) return (
     <div className="flex items-center justify-center py-12">
       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
@@ -378,12 +385,18 @@ export default function CompanySettings() {
               <Globe className="w-4 h-4 text-gray-500" />
               <span>Time Zone</span>
             </Label>
-            <Input
-              id="timezone"
+            <select
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               value={data.timezone?.value || ""}
               onChange={(e) => handleChange("timezone", e.target.value)}
-              placeholder="EST, PST, etc."
-            />
+            >
+              <option value="">Select timezone</option>
+              {timezoneOptions.map((tz) => (
+                <option key={tz.value} value={tz.value}>
+                  {tz.label}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
       </div>

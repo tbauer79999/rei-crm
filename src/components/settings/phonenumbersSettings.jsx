@@ -17,7 +17,9 @@ import {
   MessageSquare,
   PhoneCall,
   Calendar,
-  TrendingUp
+  TrendingUp,
+  ExternalLink,
+  Settings
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import supabase from '../../lib/supabaseClient';
@@ -33,6 +35,13 @@ export default function PhoneNumbersSettings() {
   const [selectedNumber, setSelectedNumber] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterAssigned, setFilterAssigned] = useState('all');
+  
+  // A2P state
+  const [a2pCampaigns, setA2pCampaigns] = useState([]);
+  const [a2pStatus, setA2pStatus] = useState(null);
+  const [showA2pModal, setShowA2pModal] = useState(false);
+  const [assigningA2pNumber, setAssigningA2pNumber] = useState(null);
+  const [selectedA2pCampaign, setSelectedA2pCampaign] = useState('');
   
   // Purchase modal state
   const [showPurchaseModal, setShowPurchaseModal] = useState(false);
@@ -55,16 +64,53 @@ export default function PhoneNumbersSettings() {
     totalNumbers: 0,
     assignedNumbers: 0,
     unassignedNumbers: 0,
-    monthlyCost: 0
+    monthlyCost: 0,
+    a2pAssigned: 0,
+    a2pCompliant: 0
   });
-
-
 
   useEffect(() => {
     loadPhoneNumbers();
     loadTeamMembers();
     loadPopularAreaCodes();
+    loadA2pData();
   }, []);
+
+  const loadA2pData = async () => {
+    try {
+      // Load A2P status
+      const { data: statusData, error: statusError } = await supabase.functions.invoke('get-a2p-status');
+      if (!statusError && statusData.success) {
+        setA2pStatus(statusData);
+        setA2pCampaigns(statusData.campaigns || []);
+      }
+
+      // Load phone number A2P assignments
+      const { data: assignmentData, error: assignmentError } = await supabase
+        .from('phone_number_campaigns')
+        .select(`
+          phone_number_id,
+          a2p_campaign_id,
+          a2p_campaigns (
+            id,
+            campaign_id,
+            status
+          )
+        `);
+
+      if (!assignmentError && assignmentData) {
+        // Update phone numbers with A2P assignments
+        setPhoneNumbers(prevNumbers => 
+          prevNumbers.map(phone => ({
+            ...phone,
+            a2p_assignment: assignmentData.find(a => a.phone_number_id === phone.id)
+          }))
+        );
+      }
+    } catch (error) {
+      console.error('Error loading A2P data:', error);
+    }
+  };
 
   const loadPhoneNumbers = async () => {
     setLoading(true);
@@ -78,20 +124,70 @@ export default function PhoneNumbersSettings() {
       
       setPhoneNumbers(data.phoneNumbers || []);
       
-      // Calculate stats
+      // Calculate stats (will be updated after A2P data loads)
       const assigned = data.phoneNumbers?.filter(n => n.user_id).length || 0;
-      setStats({
+      setStats(prevStats => ({
+        ...prevStats,
         totalNumbers: data.phoneNumbers?.length || 0,
         assignedNumbers: assigned,
         unassignedNumbers: (data.phoneNumbers?.length || 0) - assigned,
         monthlyCost: (data.phoneNumbers?.length || 0) * 1.15
-      });
+      }));
 
     } catch (error) {
       console.error('Error loading phone numbers:', error);
       setError('Failed to load phone numbers');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const assignPhoneToA2p = async () => {
+    if (!selectedA2pCampaign || !assigningA2pNumber) return;
+
+    try {
+      const { data, error } = await supabase.functions.invoke('assign-phone-to-campaign', {
+        body: {
+          phone_number_id: assigningA2pNumber.id,
+          a2p_campaign_id: parseInt(selectedA2pCampaign),
+          action: 'assign'
+        }
+      });
+
+      if (error) throw error;
+
+      if (data.success) {
+        setSuccess('Phone number assigned to A2P campaign successfully!');
+        setShowA2pModal(false);
+        setAssigningA2pNumber(null);
+        setSelectedA2pCampaign('');
+        loadA2pData(); // Reload A2P assignments
+      }
+    } catch (error) {
+      console.error('Error assigning phone to A2P campaign:', error);
+      setError('Failed to assign phone number to A2P campaign');
+    }
+  };
+
+  const unassignPhoneFromA2p = async (phoneId, a2pCampaignId) => {
+    try {
+      const { data, error } = await supabase.functions.invoke('assign-phone-to-campaign', {
+        body: {
+          phone_number_id: phoneId,
+          a2p_campaign_id: a2pCampaignId,
+          action: 'unassign'
+        }
+      });
+
+      if (error) throw error;
+
+      if (data.success) {
+        setSuccess('Phone number unassigned from A2P campaign successfully!');
+        loadA2pData(); // Reload A2P assignments
+      }
+    } catch (error) {
+      console.error('Error unassigning phone from A2P campaign:', error);
+      setError('Failed to unassign phone number from A2P campaign');
     }
   };
 
@@ -287,6 +383,20 @@ export default function PhoneNumbersSettings() {
     return matchesSearch && matchesFilter;
   });
 
+  // Calculate A2P stats
+  useEffect(() => {
+    const a2pAssigned = phoneNumbers.filter(n => n.a2p_assignment).length;
+    const a2pCompliant = phoneNumbers.filter(n => 
+      n.a2p_assignment?.a2p_campaigns?.status === 'VERIFIED'
+    ).length;
+    
+    setStats(prevStats => ({
+      ...prevStats,
+      a2pAssigned,
+      a2pCompliant
+    }));
+  }, [phoneNumbers]);
+
   // Clear messages after 5 seconds
   useEffect(() => {
     if (error || success) {
@@ -333,17 +443,43 @@ export default function PhoneNumbersSettings() {
           <h2 className="text-2xl font-bold text-gray-900">Phone Numbers</h2>
           <p className="text-gray-600 mt-1">Manage your business phone numbers and assignments</p>
         </div>
-        <button
-          onClick={() => setShowPurchaseModal(true)}
-          className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          Add Phone Number
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setShowPurchaseModal(true)}
+            className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Add Phone Number
+          </button>
+        </div>
       </div>
 
+      {/* A2P Compliance Alert */}
+      {(!a2pStatus?.brand || a2pStatus.brand.status !== 'VERIFIED') && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <Shield className="w-5 h-5 text-yellow-600 mr-3" />
+              <div>
+                <p className="text-yellow-800 font-medium">A2P Compliance Required</p>
+                <p className="text-yellow-700 text-sm mt-1">
+                  SMS messaging requires A2P brand and campaign registration for compliance.
+                </p>
+              </div>
+            </div>
+            <button 
+              onClick={() => window.open('/settings/a2p-compliance', '_blank')}
+              className="inline-flex items-center px-3 py-1.5 bg-yellow-100 text-yellow-800 rounded-lg hover:bg-yellow-200 transition-colors text-sm font-medium"
+            >
+              Setup A2P
+              <ExternalLink className="w-3 h-3 ml-1" />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-6 gap-6">
         <div className="bg-gradient-to-r from-blue-50 to-blue-100 rounded-xl p-6">
           <div className="flex items-center justify-between">
             <div>
@@ -358,7 +494,7 @@ export default function PhoneNumbersSettings() {
         <div className="bg-gradient-to-r from-green-50 to-green-100 rounded-xl p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-green-600 text-sm font-medium">Assigned</p>
+              <p className="text-green-600 text-sm font-medium">Team Assigned</p>
               <p className="text-3xl font-bold text-green-900">{stats.assignedNumbers}</p>
               <p className="text-xs text-green-600 mt-1">To team members</p>
             </div>
@@ -380,11 +516,33 @@ export default function PhoneNumbersSettings() {
         <div className="bg-gradient-to-r from-purple-50 to-purple-100 rounded-xl p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-purple-600 text-sm font-medium">Monthly Cost</p>
-              <p className="text-3xl font-bold text-purple-900">${stats.monthlyCost.toFixed(2)}</p>
-              <p className="text-xs text-purple-600 mt-1">Estimated</p>
+              <p className="text-purple-600 text-sm font-medium">A2P Assigned</p>
+              <p className="text-3xl font-bold text-purple-900">{stats.a2pAssigned}</p>
+              <p className="text-xs text-purple-600 mt-1">Campaign assigned</p>
             </div>
-            <TrendingUp className="w-10 h-10 text-purple-600" />
+            <MessageSquare className="w-10 h-10 text-purple-600" />
+          </div>
+        </div>
+
+        <div className="bg-gradient-to-r from-emerald-50 to-emerald-100 rounded-xl p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-emerald-600 text-sm font-medium">A2P Compliant</p>
+              <p className="text-3xl font-bold text-emerald-900">{stats.a2pCompliant}</p>
+              <p className="text-xs text-emerald-600 mt-1">Verified campaigns</p>
+            </div>
+            <CheckCircle className="w-10 h-10 text-emerald-600" />
+          </div>
+        </div>
+
+        <div className="bg-gradient-to-r from-slate-50 to-slate-100 rounded-xl p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-slate-600 text-sm font-medium">Monthly Cost</p>
+              <p className="text-3xl font-bold text-slate-900">${stats.monthlyCost.toFixed(2)}</p>
+              <p className="text-xs text-slate-600 mt-1">Estimated</p>
+            </div>
+            <TrendingUp className="w-10 h-10 text-slate-600" />
           </div>
         </div>
       </div>
@@ -431,13 +589,13 @@ export default function PhoneNumbersSettings() {
                   Assigned To
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  A2P Campaign
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Capabilities
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Usage This Month
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Purchased
                 </th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Actions
@@ -482,6 +640,38 @@ export default function PhoneNumbersSettings() {
                     )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
+                    {number.a2p_assignment ? (
+                      <div className="flex items-center justify-between">
+                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                          number.a2p_assignment.a2p_campaigns.status === 'VERIFIED' 
+                            ? 'bg-green-100 text-green-800' 
+                            : 'bg-yellow-100 text-yellow-800'
+                        }`}>
+                          <Shield className="w-3 h-3 mr-1" />
+                          {number.a2p_assignment.a2p_campaigns.campaign_id}
+                        </span>
+                        <button
+                          onClick={() => unassignPhoneFromA2p(number.id, number.a2p_assignment.a2p_campaign_id)}
+                          className="text-red-600 hover:text-red-900 transition-colors ml-2"
+                          title="Unassign from A2P campaign"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => {
+                          setAssigningA2pNumber(number);
+                          setShowA2pModal(true);
+                        }}
+                        disabled={a2pCampaigns.filter(c => c.status === 'VERIFIED').length === 0}
+                        className="text-blue-600 hover:text-blue-900 transition-colors text-sm disabled:text-gray-400 disabled:cursor-not-allowed"
+                      >
+                        {a2pCampaigns.filter(c => c.status === 'VERIFIED').length > 0 ? 'Assign A2P' : 'No campaigns'}
+                      </button>
+                    )}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center space-x-2">
                       {number.capabilities?.sms && (
                         <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
@@ -504,9 +694,6 @@ export default function PhoneNumbersSettings() {
                     <div className="text-xs text-gray-500">
                       {Math.floor(Math.random() * 50) + 10} calls
                     </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {formatDate(number.purchased_at)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <div className="flex items-center justify-end space-x-2">
@@ -552,12 +739,79 @@ export default function PhoneNumbersSettings() {
           <Info className="w-5 h-5 text-blue-600 mt-0.5 mr-3 flex-shrink-0" />
           <div className="text-sm text-blue-800">
             <p className="font-medium mb-1">Phone Number Management</p>
-            <p>You can purchase multiple phone numbers for different purposes: one per sales person, one per campaign, or for different regions. Each number costs approximately $1.15/month plus usage charges.</p>
+            <p>You can purchase multiple phone numbers for different purposes: one per sales person, one per campaign, or for different regions. Each number costs approximately $1.15/month plus usage charges. For SMS compliance, assign numbers to A2P campaigns after creating them in A2P Compliance settings.</p>
           </div>
         </div>
       </div>
 
-      {/* Purchase Modal */}
+      {/* A2P Assignment Modal */}
+      {showA2pModal && assigningA2pNumber && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full mx-4">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900">Assign to A2P Campaign</h3>
+              <p className="text-sm text-gray-600 mt-1">
+                Assign {formatPhoneNumber(assigningA2pNumber.phone_number)} to an A2P campaign for compliance
+              </p>
+            </div>
+            <div className="px-6 py-4">
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Select A2P Campaign
+                  </label>
+                  <select
+                    value={selectedA2pCampaign}
+                    onChange={(e) => setSelectedA2pCampaign(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="">Choose an A2P campaign...</option>
+                    {a2pCampaigns.filter(campaign => campaign.status === 'VERIFIED').map((campaign) => (
+                      <option key={campaign.id} value={campaign.id}>
+                        {campaign.campaign_id} - {campaign.status}
+                      </option>
+                    ))}
+                  </select>
+                  {a2pCampaigns.filter(c => c.status === 'VERIFIED').length === 0 && (
+                    <p className="text-sm text-amber-600 mt-2">
+                      No verified A2P campaigns available. Create and verify campaigns in A2P Compliance settings first.
+                    </p>
+                  )}
+                </div>
+                <div className="bg-blue-50 rounded-lg p-4">
+                  <div className="flex items-start">
+                    <Info className="w-5 h-5 text-blue-600 mt-0.5 mr-3" />
+                    <div className="text-sm text-blue-800">
+                      <p>Assigning phone numbers to A2P campaigns ensures SMS compliance and prevents message blocking by carriers.</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-end space-x-3">
+              <button
+                onClick={() => {
+                  setShowA2pModal(false);
+                  setAssigningA2pNumber(null);
+                  setSelectedA2pCampaign('');
+                }}
+                className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={assignPhoneToA2p}
+                disabled={!selectedA2pCampaign}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Assign to Campaign
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Existing Purchase Modal */}
       {showPurchaseModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
@@ -620,7 +874,7 @@ export default function PhoneNumbersSettings() {
                   {/* Custom Area Code */}
                   <div className="border-t pt-6">
                     <h4 className="font-medium text-gray-900 mb-3">Or Enter Custom Area Code</h4>
-                    <form onSubmit={handleCustomAreaCodeSubmit} className="flex gap-3">
+                    <div className="flex gap-3">
                       <input
                         type="text"
                         value={customAreaCode}
@@ -630,14 +884,14 @@ export default function PhoneNumbersSettings() {
                         maxLength="3"
                       />
                       <button
-                        type="submit"
+                        onClick={() => searchPhoneNumbers(customAreaCode)}
                         disabled={customAreaCode.length !== 3 || searchingNumbers}
                         className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
                       >
                         <Search className="w-4 h-4 mr-2" />
                         Search
                       </button>
-                    </form>
+                    </div>
                   </div>
                 </div>
               ) : (
@@ -706,7 +960,7 @@ export default function PhoneNumbersSettings() {
         </div>
       )}
 
-      {/* Assign Modal */}
+      {/* Existing Assign Modal */}
       {showAssignModal && assigningNumber && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-xl shadow-xl max-w-md w-full mx-4">

@@ -118,66 +118,103 @@ serve(async (req: Request) => {
     switch (path) {
       case '/':
       case '':
-        let leadsQuery = supabaseAdmin
-          .from('leads')
-          .select('id, status, created_at');
-
-        if (role !== 'global_admin') {
-          leadsQuery = leadsQuery.eq('tenant_id', tenant_id);
-        }
-
-        const { data: leads, error: leadError } = await leadsQuery;
-
-        if (leadError) throw leadError;
-
-        let messagesQuery = supabaseAdmin
-          .from('messages')
-          .select('direction, lead_id');
-
-        if (role !== 'global_admin') {
-          messagesQuery = messagesQuery.eq('tenant_id', tenant_id);
-        }
-
-        const { data: messages, error: msgError } = await messagesQuery;
-
-        if (msgError) throw msgError;
-
+        // Use COUNT queries to avoid 1000 limit - MINIMAL CHANGE
         const now = new Date();
         const weekAgo = new Date();
         weekAgo.setDate(now.getDate() - 7);
 
-        const totalLeads = leads.length;
-        const weeklyLeads = leads.filter((l: any) => new Date(l.created_at) > weekAgo).length;
-        const hotLeads = leads.filter((l: any) => l.status === 'Hot Lead').length;
-        const activeLeads = leads.filter((l: any) => ['Engaging', 'Responding'].includes(l.status)).length;
-        const completedLeads = leads.filter((l: any) =>
-          ['Hot Lead', 'Opted Out', 'Unsubscribed', 'Disqualified'].includes(l.status)
-        ).length;
+        // Get total leads count
+        let totalLeadsCountQuery = supabaseAdmin
+          .from('leads')
+          .select('*', { count: 'exact', head: true });
+        if (role !== 'global_admin') {
+          totalLeadsCountQuery = totalLeadsCountQuery.eq('tenant_id', tenant_id);
+        }
+        const { count: totalLeads } = await totalLeadsCountQuery;
 
-        let messagesSent = 0;
-        let messagesReceived = 0;
-        const repliedLeadIds = new Set();
+        // Get weekly leads count
+        let weeklyLeadsCountQuery = supabaseAdmin
+          .from('leads')
+          .select('*', { count: 'exact', head: true })
+          .gte('created_at', weekAgo.toISOString());
+        if (role !== 'global_admin') {
+          weeklyLeadsCountQuery = weeklyLeadsCountQuery.eq('tenant_id', tenant_id);
+        }
+        const { count: weeklyLeads } = await weeklyLeadsCountQuery;
 
-        messages.forEach((msg: any) => {
-          if (msg.direction === 'outbound') messagesSent++;
-          if (msg.direction === 'inbound') {
-            messagesReceived++;
-            if (msg.lead_id) repliedLeadIds.add(msg.lead_id);
-          }
-        });
+        // Get hot leads count
+        let hotLeadsCountQuery = supabaseAdmin
+          .from('leads')
+          .select('*', { count: 'exact', head: true })
+          .eq('status', 'Hot Lead');
+        if (role !== 'global_admin') {
+          hotLeadsCountQuery = hotLeadsCountQuery.eq('tenant_id', tenant_id);
+        }
+        const { count: hotLeads } = await hotLeadsCountQuery;
 
-        const replyRate = totalLeads > 0 ? (repliedLeadIds.size / totalLeads) * 100 : 0;
-        const hotLeadRate = totalLeads > 0 ? (hotLeads / totalLeads) * 100 : 0;
+        // Get active leads count
+        let activeLeadsCountQuery = supabaseAdmin
+          .from('leads')
+          .select('*', { count: 'exact', head: true })
+          .in('status', ['Engaging', 'Responding']);
+        if (role !== 'global_admin') {
+          activeLeadsCountQuery = activeLeadsCountQuery.eq('tenant_id', tenant_id);
+        }
+        const { count: activeLeads } = await activeLeadsCountQuery;
+
+        // Get completed leads count
+        let completedLeadsCountQuery = supabaseAdmin
+          .from('leads')
+          .select('*', { count: 'exact', head: true })
+          .in('status', ['Hot Lead', 'Opted Out', 'Unsubscribed', 'Disqualified']);
+        if (role !== 'global_admin') {
+          completedLeadsCountQuery = completedLeadsCountQuery.eq('tenant_id', tenant_id);
+        }
+        const { count: completedLeads } = await completedLeadsCountQuery;
+
+        // Get messages counts
+        let messagesSentCountQuery = supabaseAdmin
+          .from('messages')
+          .select('*', { count: 'exact', head: true })
+          .eq('direction', 'outbound');
+        if (role !== 'global_admin') {
+          messagesSentCountQuery = messagesSentCountQuery.eq('tenant_id', tenant_id);
+        }
+        const { count: messagesSent } = await messagesSentCountQuery;
+
+        let messagesReceivedCountQuery = supabaseAdmin
+          .from('messages')
+          .select('*', { count: 'exact', head: true })
+          .eq('direction', 'inbound');
+        if (role !== 'global_admin') {
+          messagesReceivedCountQuery = messagesReceivedCountQuery.eq('tenant_id', tenant_id);
+        }
+        const { count: messagesReceived } = await messagesReceivedCountQuery;
+
+        // For reply rate, we still need to fetch lead_ids (but this is much smaller dataset)
+        let repliedLeadsQuery = supabaseAdmin
+          .from('messages')
+          .select('lead_id')
+          .eq('direction', 'inbound')
+          .not('lead_id', 'is', null);
+        if (role !== 'global_admin') {
+          repliedLeadsQuery = repliedLeadsQuery.eq('tenant_id', tenant_id);
+        }
+        const { data: repliedLeadsData } = await repliedLeadsQuery;
+
+        const repliedLeadIds = new Set(repliedLeadsData?.map(m => m.lead_id) || []);
+        const replyRate = totalLeads && totalLeads > 0 ? (repliedLeadIds.size / totalLeads) * 100 : 0;
+        const hotLeadRate = totalLeads && totalLeads > 0 ? ((hotLeads || 0) / totalLeads) * 100 : 0;
 
         const result = {
-          totalLeads,
-          weeklyLeads,
+          totalLeads: totalLeads || 0,
+          weeklyLeads: weeklyLeads || 0,
           hotLeadRate: Number(hotLeadRate.toFixed(1)),
           replyRate: Number(replyRate.toFixed(1)),
-          activeLeads,
-          completedLeads,
-          messagesSent,
-          messagesReceived,
+          activeLeads: activeLeads || 0,
+          completedLeads: completedLeads || 0,
+          messagesSent: messagesSent || 0,
+          messagesReceived: messagesReceived || 0,
           meta: { role, tenant_id }
         };
 

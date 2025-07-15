@@ -110,6 +110,43 @@ const cleanAIMessage = (message: string): string => {
   return cleanedMessage;
 };
 
+// Helper function to retrieve previous outbound messages for retry context
+const getPreviousOutboundMessages = async (supabase: any, tenant_id: string, lead_id: string, limit: number = 3) => {
+  const { data: previousMessages, error } = await supabase
+    .from("messages")
+    .select("message_body, status, inserted_at")
+    .eq("tenant_id", tenant_id)
+    .eq("lead_id", lead_id)
+    .eq("direction", "outbound")
+    .order("inserted_at", { ascending: false })
+    .limit(limit);
+
+  if (error) {
+    console.error("❌ Error fetching previous messages:", error);
+    return [];
+  }
+
+  return previousMessages || [];
+};
+
+// Helper function to generate retry-specific prompt context
+const generateRetryContext = (previousMessages: any[], isRetry: boolean) => {
+  if (!isRetry || !previousMessages.length) {
+    return '';
+  }
+
+  const messageHistory = previousMessages
+    .map((msg, index) => `Previous attempt ${index + 1}: "${msg.message_body}" (Status: ${msg.status})`)
+    .join('\n');
+
+  return `\n=== RETRY CONTEXT ===
+This is a retry attempt. Previous outreach attempts for this lead:
+${messageHistory}
+
+IMPORTANT: Generate a completely different message approach. Avoid repeating the same content, tone, or structure from previous attempts. Try a different angle, value proposition, or call-to-action.
+`;
+};
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -121,7 +158,13 @@ serve(async (req) => {
   );
 
   try {
-    const { tenant_id, lead_id, campaign_id } = await req.json();
+    const { 
+      tenant_id, 
+      lead_id, 
+      campaign_id, 
+      is_retry = false, 
+      original_message_id = null 
+    } = await req.json();
 
     // Validate required parameters
     if (!lead_id || !tenant_id || !campaign_id) {
@@ -134,7 +177,7 @@ serve(async (req) => {
       );
     }
 
-    console.log(`🤖 Starting AI outreach for lead ${lead_id} in campaign ${campaign_id}`);
+    console.log(`🤖 Starting AI outreach for lead ${lead_id} in campaign ${campaign_id} (retry: ${is_retry})`);
 
     // 1. Initialize conversation if it doesn't exist
     const initConversationUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/initialize-conversation`;
@@ -173,6 +216,80 @@ serve(async (req) => {
         }
       );
     }
+
+    // ===== A/B TESTING INTEGRATION =====
+console.log(`🧪 Checking for active A/B tests for campaign ${campaign_id}...`);
+
+// Check if lead is already assigned to an experiment
+let experimentAssignment = null;
+const { data: existingAssignment } = await supabase
+  .from('experiment_results')
+  .select(`
+    experiment_id,
+    variant_id,
+    experiment_variants!inner(variant_name, configuration),
+    experiments!inner(test_type, status)
+  `)
+  .eq('lead_id', lead_id)
+  .eq('experiments.status', 'active')
+  .maybeSingle();
+
+if (existingAssignment) {
+  experimentAssignment = existingAssignment;
+  console.log(`✅ Lead already assigned to experiment ${existingAssignment.experiment_id}, variant ${existingAssignment.experiment_variants.variant_name}`);
+} else {
+  // Check for active experiments for this campaign
+  const { data: activeExperiment } = await supabase
+    .from('experiments')
+    .select(`
+      id, 
+      traffic_split,
+      test_type,
+      experiment_variants (id, variant_name, configuration)
+    `)
+    .eq('campaign_id', campaign_id)
+    .eq('status', 'active')
+    .eq('tenant_id', tenant_id)
+    .maybeSingle();
+
+  if (activeExperiment) {
+    console.log(`🧪 Found active experiment: ${activeExperiment.id} (${activeExperiment.test_type})`);
+    
+    // Assign lead to variant based on traffic split
+    const random = Math.random() * 100;
+    const variantA = activeExperiment.experiment_variants.find(v => v.variant_name === 'A');
+    const variantB = activeExperiment.experiment_variants.find(v => v.variant_name === 'B');
+    
+    const selectedVariant = random < activeExperiment.traffic_split ? variantA : variantB;
+
+    // Record the assignment
+    const { error: assignError } = await supabase
+      .from('experiment_results')
+      .insert({
+        experiment_id: activeExperiment.id,
+        variant_id: selectedVariant.id,
+        lead_id: lead_id,
+        tenant_id: tenant_id,
+        metric_value: 0, // Will be updated when outcome occurs
+        assigned_at: new Date()
+      });
+
+    if (!assignError) {
+      experimentAssignment = {
+        experiment_id: activeExperiment.id,
+        variant_id: selectedVariant.id,
+        experiment_variants: selectedVariant,
+        experiments: { test_type: activeExperiment.test_type, status: 'active' }
+      };
+      
+      console.log(`✅ Lead ${lead_id} assigned to experiment ${activeExperiment.id}, variant ${selectedVariant.variant_name}`);
+    } else {
+      console.error('❌ Error assigning lead to experiment:', assignError);
+    }
+  } else {
+    console.log(`ℹ️ No active experiments found for campaign ${campaign_id}`);
+  }
+}
 
     // 3. Get campaign details for AI context - INCLUDING METADATA
     const { data: campaign, error: campaignError } = await supabase
@@ -258,166 +375,250 @@ serve(async (req) => {
       console.error("❌ Error fetching field config:", fieldError);
     }
 
-    // 8. INJECT LEAD DATA AND CAMPAIGN STRATEGY INTO TEMPLATE
-    const genericTemplate = aiInstructions?.value || "You are a helpful sales assistant.";
+    // 8. GET PREVIOUS OUTBOUND MESSAGES FOR RETRY CONTEXT
+    let previousMessages: any[] = [];
+    let retryContext = '';
     
-    // First inject lead details
-    let personalizedInstructions = injectLeadDataIntoTemplate(
-      genericTemplate,
-      lead,
-      fieldConfig || []
-    );
-
-    // Generate campaign strategy based on metadata
-    const campaignStrategy = getCampaignStrategy(tenantIndustry, campaignMetadata);
-    
-    // Add campaign strategy section if we have one
-    if (campaignStrategy) {
-      personalizedInstructions = personalizedInstructions.replace(
-        '=== CAMPAIGN STRATEGY ===',
-        `=== CAMPAIGN STRATEGY ===\n${campaignStrategy}`
-      );
-      
-      // If the template doesn't have a campaign strategy section, add it
-      if (!personalizedInstructions.includes('=== CAMPAIGN STRATEGY ===')) {
-        personalizedInstructions += `\n\n=== CAMPAIGN STRATEGY ===\n${campaignStrategy}`;
-      }
+    if (is_retry) {
+      console.log(`🔄 Retry detected - fetching previous outbound messages for context`);
+      previousMessages = await getPreviousOutboundMessages(supabase, tenant_id, lead_id, 3);
+      retryContext = generateRetryContext(previousMessages, is_retry);
+      console.log(`📋 Found ${previousMessages.length} previous messages for retry context`);
     }
 
-    console.log(`📋 Personalized instructions with campaign strategy for ${lead.name}:`, personalizedInstructions);
+    // 9. INJECT LEAD DATA AND CAMPAIGN STRATEGY INTO TEMPLATE
+   const genericTemplate = aiInstructions?.value || "You are a helpful sales assistant.";
+   
+   // First inject lead details
+   let personalizedInstructions = injectLeadDataIntoTemplate(
+     genericTemplate,
+     lead,
+     fieldConfig || []
+   );
 
-    // 9. Generate AI message using OpenAI with personalized instructions
-    const openaiApiKey = Deno.env.get("OPENAI_API_KEY");
-    if (!openaiApiKey) {
-      throw new Error("OpenAI API key not configured");
-    }
+   // Generate campaign strategy based on metadata
+   const campaignStrategy = getCampaignStrategy(tenantIndustry, campaignMetadata);
+   
+   // Add campaign strategy section if we have one
+   if (campaignStrategy) {
+     personalizedInstructions = personalizedInstructions.replace(
+       '=== CAMPAIGN STRATEGY ===',
+       `=== CAMPAIGN STRATEGY ===\n${campaignStrategy}`
+     );
+     
+     // If the template doesn't have a campaign strategy section, add it
+     if (!personalizedInstructions.includes('=== CAMPAIGN STRATEGY ===')) {
+       personalizedInstructions += `\n\n=== CAMPAIGN STRATEGY ===\n${campaignStrategy}`;
+     }
+   }
 
-    const aiPrompt = `${personalizedInstructions}
+   // Add retry context if this is a retry attempt
+   if (retryContext) {
+     personalizedInstructions += retryContext;
+   }
+
+   // ===== APPLY VARIANT CONFIGURATION =====
+   // Apply A/B test variant configuration if lead is in an experiment
+   if (experimentAssignment) {
+     const variantConfig = experimentAssignment.experiment_variants.configuration;
+     const testType = experimentAssignment.experiments.test_type;
+     const variantName = experimentAssignment.experiment_variants.variant_name;
+     
+     console.log(`🧪 Applying variant ${variantName} configuration for ${testType} test:`, variantConfig);
+     
+     // Apply different modifications based on test type
+     switch (testType) {
+       case 'opening':
+         if (variantConfig.config && variantName === 'B') {
+           // Replace opening message template with variant B config
+           personalizedInstructions += `\n\n=== MESSAGE TEMPLATE OVERRIDE ===\nIMPORTANT: Use this specific opening message template: "${variantConfig.config}"\nThis overrides any other message templates.\n`;
+         }
+         break;
+         
+       case 'tone':
+         if (variantConfig.config && variantName === 'B') {
+           // Modify AI tone instructions
+           personalizedInstructions += `\n\n=== TONE OVERRIDE ===\nIMPORTANT: Use a ${variantConfig.config} tone throughout your message. This overrides any other tone instructions.\n`;
+         }
+         break;
+         
+       case 'sequence':
+         if (variantConfig.config && variantName === 'B') {
+           // Modify message sequence/structure
+           personalizedInstructions += `\n\n=== MESSAGE STRUCTURE OVERRIDE ===\nUse this message structure: ${variantConfig.config}\n`;
+         }
+         break;
+         
+       case 'timing':
+         // Timing tests don't affect initial message generation
+         console.log(`ℹ️ Timing test detected - no message modification needed for initial outreach`);
+         break;
+         
+       default:
+         console.log(`⚠️ Unknown test type: ${testType}`);
+     }
+     
+     console.log(`✅ Variant ${variantName} configuration applied to AI instructions`);
+   }
+
+   console.log(`📋 Personalized instructions ${is_retry ? 'with retry context' : ''} for ${lead.name}:`, personalizedInstructions);
+
+   // 10. Generate AI message using OpenAI with personalized instructions
+   const openaiApiKey = Deno.env.get("OPENAI_API_KEY");
+   if (!openaiApiKey) {
+     throw new Error("OpenAI API key not configured");
+   }
+
+   // Adjust system prompt for retry scenarios
+   const systemPrompt = is_retry 
+     ? "You are an AI assistant that generates personalized sales outreach messages. This is a RETRY attempt - the previous messages failed to deliver or get a response. Generate a completely different approach with fresh content, different tone, and new angle. Avoid repeating any content from previous attempts. Return ONLY the message text that should be sent to the customer. Do not include any labels, prefixes like 'Initial message:', or formatting. Just return the plain message text."
+     : "You are an AI assistant that generates personalized sales outreach messages. Return ONLY the message text that should be sent to the customer. Do not include any labels, prefixes like 'Initial message:', or formatting. Just return the plain message text.";
+
+   // Add A/B testing context to the prompt
+   const abTestContext = experimentAssignment 
+     ? `\n\n=== A/B TEST CONTEXT ===\nThis lead is part of experiment ${experimentAssignment.experiment_id}, variant ${experimentAssignment.experiment_variants.variant_name}. Follow the variant configuration above exactly.\n`
+     : '';
+
+   const aiPrompt = `${personalizedInstructions}
 
 Campaign: ${campaign.name}
 Campaign Description: ${campaign.description || ""}
 ${campaignStrategy ? `Campaign Strategy: ${campaignStrategy}` : ''}
+${abTestContext}
 
-Generate a personalized outreach message for this lead. Return ONLY the message text that should be sent to the customer - no labels, prefixes, or formatting.`;
+${is_retry ? 'RETRY ATTEMPT: ' : ''}Generate a personalized outreach message for this lead. Return ONLY the message text that should be sent to the customer - no labels, prefixes, or formatting.`;
 
-    const openaiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${openaiApiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "gpt-4",
-        messages: [
-          {
-            role: "system",
-            content: "You are an AI assistant that generates personalized sales outreach messages. Return ONLY the message text that should be sent to the customer. Do not include any labels, prefixes like 'Initial message:', or formatting. Just return the plain message text."
-          },
-          {
-            role: "user",
-            content: aiPrompt
-          }
-        ],
-        max_tokens: 150,
-        temperature: 0.7,
-      }),
-    });
+   const openaiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
+     method: "POST",
+     headers: {
+       "Authorization": `Bearer ${openaiApiKey}`,
+       "Content-Type": "application/json",
+     },
+     body: JSON.stringify({
+       model: "gpt-4",
+       messages: [
+         {
+           role: "system",
+           content: systemPrompt
+         },
+         {
+           role: "user",
+           content: aiPrompt
+         }
+       ],
+       max_tokens: 150,
+       temperature: is_retry ? 0.9 : 0.7, // Higher temperature for retries to encourage variety
+     }),
+   });
 
-    if (!openaiResponse.ok) {
-      throw new Error(`OpenAI API error: ${openaiResponse.statusText}`);
-    }
+   if (!openaiResponse.ok) {
+     throw new Error(`OpenAI API error: ${openaiResponse.statusText}`);
+   }
 
-    const openaiData = await openaiResponse.json();
-    let aiMessage = openaiData.choices[0]?.message?.content?.trim();
+   const openaiData = await openaiResponse.json();
+   let aiMessage = openaiData.choices[0]?.message?.content?.trim();
 
-    if (!aiMessage) {
-      throw new Error("Failed to generate AI message");
-    }
+   if (!aiMessage) {
+     throw new Error("Failed to generate AI message");
+   }
 
-    // Clean the AI message to remove any unwanted prefixes
-    aiMessage = cleanAIMessage(aiMessage);
+   // Clean the AI message to remove any unwanted prefixes
+   aiMessage = cleanAIMessage(aiMessage);
 
-    console.log(`📝 Generated AI message: ${aiMessage}`);
+   console.log(`📝 Generated AI message ${is_retry ? '(retry)' : ''}: ${aiMessage}`);
 
-    // 10. Send SMS via Twilio
-    const twilioSid = Deno.env.get("TWILIO_ACCOUNT_SID");
-    const twilioToken = Deno.env.get("TWILIO_AUTH_TOKEN");
+   // 11. Send SMS via Twilio
+   const twilioSid = Deno.env.get("TWILIO_ACCOUNT_SID");
+   const twilioToken = Deno.env.get("TWILIO_AUTH_TOKEN");
 
-    if (!twilioSid || !twilioToken) {
-      throw new Error("Twilio credentials not configured");
-    }
+   if (!twilioSid || !twilioToken) {
+     throw new Error("Twilio credentials not configured");
+   }
 
-    const twilioResponse = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${twilioSid}/Messages.json`, {
-      method: "POST",
-      headers: {
-        "Authorization": `Basic ${btoa(`${twilioSid}:${twilioToken}`)}`,
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
-      body: new URLSearchParams({
-        From: campaignPhoneNumber,
-        To: lead.phone,
-        Body: aiMessage,
-      }),
-    });
+   const twilioResponse = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${twilioSid}/Messages.json`, {
+     method: "POST",
+     headers: {
+       "Authorization": `Basic ${btoa(`${twilioSid}:${twilioToken}`)}`,
+       "Content-Type": "application/x-www-form-urlencoded",
+     },
+     body: new URLSearchParams({
+       From: campaignPhoneNumber,
+       To: lead.phone,
+       Body: aiMessage,
+     }),
+   });
 
-    if (!twilioResponse.ok) {
-      const twilioError = await twilioResponse.text();
-      throw new Error(`Twilio error: ${twilioError}`);
-    }
+   if (!twilioResponse.ok) {
+     const twilioError = await twilioResponse.text();
+     throw new Error(`Twilio error: ${twilioError}`);
+   }
 
-    const twilioData = await twilioResponse.json();
-    console.log(`📤 SMS sent successfully. Twilio SID: ${twilioData.sid}`);
+   const twilioData = await twilioResponse.json();
+   console.log(`📤 SMS sent successfully. Twilio SID: ${twilioData.sid}`);
 
-    // 11. Log message in database
-    const { error: messageError } = await supabase
-      .from("messages")
-      .insert({
-        tenant_id,
-        lead_id,
-        message_id: twilioData.sid,
-        direction: "outbound",
-        message_body: aiMessage,
-        sender: campaignPhoneNumber,
-        channel: "sms",
-        timestamp: new Date().toISOString(),
-        phone: lead.phone,
-      });
+   // 12. Log message in database with retry tracking
+   const { error: messageError } = await supabase
+     .from("messages")
+     .insert({
+       tenant_id,
+       lead_id,
+       message_id: twilioData.sid,
+       direction: "outbound",
+       message_body: aiMessage,
+       sender: campaignPhoneNumber,
+       channel: "sms",
+       timestamp: new Date().toISOString(),
+       phone: lead.phone,
+       original_message_id: is_retry ? original_message_id : null,
+       retry_eligible: false, // New retry messages shouldn't be eligible for retry themselves
+       retry_reason: is_retry ? 'blocked' : null,
+       status: 'pending', // Will be updated by delivery status webhook
+       queued: true
+     });
 
-    if (messageError) {
-      console.error("❌ Error logging message:", messageError);
-    }
+   if (messageError) {
+     console.error("❌ Error logging message:", messageError);
+   }
 
-    // 12. Update lead's last_contacted timestamp
-    await supabase
-      .from("leads")
-      .update({ 
-        last_contacted: new Date().toISOString(),
-        last_message_at: new Date().toISOString()
-      })
-      .eq("id", lead_id);
+   // 13. Update lead's last_contacted timestamp
+   await supabase
+     .from("leads")
+     .update({ 
+       last_contacted: new Date().toISOString(),
+       last_message_at: new Date().toISOString()
+     })
+     .eq("id", lead_id);
 
-    return new Response(
-      JSON.stringify({
-        success: true,
-        message: "AI outreach sent successfully",
-        twilio_sid: twilioData.sid,
-        ai_message: aiMessage,
-        campaign_strategy: campaignStrategy,
-        personalized_instructions: personalizedInstructions // For debugging
-      }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      }
-    );
+   return new Response(
+     JSON.stringify({
+       success: true,
+       message: `AI outreach sent successfully${is_retry ? ' (retry attempt)' : ''}`,
+       twilio_sid: twilioData.sid,
+       ai_message: aiMessage,
+       campaign_strategy: campaignStrategy,
+       is_retry: is_retry,
+       previous_attempts: previousMessages.length,
+       original_message_id: is_retry ? original_message_id : null,
+       experiment_assignment: experimentAssignment ? {
+         experiment_id: experimentAssignment.experiment_id,
+         variant: experimentAssignment.experiment_variants.variant_name,
+         test_type: experimentAssignment.experiments.test_type
+       } : null,
+       personalized_instructions: personalizedInstructions // For debugging
+     }),
+     {
+       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+     }
+   );
 
-  } catch (err) {
-    console.error("❗ Unexpected error in ai-initial-outreach:", err);
-    return new Response(
-      JSON.stringify({ error: err.message || "Internal Server Error" }),
-      { 
-        status: 500, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      }
-    );
-  }
+ } catch (err) {
+   console.error("❗ Unexpected error in ai-initial-outreach:", err);
+   return new Response(
+     JSON.stringify({ error: err.message || "Internal Server Error" }),
+     { 
+       status: 500, 
+       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+     }
+   );
+ }
 });

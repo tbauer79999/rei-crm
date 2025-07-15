@@ -4,6 +4,7 @@ import { TrendingUp, Users, Target, DollarSign, Calendar, Filter, Download, Refr
 import { useAuth } from '../context/AuthContext';
 import { analyticsService } from '../lib/analyticsDataService';
 import ABTestingDashboard from '../components/ABTestingDashboard';
+import CustomReportsBuilder from '../components/CustomReportsBuilder';
 
 export default function BusinessAnalytics() {
   const { user } = useAuth();
@@ -652,7 +653,7 @@ export default function BusinessAnalytics() {
           <div className="bg-white rounded-2xl border border-gray-200 p-6 hover:shadow-lg transition-shadow">
             <h3 className="text-lg font-bold text-gray-900 mb-1">Follow-Up Results: No Response</h3>
             <p className="text-sm text-gray-600 mb-4">
-              For contacts who haven’t responded yet
+              For contacts who haven't responded yet
             </p>
             
             <div className="space-y-4">
@@ -912,26 +913,7 @@ export default function BusinessAnalytics() {
     );
   };
 
-  const CustomReports = () => (
-    <div className="space-y-6">
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
-        <div className="px-6 py-4 border-b border-gray-100">
-          <h3 className="text-lg font-semibold text-gray-900">Custom Report Builder</h3>
-        </div>
-        <div className="p-6">
-          <div className="text-center py-12">
-            <Database className="w-16 h-16 mx-auto text-gray-400 mb-4" />
-            <h4 className="text-lg font-semibold text-gray-900 mb-2">Build Custom Reports</h4>
-            <p className="text-gray-600 mb-6">Create personalized analytics dashboards with your real data</p>
-            <button className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
-              <Plus className="w-4 h-4 inline mr-2" />
-              Create New Report
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+  const CustomReports = () => <CustomReportsBuilder />;
 
   const renderActiveView = () => {
     if (error) {

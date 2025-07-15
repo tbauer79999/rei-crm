@@ -393,4 +393,33 @@ router.post('/bulk', async (req, res) => {
   }
 });
 
+// ✅ ADDITION: POST /api/leads/import — supports extension push (single or batch)
+router.post('/import', async (req, res) => {
+  try {
+    const { role, tenant_id } = req.user || {};
+    const records = Array.isArray(req.body) ? req.body : [req.body];
+
+    if (!tenant_id && role !== 'global_admin') {
+      return res.status(403).json({ error: 'No tenant access configured' });
+    }
+
+    const enriched = records.map(r => ({
+      ...r,
+      tenant_id: tenant_id,
+      created_at: new Date().toISOString(),
+      status: 'New Lead',
+      status_history: `${new Date().toISOString().split('T')[0]}: New Lead`
+    }));
+
+    const { error } = await supabase.from('leads').insert(enriched);
+    if (error) throw error;
+
+    res.status(200).json({ message: `✅ ${records.length} lead(s) added.` });
+  } catch (err) {
+    console.error('Import error:', err.message);
+    res.status(500).json({ error: '❌ Failed to import lead(s).' });
+  }
+});
+
+
 module.exports = router;

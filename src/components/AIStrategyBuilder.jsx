@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext.jsx';
 import supabase from '../lib/supabaseClient.js';
 import { buildInstructionBundle, buildInitialInstruction } from '../lib/instructionBuilder.js';
+import { getRecommendedToneFromScores } from '../lib/supabaseHelpers.js';
 
 import { 
   Brain,
@@ -271,6 +272,8 @@ const initialBundle = buildInitialInstruction({
 });
 
 
+const dynamicTone = await getRecommendedToneFromScores(user.tenant_id);
+
 const engagementBundle = buildInstructionBundle({
   tone: strategyConfig.engagementTone,
   persona: strategyConfig.engagementPersona,
@@ -278,7 +281,8 @@ const engagementBundle = buildInstructionBundle({
   role: strategyConfig.role,
   leadDetails: strategyConfig.leadDetails || {},
   knowledgeBase: strategyConfig.knowledgeBase || '',
-  campaignMetadata: strategyConfig.campaignMetadata || {}
+  campaignMetadata: strategyConfig.campaignMetadata || {},
+  dynamicTone // ← this overrides tone only if the model recommends it
 });
 
 

@@ -7,37 +7,23 @@ import {
   Plus, 
   Search, 
   Filter, 
-  MoreVertical, 
-  Eye, 
-  Edit, 
-  Trash2, 
-  Play, 
-  Pause, 
-  CheckCircle, 
-  AlertCircle,
-  Calendar,
-  Users,
-  MessageSquare,
-  TrendingUp,
-  Megaphone,
-  Building2,
-  Archive,
+  Archive, 
   ArchiveRestore,
   Zap,
   ZapOff,
   X,
-  Target,
-  Bot,
-  Phone,
-  Tag,
-  Palette,
-  Rocket,
-  Settings,
+  Building2,
+  Megaphone,
+  CheckCircle,
   Clock,
-  UserCheck
+  TrendingUp,
+  AlertCircle,
+  MessageSquare,
+  AlertTriangle,
+  RefreshCcw
 } from 'lucide-react';
 
-// API Base URL - Add this after imports
+// API Base URL
 const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
 // Knowledge Assets Dropdown Component
@@ -117,47 +103,136 @@ const KnowledgeAssetsDropdown = ({ campaign, knowledgeAssets, selectedAssets, on
   );
 };
 
-// Campaign Progress Component
+// Enhanced Campaign Progress Component with Delivery Status
 const CampaignProgress = ({ campaignId }) => {
-  const [progress, setProgress] = useState({ processed: 0, total: 0 });
+  const [progress, setProgress] = useState({ 
+    processed: 0, 
+    total: 0,
+    delivered: 0,
+    failed: 0,
+    retries: 0,
+    queued: 0
+  });
   
   useEffect(() => {
     const fetchProgress = async () => {
-      const { data, error } = await supabase
-        .from('leads')
-        .select('ai_sent')
-        .eq('campaign_id', campaignId);
-      
-      if (!error && data) {
-        const total = data.length;
-        const processed = data.filter(l => l.ai_sent).length;
-        setProgress({ processed, total });
+      try {
+        // Get lead progress
+        const { data: leads, error: leadsError } = await supabase
+          .from('leads')
+          .select('id, ai_sent')
+          .eq('campaign_id', campaignId);
+        
+        if (leadsError) throw leadsError;
+        
+        // Get message delivery status for this campaign's leads
+        const leadIds = leads?.map(l => l.id) || [];
+        
+        if (leadIds.length > 0) {
+          const { data: messages, error: messagesError } = await supabase
+            .from('messages')
+            .select('status, original_message_id')
+            .eq('direction', 'outbound')
+            .in('lead_id', leadIds);
+          
+          if (!messagesError && messages) {
+            const total = leads.length;
+            const processed = leads.filter(l => l.ai_sent).length;
+            
+            // Count delivery statuses
+            const delivered = messages.filter(m => m.status === 'sent' || m.status === 'delivered').length;
+            const failed = messages.filter(m => m.status === 'failed').length;
+            const retries = messages.filter(m => m.original_message_id !== null).length;
+            const queued = messages.filter(m => m.status === 'queued').length;
+            
+            setProgress({ 
+              processed, 
+              total,
+              delivered,
+              failed,
+              retries,
+              queued
+            });
+          } else {
+            // If no messages or error, just show lead progress
+            setProgress({ 
+              processed: leads.filter(l => l.ai_sent).length, 
+              total: leads.length,
+              delivered: 0,
+              failed: 0,
+              retries: 0,
+              queued: 0
+            });
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching progress:', err);
       }
     };
     
     fetchProgress();
+    
+    // Set up real-time updates
+    const interval = setInterval(fetchProgress, 30000); // Refresh every 30 seconds
+    return () => clearInterval(interval);
   }, [campaignId]);
   
   if (progress.total === 0) {
-    return <span className="text-sm text-gray-500">No leads</span>;
+    return (
+      <div className="space-y-2">
+        <span className="text-sm text-gray-500">No leads</span>
+      </div>
+    );
   }
   
   const percentage = Math.round((progress.processed / progress.total) * 100);
   
   return (
-    <div className="space-y-1">
-      <div className="flex items-center text-sm">
-        <span className="font-medium">{progress.processed}</span>
-        <span className="text-gray-500 mx-1">/</span>
-        <span className="text-gray-500">{progress.total}</span>
-        <span className="text-gray-500 ml-2">({percentage}%)</span>
+    <div className="space-y-3">
+      {/* Main Progress */}
+      <div className="space-y-1">
+        <div className="flex items-center text-sm">
+          <span className="font-medium">{progress.processed}</span>
+          <span className="text-gray-500 mx-1">/</span>
+          <span className="text-gray-500">{progress.total}</span>
+          <span className="text-gray-500 ml-2">({percentage}%)</span>
+        </div>
+        <div className="w-full bg-gray-200 rounded-full h-1.5">
+          <div 
+            className="bg-blue-600 h-1.5 rounded-full transition-all duration-300"
+            style={{ width: `${percentage}%` }}
+          />
+        </div>
       </div>
-      <div className="w-full bg-gray-200 rounded-full h-1.5">
-        <div 
-          className="bg-blue-600 h-1.5 rounded-full transition-all duration-300"
-          style={{ width: `${percentage}%` }}
-        />
-      </div>
+      
+      {/* Delivery Status Metrics */}
+      {progress.processed > 0 && (
+        <div className="grid grid-cols-2 gap-2 text-xs">
+          <div className="flex items-center gap-1">
+            <CheckCircle className="w-3 h-3 text-green-500" />
+            <span className="text-gray-600">Delivered:</span>
+            <span className="font-medium text-green-600">{progress.delivered}</span>
+          </div>
+          
+          <div className="flex items-center gap-1">
+            <AlertCircle className="w-3 h-3 text-red-500" />
+            <span className="text-gray-600">Failed:</span>
+            <span className="font-medium text-red-600">{progress.failed}</span>
+          </div>
+          
+          <div className="flex items-center gap-1">
+            <RefreshCcw className="w-3 h-3 text-blue-500" />
+            <span className="text-gray-600">Retries:</span>
+            <span className="font-medium text-blue-600">{progress.retries}</span>
+          </div>
+          
+          <div className="flex items-center gap-1">
+            <Clock className="w-3 h-3 text-yellow-500" />
+            <span className="text-gray-600">Queued:</span>
+            <span className="font-medium text-yellow-600">{progress.queued}</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -180,26 +255,16 @@ export default function CampaignManagement() {
     remainingLeads: 0
   });
   const [tenantNames, setTenantNames] = useState({});
-  const [tenantNamesLoaded, setTenantNamesLoaded] = useState(false);
   const [tenantIndustry, setTenantIndustry] = useState('');
   const [knowledgeAssets, setKnowledgeAssets] = useState([]);
   const [selectedKnowledgeAssets, setSelectedKnowledgeAssets] = useState({});
   const [knowledgeDropdownOpen, setKnowledgeDropdownOpen] = useState({});
+  const [phoneNumbers, setPhoneNumbers] = useState([]);
   
   // Campaign creation form state
   const [isCreating, setIsCreating] = useState(false);
-  const [aiArchetypes, setAiArchetypes] = useState([]);
-  const [phoneNumbers, setPhoneNumbers] = useState([]);
   const [campaignForm, setCampaignForm] = useState({
-    name: '',
-    goal: '',
-    aiArchetype: '',
-    phoneNumberId: '',
-    aiEnabled: true,
-    routingTags: [],
-    color: '#3B82F6',
-    description: '',
-    assignedTo: ''
+    name: ''
   });
 
   const isGlobalAdmin = user?.role === 'global_admin';
@@ -219,7 +284,6 @@ export default function CampaignManagement() {
       if (error) throw error;
       
       setTenantIndustry(data?.industry || '');
-      console.log('Tenant industry:', data?.industry);
     } catch (err) {
       console.error('Error fetching tenant industry:', err);
     }
@@ -239,7 +303,6 @@ export default function CampaignManagement() {
       if (error) throw error;
       
       setKnowledgeAssets(data || []);
-      console.log('Knowledge assets:', data);
     } catch (err) {
       console.error('Error fetching knowledge assets:', err);
     }
@@ -286,8 +349,6 @@ export default function CampaignManagement() {
         
         if (insertError) throw insertError;
       }
-      
-      console.log('Successfully updated knowledge links for campaign:', campaignId);
     } catch (err) {
       console.error('Error updating campaign knowledge links:', err);
       setError('Failed to update knowledge assets');
@@ -353,7 +414,66 @@ export default function CampaignManagement() {
     }
   };
 
-  // Update campaign dynamic field (generic function for all industry-specific fields)
+  // Update campaign assignment
+  const updateCampaignAssignment = async (campaignId, salesTeamId) => {
+    try {
+      const { error } = await supabase
+        .from('campaigns')
+        .update({ assigned_to_sales_team_id: salesTeamId })
+        .eq('id', campaignId);
+
+      if (error) throw error;
+
+      setCampaigns(campaigns.map(c => {
+        if (c.id === campaignId) {
+          const salesPerson = salesTeamMembers.find(s => s.sales_team_id === salesTeamId);
+          return {
+            ...c,
+            assigned_to_sales_team_id: salesTeamId,
+            assigned_to_name: salesPerson?.full_name,
+            assigned_to_email: salesPerson?.email
+          };
+        }
+        return c;
+      }));
+      
+      setError('');
+    } catch (err) {
+      console.error('Error updating campaign assignment:', err);
+      setError('Failed to update campaign assignment');
+    }
+  };
+
+  // Update campaign phone number
+  const updateCampaignPhoneNumber = async (campaignId, phoneNumberId) => {
+    try {
+      const { error } = await supabase
+        .from('campaigns')
+        .update({ phone_number_id: phoneNumberId })
+        .eq('id', campaignId);
+
+      if (error) throw error;
+
+      setCampaigns(campaigns.map(c => {
+        if (c.id === campaignId) {
+          const phone = phoneNumbers.find(p => p.id === phoneNumberId);
+          return {
+            ...c,
+            phone_number_id: phoneNumberId,
+            phone_number: phone?.phone_number || null
+          };
+        }
+        return c;
+      }));
+      
+      setError('');
+    } catch (err) {
+      console.error('Error updating campaign phone number:', err);
+      setError('Failed to update campaign phone number');
+    }
+  };
+
+  // Update campaign dynamic field
   const updateCampaignDynamicField = async (campaignId, value) => {
     try {
       // Determine which field to update based on industry
@@ -394,7 +514,7 @@ export default function CampaignManagement() {
 
   // Fetch campaigns from API
   const fetchCampaigns = async () => {
-    if (isFetching) return; // Prevent multiple simultaneous fetches
+    if (isFetching) return;
     
     try {
       setIsFetching(true);
@@ -404,7 +524,6 @@ export default function CampaignManagement() {
       let url = `${API_BASE}/campaigns`;
       const params = new URLSearchParams();
       
-      // If global admin and specific tenant selected, filter by tenant
       if (isGlobalAdmin && tenantFilter !== 'all') {
         params.append('tenant_id', tenantFilter);
       }
@@ -417,8 +536,6 @@ export default function CampaignManagement() {
         url += `?${params.toString()}`;
       }
 
-      console.log('🔍 Fetching campaigns from:', url);
-
       const response = await fetch(url, {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -426,20 +543,15 @@ export default function CampaignManagement() {
         }
       });
 
-      console.log('🔍 Response status:', response.status);
-
       if (!response.ok) {
-        const errorData = await response.text();
-        console.error('❌ Response error:', errorData);
-        throw new Error(`Failed to fetch campaigns: ${response.status} ${response.statusText}`);
+        throw new Error(`Failed to fetch campaigns: ${response.status}`);
       }
 
       const data = await response.json();
 
-      // Fetch sales team assignments AND phone numbers for campaigns
+      // Fetch additional campaign details
       const campaignIds = data.map(c => c.id);
       if (campaignIds.length > 0) {
-        // Get campaign details with phone numbers and dynamic fields
         const { data: campaignDetails, error: detailError } = await supabase
           .from('campaigns')
           .select(`
@@ -457,7 +569,6 @@ export default function CampaignManagement() {
           .in('id', campaignIds);
         
         if (!detailError && campaignDetails) {
-          // Get sales team member details
           const salesTeamIds = campaignDetails
             .filter(c => c.assigned_to_sales_team_id)
             .map(c => c.assigned_to_sales_team_id);
@@ -472,7 +583,6 @@ export default function CampaignManagement() {
             salesTeamData = salesData || [];
           }
           
-          // Merge all data together
           const enhancedCampaigns = data.map(campaign => {
             const details = campaignDetails.find(d => d.id === campaign.id);
             const salesPerson = salesTeamData.find(s => s.sales_team_id === details?.assigned_to_sales_team_id);
@@ -498,7 +608,7 @@ export default function CampaignManagement() {
         setCampaigns(data);
       }
     } catch (err) {
-      console.error('❌ Error fetching campaigns:', err);
+      console.error('Error fetching campaigns:', err);
       setError(`Failed to load campaigns: ${err.message}`);
       setCampaigns([]);
     } finally {
@@ -507,82 +617,9 @@ export default function CampaignManagement() {
     }
   };
 
-  // Initial data load
-  useEffect(() => {
-    let mounted = true;
-    
-    const loadData = async () => {
-      if (user?.tenant_id && mounted) {
-        await fetchTenantIndustry();
-        await fetchCampaigns();
-        await fetchSalesTeamMembers();
-        await fetchPhoneNumbers();
-        await fetchKnowledgeAssets();
-        
-        if (isGlobalAdmin && mounted) {
-          await fetchTenants();
-          await fetchTenantNames();
-        }
-      }
-    };
-    
-    loadData();
-    
-    return () => {
-      mounted = false;
-    };
-  }, [user?.tenant_id, isGlobalAdmin]);
-
-  // Load campaign knowledge links
-  useEffect(() => {
-    const loadKnowledgeLinks = async () => {
-      for (const campaign of campaigns) {
-        const linkedIds = await fetchCampaignKnowledgeLinks(campaign.id);
-        setSelectedKnowledgeAssets(prev => ({
-          ...prev,
-          [campaign.id]: linkedIds
-        }));
-      }
-    };
-    
-    if (campaigns.length > 0) {
-      loadKnowledgeLinks();
-    }
-  }, [campaigns]);
-
-  // Close knowledge dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      // Check if click is outside of any knowledge dropdown button or portal content
-      const isClickInsideButton = event.target.closest('[id^="knowledge-dropdown-"]');
-      const isClickInsidePortal = event.target.closest('.fixed.z-50');
-      
-      if (!isClickInsideButton && !isClickInsidePortal) {
-        setKnowledgeDropdownOpen({});
-      }
-    };
-    
-    document.addEventListener('click', handleClickOutside);
-    return () => document.removeEventListener('click', handleClickOutside);
-  }, []);
-
-  // Load form data when create modal opens
-  useEffect(() => {
-    if (showCreateModal) {
-      fetchAiArchetypes();
-      fetchPhoneNumbers();
-      fetchSalesTeamMembers();
-    }
-  }, [showCreateModal]);
-
   const fetchSalesTeamMembers = async () => {
     try {
-      console.log('🔍 Fetching sales team for tenant:', user?.tenant_id);
-      
-      if (!user?.tenant_id) {
-        console.log('❌ No tenant_id available yet');
-        return;
-      }
+      if (!user?.tenant_id) return;
       
       const { data, error } = await supabase
         .from('sales_team_view')
@@ -591,17 +628,9 @@ export default function CampaignManagement() {
         .eq('is_available', true)
         .order('full_name');
 
-      console.log('📊 Sales team data:', data);
-      console.log('❌ Sales team error:', error);
-
       if (error) throw error;
       
       setSalesTeamMembers(data || []);
-      
-      // If only one sales person (likely the admin), auto-select them
-      if (data && data.length === 1) {
-        setCampaignForm(prev => ({ ...prev, assignedTo: data[0].sales_team_id }));
-      }
     } catch (err) {
       console.error('Error fetching sales team:', err);
       setSalesTeamMembers([]);
@@ -644,50 +673,23 @@ export default function CampaignManagement() {
       });
 
       setTenantNames(nameMap);
-      setTenantNamesLoaded(true);
     } catch (err) {
       console.error('Error fetching tenant names:', err);
-      setTenantNamesLoaded(true);
-    }
-  };
-
-  const fetchAiArchetypes = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('ai_archetypes')
-        .select('id, name, persona')
-        .order('name');
-
-      if (error) {
-        throw error;
-      }
-      setAiArchetypes(data || []);
-    } catch (err) {
-      console.error('Error fetching AI archetypes:', err);
-      setAiArchetypes([]);
     }
   };
 
   const fetchPhoneNumbers = async () => {
     try {
-      console.log('🔍 Fetching phone numbers for tenant:', user.tenant_id);
-      
       const { data: tenantPhones, error } = await supabase
         .from('phone_numbers')
         .select('*')
         .eq('tenant_id', user.tenant_id);
         
-      console.log('📞 Phone numbers found:', tenantPhones);
-      console.log('📞 Count:', tenantPhones?.length || 0);
-      
-      if (error) {
-        console.error('❌ Error fetching phone numbers:', error);
-        throw error;
-      }
+      if (error) throw error;
       
       setPhoneNumbers(tenantPhones || []);
     } catch (err) {
-      console.error('❌ Error in fetchPhoneNumbers:', err);
+      console.error('Error fetching phone numbers:', err);
       setPhoneNumbers([]);
     }
   };
@@ -723,7 +725,7 @@ export default function CampaignManagement() {
   };
 
   const archiveCampaign = async (campaignId) => {
-    if (!window.confirm('Are you sure you want to archive this campaign? It will be hidden from the main view but can be restored later.')) {
+    if (!window.confirm('Are you sure you want to archive this campaign?')) {
       return;
     }
 
@@ -776,32 +778,6 @@ export default function CampaignManagement() {
     }
   };
 
-  const updateCampaignActiveStatus = async (campaignId, newActiveStatus) => {
-    try {
-      const token = localStorage.getItem('auth_token');
-      const response = await fetch(`${API_BASE}/campaigns/${campaignId}/toggle-active`, {
-        method: 'PATCH',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ is_active: newActiveStatus })
-      });
-
-      if (response.ok) {
-        const updatedCampaign = await response.json();
-        setCampaigns(campaigns.map(c => 
-          c.id === campaignId ? { ...c, is_active: updatedCampaign.is_active } : c
-        ));
-      } else {
-        throw new Error('Failed to update campaign status');
-      }
-    } catch (err) {
-      console.error('Error updating campaign status:', err);
-      setError('Failed to update campaign status');
-    }
-  };
-
   const toggleAiOn = async (campaignId, currentAiOn) => {
     try {
       const token = localStorage.getItem('auth_token');
@@ -818,14 +794,10 @@ export default function CampaignManagement() {
       });
 
       if (response.ok) {
-        const result = await response.json();
-        
         setCampaigns(campaigns.map(c => 
           c.id === campaignId ? { ...c, ai_on: !currentAiOn } : c
         ));
-        
         setError('');
-        console.log(`AI ${!currentAiOn ? 'enabled' : 'disabled'} for campaign`);
       } else {
         const errorData = await response.json();
         throw new Error(errorData.error || 'Failed to toggle AI setting');
@@ -833,63 +805,6 @@ export default function CampaignManagement() {
     } catch (err) {
       console.error('Error toggling AI setting:', err);
       setError(`Failed to toggle AI setting: ${err.message}`);
-    }
-  };
-
-  const updateCampaignAssignment = async (campaignId, salesTeamId) => {
-    try {
-      const { error } = await supabase
-        .from('campaigns')
-        .update({ assigned_to_sales_team_id: salesTeamId })
-        .eq('id', campaignId);
-
-      if (error) throw error;
-
-      setCampaigns(campaigns.map(c => {
-        if (c.id === campaignId) {
-          const salesPerson = salesTeamMembers.find(s => s.sales_team_id === salesTeamId);
-          return {
-            ...c,
-            assigned_to_sales_team_id: salesTeamId,
-            assigned_to_name: salesPerson?.full_name,
-            assigned_to_email: salesPerson?.email
-          };
-        }
-        return c;
-      }));
-      
-      setError('');
-    } catch (err) {
-      console.error('Error updating campaign assignment:', err);
-      setError('Failed to update campaign assignment');
-    }
-  };
-
-  const updateCampaignPhoneNumber = async (campaignId, phoneNumberId) => {
-    try {
-      const { error } = await supabase
-        .from('campaigns')
-        .update({ phone_number_id: phoneNumberId })
-        .eq('id', campaignId);
-
-      if (error) throw error;
-
-      setCampaigns(campaigns.map(c => {
-        if (c.id === campaignId) {
-          const phone = phoneNumbers.find(p => p.id === phoneNumberId);
-          return {
-            ...c,
-            phone_number_id: phoneNumberId,
-            phone_number: phone?.phone_number || null
-          };
-        }
-        return c;
-      }));
-      
-      setError('');
-    } catch (err) {
-      console.error('Error updating campaign phone number:', err);
-      setError('Failed to update campaign phone number');
     }
   };
 
@@ -902,107 +817,55 @@ export default function CampaignManagement() {
     setIsCreating(true);
     try {
       if (!user || !user.tenant_id) {
-        throw new Error('User authentication information not available. Please log in.');
+        throw new Error('User authentication information not available.');
       }
 
-      const now = new Date().toISOString();
       const startDate = new Date().toISOString().split('T')[0];
 
-      const campaignData = {
-        name: campaignForm.name.trim(),
-        description: null,
-        start_date: startDate,
-        end_date: null,
-        phone_number_id: null,
-        target_audience: null,
-        ai_prompt_template: null,
-        created_by_email: user.email,
-        tenant_id: user.tenant_id,
-        is_active: true,
-        ai_outreach_enabled: false,
-        ai_on: false,
-        archived: false,
-        ai_archetype_id: null,
-        assigned_to_sales_team_id: null
-      };
+      const token = localStorage.getItem('auth_token');
+      const response = await fetch(`${API_BASE}/campaigns`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          name: campaignForm.name.trim(),
+          startDate: startDate,
+          description: null,
+          tenant_id: user.tenant_id
+        })
+      });
 
-      console.log('🔍 Creating campaign with data:', campaignData);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to create campaign');
+      }
 
-const token = localStorage.getItem('auth_token');
-const response = await fetch(`${API_BASE}/campaigns`, {
-  method: 'POST',
-  headers: {
-    'Authorization': `Bearer ${token}`,
-    'Content-Type': 'application/json'
-  },
-  body: JSON.stringify({
-    name: campaignData.name,
-    startDate: campaignData.start_date,
-    description: campaignData.description,
-    tenant_id: campaignData.tenant_id
-  })
-});
-
-if (!response.ok) {
-  const errorData = await response.json();
-  throw new Error(errorData.error || 'Failed to create campaign');
-}
-
-const newCampaign = await response.json();
+      const newCampaign = await response.json();
 
       setCampaigns([newCampaign, ...campaigns]);
       setShowCreateModal(false);
-      resetForm();
+      setCampaignForm({ name: '' });
       setError('');
-      
-      console.log('✅ Campaign created successfully:', newCampaign.id);
     } catch (err) {
-      console.error('❌ Error creating campaign:', err);
+      console.error('Error creating campaign:', err);
       setError(`Failed to create campaign: ${err.message}`);
     } finally {
       setIsCreating(false);
     }
   };
 
-  const resetForm = () => {
-    setCampaignForm({
-      name: '',
-      goal: '',
-      aiArchetype: '',
-      phoneNumberId: '',
-      aiEnabled: true,
-      routingTags: [],
-      color: '#3B82F6',
-      description: '',
-      assignedTo: salesTeamMembers.length === 1 ? salesTeamMembers[0].sales_team_id : ''
-    });
-  };
-
   const handleCloseModal = () => {
     setShowCreateModal(false);
-    resetForm();
+    setCampaignForm({ name: '' });
     setError('');
-  };
-
-  const addRoutingTag = (tag) => {
-    if (tag && !campaignForm.routingTags.includes(tag)) {
-      setCampaignForm({
-        ...campaignForm,
-        routingTags: [...campaignForm.routingTags, tag]
-      });
-    }
-  };
-
-  const removeRoutingTag = (tagToRemove) => {
-    setCampaignForm({
-      ...campaignForm,
-      routingTags: campaignForm.routingTags.filter(tag => tag !== tagToRemove)
-    });
   };
 
   const getStatusBadge = (campaign) => {
     const isActive = campaign.is_active;
     const isArchived = campaign.archived;
+    const aiOn = campaign.ai_on;
     
     if (isArchived) {
       return (
@@ -1013,31 +876,28 @@ const newCampaign = await response.json();
       );
     }
     
-    if (isActive) {
+    if (aiOn && isActive) {
       return (
         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-          <Play className="w-3 h-3 mr-1" />
-          Active
+          <Zap className="w-3 h-3 mr-1" />
+          AI Active
+        </span>
+      );
+    } else if (isActive) {
+      return (
+        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+          <CheckCircle className="w-3 h-3 mr-1" />
+          Ready
         </span>
       );
     } else {
       return (
         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-          <Pause className="w-3 h-3 mr-1" />
+          <Clock className="w-3 h-3 mr-1" />
           Inactive
         </span>
       );
     }
-  };
-
-  const getTypeColor = (type) => {
-    const colors = {
-      'Lead Generation': 'text-blue-600',
-      'Promotional': 'text-purple-600',
-      'Follow-up': 'text-green-600',
-      'Nurture': 'text-orange-600'
-    };
-    return colors[type] || 'text-gray-600';
   };
 
   const filteredCampaigns = useMemo(() => {
@@ -1052,11 +912,71 @@ const newCampaign = await response.json();
         matchesStatus = campaign.is_active === true;
       } else if (statusFilter === 'inactive') {
         matchesStatus = campaign.is_active === false;
+      } else if (statusFilter === 'ai_active') {
+        matchesStatus = campaign.ai_on === true;
       }
 
       return matchesSearch && matchesStatus;
     });
   }, [campaigns, searchTerm, statusFilter]);
+
+  // Initial data load
+  useEffect(() => {
+    let mounted = true;
+    
+    const loadData = async () => {
+      if (user?.tenant_id && mounted) {
+        await fetchTenantIndustry();
+        await fetchCampaigns();
+        await fetchSalesTeamMembers();
+        await fetchPhoneNumbers();
+        await fetchKnowledgeAssets();
+        
+        if (isGlobalAdmin && mounted) {
+          await fetchTenants();
+          await fetchTenantNames();
+        }
+      }
+    };
+    
+    loadData();
+    
+    return () => {
+      mounted = false;
+    };
+  }, [user?.tenant_id, isGlobalAdmin]);
+
+  // Load campaign knowledge links
+  useEffect(() => {
+    const loadKnowledgeLinks = async () => {
+      for (const campaign of campaigns) {
+        const linkedIds = await fetchCampaignKnowledgeLinks(campaign.id);
+        setSelectedKnowledgeAssets(prev => ({
+          ...prev,
+          [campaign.id]: linkedIds
+        }));
+      }
+    };
+    
+    if (campaigns.length > 0) {
+      loadKnowledgeLinks();
+    }
+  }, [campaigns]);
+
+  // Close knowledge dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      const isClickInsideButton = event.target.closest('[id^="knowledge-dropdown-"]');
+      const isClickInsidePortal = event.target.closest('.fixed.z-50');
+      
+      if (!isClickInsideButton && !isClickInsidePortal) {
+        setKnowledgeDropdownOpen({});
+      }
+    };
+    
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, []);
 
   // Fetch stats when filtered campaigns change
   useEffect(() => {
@@ -1066,6 +986,21 @@ const newCampaign = await response.json();
       setCampaignStats({ totalLeads: 0, processedLeads: 0, remainingLeads: 0 });
     }
   }, [filteredCampaigns]);
+
+  // Add this new useEffect
+useEffect(() => {
+  const checkJWT = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.access_token) {
+      // Decode the JWT to see what claims are inside
+      const payload = JSON.parse(atob(session.access_token.split('.')[1]));
+      console.log('JWT payload:', payload);
+      console.log('tenant_id in JWT:', payload.tenant_id);
+      console.log('role in JWT:', payload.role);
+    }
+  };
+  checkJWT();
+}, []);
 
   const totalCampaigns = campaigns.length;
   const activeCampaigns = campaigns.filter(c => c.is_active === true && c.ai_on === true).length;
@@ -1228,6 +1163,7 @@ const newCampaign = await response.json();
               <option value="all">All Status</option>
               <option value="active">Active</option>
               <option value="inactive">Inactive</option>
+              <option value="ai_active">AI Active</option>
             </select>
 
             {/* Tenant Filter - Only for Global Admins */}
@@ -1249,7 +1185,7 @@ const newCampaign = await response.json();
         </div>
       </div>
 
-      {/* Campaigns Table */}
+      {/* Condensed Campaigns Table */}
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
@@ -1267,13 +1203,10 @@ const newCampaign = await response.json();
                   Status
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Progress
+                  Progress & Delivery
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Assigned To
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Phone Number
+                  Assignment & Phone
                 </th>
                 {/* Dynamic Column Header */}
                 {showDynamicColumn && (
@@ -1285,9 +1218,9 @@ const newCampaign = await response.json();
                   Knowledge Assets
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  AI Activation
+                  AI Toggle
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Actions
                 </th>
               </tr>
@@ -1298,7 +1231,9 @@ const newCampaign = await response.json();
                   <td className="px-6 py-4">
                     <div>
                       <div className="text-sm font-medium text-gray-900">{campaign.name}</div>
-                      <div className="text-sm text-gray-500">{campaign.description || 'No description'}</div>
+                      <div className="text-sm text-gray-500">
+                        {campaign.description || 'No description'}
+                      </div>
                     </div>
                   </td>
                   {isGlobalAdmin && (
@@ -1318,34 +1253,41 @@ const newCampaign = await response.json();
                     <CampaignProgress campaignId={campaign.id} />
                   </td>
                   <td className="px-6 py-4">
-                    <select
-                      value={campaign.assigned_to_sales_team_id || ''}
-                      onChange={(e) => updateCampaignAssignment(campaign.id, e.target.value || null)}
-                      className="text-sm border border-gray-300 rounded-lg px-2 py-1 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      title={campaign.assigned_to_name ? `Assigned to ${campaign.assigned_to_name}` : 'Not assigned'}
-                    >
-                      <option value="">Unassigned</option>
-                      {salesTeamMembers.map(member => (
-                        <option key={member.sales_team_id} value={member.sales_team_id}>
-                          {member.full_name || member.email}
-                        </option>
-                      ))}
-                    </select>
-                  </td>
-                  <td className="px-6 py-4">
-                    <select
-                      value={campaign.phone_number_id || ''}
-                      onChange={(e) => updateCampaignPhoneNumber(campaign.id, e.target.value || null)}
-                      className="text-sm border border-gray-300 rounded-lg px-2 py-1 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      title={campaign.phone_number ? `Current: ${campaign.phone_number}` : 'Not assigned'}
-                    >
-                      <option value="">Not assigned</option>
-                      {phoneNumbers.map(phone => (
-                        <option key={phone.id} value={phone.id}>
-                          {phone.phone_number}
-                        </option>
-                      ))}
-                    </select>
+                    <div className="space-y-2">
+                      {/* Assigned To */}
+                      <div>
+                        <select
+                          value={campaign.assigned_to_sales_team_id || ''}
+                          onChange={(e) => updateCampaignAssignment(campaign.id, e.target.value || null)}
+                          className="text-xs border border-gray-300 rounded px-2 py-1 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 w-full"
+                          title={campaign.assigned_to_name ? `Assigned to ${campaign.assigned_to_name}` : 'Not assigned'}
+                        >
+                          <option value="">Unassigned</option>
+                          {salesTeamMembers.map(member => (
+                            <option key={member.sales_team_id} value={member.sales_team_id}>
+                              {member.full_name || member.email}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      
+                      {/* Phone Number */}
+                      <div>
+                        <select
+                          value={campaign.phone_number_id || ''}
+                          onChange={(e) => updateCampaignPhoneNumber(campaign.id, e.target.value || null)}
+                          className="text-xs border border-gray-300 rounded px-2 py-1 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 w-full"
+                          title={campaign.phone_number ? `Current: ${campaign.phone_number}` : 'Not assigned'}
+                        >
+                          <option value="">No phone assigned</option>
+                          {phoneNumbers.map(phone => (
+                            <option key={phone.id} value={phone.id}>
+                              {phone.phone_number}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
                   </td>
                   {/* Dynamic Dropdown Cell */}
                   {showDynamicColumn && (
@@ -1358,7 +1300,7 @@ const newCampaign = await response.json();
                           ''
                         }
                         onChange={(e) => updateCampaignDynamicField(campaign.id, e.target.value || null)}
-                        className="text-sm border border-gray-300 rounded-lg px-2 py-1 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        className="text-sm border border-gray-300 rounded-lg px-2 py-1 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 w-full"
                       >
                         <option value="">Select {getDynamicColumnHeader().toLowerCase()}...</option>
                         {getDynamicDropdownOptions().map(option => (
@@ -1378,12 +1320,12 @@ const newCampaign = await response.json();
                           ...knowledgeDropdownOpen,
                           [campaign.id]: !knowledgeDropdownOpen[campaign.id]
                         })}
-                        className="text-sm border border-gray-300 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 flex items-center justify-between min-w-[140px] bg-white hover:bg-gray-50"
+                        className="text-sm border border-gray-300 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 flex items-center justify-between min-w-[120px] bg-white hover:bg-gray-50"
                       >
                         <span className="truncate">
                           {selectedKnowledgeAssets[campaign.id]?.length > 0
                             ? `${selectedKnowledgeAssets[campaign.id].length} selected`
-                            : 'Select assets...'}
+                            : 'Select...'}
                         </span>
                         <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -1421,7 +1363,7 @@ const newCampaign = await response.json();
                     </div>
                   </td>
                   <td className="px-6 py-4">
-                    <div className="flex items-center space-x-3">
+                    <div className="flex items-center justify-center">
                       {/* AI Toggle Switch */}
                       <button
                         onClick={() => toggleAiOn(campaign.id, campaign.ai_on)}
@@ -1438,32 +1380,10 @@ const newCampaign = await response.json();
                           }`}
                         />
                       </button>
-                      
-                      {/* AI Status Text */}
-                      <div className="flex items-center space-x-1">
-                        {campaign.ai_on ? (
-                          <>
-                            <Zap className="w-4 h-4 text-blue-600" />
-                            <span className="text-sm font-medium text-blue-600">AI Engaged</span>
-                          </>
-                        ) : (
-                          <>
-                            <ZapOff className="w-4 h-4 text-gray-400" />
-                            <span className="text-sm text-gray-500">AI Inactive</span>
-                          </>
-                        )}
-                      </div>
                     </div>
                   </td>
                   <td className="px-6 py-4">
-                    <div className="flex items-center space-x-2">
-                      <button 
-                        className="p-2 text-gray-400 hover:text-blue-600 rounded-lg hover:bg-blue-50"
-                        title="View Campaign"
-                      >
-                        <Eye className="w-4 h-4" />
-                      </button>
-                      
+                    <div className="flex items-center justify-end space-x-2">
                       {showArchived ? (
                         <button 
                           className="p-2 text-gray-400 hover:text-green-600 rounded-lg hover:bg-green-50"
@@ -1473,43 +1393,14 @@ const newCampaign = await response.json();
                           <ArchiveRestore className="w-4 h-4" />
                         </button>
                       ) : (
-                        <>
-                          <button 
-                            className="p-2 text-gray-400 hover:text-green-600 rounded-lg hover:bg-green-50"
-                            title="Edit Campaign"
-                          >
-                            <Edit className="w-4 h-4" />
-                          </button>
-                          {!campaign.is_active && (
-                            <button 
-                              className="p-2 text-gray-400 hover:text-green-600 rounded-lg hover:bg-green-50"
-                              title="Activate Campaign"
-                              onClick={() => updateCampaignActiveStatus(campaign.id, true)}
-                            >
-                              <Play className="w-4 h-4" />
-                            </button>
-                          )}
-                          {campaign.is_active && (
-                            <button 
-                              className="p-2 text-gray-400 hover:text-yellow-600 rounded-lg hover:bg-yellow-50"
-                              title="Deactivate Campaign"
-                              onClick={() => updateCampaignActiveStatus(campaign.id, false)}
-                            >
-                              <Pause className="w-4 h-4" />
-                            </button>
-                          )}
-                          <button 
-                            className="p-2 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50"
-                            title="Archive Campaign"
-                            onClick={() => archiveCampaign(campaign.id)}
-                          >
-                            <Archive className="w-4 h-4" />
-                          </button>
-                        </>
+                        <button 
+                          className="p-2 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50"
+                          title="Archive Campaign"
+                          onClick={() => archiveCampaign(campaign.id)}
+                        >
+                          <Archive className="w-4 h-4" />
+                        </button>
                       )}
-                      <button className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-50">
-                        <MoreVertical className="w-4 h-4" />
-                      </button>
                     </div>
                   </td>
                 </tr>
@@ -1547,7 +1438,7 @@ const newCampaign = await response.json();
         )}
       </div>
 
-      {/* Create Campaign Drawer */}
+      {/* Create Campaign Modal */}
       {showCreateModal && (
         <>
           {/* Backdrop */}
@@ -1558,7 +1449,7 @@ const newCampaign = await response.json();
             onClick={handleCloseModal}
           ></div>
           
-          {/* Sliding Drawer */}
+          {/* Sliding Modal */}
           <div className={`fixed right-0 top-0 h-full w-full max-w-lg bg-white shadow-2xl z-50 transform transition-all duration-500 ease-out ${
             showCreateModal ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0'
           }`}>

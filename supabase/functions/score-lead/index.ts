@@ -458,27 +458,81 @@ serve(async (req) => {
       funnelStage = 'Hot';
     }
 
-    // ========== ENTERPRISE ALERT TRIGGERS & BUSINESS RULES ==========
+    // ========== ENHANCED ENTERPRISE ALERT TRIGGERS & BUSINESS RULES ==========
     
     // Get conversation text for pattern matching
     const conversationText = messages.map(m => m.message_body || '').join(' ').toLowerCase();
     const lastInboundMessage = inboundMessages[inboundMessages.length - 1]?.message_body?.toLowerCase() || '';
     
-    // Critical business triggers that require immediate attention
+    // Minimum engagement requirements to prevent false positives
+    const MIN_MESSAGES_FOR_CRITICAL = 3; // Need at least 3 inbound messages
+    const MIN_CONVERSATION_DURATION = 5; // At least 5 minutes of conversation
+    const MIN_TOTAL_ENGAGEMENT = 5; // At least 5 total messages (in + out)
+
+    // Calculate engagement depth
+    const totalMessages = messages.length;
+    const hasMinimumEngagement = inboundMessages.length >= MIN_MESSAGES_FOR_CRITICAL && 
+                                durationMinutes >= MIN_CONVERSATION_DURATION &&
+                                totalMessages >= MIN_TOTAL_ENGAGEMENT;
+
+    // Enhanced critical triggers - More aggressive on genuine intent
     const criticalTriggers = {
-      agreed_to_meeting: followupAcceptance > 20 || 
-        /sounds good|yes|sure|okay|thay sounds good|let's|agree|perfect|works for me/i.test(lastInboundMessage),
-      requested_callback: /call me|phone|speak|talk|call you|contact me/i.test(conversationText),
-      buying_signal: /ready to buy|purchase|get started|sign up|proceed/i.test(conversationText) ||
-        /what.*(cost|price|charge|fee|rate|pricing)/i.test(conversationText), // ENHANCED
-      timeline_urgent: /asap|today|tomorrow|this week|urgent|immediately/i.test(conversationText),
-      high_interest_question: questionDensity > 30 && inboundMessages.length > 2,
-      explicit_timeline: /3 to 6 months|next month|this year|timeline|when/i.test(conversationText),
-      pricing_inquiry: /what.*(cost|price|charge|fee|rate|pricing)|how much/i.test(conversationText) // NEW
+      // EXPLICIT CALLBACK REQUEST - Direct request for human contact
+      requested_callback: /call me|phone me|give me a call|can you call|please call|speak.*phone/i.test(conversationText) && 
+                         inboundMessages.length >= 2, // Just need 2+ messages to show it's not a bot
+      
+      // STRONG AGREEMENT - Multiple confirmations or explicit agreement  
+      agreed_to_meeting: (followupAcceptance > 30 && hasMinimumEngagement) || 
+        (/let's schedule|book.*meeting|set.*appointment|when.*available/i.test(lastInboundMessage) && inboundMessages.length >= 2),
+      
+      // PRICING + ENGAGEMENT COMBO - Pricing question with sustained interest
+      pricing_inquiry: inboundMessages.length >= 3 && // At least 3 messages
+        motivationScore > 50 && // Reasonable motivation threshold
+        /what.*charge|what.*cost|what.*price|pricing|how much|what.*fee|quote/i.test(conversationText),
+      
+      // STRONG BUYING SIGNALS - Clear commercial intent
+      buying_signal: (
+        /ready to buy|want to purchase|let's get started|ready to proceed|sign me up/i.test(conversationText) ||
+        (motivationScore > 70 && /get started|move forward|next steps/i.test(conversationText))
+      ),
+      
+      // URGENT TIMELINE - Explicit urgency
+      timeline_urgent: /need.*(asap|today|tomorrow|this week|immediately|urgent|right away)/i.test(conversationText),
+      
+      // HIGH INTEREST - Sustained questioning with engagement
+      high_interest_question: questionDensity > 50 && 
+                             inboundMessages.length >= 4 && 
+                             messageFrequency > 0.5,
+      
+      // EXPLICIT TIMELINE - Business timeline mentioned
+      explicit_timeline: /timeline|when.*start|how long|next month|this quarter|planning.*months/i.test(conversationText)
     };
+
+    // QUALIFIED BUYING SIGNAL - Multiple strong indicators
+    const qualifiedBuyingSignal = motivationScore > 75 && 
+      (criticalTriggers.pricing_inquiry || criticalTriggers.agreed_to_meeting || criticalTriggers.requested_callback) &&
+      objectionScore < 30; // Lower objection threshold
     
-    // Calculate if immediate attention is required
-    const requiresImmediateAttention = Object.values(criticalTriggers).some(v => v);
+    // IMMEDIATE ATTENTION LOGIC - More actionable triggers
+    const requiresImmediateAttention = 
+      // ALWAYS trigger for callback requests (highest priority)
+      criticalTriggers.requested_callback ||
+      
+      // ALWAYS trigger for meeting agreements  
+      criticalTriggers.agreed_to_meeting ||
+      
+      // Trigger for pricing + engagement combo
+      (criticalTriggers.pricing_inquiry && hotScore > 50) ||
+      
+      // Trigger for strong buying signals
+      criticalTriggers.buying_signal ||
+      
+      // Trigger for qualified signals
+      qualifiedBuyingSignal ||
+      
+      // Trigger for urgent timelines
+      criticalTriggers.timeline_urgent;
+
     const attentionReasons = Object.entries(criticalTriggers)
       .filter(([_, triggered]) => triggered)
       .map(([reason, _]) => reason);
@@ -491,35 +545,56 @@ serve(async (req) => {
       last_message: lastInboundMessage.substring(0, 100) // First 100 chars for context
     } : null;
     
-    // Override funnel stage based on business rules
+    // Enhanced business rule overrides - More aggressive on genuine signals
     let stageOverrideReason = null;
-    if (criticalTriggers.pricing_inquiry && motivationScore > 50) {
+
+    if (criticalTriggers.requested_callback) {
       funnelStage = 'Hot';
-      stageOverrideReason = 'pricing_inquiry_with_high_motivation';
-    } else if (criticalTriggers.agreed_to_meeting || criticalTriggers.requested_callback) {
-      if (hotScore > 40) {
-        funnelStage = 'Hot';
-        stageOverrideReason = 'lead_agreed_to_next_step';
-      } else if (hotScore > 20) {
-        funnelStage = 'Engaged';
-        stageOverrideReason = 'lead_showing_interest_despite_low_score';
-      }
-    } else if (criticalTriggers.buying_signal && hotScore > 30) {
+      stageOverrideReason = 'explicit_callback_request';
+    } else if (qualifiedBuyingSignal) {
       funnelStage = 'Qualified';
+      stageOverrideReason = 'qualified_buying_signal_detected';
+    } else if (criticalTriggers.pricing_inquiry && motivationScore > 60) {
+      funnelStage = 'Hot';
+      stageOverrideReason = 'pricing_inquiry_with_engagement';
+    } else if (criticalTriggers.agreed_to_meeting) {
+      funnelStage = 'Hot';
+      stageOverrideReason = 'lead_agreed_to_next_step';
+    } else if (criticalTriggers.buying_signal) {
+      funnelStage = 'Hot';
       stageOverrideReason = 'buying_signal_detected';
     }
     
-    // Calculate alert priority
+    // More actionable alert priority
     let alertPriority = 'none';
     if (requiresImmediateAttention) {
-      if (criticalTriggers.pricing_inquiry || criticalTriggers.agreed_to_meeting || criticalTriggers.buying_signal) {
+      if (criticalTriggers.requested_callback || criticalTriggers.agreed_to_meeting) {
+        alertPriority = 'critical'; // Human contact requested = critical
+      } else if (qualifiedBuyingSignal || criticalTriggers.buying_signal) {
         alertPriority = 'critical';
-      } else if (criticalTriggers.requested_callback || criticalTriggers.timeline_urgent) {
+      } else if (criticalTriggers.pricing_inquiry || criticalTriggers.timeline_urgent) {
         alertPriority = 'high';
       } else {
         alertPriority = 'medium';
       }
     }
+
+    // Enhanced logging for debugging false positives
+    console.log('🔍 Engagement Analysis:', {
+      totalMessages,
+      inboundCount: inboundMessages.length,
+      durationMinutes,
+      hasMinimumEngagement,
+      motivationScore,
+      hotScore,
+      questionDensity,
+      messageFrequency,
+      requiresImmediateAttention,
+      alertPriority,
+      triggeredReasons: Object.entries(criticalTriggers)
+        .filter(([_, triggered]) => triggered)
+        .map(([reason, _]) => reason)
+    });
 
     // Calculate score trajectory based on multiple trend factors
     const scoreTrajectory = Math.round(
@@ -592,17 +667,19 @@ serve(async (req) => {
       repeated_contact: repeatedContact,
       responded_outside_hours: respondedOutsideHours,
       manual_override: false,
-      computed_by: 'engine_v4',
+      computed_by: 'engine_v4_improved',
       updated_at: new Date().toISOString(),
       sentiment_score: avgSentiment,
       
-      // NEW ENTERPRISE FIELDS
+      // ENHANCED ENTERPRISE FIELDS
       requires_immediate_attention: requiresImmediateAttention,
       alert_priority: alertPriority,
       alert_triggers: criticalTriggers,
       alert_details: alertDetails,
       stage_override_reason: stageOverrideReason,
-      attention_reasons: attentionReasons
+      attention_reasons: attentionReasons,
+      
+      // Note: Anti-false-positive logic is applied but not stored as separate fields
     };
 
     // Upsert the lead scores
@@ -658,7 +735,7 @@ serve(async (req) => {
           'timeline_urgent': 'Urgent timeline mentioned',
           'high_interest_question': 'Multiple high-interest questions',
           'explicit_timeline': 'Specific timeline mentioned',
-          'pricing_inquiry': 'Asked about pricing'
+          'pricing_inquiry': 'Sustained pricing inquiry with high motivation'
         };
 
         const primaryReason = reasonDescriptions[attentionReasons[0]] || attentionReasons[0];
@@ -668,6 +745,7 @@ serve(async (req) => {
 Lead: ${lead?.name || 'Unknown'} (${lead?.phone})
 Score: ${hotScore}/100 (${funnelStage})
 Reason: ${primaryReason}
+Engagement: ${inboundMessages.length} msgs, ${Math.round(durationMinutes)}min
 Last Message: "${lastInboundMessage.substring(0, 100)}..."
         `.trim();
 
@@ -744,6 +822,7 @@ Last Message: "${lastInboundMessage.substring(0, 100)}..."
                 <p><strong>Lead:</strong> ${lead?.name || 'Unknown'} (${lead?.phone})</p>
                 <p><strong>Score:</strong> ${hotScore}/100 (${funnelStage})</p>
                 <p><strong>Reason:</strong> ${primaryReason}</p>
+                <p><strong>Engagement:</strong> ${inboundMessages.length} messages over ${Math.round(durationMinutes)} minutes</p>
                 <p><strong>Additional Triggers:</strong> ${attentionReasons.join(', ')}</p>
                 <p><strong>Last Message:</strong> "${lastInboundMessage}"</p>
                 <br>
@@ -793,7 +872,12 @@ Last Message: "${lastInboundMessage.substring(0, 100)}..."
               funnel_stage: funnelStage,
               alert_triggers: criticalTriggers,
               attention_reasons: attentionReasons,
-              last_message: lastInboundMessage
+              last_message: lastInboundMessage,
+              engagement_metrics: {
+                inbound_count: inboundMessages.length,
+                duration_minutes: Math.round(durationMinutes),
+                has_minimum_engagement: hasMinimumEngagement
+              }
             },
             read: false,
             created_at: new Date().toISOString()
@@ -845,7 +929,7 @@ Last Message: "${lastInboundMessage.substring(0, 100)}..."
                   type: "section",
                   text: {
                     type: "mrkdwn",
-                    text: `*Reason:* ${primaryReason}\n*Last Message:* "${lastInboundMessage.substring(0, 200)}..."`
+                    text: `*Reason:* ${primaryReason}\n*Engagement:* ${inboundMessages.length} msgs, ${Math.round(durationMinutes)}min\n*Last Message:* "${lastInboundMessage.substring(0, 200)}..."`
                   }
                 },
                 {

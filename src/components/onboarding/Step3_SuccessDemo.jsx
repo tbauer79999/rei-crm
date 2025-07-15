@@ -1,11 +1,11 @@
-// src/components/onboarding/Step7_SuccessDemo.jsx
+// src/components/onboarding/Step3_SuccessDemo.jsx
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CheckCircle, Users, MessageCircle, BarChart3 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import supabase from '../../lib/supabaseClient';
 
-export default function Step7_SuccessDemo({ tenantId, formData, setFormData }) {
+export default function Step3_SuccessDemo({ tenantId, formData, setFormData }) {
   const [loading, setLoading] = useState(false);
   const [completed, setCompleted] = useState(false);
   const [error, setError] = useState(null);

@@ -10,12 +10,14 @@ export class AnalyticsDataService {
   constructor() {
     this.tenantId = null;
     this.dateRange = 30; // Default to last 30 days
+    this.userId = null; // Add userId for A/B testing
   }
 
   // Initialize with user context
   async initialize(user) {
     this.tenantId = user?.tenant_id;
     this.userRole = user?.role;
+    this.userId = user?.id; // Store user ID for A/B testing
     return this;
   }
 
@@ -69,7 +71,8 @@ export class AnalyticsDataService {
         `)
         .eq('archived', false)
         .match(tenantFilter)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .limit(null); // Remove the 1000 row limit - fetch all results
 
       if (campaignsError) throw campaignsError;
 
@@ -84,7 +87,8 @@ export class AnalyticsDataService {
         .from('leads')
         .select('campaign_id, status, id')
         .in('campaign_id', campaignIds)
-        .match(tenantFilter);
+        .match(tenantFilter)
+        .limit(null); // Remove the 1000 row limit - fetch all results
 
       if (leadsError) {
         console.error('Error fetching leads:', leadsError);
@@ -96,7 +100,8 @@ export class AnalyticsDataService {
         .select('lead_id, direction')
         .gte('timestamp', dateFilter.start)
         .lte('timestamp', dateFilter.end)
-        .match(tenantFilter);
+        .match(tenantFilter)
+        .limit(null); // Remove the 1000 row limit - fetch all results
 
       if (msgError) {
         console.error('Error fetching messages:', msgError);
@@ -264,7 +269,8 @@ export class AnalyticsDataService {
         .select('id, name, is_active, created_at')
         .eq('archived', false)
         .match(tenantFilter)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .limit(null); // Remove the 1000 row limit - fetch all results
 
       if (error) throw error;
 
@@ -278,7 +284,8 @@ export class AnalyticsDataService {
         .from('leads')
         .select('id, campaign_id, status, marked_hot_at')
         .in('campaign_id', campaignIds)
-        .match(tenantFilter);
+        .match(tenantFilter)
+        .limit(null); // Remove the 1000 row limit - fetch all results
 
       // Get all messages in date range
       const { data: allMessages } = await supabase
@@ -286,7 +293,8 @@ export class AnalyticsDataService {
         .select('lead_id, direction')
         .gte('timestamp', dateFilter.start)
         .lte('timestamp', dateFilter.end)
-        .match(tenantFilter);
+        .match(tenantFilter)
+        .limit(null); // Remove the 1000 row limit - fetch all results
 
       // Create lookup maps
       const leadsByCampaign = new Map();
@@ -385,7 +393,8 @@ export class AnalyticsDataService {
         `)
         .match(tenantFilter)
         .gte('created_at', dateFilter.start)
-        .lte('created_at', dateFilter.end);
+        .lte('created_at', dateFilter.end)
+        .limit(null); // Remove the 1000 row limit - fetch all results
 
       if (!conversations || conversations.length === 0) {
         return [
@@ -489,7 +498,8 @@ export class AnalyticsDataService {
         .gte('timestamp', dateFilter.start)
         .lte('timestamp', dateFilter.end)
         .order('lead_id')
-        .order('timestamp');
+        .order('timestamp')
+        .limit(null); // Remove the 1000 row limit - fetch all results
 
       // Group by lead_id
       const leadMessages = new Map();
@@ -561,7 +571,8 @@ export class AnalyticsDataService {
         .select('ai_confidence, lead_id')
         .gte('created_at', dateFilter.start)
         .lte('created_at', dateFilter.end)
-        .match(tenantFilter);
+        .match(tenantFilter)
+        .limit(null); // Remove the 1000 row limit - fetch all results
 
       if (aiError) console.error('AI analytics error:', aiError);
 
@@ -570,7 +581,8 @@ export class AnalyticsDataService {
         .from('leads')
         .select('id')
         .eq('status', 'Hot Lead')
-        .match(tenantFilter);
+        .match(tenantFilter)
+        .limit(null); // Remove the 1000 row limit - fetch all results
 
       const hotLeadIds = new Set(hotLeads?.map(l => l.id) || []);
 
@@ -640,7 +652,8 @@ export class AnalyticsDataService {
         `)
         .eq('archived', false)
         .not('ai_archetype_id', 'is', null)
-        .match(tenantFilter);
+        .match(tenantFilter)
+        .limit(null); // Remove the 1000 row limit - fetch all results
 
       if (!campaigns || campaigns.length === 0) {
         return [
@@ -721,7 +734,8 @@ export class AnalyticsDataService {
         .from('campaigns')
         .select('id, name')
         .eq('archived', false)
-        .match(tenantFilter);
+        .match(tenantFilter)
+        .limit(null); // Remove the 1000 row limit - fetch all results
 
       if (!campaigns || campaigns.length === 0) {
         return [];
@@ -736,12 +750,14 @@ export class AnalyticsDataService {
           .from('leads')
           .select('id, campaign_id, status')
           .in('campaign_id', campaigns.map(c => c.id))
-          .match(tenantFilter),
+          .match(tenantFilter)
+          .limit(null), // Remove the 1000 row limit - fetch all results
         
         supabase
           .from('sales_outcomes')
           .select('lead_id, deal_amount')
           .match(tenantFilter)
+          .limit(null) // Remove the 1000 row limit - fetch all results
       ]);
 
       // Create lookup maps
@@ -896,7 +912,8 @@ export class AnalyticsDataService {
             role
           )
         `)
-        .match(tenantFilter);
+        .match(tenantFilter)
+        .limit(null); // Remove the 1000 row limit - fetch all results
 
       if (teamError) {
         console.error('Sales team fetch error:', teamError);
@@ -904,14 +921,16 @@ export class AnalyticsDataService {
         const { data: salesTeamBasic } = await supabase
           .from('sales_team')
           .select('*')
-          .match(tenantFilter);
+          .match(tenantFilter)
+          .limit(null); // Remove the 1000 row limit - fetch all results
 
         if (salesTeamBasic && salesTeamBasic.length > 0) {
           const userIds = salesTeamBasic.map(st => st.user_profile_id);
           const { data: users } = await supabase
             .from('users_profile')
             .select('id, email')
-            .in('id', userIds);
+            .in('id', userIds)
+            .limit(null); // Remove the 1000 row limit - fetch all results
 
           const userMap = new Map(users?.map(u => [u.id, u.email]) || []);
 
@@ -941,7 +960,8 @@ export class AnalyticsDataService {
         const { data: assignedLeads } = await supabase
           .from('leads')
           .select('id, status, estimated_pipeline_value')
-          .eq('assigned_to_sales_team_id', member.id);
+          .eq('assigned_to_sales_team_id', member.id)
+          .limit(null); // Remove the 1000 row limit - fetch all results
 
         const totalAssigned = assignedLeads?.length || 0;
         const hotLeads = assignedLeads?.filter(l => l.status === 'Hot Lead') || [];
@@ -991,7 +1011,8 @@ export class AnalyticsDataService {
         `)
         .gte('created_at', dateFilter.start)
         .lte('created_at', dateFilter.end)
-        .match(tenantFilter);
+        .match(tenantFilter)
+        .limit(null); // Remove the 1000 row limit - fetch all results
 
       if (!salesData || salesData.length === 0) {
         return [];
@@ -1004,7 +1025,8 @@ export class AnalyticsDataService {
       const { data: profiles } = await supabase
         .from('users_profile')
         .select('id, email')
-        .in('id', repIds);
+        .in('id', repIds)
+        .limit(null); // Remove the 1000 row limit - fetch all results
 
       const profileMap = new Map(profiles?.map(p => [p.id, p.email?.split('@')[0] || 'Unknown']) || []);
 
@@ -1053,7 +1075,8 @@ export class AnalyticsDataService {
         .from('leads')
         .select('estimated_pipeline_value')
         .not('estimated_pipeline_value', 'is', null)
-        .match(tenantFilter);
+        .match(tenantFilter)
+        .limit(null); // Remove the 1000 row limit - fetch all results
 
       const totalPipeline = leads?.reduce((sum, lead) => {
         return sum + (parseFloat(lead.estimated_pipeline_value) || 0);
@@ -1112,7 +1135,336 @@ export class AnalyticsDataService {
       return [125, 132, 118, 125, 108, 115]; // Fallback to reasonable estimates
     }
   }
-}
 
+
+  /**
+   * ========================================
+   * A/B TESTING METHODS
+   * ========================================
+   */
+
+  /**
+   * Get role-based tenant filter for A/B testing
+   */
+  getABTestingFilter() {
+    if (this.userRole === 'business_admin') {
+      return { tenant_id: this.tenantId };
+    } else {
+      return { 
+        tenant_id: this.tenantId,
+        user_id: this.userId 
+      };
+    }
+  }
+
+  /**
+   * Get all campaigns for experiment creation
+   */
+  async getCampaignsForABTesting() {
+    const tenantFilter = this.getTenantFilter();
+    
+    try {
+      const { data: campaigns, error } = await supabase
+        .from('campaigns')
+        .select('id, name, description, start_date, end_date, is_active')
+        .match(tenantFilter)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      return campaigns || [];
+    } catch (error) {
+      console.error('Error fetching campaigns for A/B testing:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Get all active experiments
+   */
+  async getActiveExperiments() {
+    const abTestingFilter = this.getABTestingFilter();
+
+    try {
+      const { data: experiments, error } = await supabase
+        .from('experiments')
+        .select(`
+          *,
+          experiment_variants (*),
+          campaigns (name)
+        `)
+        .in('status', ['active', 'running'])
+        .match(abTestingFilter)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      if (!experiments || experiments.length === 0) {
+        return [];
+      }
+
+      const experimentsWithMetrics = await Promise.all(
+        experiments.map(async (experiment) => {
+          const metrics = await this.calculateExperimentMetrics(experiment.id);
+          
+          return {
+            id: experiment.id,
+            name: experiment.name,
+            status: experiment.status,
+            startDate: experiment.start_date,
+            endDate: experiment.end_date,
+            testType: experiment.test_type,
+            metric: experiment.primary_metric,
+            experimentType: experiment.experiment_type,
+            campaignName: experiment.campaigns?.name || 'Global',
+            participants: metrics.totalParticipants,
+            confidence: metrics.confidence,
+            leader: metrics.leader,
+            variants: metrics.variants,
+            trafficSplit: experiment.traffic_split
+          };
+        })
+      );
+
+      return experimentsWithMetrics;
+    } catch (error) {
+      console.error('Error fetching active experiments:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Get completed experiments
+   */
+  async getCompletedExperiments() {
+    const abTestingFilter = this.getABTestingFilter();
+
+    try {
+      const { data: experiments, error } = await supabase
+        .from('experiments')
+        .select(`
+          *,
+          campaigns (name)
+        `)
+        .eq('status', 'completed')
+        .match(abTestingFilter)
+        .order('completed_at', { ascending: false })
+        .limit(20);
+
+      if (error) throw error;
+
+      return (experiments || []).map(exp => ({
+        id: exp.id,
+        name: exp.name,
+        status: exp.status,
+        winner: exp.winner_variant,
+        improvement: exp.confidence_level,
+        metric: exp.primary_metric,
+        campaignName: exp.campaigns?.name || 'Global',
+        participants: exp.total_participants || 0
+      }));
+    } catch (error) {
+      console.error('Error fetching completed experiments:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Calculate experiment metrics
+   */
+  async calculateExperimentMetrics(experimentId) {
+    try {
+      const { data: results, error } = await supabase
+        .from('experiment_results')
+        .select('variant_id, metric_value, outcome_type')
+        .eq('experiment_id', experimentId);
+
+      if (error) throw error;
+
+      if (!results || results.length === 0) {
+        return {
+          totalParticipants: 0,
+          confidence: 0,
+          leader: null,
+          variants: { a: 0, b: 0 }
+        };
+      }
+
+      const { data: variants, error: variantError } = await supabase
+        .from('experiment_variants')
+        .select('id, variant_name')
+        .eq('experiment_id', experimentId);
+
+      if (variantError) throw variantError;
+
+      const variantStats = new Map();
+      variants?.forEach(variant => {
+        variantStats.set(variant.id, {
+          name: variant.variant_name,
+          total: 0,
+          conversions: 0,
+          rate: 0
+        });
+      });
+
+      results.forEach(result => {
+        const variant = variantStats.get(result.variant_id);
+        if (variant) {
+          variant.total++;
+          if (result.metric_value === 1 || result.metric_value > 0.5) {
+            variant.conversions++;
+          }
+        }
+      });
+
+      let leader = null;
+      let maxRate = 0;
+      const variantRates = {};
+
+      variantStats.forEach((stats) => {
+        if (stats.total > 0) {
+          stats.rate = (stats.conversions / stats.total) * 100;
+          variantRates[stats.name.toLowerCase()] = stats.rate;
+
+          if (stats.rate > maxRate) {
+            maxRate = stats.rate;
+            leader = {
+              variant: stats.name,
+              improvement: 0
+            };
+          }
+        }
+      });
+
+      const variantValues = Array.from(variantStats.values());
+      let confidence = 0;
+
+      if (variantValues.length >= 2 && variantValues.every(v => v.total >= 30)) {
+        const [variantA, variantB] = variantValues;
+        if (variantA.total > 0 && variantB.total > 0) {
+          const pooledRate = (variantA.conversions + variantB.conversions) / (variantA.total + variantB.total);
+          const se = Math.sqrt(pooledRate * (1 - pooledRate) * (1/variantA.total + 1/variantB.total));
+          const zScore = Math.abs(variantA.rate - variantB.rate) / (se * 100);
+          confidence = Math.min(95, Math.max(0, (zScore - 1.96) * 25 + 95));
+          
+          if (leader) {
+            const loserRate = variantValues.find(v => v.name !== leader.variant)?.rate || 0;
+            const improvement = loserRate > 0 ? Math.round(((maxRate - loserRate) / loserRate) * 100) : 0;
+            leader.improvement = improvement;
+          }
+        }
+      }
+
+      return {
+        totalParticipants: results.length,
+        confidence: Math.round(confidence),
+        leader: leader,
+        variants: variantRates
+      };
+    } catch (error) {
+      console.error('Error calculating experiment metrics:', error);
+      return {
+        totalParticipants: 0,
+        confidence: 0,
+        leader: null,
+        variants: { a: 0, b: 0 }
+      };
+    }
+  }
+
+  /**
+   * Create new experiment
+   */
+  async createExperiment(experimentConfig) {
+    try {
+      console.log('Creating A/B test experiment:', experimentConfig);
+
+      if (!experimentConfig.name || !experimentConfig.testType || !experimentConfig.metric) {
+        throw new Error('Missing required experiment fields');
+      }
+
+      const campaignId = experimentConfig.experimentType === 'global' ? null : experimentConfig.campaignId;
+
+      const { data: experiment, error: expError } = await supabase
+        .from('experiments')
+        .insert({
+          user_id: this.userId,
+          tenant_id: this.tenantId,
+          name: experimentConfig.name,
+          test_type: experimentConfig.testType,
+          primary_metric: experimentConfig.metric,
+          status: 'active',
+          traffic_split: experimentConfig.trafficSplit || 50,
+          experiment_type: experimentConfig.experimentType || 'campaign',
+          campaign_id: campaignId,
+          minimum_sample_size: experimentConfig.minimumSampleSize || 100,
+          created_by_user_id: this.userId,
+          start_date: new Date(),
+          scheduled_end_date: experimentConfig.endDate ? new Date(experimentConfig.endDate) : null
+        })
+        .select()
+        .single();
+
+      if (expError) throw expError;
+
+      const variants = [
+        {
+          experiment_id: experiment.id,
+          variant_name: 'A',
+          configuration: experimentConfig.variantA || {}
+        },
+        {
+          experiment_id: experiment.id,
+          variant_name: 'B', 
+          configuration: experimentConfig.variantB || {}
+        }
+      ];
+
+      const { error: variantError } = await supabase
+        .from('experiment_variants')
+        .insert(variants);
+
+      if (variantError) throw variantError;
+
+      console.log('✅ A/B test experiment created successfully');
+      return { success: true, experimentId: experiment.id };
+    } catch (error) {
+      console.error('Error creating A/B test experiment:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Update experiment status
+   */
+  async updateExperimentStatus(experimentId, newStatus) {
+    const abTestingFilter = this.getABTestingFilter();
+
+    try {
+      const updateData = {
+        status: newStatus,
+        modified_by_user_id: this.userId,
+        updated_at: new Date()
+      };
+
+      if (newStatus === 'completed') {
+        updateData.completed_at = new Date();
+      }
+
+      const { error } = await supabase
+        .from('experiments')
+        .update(updateData)
+        .eq('id', experimentId)
+        .match(abTestingFilter);
+
+      if (error) throw error;
+
+      console.log(`✅ Experiment ${experimentId} status updated to ${newStatus}`);
+      return { success: true };
+    } catch (error) {
+      console.error('Error updating experiment status:', error);
+      return { success: false, error: error.message };
+    }
+  }
+}
 // Export singleton instance
 export const analyticsService = new AnalyticsDataService();

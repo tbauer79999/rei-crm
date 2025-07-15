@@ -24,7 +24,8 @@ router.get('/', async (req, res) => {
     // Build leads query based on role
     let leadsQuery = supabase
       .from('leads')
-      .select('id, status, created_at');
+      .select('id, status, created_at')
+      .limit(null); // Remove the 1000 row limit - fetch all results
 
     // Apply tenant filtering
     if (role !== 'global_admin') {
@@ -46,7 +47,8 @@ router.get('/', async (req, res) => {
     // Build messages query based on role
     let messagesQuery = supabase
       .from('messages')
-      .select('direction, lead_id');
+      .select('direction, lead_id')
+      .limit(null); // Remove the 1000 row limit - fetch all results
 
     // Apply tenant filtering
     if (role !== 'global_admin') {
@@ -141,7 +143,8 @@ router.get('/analytics-trend-cost', async (req, res) => {
     // Build leads query based on role
     let leadsQuery = supabase
       .from('leads')
-      .select('id, created_at, status');
+      .select('id, created_at, status')
+      .limit(null); // Remove the 1000 row limit - fetch all results
 
     // Apply tenant filtering
     if (role !== 'global_admin') {
@@ -182,7 +185,8 @@ router.get('/analytics-trend-cost', async (req, res) => {
     // Build messages query based on role
     let messagesQuery = supabase
       .from('messages')
-      .select('timestamp, direction');
+      .select('timestamp, direction')
+      .limit(null); // Remove the 1000 row limit - fetch all results
 
     // Apply tenant filtering
     if (role !== 'global_admin') {

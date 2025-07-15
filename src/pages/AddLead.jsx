@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { X, Upload, FileText, AlertCircle, CheckCircle2, Download, Loader2, Users, Phone, Mail, Building2, Tag, Sparkles, Zap, TrendingUp, ChevronDown } from 'lucide-react';
+import { 
+  X, Upload, FileText, AlertCircle, CheckCircle2, Download, Loader2, Users, Phone, Mail, Building2, Tag, Sparkles, Zap, TrendingUp, ChevronDown,
+  Clock, Activity, RefreshCw, Pause, Play, Calendar, BarChart3
+} from 'lucide-react';
 import Papa from 'papaparse';
 import apiClient from '../lib/apiClient';
 import supabase from '../lib/supabaseClient';
@@ -17,6 +20,15 @@ export default function AddLead({ onSuccess, onCancel }) {
   const [leadFields, setLeadFields] = useState([]);
   const [parsedRecords, setParsedRecords] = useState([]);
   const [fileReady, setFileReady] = useState(false);
+  
+  // Upload Status Tab State
+  const [jobs, setJobs] = useState([]);
+  const [jobsLoading, setJobsLoading] = useState(true);
+  const [jobsError, setJobsError] = useState('');
+  const [pollingActive, setPollingActive] = useState(true);
+  const [lastUpdated, setLastUpdated] = useState(new Date());
+  const [hiddenJobIds, setHiddenJobIds] = useState(new Set());
+  const [showAllJobs, setShowAllJobs] = useState(false);
   
   // Form state
   const [campaigns, setCampaigns] = useState([]);
@@ -46,6 +58,47 @@ export default function AddLead({ onSuccess, onCancel }) {
     fetchLeadFields();
     fetchCampaigns();
   }, [user]);
+
+  // Fetch upload jobs for status tab
+  const fetchUploadJobs = async () => {
+    if (!user?.tenant_id || activeTab !== 'status') return;
+
+    try {
+      const { data, error } = await supabase
+        .from('bulk_upload_jobs')
+        .select('*')
+        .eq('tenant_id', user.tenant_id)
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      if (error) throw error;
+
+      setJobs(data || []);
+      setLastUpdated(new Date());
+      setJobsError('');
+    } catch (err) {
+      console.error('Error fetching upload jobs:', err);
+      setJobsError('Failed to load upload status');
+    } finally {
+      setJobsLoading(false);
+    }
+  };
+
+  // Poll for job updates when status tab is active
+  useEffect(() => {
+    if (activeTab === 'status') {
+      fetchUploadJobs();
+
+      let interval;
+      if (pollingActive) {
+        interval = setInterval(fetchUploadJobs, 5000);
+      }
+
+      return () => {
+        if (interval) clearInterval(interval);
+      };
+    }
+  }, [user?.tenant_id, pollingActive, activeTab]);
 
   const fetchLeadFields = async () => {
     if (!user?.tenant_id) return;
@@ -216,38 +269,66 @@ export default function AddLead({ onSuccess, onCancel }) {
   const [showCreateCampaignBulk, setShowCreateCampaignBulk] = useState(false);
   const [bulkCampaignId, setBulkCampaignId] = useState('');
   
+  // Updated bulk submit to use new job queue system
   const handleBulkSubmit = async () => {
     if (!bulkCampaignId && campaigns.length > 0) {
       alert('Please select a campaign for the bulk import');
       return;
     }
     
+    if (!selectedFile) {
+      alert('Please select a CSV file to upload');
+      return;
+    }
+    
     setIsUploading(true);
     try {
-      // Add campaign_id to all records
-      const recordsWithCampaign = parsedRecords.map(record => ({
-        ...record,
-        fields: {
-          ...record.fields,
-          campaign_id: bulkCampaignId
-        }
-      }));
+      // Upload file to Supabase Storage first
+      const fileName = `bulk-uploads/${user.tenant_id}/${Date.now()}-${selectedFile.name}`;
       
-      const res = await apiClient.post('/leads/bulk', { records: recordsWithCampaign });
-      const { uploaded = 0, skipped = 0, added = 0 } = res.data;
-      setUploadStatus(`✅ Successfully imported ${added} leads (${skipped} skipped)`);
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('bulk-uploads')
+        .upload(fileName, selectedFile);
+
+      if (uploadError) {
+        throw new Error(`File upload failed: ${uploadError.message}`);
+      }
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('bulk-uploads')
+        .getPublicUrl(fileName);
+
+      // Create bulk upload job
+      const { data: jobData, error: jobError } = await supabase
+        .rpc('create_bulk_upload_job', {
+          p_tenant_id: user.tenant_id,
+          p_created_by: user.id,
+          p_file_name: selectedFile.name,
+          p_file_url: publicUrl,
+          p_file_size: selectedFile.size,
+          p_campaign_id: bulkCampaignId || null,
+          p_total_records: parsedRecords.length
+        });
+
+      if (jobError) {
+        throw new Error(`Failed to create upload job: ${jobError.message}`);
+      }
+
+      setUploadStatus(`✅ Upload queued successfully! Processing ${parsedRecords.length} leads in background.`);
       setUploadError(false);
       setSelectedFile(null);
       setParsedRecords([]);
       setFileReady(false);
       setBulkCampaignId('');
-      setTimeout(() => {
-        onSuccess && onSuccess();
-      }, 1500);
+      
+      // Switch to status tab to show progress
+      setActiveTab('status');
+      fetchUploadJobs(); // Refresh jobs
+      
     } catch (err) {
-      const data = err.response?.data;
-      const errorMsg = data?.error || 'Bulk upload failed';
-      setUploadStatus(`❌ ${errorMsg}`);
+      console.error('Bulk upload error:', err);
+      setUploadStatus(`❌ ${err.message}`);
       setUploadError(true);
     } finally {
       setIsUploading(false);
@@ -349,6 +430,97 @@ export default function AddLead({ onSuccess, onCancel }) {
     URL.revokeObjectURL(url);
   };
 
+  // Helper functions for Upload Status tab
+  const timeAgo = (date) => {
+    const now = new Date();
+    const diffMs = now - new Date(date);
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMins / 60);
+    const diffDays = Math.floor(diffHours / 24);
+
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    return `${diffDays}d ago`;
+  };
+
+  const formatEstimatedCompletion = (estimatedTime) => {
+    if (!estimatedTime) return 'Calculating...';
+    
+    const now = new Date();
+    const estimated = new Date(estimatedTime);
+    const diffMs = estimated - now;
+    
+    if (diffMs <= 0) return 'Completing soon...';
+    
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMins / 60);
+    
+    if (diffMins < 60) return `~${diffMins} minutes`;
+    return `~${diffHours}h ${diffMins % 60}m`;
+  };
+
+  // Download failed rows CSV
+  const downloadFailedRows = async (jobId, fileName) => {
+    try {
+      const { data: errors, error } = await supabase
+        .from('bulk_upload_errors')
+        .select('*')
+        .eq('job_id', jobId);
+
+      if (error) throw error;
+
+      if (!errors || errors.length === 0) {
+        alert('No failed rows to download');
+        return;
+      }
+
+      // Convert errors to CSV
+      const headers = ['Row Number', 'Error Type', 'Error Message', 'Field', 'Original Data'];
+      const csvData = errors.map(error => [
+        error.row_number,
+        error.error_type,
+        error.error_message,
+        error.error_field || '',
+        JSON.stringify(error.raw_data)
+      ]);
+
+      const csvContent = [
+        headers.join(','),
+        ...csvData.map(row => row.map(cell => `"${cell}"`).join(','))
+      ].join('\n');
+
+      const blob = new Blob([csvContent], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `failed_rows_${fileName}_${new Date().toISOString().split('T')[0]}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Error downloading failed rows:', err);
+      alert('Failed to download error report');
+    }
+  };
+
+  // Separate active and completed jobs
+  const activeJobs = jobs.filter(job => ['pending', 'processing'].includes(job.status));
+  const completedJobs = jobs.filter(job => ['completed', 'failed', 'cancelled'].includes(job.status));
+
+  // Hide dismissed jobs and limit completed jobs if not showing all
+  const visibleJobs = jobs.filter(job => !hiddenJobIds.has(job.id));
+  const displayedJobs = showAllJobs ? visibleJobs : [
+    ...visibleJobs.filter(job => ['pending', 'processing'].includes(job.status)),
+    ...visibleJobs.filter(job => ['completed', 'failed', 'cancelled'].includes(job.status)).slice(0, 5)
+  ];
+
+  const hasMoreJobs = visibleJobs.length > displayedJobs.length;
+
+  // Function to dismiss a job
+  const dismissJob = (jobId) => {
+    setHiddenJobIds(prev => new Set([...prev, jobId]));
+  };
+
   return (
     <>
       {/* Backdrop */}
@@ -396,6 +568,26 @@ export default function AddLead({ onSuccess, onCancel }) {
                 >
                   <Upload className="w-4 h-4 inline-block mr-2" />
                   Bulk Import
+                </button>
+                <button
+                  onClick={() => {
+                    setActiveTab('status');
+                    setJobsLoading(true);
+                    fetchUploadJobs();
+                  }}
+                  className={`py-4 px-6 text-sm font-medium border-b-2 transition-colors ${
+                    activeTab === 'status'
+                      ? 'border-blue-500 text-blue-600'
+                      : 'border-transparent text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  <Activity className="w-4 h-4 inline-block mr-2" />
+                  Upload Status
+                  {activeJobs.length > 0 && (
+                    <span className="ml-2 px-2 py-0.5 bg-blue-600 text-white text-xs rounded-full">
+                      {activeJobs.length}
+                    </span>
+                  )}
                 </button>
               </nav>
             </div>
@@ -553,7 +745,7 @@ export default function AddLead({ onSuccess, onCancel }) {
                     </div>
                   </div>
                 </div>
-              ) : (
+              ) : activeTab === 'bulk' ? (
                 /* Bulk Import */
                 <div className="space-y-6">
                   <div className="flex items-center justify-between">
@@ -728,14 +920,257 @@ export default function AddLead({ onSuccess, onCancel }) {
 
                   {/* Guidelines */}
                   <div className="bg-blue-50 rounded-lg p-4">
-                    <h4 className="text-sm font-medium text-blue-900 mb-2">Import Guidelines</h4>
+                    <h4 className="text-sm font-medium text-blue-900 mb-2">Enterprise Import System</h4>
                     <ul className="space-y-1 text-sm text-blue-800">
-                      <li>• CSV files should include headers matching your configured fields</li>
-                      <li>• Required fields: name, phone, and campaign</li>
-                      <li>• Duplicate leads will be automatically skipped</li>
-                      <li>• Maximum 10,000 rows per import</li>
+                      <li>• Upload files up to 100,000+ leads</li>
+                      <li>• Background processing with real-time progress</li>
+                      <li>• Automatic deduplication and validation</li>
+                      <li>• Switch to "Upload Status" tab to monitor progress</li>
+                      <li>• Email notifications when processing completes</li>
                     </ul>
                   </div>
+                </div>
+              ) : (
+                /* Upload Status Tab - NEW IMPROVED VERSION */
+                <div className="space-y-6">
+                  {/* Header */}
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-lg font-medium text-gray-900">Upload Status</h3>
+                      <p className="text-sm text-gray-500">Monitor your bulk upload progress</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={fetchUploadJobs}
+                        className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
+                        title="Refresh"
+                      >
+                        <RefreshCw size={16} />
+                      </button>
+                      <div className="flex items-center gap-2 text-xs text-gray-500">
+                        <div className={`w-2 h-2 rounded-full ${pollingActive ? 'bg-green-500' : 'bg-gray-400'}`} />
+                        Auto-refresh {pollingActive ? 'on' : 'off'}
+                      </div>
+                    </div>
+                  </div>
+
+                  {jobsError && (
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex items-center text-sm">
+                      <AlertCircle className="w-4 h-4 text-red-600 mr-2 flex-shrink-0" />
+                      <span className="text-red-800">{jobsError}</span>
+                    </div>
+                  )}
+
+                  {jobsLoading ? (
+                    <div className="flex items-center justify-center py-8">
+                      <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
+                    </div>
+                  ) : jobs.length === 0 ? (
+                    <div className="text-center py-12 bg-gray-50 rounded-lg">
+                      <Upload className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+                      <p className="text-gray-600">No uploads yet</p>
+                      <p className="text-sm text-gray-500">Start a bulk import to see progress here</p>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="space-y-3">
+                        {displayedJobs.map((job) => {
+                        const isActive = ['pending', 'processing'].includes(job.status);
+                        const isCompleted = job.status === 'completed';
+                        const isFailed = job.status === 'failed';
+                        
+                        const progressPercent = Math.min(job.progress_percentage || 0, 100);
+                        const successRate = job.total_records > 0 ? ((job.successful_records || 0) / job.total_records * 100) : 0;
+                        
+                        return (
+                          <div key={job.id} className={`border rounded-lg p-4 transition-all ${
+                            isActive ? 'bg-blue-50 border-blue-200' : 
+                            isCompleted ? 'bg-white border-gray-200' : 
+                            'bg-red-50 border-red-200'
+                          }`}>
+                            
+                            {/* Header Row */}
+                            <div className="flex items-center justify-between mb-3">
+                              <div className="flex items-center gap-3 min-w-0 flex-1">
+                                <div className={`p-1.5 rounded-full ${
+                                  isActive ? 'bg-blue-100' :
+                                  isCompleted ? 'bg-green-100' : 
+                                  'bg-red-100'
+                                }`}>
+                                  {isActive ? <Activity className="w-4 h-4 text-blue-600" /> :
+                                   isCompleted ? <CheckCircle2 className="w-4 h-4 text-green-600" /> :
+                                   <AlertCircle className="w-4 h-4 text-red-600" />}
+                                </div>
+                                
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-center gap-2">
+                                    <h4 className="font-medium text-gray-900 truncate">{job.file_name}</h4>
+                                    <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${
+                                      isActive ? 'bg-blue-100 text-blue-800' :
+                                      isCompleted ? 'bg-green-100 text-green-800' :
+                                      'bg-red-100 text-red-800'
+                                    }`}>
+                                      {job.status === 'pending' ? 'Queued' :
+                                       job.status === 'processing' ? 'Processing' :
+                                       job.status === 'completed' ? 'Complete' :
+                                       'Failed'}
+                                    </span>
+                                  </div>
+                                  <p className="text-xs text-gray-500">
+                                    {timeAgo(job.created_at)} • {job.total_records?.toLocaleString() || 0} records
+                                  </p>
+                                </div>
+                              </div>
+                              
+                              {/* Actions */}
+                              <div className="flex items-center gap-1">
+                                {job.failed_records > 0 && (
+                                  <button
+                                    onClick={() => downloadFailedRows(job.id, job.file_name)}
+                                    className="p-1.5 text-gray-400 hover:text-blue-600 transition-colors"
+                                    title="Download failed rows"
+                                  >
+                                    <Download size={14} />
+                                  </button>
+                                )}
+                                {!['pending', 'processing'].includes(job.status) && (
+                                  <button
+                                    onClick={() => dismissJob(job.id)}
+                                    className="p-1.5 text-gray-400 hover:text-red-600 transition-colors"
+                                    title="Dismiss"
+                                  >
+                                    <X size={14} />
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Progress Bar for Active Jobs */}
+                            {isActive && (
+                              <div className="mb-3">
+                                <div className="flex items-center justify-between text-xs text-gray-600 mb-1">
+                                  <span>{job.processed_records?.toLocaleString() || 0} / {job.total_records?.toLocaleString() || 0}</span>
+                                  <span>{progressPercent.toFixed(0)}%</span>
+                                </div>
+                                <div className="w-full bg-gray-200 rounded-full h-1.5">
+                                  <div 
+                                    className="bg-blue-600 h-1.5 rounded-full transition-all duration-300"
+                                    style={{ width: `${progressPercent}%` }}
+                                  />
+                                </div>
+                                {job.status === 'processing' && job.average_records_per_minute && (
+                                  <p className="text-xs text-gray-500 mt-1">
+                                    ~{job.average_records_per_minute} records/min • ETA: {formatEstimatedCompletion(job.estimated_completion_at)}
+                                  </p>
+                                )}
+                              </div>
+                            )}
+
+                            {/* Results Summary */}
+                            <div className="flex items-center justify-between text-sm">
+                              <div className="flex items-center gap-4">
+                                {job.successful_records > 0 && (
+                                  <div className="flex items-center gap-1 text-green-700">
+                                    <CheckCircle2 size={14} />
+                                    <span className="font-medium">{job.successful_records?.toLocaleString()}</span>
+                                    <span className="text-gray-500">success</span>
+                                  </div>
+                                )}
+                                
+                                {job.failed_records > 0 && (
+                                  <div className="flex items-center gap-1 text-red-700">
+                                    <AlertCircle size={14} />
+                                    <span className="font-medium">{job.failed_records?.toLocaleString()}</span>
+                                    <span className="text-gray-500">failed</span>
+                                  </div>
+                                )}
+                                
+                                {job.duplicate_records > 0 && (
+                                  <div className="flex items-center gap-1 text-yellow-700">
+                                    <Users size={14} />
+                                    <span className="font-medium">{job.duplicate_records?.toLocaleString()}</span>
+                                    <span className="text-gray-500">dupes</span>
+                                  </div>
+                                )}
+                              </div>
+                              
+                              {/* Success Rate for Completed Jobs */}
+                              {isCompleted && job.total_records > 0 && (
+                                <div className="text-xs text-gray-500">
+                                  {successRate.toFixed(1)}% success rate
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Error Message */}
+                            {isFailed && job.error_message && (
+                              <div className="mt-3 pt-3 border-t border-red-200">
+                                <p className="text-xs text-red-600 flex items-start gap-1">
+                                  <AlertCircle size={12} className="mt-0.5 flex-shrink-0" />
+                                  <span>{job.error_message}</span>
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        );
+})}
+                    </div>
+
+                    {/* Show More/Less Button */}
+                    {hasMoreJobs && (
+                      <div className="text-center pt-4">
+                        <button
+                          onClick={() => setShowAllJobs(!showAllJobs)}
+                          className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+                        >
+                          {showAllJobs ? 'Show Less' : `Show ${visibleJobs.length - displayedJobs.length} More`}
+                        </button>
+                      </div>
+                    )}
+
+                    {hiddenJobIds.size > 0 && (
+                      <div className="text-center pt-2">
+                        <button
+                          onClick={() => setHiddenJobIds(new Set())}
+                          className="text-xs text-gray-500 hover:text-gray-700"
+                        >
+                          Show {hiddenJobIds.size} dismissed job{hiddenJobIds.size === 1 ? '' : 's'}
+                        </button>
+                      </div>
+                    )}
+                  </>
+                  )}
+
+
+                  {/* Summary Stats */}
+                  {jobs.length > 0 && (
+                    <div className="grid grid-cols-4 gap-4 pt-4 border-t border-gray-200">
+                      <div className="text-center">
+                        <div className="text-lg font-semibold text-gray-900">
+                          {visibleJobs.reduce((sum, job) => sum + (job.total_records || 0), 0).toLocaleString()}
+                        </div>
+                        <div className="text-xs text-gray-500">Total Records</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-lg font-semibold text-green-600">
+                          {visibleJobs.reduce((sum, job) => sum + (job.successful_records || 0), 0).toLocaleString()}
+                        </div>
+                        <div className="text-xs text-gray-500">Successful</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-lg font-semibold text-red-600">
+                          {visibleJobs.reduce((sum, job) => sum + (job.failed_records || 0), 0).toLocaleString()}
+                        </div>
+                        <div className="text-xs text-gray-500">Failed</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-lg font-semibold text-yellow-600">
+                          {visibleJobs.reduce((sum, job) => sum + (job.duplicate_records || 0), 0).toLocaleString()}
+                        </div>
+                        <div className="text-xs text-gray-500">Duplicates</div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -757,7 +1192,7 @@ export default function AddLead({ onSuccess, onCancel }) {
                   <CheckCircle2 className="w-4 h-4 mr-2" />
                   Add Lead
                 </button>
-              ) : (
+              ) : activeTab === 'bulk' ? (
                 <button
                   onClick={handleBulkSubmit}
                   disabled={!fileReady || isUploading || !bulkCampaignId}
@@ -766,16 +1201,16 @@ export default function AddLead({ onSuccess, onCancel }) {
                   {isUploading ? (
                     <>
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Importing...
+                      Queuing Upload...
                     </>
                   ) : (
                     <>
                       <Upload className="w-4 h-4 mr-2" />
-                      Import {parsedRecords.length} Leads
+                      Queue {parsedRecords.length} Leads
                     </>
                   )}
                 </button>
-              )}
+              ) : null}
             </div>
           </div>
         </div>

@@ -118,10 +118,11 @@ serve(async (req) => {
 async function handleStatusDistribution(supabaseClient: any, role: string, tenant_id: string, period: string) {
   try {
     // Get all leads for status distribution
-    let query = supabaseClient
-      .from('leads')
-      .select('id, name, status, created_at, status_history')
-
+let query = supabaseClient
+  .from('leads')
+  .select('id, name, status, created_at, status_history')
+  .limit(50000) // Use a high number instead of null
+  
     if (role !== 'global_admin') {
       query = query.eq('tenant_id', tenant_id)
     }
@@ -229,6 +230,7 @@ async function handleProgressionFunnel(supabaseClient: any, role: string, tenant
     let query = supabaseClient
       .from('leads')
       .select('id, status, status_history, created_at')
+      .limit(null) // Remove the 1000 row limit - fetch all results
 
     if (role !== 'global_admin') {
       query = query.eq('tenant_id', tenant_id)
@@ -328,6 +330,7 @@ async function handleUploadTrend(supabaseClient: any, role: string, tenant_id: s
       .select('id, name, created_at, campaign, status')
       .gte('created_at', startDate.toISOString())
       .order('created_at', { ascending: false })
+      .limit(null) // Remove the 1000 row limit - fetch all results
 
     if (role !== 'global_admin') {
       query = query.eq('tenant_id', tenant_id)
@@ -428,6 +431,7 @@ async function handleStatusTransitions(supabaseClient: any, role: string, tenant
     let query = supabaseClient
       .from('leads')
       .select('id, name, status, status_history, created_at')
+      .limit(null) // Remove the 1000 row limit - fetch all results
 
     if (role !== 'global_admin') {
       query = query.eq('tenant_id', tenant_id)
@@ -581,6 +585,7 @@ async function handleDefaultData(supabaseClient: any, role: string, tenant_id: s
     let leadsQuery = supabaseClient
       .from('leads')
       .select('id, status, status_history, created_at, campaign')
+      .limit(null) // Remove the 1000 row limit - fetch all results
 
     // Apply tenant filtering based on role
     if (role !== 'global_admin') {
@@ -680,6 +685,7 @@ async function handleDefaultData(supabaseClient: any, role: string, tenant_id: s
       .select('created_at')
       .gte('created_at', daysAgo)
       .order('created_at', { ascending: true })
+      .limit(null) // Remove the 1000 row limit - fetch all results
 
     // Apply tenant filtering
     if (role !== 'global_admin') {

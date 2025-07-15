@@ -1,8 +1,7 @@
 // src/components/onboarding/Step1_CompanyInfo.jsx
 import { useState, useEffect } from 'react';
-import { Building2, Sparkles, CheckCircle, Search, Brain } from 'lucide-react';
+import { Building2, Sparkles, CheckCircle, Search, Brain, MessageCircle, Users, Bot } from 'lucide-react';
 import supabase from '../../lib/supabaseClient';
-
 
 // Helper function to extract domain from email
 const extractDomain = (email) => {
@@ -119,6 +118,20 @@ const detectIndustry = (companyData) => {
   return '';
 };
 
+const toneOptions = [
+  { value: 'Friendly & Casual', icon: '😊', desc: 'Warm and approachable communication' },
+  { value: 'Professional & Polite', icon: '🤝', desc: 'Formal and respectful tone' },
+  { value: 'Confident & Assertive', icon: '💪', desc: 'Direct and confident approach' },
+  { value: 'Urgent & Direct', icon: '⚡', desc: 'Fast-paced and action-oriented' }
+];
+
+const personaOptions = [
+  { value: 'Helpful Assistant', icon: '🤖', desc: 'Supportive and informative' },
+  { value: 'Hard Closer', icon: '🎯', desc: 'Results-focused and persuasive' },
+  { value: 'Friendly Neighbor', icon: '👋', desc: 'Casual and personable' },
+  { value: 'Patient Consultant', icon: '🧠', desc: 'Thoughtful and educational' }
+];
+
 export default function Step1_CompanyInfo({ formData, setFormData, onNext }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -127,19 +140,19 @@ export default function Step1_CompanyInfo({ formData, setFormData, onNext }) {
   const [error, setError] = useState(null);
   const [companyResearch, setCompanyResearch] = useState(null);
   const [researchInsight, setResearchInsight] = useState('');
-
   const [industryOptions, setIndustryOptions] = useState([]);
+  const [industryId, setIndustryId] = useState('');
+  const [archetypes, setArchetypes] = useState([]);
 
-useEffect(() => {
-  const fetchIndustries = async () => {
-    const { data, error } = await supabase.from('industries').select('*');
-    if (!error) setIndustryOptions(data);
-    else console.error('❌ Failed to load industries:', error);
-  };
+  useEffect(() => {
+    const fetchIndustries = async () => {
+      const { data, error } = await supabase.from('industries').select('*');
+      if (!error) setIndustryOptions(data);
+      else console.error('❌ Failed to load industries:', error);
+    };
 
-  fetchIndustries();
-}, []);
-
+    fetchIndustries();
+  }, []);
 
   useEffect(() => {
     const initializeUser = async () => {
@@ -190,6 +203,34 @@ useEffect(() => {
 
     initializeUser();
   }, []); // Empty dependency array - only run once on mount
+
+  // Load archetypes for industry
+  useEffect(() => {
+    const fetchArchetypes = async () => {
+      if (!industryId) return;
+
+      const { data, error } = await supabase
+        .from('ai_archetypes')
+        .select('*')
+        .contains('allowed_industries', [industryId]);
+
+      if (error) {
+        console.error('Error fetching archetypes:', error);
+        return;
+      }
+
+      setArchetypes(data);
+    };
+
+    fetchArchetypes();
+  }, [industryId]);
+
+  // Update industryId when formData.industry_id changes
+  useEffect(() => {
+    if (formData.industry_id) {
+      setIndustryId(formData.industry_id);
+    }
+  }, [formData.industry_id]);
 
   const performCompanyResearch = async (email) => {
     console.log('🔍 Starting company research...');
@@ -270,19 +311,35 @@ useEffect(() => {
       console.log('Updating tenant with ID:', profile.tenant_id);
       
       const { error: tenantError } = await supabase
-  .from('tenants')
-  .update({
-    name: formData.companyName,
-    industry_id: formData.industry_id,
-    description: formData.description,
-    preferred_area_code: formData.areaCode
-  })
-  .eq('id', profile.tenant_id);
-
+        .from('tenants')
+        .update({
+          name: formData.companyName,
+          industry_id: formData.industry_id,
+          description: formData.description,
+          preferred_area_code: formData.areaCode
+        })
+        .eq('id', profile.tenant_id);
 
       if (tenantError) {
         console.error('Tenant update error:', tenantError);
         throw tenantError;
+      }
+
+      // Save AI instruction bundle
+      const { error: aiError } = await supabase.from('ai_instruction_bundles').insert([{
+        tenant_id: profile.tenant_id,
+        tone: formData.tone,
+        persona: formData.persona,
+        archetype: formData.archetype || '',
+        industry: industryId,
+        use_case: '',
+        role: '',
+        full_bundle: '',
+      }]);
+
+      if (aiError) {
+        console.error('AI instruction bundle error:', aiError);
+        throw aiError;
       }
 
       // Optional Twilio assignment
@@ -351,7 +408,7 @@ useEffect(() => {
           {companyResearch ? 'Hey there! 👋' : 'Tell us about your company'}
         </h2>
         <p className="text-gray-600 mt-2">
-          {companyResearch ? 'We did a little research and found some info about your company' : 'This helps us personalize your CRM experience'}
+          {companyResearch ? 'We did a little research and found some info about your company' : 'This helps us personalize your AI messaging experience'}
         </p>
       </div>
 
@@ -408,6 +465,7 @@ useEffect(() => {
         </div>
       )}
 
+      {/* Company Information Section */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="space-y-2">
           <label className="text-sm font-medium text-gray-700 flex items-center space-x-2">
@@ -489,6 +547,101 @@ useEffect(() => {
         </div>
       </div>
 
+      {/* AI Style Configuration Section */}
+      <div className="space-y-8 pt-8 border-t border-gray-200">
+        <div className="text-center">
+          <div className="w-16 h-16 bg-gradient-to-r from-purple-500 to-pink-600 rounded-full flex items-center justify-center mx-auto mb-4">
+            <MessageCircle size={24} className="text-white" />
+          </div>
+          <h3 className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
+            Configure your AI assistant
+          </h3>
+          <p className="text-gray-600 mt-2">Choose how your AI will communicate with leads</p>
+        </div>
+
+        <div className="space-y-8">
+          {/* Tone selector */}
+          <div>
+            <h4 className="text-lg font-semibold mb-4 flex items-center gap-2">
+              <Sparkles size={20} className="text-purple-500" />
+              Communication Tone
+            </h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {toneOptions.map(option => (
+                <div
+                  key={option.value}
+                  onClick={() => setFormData({ ...formData, tone: option.value })}
+                  className={`p-4 border-2 rounded-xl cursor-pointer transition-all ${
+                    formData.tone === option.value
+                      ? 'border-purple-500 bg-purple-50'
+                      : 'border-gray-200 hover:border-purple-300 hover:bg-gray-50'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-2xl">{option.icon}</span>
+                    <div>
+                      <div className="font-medium">{option.value}</div>
+                      <div className="text-sm text-gray-500">{option.desc}</div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Persona selector */}
+          <div>
+            <h4 className="text-lg font-semibold mb-4 flex items-center gap-2">
+              <Users size={20} className="text-pink-500" />
+              AI Persona
+            </h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {personaOptions.map(option => (
+                <div
+                  key={option.value}
+                  onClick={() => setFormData({ ...formData, persona: option.value })}
+                  className={`p-4 border-2 rounded-xl cursor-pointer transition-all ${
+                    formData.persona === option.value
+                      ? 'border-pink-500 bg-pink-50'
+                      : 'border-gray-200 hover:border-pink-300 hover:bg-gray-50'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-2xl">{option.icon}</span>
+                    <div>
+                      <div className="font-medium">{option.value}</div>
+                      <div className="text-sm text-gray-500">{option.desc}</div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Archetype selector */}
+          {archetypes.length > 0 && (
+            <div>
+              <h4 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                <Bot size={20} className="text-indigo-500" />
+                Choose an AI Assistant Archetype
+              </h4>
+              <select
+                className="w-full p-3 border rounded-lg"
+                value={formData.archetype || ''}
+                onChange={(e) => setFormData({ ...formData, archetype: e.target.value })}
+              >
+                <option value="">Select an archetype</option>
+                {archetypes.map(arc => (
+                  <option key={arc.id} value={arc.key}>
+                    {arc.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* Manual Research Button - Only show if auto-research failed and fields are empty */}
       {!companyResearch && !researchLoading && user?.email && !formData.companyName && (
         <div className="text-center">
@@ -511,10 +664,10 @@ useEffect(() => {
       <div className="flex justify-end">
         <button
           onClick={handleSubmit}
-          disabled={submitLoading || !formData.companyName || !formData.industry_id}
+          disabled={submitLoading || !formData.companyName || !formData.industry_id || !formData.tone || !formData.persona}
           className={`
             px-8 py-3 rounded-xl font-medium transition-all flex items-center gap-2
-            ${(formData.companyName && formData.industry_id) && !submitLoading
+            ${(formData.companyName && formData.industry_id && formData.tone && formData.persona) && !submitLoading
               ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white hover:shadow-lg transform hover:scale-105'
               : 'bg-gray-200 text-gray-400 cursor-not-allowed'}
           `}

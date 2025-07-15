@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import {
   ArrowLeft,
   Phone,
@@ -13,7 +14,10 @@ import {
   MoreHorizontal,
   Sparkles,
   Activity,
-  Calendar
+  Calendar,
+  ChevronDown,
+  ChevronRight,
+  AlertTriangle
 } from 'lucide-react';
 import {
   LineChart,
@@ -26,6 +30,32 @@ import {
 } from 'recharts';
 import supabase from '../lib/supabaseClient';
 
+// Reusable StatusPill component
+const StatusPill = ({ type, label, tooltip }) => (
+  <span 
+    className={`text-xs px-2 py-1 rounded-full font-medium ${
+      type === 'error' ? 'bg-red-100 text-red-600' :
+      type === 'success' ? 'bg-green-100 text-green-600' :
+      type === 'warning' ? 'bg-yellow-100 text-yellow-600' :
+      'bg-blue-100 text-blue-600'
+    }`}
+    title={tooltip}
+  >
+    {label}
+  </span>
+);
+
+// Alert component for retry banner
+const Alert = ({ variant, children }) => (
+  <div className={`p-3 rounded-lg border ${
+    variant === 'warning' ? 'bg-yellow-50 border-yellow-200 text-yellow-800' :
+    variant === 'error' ? 'bg-red-50 border-red-200 text-red-800' :
+    'bg-blue-50 border-blue-200 text-blue-800'
+  }`}>
+    {children}
+  </div>
+);
+
 export default function LeadDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -34,6 +64,12 @@ export default function LeadDetail() {
   const [loading, setLoading] = useState(true);
   const [newMessage, setNewMessage] = useState('');
   const [sendingMessage, setSendingMessage] = useState(false);
+  const [expandedRetries, setExpandedRetries] = useState(new Set()); // Track expanded retry groups
+
+  const { user } = useAuth();
+  const [twilioDevice, setTwilioDevice] = useState(null);
+  const [isCallInProgress, setIsCallInProgress] = useState(false);
+  const [callStatus, setCallStatus] = useState('');
 
   useEffect(() => {
     const fetchLeadAndMessages = async () => {
@@ -60,7 +96,7 @@ export default function LeadDetail() {
           setLead(leadData);
         }
 
-        // Updated query to fetch messages for this specific lead
+        // Enhanced query to fetch messages with retry/status fields
         const { data: msgData, error: msgError } = await supabase
           .from('messages')
           .select(`
@@ -71,7 +107,12 @@ export default function LeadDetail() {
             hesitation_score,
             urgency_score,
             weighted_score,
-            response_score
+            response_score,
+            status,
+            error_code,
+            retry_eligible,
+            retry_count,
+            original_message_id
           `)
           .eq('lead_id', id)
           .order('timestamp', { ascending: true });
@@ -130,7 +171,12 @@ export default function LeadDetail() {
                 hesitation_score,
                 urgency_score,
                 weighted_score,
-                response_score
+                response_score,
+                status,
+                error_code,
+                retry_eligible,
+                retry_count,
+                original_message_id
               `)
               .eq('lead_id', id)
               .order('timestamp', { ascending: true });
@@ -154,6 +200,141 @@ export default function LeadDetail() {
       clearInterval(interval);
     };
   }, [id]); // Restart interval if lead ID changes
+
+  // Add this useEffect after your existing useEffect hooks
+// Replace the entire Twilio useEffect with this:
+useEffect(() => {
+  const initializeTwilio = async () => {
+    try {
+      console.log('🔄 Initializing Twilio for user:', user?.id);
+      
+      // Get Twilio access token from edge function
+      const { data, error } = await supabase.functions.invoke('twilio-token', {
+        body: {
+          user_id: user?.id || 'unknown',
+          tenant_id: user?.tenant_id || 'unknown'
+        }
+      });
+
+      console.log('📞 Twilio token response:', data);
+
+      if (error) {
+        console.error('Edge function error:', error);
+        throw error;
+      }
+
+      if (data && data.success) {
+        // Mock device is ready
+        setTwilioDevice({ ready: true, mock: true });
+        setCallStatus('Ready to call');
+        console.log('✅ Mock Twilio device ready');
+      } else {
+        throw new Error('Invalid response from edge function');
+      }
+      
+    } catch (err) {
+      console.error('❌ Failed to initialize Twilio:', err);
+      setCallStatus('Failed to initialize calling');
+      setTwilioDevice(null);
+    }
+  };
+
+  // Initialize when user is available
+  if (user?.id) {
+    initializeTwilio();
+  }
+}, [user]);
+
+const handleCall = async (phoneNumber) => {
+  if (!twilioDevice) {
+    alert('Calling not available. Please refresh the page.');
+    return;
+  }
+
+  try {
+    console.log('📞 Initiating call to:', phoneNumber);
+    setCallStatus('Opening phone dialer...');
+    
+    // For now, use system dialer
+    window.open(`tel:${phoneNumber}`, '_self');
+    
+    setTimeout(() => {
+      setCallStatus('Ready to call');
+    }, 2000);
+    
+  } catch (err) {
+    console.error('Call failed:', err);
+    setCallStatus('Call failed: ' + err.message);
+  }
+};
+
+  // Helper function to group messages with their retries
+  const groupMessagesWithRetries = (messages) => {
+    const grouped = [];
+    const retryMap = new Map(); // Maps original_message_id to retry messages
+    
+    // First, build the retry map
+    messages.forEach(msg => {
+      if (msg.original_message_id) {
+        if (!retryMap.has(msg.original_message_id)) {
+          retryMap.set(msg.original_message_id, []);
+        }
+        retryMap.get(msg.original_message_id).push(msg);
+      }
+    });
+    
+    // Now group messages
+    messages.forEach(msg => {
+      if (!msg.original_message_id) { // This is an original message
+        const messageGroup = {
+          original: msg,
+          retries: retryMap.get(msg.id) || []
+        };
+        grouped.push(messageGroup);
+      }
+    });
+    
+    return grouped;
+  };
+
+  // Helper function to check if first outbound message failed
+  const hasFirstMessageFailure = () => {
+    const outboundMessages = messages.filter(msg => msg.direction === 'outbound');
+    if (outboundMessages.length === 0) return false;
+    
+    // Sort by timestamp to get the first message
+    const sortedOutbound = outboundMessages.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+    const firstMessage = sortedOutbound[0];
+    
+    return firstMessage.status === 'failed';
+  };
+
+  // Calculate retry statistics
+  const calculateRetryStats = () => {
+    const failedMessages = messages.filter(msg => msg.status === 'failed').length;
+    const retryMessages = messages.filter(msg => msg.original_message_id).length;
+    const successfulRetries = messages.filter(msg => 
+      msg.original_message_id && (msg.status === 'sent' || msg.status === 'delivered')
+    ).length;
+    
+    const retrySuccessRate = retryMessages > 0 ? Math.round((successfulRetries / retryMessages) * 100) : 0;
+    
+    return {
+      failedMessages,
+      retryMessages,
+      retrySuccessRate
+    };
+  };
+
+  const toggleRetryExpansion = (messageId) => {
+    const newExpanded = new Set(expandedRetries);
+    if (newExpanded.has(messageId)) {
+      newExpanded.delete(messageId);
+    } else {
+      newExpanded.add(messageId);
+    }
+    setExpandedRetries(newExpanded);
+  };
 
   const getStatusConfig = (status) => {
     const configs = {
@@ -456,8 +637,10 @@ export default function LeadDetail() {
     }
   };
 
-  // Calculate AI insights
+  // Calculate AI insights and retry stats
   const aiInsights = calculateAIInsights();
+  const retryStats = calculateRetryStats();
+  const groupedMessages = groupMessagesWithRetries(messages);
 
   if (loading) {
     return (
@@ -546,15 +729,20 @@ export default function LeadDetail() {
                 </span>
               )}
             </span>
-            {lead.phone && (
-              <a
-                href={`tel:${lead.phone}`}
-                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 transition-colors"
-              >
-                <Phone size={16} />
-                Call
-              </a>
-            )}
+ {lead.phone && (
+  <button
+    onClick={() => handleCall(lead.phone)}
+    disabled={!twilioDevice || isCallInProgress}
+    className={`flex items-center gap-2 px-4 py-2 text-sm font-medium text-white rounded-lg transition-colors ${
+      isCallInProgress 
+        ? 'bg-red-600 hover:bg-red-700' 
+        : 'bg-green-600 hover:bg-green-700'
+    } ${!twilioDevice ? 'opacity-50 cursor-not-allowed' : ''}`}
+  >
+    <Phone size={16} />
+    {isCallInProgress ? 'End Call' : 'Call'}
+  </button>
+)}
           </div>
         </div>
       </div>
@@ -730,6 +918,18 @@ export default function LeadDetail() {
             </div>
           </div>
 
+          {/* First Message Failure Banner */}
+          {hasFirstMessageFailure() && (
+            <div className="px-6 pt-4">
+              <Alert variant="warning">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle size={16} />
+                  <span>⚠️ First message failed to send. SurFox automatically retried with a new message.</span>
+                </div>
+              </Alert>
+            </div>
+          )}
+
           {/* Messages */}
           <div className="flex-1 overflow-y-auto p-6 space-y-4">
             {messages.length === 0 ? (
@@ -744,24 +944,26 @@ export default function LeadDetail() {
                 </button>
               </div>
             ) : (
-              messages.map((msg, index) => {
-                const isInbound = msg.direction?.toLowerCase() === 'inbound';
+              groupedMessages.map((messageGroup, groupIndex) => {
+                const { original, retries } = messageGroup;
+                const isInbound = original.direction?.toLowerCase() === 'inbound';
                 const isAI = !isInbound;
                 const showTimestamp =
-                  index === 0 ||
-                  new Date(msg.timestamp) - new Date(messages[index - 1].timestamp) >
+                  groupIndex === 0 ||
+                  new Date(original.timestamp) - new Date(groupedMessages[groupIndex - 1].original.timestamp) >
                     5 * 60 * 1000;
 
                 return (
-                  <div key={msg.id}>
+                  <div key={original.id}>
                     {showTimestamp && (
                       <div className="text-center my-4">
                         <span className="px-3 py-1 bg-gray-100 text-gray-500 text-xs rounded-full">
-                          {formatDate(msg.timestamp)}
+                          {formatDate(original.timestamp)}
                         </span>
                       </div>
                     )}
 
+                    {/* Original Message */}
                     <div
                       className={`flex ${isInbound ? 'justify-start' : 'justify-end'} items-start gap-3`}
                     >
@@ -779,7 +981,7 @@ export default function LeadDetail() {
                               : 'bg-gradient-to-r from-blue-600 to-blue-700 text-white'
                           }`}
                         >
-                          <p className="text-sm leading-relaxed">{msg.message_body || '—'}</p>
+                          <p className="text-sm leading-relaxed">{original.message_body || '—'}</p>
                         </div>
 
                         <div
@@ -787,7 +989,7 @@ export default function LeadDetail() {
                             isInbound ? 'justify-start' : 'justify-end'
                           }`}
                         >
-                          <span>{formatTime(msg.timestamp)}</span>
+                          <span>{formatTime(original.timestamp)}</span>
                           {isAI && (
                             <>
                               <span>•</span>
@@ -798,22 +1000,104 @@ export default function LeadDetail() {
                             </>
                           )}
                           {/* Show scoring info for inbound messages with scores */}
-                          {msg.direction === 'inbound' && msg.weighted_score && (
+                          {original.direction === 'inbound' && original.weighted_score && (
                             <>
                               <span>•</span>
                               <span className="text-xs text-gray-400">
-                                Score: {msg.weighted_score}
+                                Score: {original.weighted_score}
                               </span>
                             </>
                           )}
                         </div>
+
+                        {/* Status Pill for Outbound Messages */}
+                        {original.direction === 'outbound' && (
+                          <div className={`mt-2 ${isInbound ? 'text-left' : 'text-right'}`}>
+                            {original.status === 'failed' && (
+                              <StatusPill 
+                                type="error" 
+                                label="Failed" 
+                                tooltip={`Error Code: ${original.error_code || 'Unknown'}`} 
+                              />
+                            )}
+                            {original.status === 'sent' && (
+                              <StatusPill type="success" label="Delivered" />
+                            )}
+                            {original.status === 'queued' && (
+                              <StatusPill type="warning" label="Queued" />
+                            )}
+                            {original.status === 'delivered' && (
+                              <StatusPill type="success" label="Delivered" />
+                            )}
+                          </div>
+                        )}
                         
                         {/* Show if this message triggered an alert */}
                         {lead.alert_details?.last_message && 
-                         msg.message_body?.toLowerCase().includes(lead.alert_details.last_message.toLowerCase()) && (
+                         original.message_body?.toLowerCase().includes(lead.alert_details.last_message.toLowerCase()) && (
                           <div className="mt-2 flex items-center gap-2 text-xs text-orange-600">
                             <AlertCircle size={12} />
                             <span>This message triggered an alert</span>
+                          </div>
+                        )}
+
+                        {/* Retry Messages Section */}
+                        {retries.length > 0 && (
+                          <div className="mt-3 space-y-2">
+                            <button
+                              onClick={() => toggleRetryExpansion(original.id)}
+                              className="flex items-center gap-2 text-xs text-gray-500 hover:text-gray-700 transition-colors"
+                            >
+                              {expandedRetries.has(original.id) ? (
+                                <ChevronDown size={14} />
+                              ) : (
+                                <ChevronRight size={14} />
+                              )}
+                              <span>{retries.length} retry attempt{retries.length > 1 ? 's' : ''}</span>
+                              <span className="text-gray-400">
+                                (Last: {formatTime(retries[retries.length - 1].timestamp)})
+                              </span>
+                            </button>
+
+                            {/* Expanded Retry Messages */}
+                            {expandedRetries.has(original.id) && (
+                              <div className="ml-4 space-y-3 border-l-2 border-gray-200 pl-4">
+                                {retries.map((retry, retryIndex) => (
+                                  <div key={retry.id} className="space-y-1">
+                                    <div className="px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg text-sm">
+                                      <p className="text-gray-900">{retry.message_body}</p>
+                                    </div>
+                                    
+                                    <div className="flex items-center justify-between text-xs text-gray-500">
+                                      <div className="flex items-center gap-2">
+                                        <span>Retry #{retryIndex + 1}</span>
+                                        <span>•</span>
+                                        <span>{formatTime(retry.timestamp)}</span>
+                                      </div>
+                                      
+                                      <div>
+                                        {retry.status === 'failed' && (
+                                          <StatusPill 
+                                            type="error" 
+                                            label="Failed" 
+                                            tooltip={`Error Code: ${retry.error_code || 'Unknown'}`} 
+                                          />
+                                        )}
+                                        {retry.status === 'sent' && (
+                                          <StatusPill type="success" label="Delivered" />
+                                        )}
+                                        {retry.status === 'queued' && (
+                                          <StatusPill type="warning" label="Queued" />
+                                        )}
+                                        {retry.status === 'delivered' && (
+                                          <StatusPill type="success" label="Delivered" />
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>
@@ -998,6 +1282,7 @@ export default function LeadDetail() {
               </div>
             </div>
 
+            {/* Enhanced Conversation Stats with Retry Metrics */}
             <div className="bg-white rounded-xl border border-gray-200 p-4">
               <div className="flex items-center gap-2 mb-4">
                 <Activity size={18} className="text-blue-600" />
@@ -1033,6 +1318,35 @@ export default function LeadDetail() {
                     {inboundMessages.length > 0 ? Math.round((outboundMessages.length / inboundMessages.length) * 100) : 0}%
                   </span>
                 </div>
+
+                {/* Retry Stats - Only show if retries exist */}
+                {retryStats.retryMessages > 0 && (
+                  <>
+                    <div className="border-t border-gray-100 pt-3">
+                      <div className="text-xs font-medium text-gray-700 mb-2">Delivery Stats:</div>
+                    </div>
+                    
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-gray-600">Failed Messages</span>
+                      <span className="text-sm font-semibold text-red-600">{retryStats.failedMessages}</span>
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-gray-600">Retries Sent</span>
+                      <span className="text-sm font-semibold text-blue-600">{retryStats.retryMessages}</span>
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-gray-600">Retry Success Rate</span>
+                      <span className={`text-sm font-semibold ${
+                        retryStats.retrySuccessRate >= 70 ? 'text-green-600' :
+                        retryStats.retrySuccessRate >= 40 ? 'text-yellow-600' : 'text-red-600'
+                      }`}>
+                        {retryStats.retrySuccessRate}%
+                      </span>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
 
