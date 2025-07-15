@@ -241,7 +241,7 @@ ${leadDetails}
 ${knowledgeBase}`;
 }
 
-module.exports = {
+export {
   buildInstructionBundle,
   buildInitialInstruction,
   getToneDescription,
