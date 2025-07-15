@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext.jsx';
 import supabase from '../lib/supabaseClient.js';
-import { buildInstructionBundle, buildInitialInstruction } from '../lib/instructionBuilder.js';
 import { getRecommendedToneFromScores } from '../lib/supabaseHelpers.js';
 
-import { 
+import {
   Brain,
   Save,
   AlertTriangle,
@@ -17,8 +16,14 @@ import {
   ArrowRight,
   RefreshCw,
   Calendar,
-  Wand2
+  Wand2,
 } from 'lucide-react';
+
+const {
+  buildInstructionBundle,
+  buildInitialInstruction,
+} = require('../lib/instructionBuilder.js');
+
 
 const AIStrategyBuilder = () => {
   const { user } = useAuth();

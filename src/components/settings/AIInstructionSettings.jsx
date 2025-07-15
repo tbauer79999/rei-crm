@@ -1,13 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext.jsx';
 import supabase from '../../lib/supabaseClient.js';
-import { buildInstructionBundle, buildInitialInstruction } from '../../lib/instructionBuilder.js';
-import { 
+import {
   Brain,
-  MessageSquare, 
-  Clock, 
-  Wand2, 
-  Save, 
+  MessageSquare,
+  Clock,
+  Wand2,
+  Save,
   Settings,
   Eye,
   AlertTriangle,
@@ -33,8 +32,14 @@ import {
   Users,
   Calendar,
   ArrowRight,
-  RefreshCw
+  RefreshCw,
 } from 'lucide-react';
+const {
+  buildInstructionBundle,
+  buildInitialInstruction,
+} = require('../../lib/instructionBuilder.js');
+
+
 
 const EnterpriseAIStrategyHub = () => {
   const { user } = useAuth();
