@@ -251,3 +251,13 @@ module.exports = {
   getCampaignStrategy,
   getKnowledgeBaseInstructions
 };
+
+// ESM-compatible named exports for Webpack/CRA builds
+exports.buildInstructionBundle = buildInstructionBundle;
+exports.buildInitialInstruction = buildInitialInstruction;
+exports.getToneDescription = getToneDescription;
+exports.getPersonaDescription = getPersonaDescription;
+exports.getIndustryDescription = getIndustryDescription;
+exports.getRoleDescription = getRoleDescription;
+exports.getCampaignStrategy = getCampaignStrategy;
+exports.getKnowledgeBaseInstructions = getKnowledgeBaseInstructions;
