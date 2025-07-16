@@ -223,7 +223,12 @@ app.listen(PORT, () => {
 // Run website scraper every 2 minutes
 setInterval(() => {
   const { exec } = require('child_process');
-  exec('node workers/scrapeAndEmbedPendingWebsites.js', (error, stdout) => {
+  const path = require('path');
+  
+  // Construct the correct path relative to the current file
+  const workerPath = path.join(__dirname, '../workers/scrapeAndEmbedPendingWebsites.js');
+  
+  exec(`node ${workerPath}`, (error, stdout) => {
     if (error) console.error('Scraper error:', error);
     else console.log('Website scraper ran:', new Date().toISOString());
   });
