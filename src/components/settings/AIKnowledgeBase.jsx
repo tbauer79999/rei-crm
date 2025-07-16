@@ -33,11 +33,12 @@ const fetchKnowledgeBase = async () => {
     const { data: { session } } = await supabase.auth.getSession();
     const token = session?.access_token;
 
-    if (!token) return console.error('No auth token found');
+if (!token) return console.error('No auth token found');
 
-    const res = await axios.get('http://localhost:5000/api/knowledge/docs', {
-      headers: { Authorization: `Bearer ${token}` }
-    });
+const res = await axios.get(`${process.env.REACT_APP_API_URL}/knowledge/docs`, {
+  headers: { Authorization: `Bearer ${token}` }
+});
+
 
     const docsData = Array.isArray(res.data) ? res.data : res.data.data || [];
     
@@ -140,12 +141,17 @@ const fetchKnowledgeBase = async () => {
         description: ''
       };
 
-      const uploadResponse = await axios.post('http://localhost:5000/api/knowledge/upload', uploadPayload, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
+const uploadResponse = await axios.post(
+  `${process.env.REACT_APP_API_URL}/knowledge/upload`,
+  uploadPayload,
+  {
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    }
+  }
+);
+
 
       const docId = uploadResponse.data?.record?.id;
       if (!docId) throw new Error('Upload succeeded but document ID missing');
@@ -305,14 +311,18 @@ const pollWebsiteStatus = async (websiteId) => {
   const handleDelete = async (docId) => {
     if (!window.confirm('Are you sure you want to delete this document?')) return;
 
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token;
-      if (!token) throw new Error('No authentication token found');
+try {
+  const { data: { session } } = await supabase.auth.getSession();
+  const token = session?.access_token;
+  if (!token) throw new Error('No authentication token found');
 
-      await axios.delete(`http://localhost:5000/api/knowledge/docs/${docId}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+  await axios.delete(
+    `${process.env.REACT_APP_API_URL}/knowledge/docs/${docId}`,
+    {
+      headers: { Authorization: `Bearer ${token}` }
+    }
+  );
+
 
       setSuccess('Document deleted successfully!');
       fetchKnowledgeBase();

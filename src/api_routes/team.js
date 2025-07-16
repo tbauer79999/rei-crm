@@ -301,7 +301,7 @@ router.post('/invite', async (req, res) => {
     }
 
     // Build the signup URL
-    const signupUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/signup?invitation_email=${encodeURIComponent(email)}`;
+    const signupUrl = `${process.env.FRONTEND_URL}/signup?invitation_email=${encodeURIComponent(email)}`;
 
     // Don't use Supabase's inviteUserByEmail - just return the signup URL
     console.log('✅ Invitation created successfully');
@@ -367,7 +367,7 @@ router.post('/invitations/:invitationId/resend', async (req, res) => {
       .eq('id', invitationId);
 
     // Build the signup URL
-    const signupUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/signup?invitation_email=${encodeURIComponent(invitation.email)}`;
+    const signupUrl = `${process.env.FRONTEND_URL}/signup?invitation_email=${encodeURIComponent(invitation.email)}`;
 
     console.log('Invitation resent successfully');
     res.json({ 
