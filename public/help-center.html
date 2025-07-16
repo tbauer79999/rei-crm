@@ -1,0 +1,3578 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Help Center - AI Lead Texting Platform</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            line-height: 1.6;
+            color: #1a202c;
+            background-color: #f7fafc;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+
+        /* Header Styles */
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 3rem 0;
+            text-align: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+            font-weight: 700;
+        }
+
+        .header p {
+            font-size: 1.2rem;
+            opacity: 0.9;
+        }
+
+        /* Search Bar */
+        .search-section {
+            background: white;
+            padding: 2rem 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .search-bar {
+            position: relative;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .search-bar input {
+            width: 100%;
+            padding: 1rem 3rem 1rem 1rem;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: border-color 0.3s ease;
+        }
+
+        .search-bar input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .search-icon {
+            position: absolute;
+            right: 1rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #a0aec0;
+        }
+
+        /* Navigation */
+        .nav-section {
+            background: white;
+            padding: 1rem 0;
+            border-bottom: 1px solid #e2e8f0;
+            margin-bottom: 3rem;
+        }
+
+        .nav-tabs {
+            display: flex;
+            gap: 2rem;
+            overflow-x: auto;
+            padding-bottom: 0.5rem;
+        }
+
+        .nav-tab {
+            color: #4a5568;
+            text-decoration: none;
+            padding: 0.5rem 1rem;
+            border-bottom: 2px solid transparent;
+            white-space: nowrap;
+            transition: all 0.3s ease;
+            font-weight: 500;
+        }
+
+        .nav-tab:hover {
+            color: #667eea;
+            border-bottom-color: #667eea;
+        }
+
+        .nav-tab.active {
+            color: #667eea;
+            border-bottom-color: #667eea;
+        }
+
+        /* Content Sections */
+        .content-section {
+            display: none;
+            animation: fadeIn 0.3s ease-in-out;
+        }
+
+        .content-section.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Cards */
+        .cards-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            margin-bottom: 3rem;
+        }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 2rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            transition: all 0.3s ease;
+            cursor: pointer;
+            border: 2px solid transparent;
+        }
+
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            border-color: #667eea;
+        }
+
+        .card-icon {
+            width: 48px;
+            height: 48px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 1rem;
+            font-size: 24px;
+        }
+
+        .card h3 {
+            font-size: 1.25rem;
+            margin-bottom: 0.5rem;
+            color: #2d3748;
+        }
+
+        .card p {
+            color: #4a5568;
+            line-height: 1.6;
+        }
+
+        /* Feature Lists */
+        .feature-section {
+            background: white;
+            border-radius: 12px;
+            padding: 2.5rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+
+        .feature-section h2 {
+            font-size: 1.75rem;
+            margin-bottom: 1.5rem;
+            color: #2d3748;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .feature-section h3 {
+            font-size: 1.4rem;
+            margin-bottom: 1rem;
+            margin-top: 2rem;
+            color: #2d3748;
+        }
+
+        .feature-list {
+            list-style: none;
+            padding: 0;
+        }
+
+        .feature-list li {
+            padding: 1rem 0;
+            border-bottom: 1px solid #e2e8f0;
+            display: flex;
+            align-items: flex-start;
+            gap: 1rem;
+        }
+
+        .feature-list li:last-child {
+            border-bottom: none;
+        }
+
+        .feature-icon {
+            color: #667eea;
+            flex-shrink: 0;
+            margin-top: 0.25rem;
+        }
+
+        .feature-content h4 {
+            font-size: 1.1rem;
+            margin-bottom: 0.25rem;
+            color: #2d3748;
+        }
+
+        .feature-content p {
+            color: #4a5568;
+            font-size: 0.95rem;
+        }
+
+        /* Status Pills */
+        .status-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.875rem;
+            font-weight: 500;
+        }
+
+        .status-hot {
+            background: #fee2e2;
+            color: #dc2626;
+        }
+
+        .status-engaging {
+            background: #fed7aa;
+            color: #ea580c;
+        }
+
+        .status-responding {
+            background: #bbf7d0;
+            color: #16a34a;
+        }
+
+        .status-cold {
+            background: #dbeafe;
+            color: #2563eb;
+        }
+
+        /* Score Indicators */
+        .score-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            font-weight: 600;
+            margin: 0.25rem;
+        }
+
+        .score-high {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .score-medium {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .score-low {
+            background: #e0e7ff;
+            color: #3730a3;
+        }
+
+        /* Quick Start Guide */
+        .quick-start {
+            background: linear-gradient(135deg, #f6f9fc 0%, #e9ecef 100%);
+            border-radius: 12px;
+            padding: 2.5rem;
+            margin-bottom: 3rem;
+        }
+
+        .quick-start h2 {
+            font-size: 1.75rem;
+            margin-bottom: 1.5rem;
+            color: #2d3748;
+        }
+
+        .steps {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 2rem;
+        }
+
+        .step {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+
+        .step-number {
+            width: 32px;
+            height: 32px;
+            background: #667eea;
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            margin-bottom: 1rem;
+        }
+
+        .step h4 {
+            margin-bottom: 0.5rem;
+            color: #2d3748;
+        }
+
+        .step p {
+            color: #4a5568;
+            font-size: 0.95rem;
+        }
+
+        /* Collapsible Sections */
+        .collapsible {
+            background: white;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            overflow: hidden;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+
+        .collapsible-header {
+            padding: 1.25rem;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: background-color 0.3s ease;
+        }
+
+        .collapsible-header:hover {
+            background-color: #f7fafc;
+        }
+
+        .collapsible-header h3 {
+            margin: 0;
+            color: #2d3748;
+            font-size: 1.1rem;
+        }
+
+        .collapsible-icon {
+            transition: transform 0.3s ease;
+            color: #a0aec0;
+        }
+
+        .collapsible.active .collapsible-icon {
+            transform: rotate(180deg);
+        }
+
+        .collapsible-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+            padding: 0 1.25rem;
+        }
+
+        .collapsible.active .collapsible-content {
+            max-height: 3000px;
+            padding: 0 1.25rem 1.25rem;
+        }
+
+        /* Tables */
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+        }
+
+        .data-table th,
+        .data-table td {
+            padding: 0.75rem;
+            text-align: left;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .data-table th {
+            background-color: #f7fafc;
+            font-weight: 600;
+            color: #2d3748;
+        }
+
+        .data-table tr:hover {
+            background-color: #f7fafc;
+        }
+
+        /* Code blocks */
+        .code-block {
+            background: #2d3748;
+            color: #e2e8f0;
+            padding: 1rem;
+            border-radius: 8px;
+            overflow-x: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            margin: 1rem 0;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .nav-tabs {
+                gap: 1rem;
+            }
+            
+            .cards-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Alert Boxes */
+        .alert {
+            padding: 1rem 1.5rem;
+            border-radius: 8px;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: flex-start;
+            gap: 1rem;
+        }
+
+        .alert-info {
+            background: #dbeafe;
+            color: #1e40af;
+            border: 1px solid #93c5fd;
+        }
+
+        .alert-warning {
+            background: #fef3c7;
+            color: #92400e;
+            border: 1px solid #fcd34d;
+        }
+
+        .alert-success {
+            background: #d1fae5;
+            color: #065f46;
+            border: 1px solid #6ee7b7;
+        }
+
+        .alert-danger {
+            background: #fee2e2;
+            color: #991b1b;
+            border: 1px solid #fca5a5;
+        }
+
+        /* Video placeholder */
+        .video-placeholder {
+            background: #e5e7eb;
+            border-radius: 8px;
+            padding: 3rem;
+            text-align: center;
+            color: #6b7280;
+            margin: 1.5rem 0;
+        }
+
+        /* Process Flow */
+        .process-flow {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin: 2rem 0;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .process-step {
+            flex: 1;
+            text-align: center;
+            position: relative;
+            min-width: 150px;
+        }
+
+        .process-step:not(:last-child)::after {
+            content: '→';
+            position: absolute;
+            right: -20px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #cbd5e0;
+            font-size: 1.5rem;
+        }
+
+        .process-icon {
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 0.5rem;
+            color: white;
+            font-size: 24px;
+        }
+
+        .process-label {
+            font-weight: 600;
+            color: #2d3748;
+        }
+
+        /* Metric Cards */
+        .metric-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin: 1.5rem 0;
+        }
+
+        .metric-card {
+            background: #f7fafc;
+            padding: 1.5rem;
+            border-radius: 8px;
+            text-align: center;
+            border: 1px solid #e2e8f0;
+        }
+
+        .metric-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #667eea;
+            margin-bottom: 0.25rem;
+        }
+
+        .metric-label {
+            color: #4a5568;
+            font-size: 0.875rem;
+        }
+
+        /* Best Practices */
+        .best-practice {
+            background: #f0fdf4;
+            border: 1px solid #86efac;
+            border-radius: 8px;
+            padding: 1.25rem;
+            margin: 1rem 0;
+        }
+
+        .best-practice h4 {
+            color: #166534;
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .best-practice p {
+            color: #166534;
+            font-size: 0.95rem;
+        }
+
+        /* Warning Box */
+        .warning-box {
+            background: #fef3c7;
+            border: 1px solid #fcd34d;
+            border-radius: 8px;
+            padding: 1.25rem;
+            margin: 1rem 0;
+        }
+
+        .warning-box h4 {
+            color: #92400e;
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .warning-box p {
+            color: #92400e;
+            font-size: 0.95rem;
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="container">
+            <h1>AI Lead Texting Platform Help Center</h1>
+            <p>Master every feature of your AI-powered lead engagement system</p>
+        </div>
+    </header>
+
+    <!-- Search Section -->
+    <section class="search-section">
+        <div class="container">
+            <div class="search-bar">
+                <input type="text" placeholder="Search for help articles, features, or tutorials..." id="searchInput">
+                <span class="search-icon">🔍</span>
+            </div>
+        </div>
+    </section>
+
+    <!-- Navigation -->
+    <nav class="nav-section">
+        <div class="container">
+            <div class="nav-tabs">
+                <a href="#" class="nav-tab active" data-tab="getting-started">Getting Started</a>
+                <a href="#" class="nav-tab" data-tab="lead-management">Lead Management</a>
+                <a href="#" class="nav-tab" data-tab="campaigns">Campaigns</a>
+                <a href="#" class="nav-tab" data-tab="ai-features">AI Features</a>
+                <a href="#" class="nav-tab" data-tab="analytics">Analytics</a>
+                <a href="#" class="nav-tab" data-tab="settings">Settings</a>
+                <a href="#" class="nav-tab" data-tab="integrations">Integrations</a>
+                <a href="#" class="nav-tab" data-tab="troubleshooting">Troubleshooting</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="container">
+        <!-- Getting Started Section -->
+        <section id="getting-started" class="content-section active">
+            <div class="quick-start">
+                <h2>🚀 Complete Platform Overview</h2>
+                <p style="margin-bottom: 2rem;">Welcome to the most advanced AI-powered lead engagement platform. This system automatically texts your leads, qualifies them through intelligent conversations, and hands off hot prospects to your sales team - all while you sleep.</p>
+                
+                <div class="process-flow">
+                    <div class="process-step">
+                        <div class="process-icon">📤</div>
+                        <div class="process-label">Upload Leads</div>
+                    </div>
+                    <div class="process-step">
+                        <div class="process-icon">🤖</div>
+                        <div class="process-label">AI Engages</div>
+                    </div>
+                    <div class="process-step">
+                        <div class="process-icon">💬</div>
+                        <div class="process-label">Conversations</div>
+                    </div>
+                    <div class="process-step">
+                        <div class="process-icon">🔥</div>
+                        <div class="process-label">Hot Leads</div>
+                    </div>
+                    <div class="process-step">
+                        <div class="process-icon">🤝</div>
+                        <div class="process-label">Sales Closes</div>
+                    </div>
+                </div>
+
+                <div class="steps">
+                    <div class="step">
+                        <div class="step-number">1</div>
+                        <h4>Upload Your Leads</h4>
+                        <p>Import leads via CSV or add them manually. Our system accepts phone numbers and automatically starts AI conversations.</p>
+                    </div>
+                    <div class="step">
+                        <div class="step-number">2</div>
+                        <h4>Create a Campaign</h4>
+                        <p>Set up targeted campaigns with specific goals, assign AI personalities, and configure your outreach strategy.</p>
+                    </div>
+                    <div class="step">
+                        <div class="step-number">3</div>
+                        <h4>Monitor & Optimize</h4>
+                        <p>Watch as AI engages leads, track hot leads in real-time, and let your sales team take over when leads are ready.</p>
+                    </div>
+                    <div class="step">
+                        <div class="step-number">4</div>
+                        <h4>Close Deals</h4>
+                        <p>Hot leads are automatically handed off to your sales team for personal follow-up and deal closure.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="feature-section">
+                <h2>🎯 Platform Capabilities at a Glance</h2>
+                
+                <div class="metric-grid">
+                    <div class="metric-card">
+                        <div class="metric-value">120</div>
+                        <div class="metric-label">Leads/Hour per Campaign</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value">24/7</div>
+                        <div class="metric-label">AI Availability</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value">0-100</div>
+                        <div class="metric-label">Lead Scoring Range</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value">95%</div>
+                        <div class="metric-label">A/B Test Confidence</div>
+                    </div>
+                </div>
+
+                <h3>Key Platform Components</h3>
+                <div class="cards-grid">
+                    <div class="card">
+                        <div class="card-icon">📊</div>
+                        <h3>Pipeline Control Room</h3>
+                        <p>Executive dashboard showing real-time system health, lead flow metrics, AI performance indicators, and conversion funnels. Monitor hot lead handoffs, response times, and system-wide KPIs from a single command center.</p>
+                    </div>
+                    <div class="card">
+                        <div class="card-icon">👥</div>
+                        <h3>Lead Dashboard</h3>
+                        <p>Comprehensive lead management interface with advanced filtering, bulk actions, custom field configuration, and real-time status updates. Track leads through their entire journey from cold to closed.</p>
+                    </div>
+                    <div class="card">
+                        <div class="card-icon">🤖</div>
+                        <h3>AI Conversation Engine</h3>
+                        <p>View detailed AI-lead conversations with sentiment analysis, lead scoring, urgency detection, and engagement metrics. Every message is analyzed for buying signals and qualification criteria.</p>
+                    </div>
+                    <div class="card">
+                        <div class="card-icon">🚀</div>
+                        <h3>Campaign Management</h3>
+                        <p>Create and manage multiple campaigns with different goals, AI personalities, phone numbers, and routing rules. Control processing speed and monitor campaign-specific performance.</p>
+                    </div>
+                    <div class="card">
+                        <div class="card-icon">📈</div>
+                        <h3>Analytics & Insights</h3>
+                        <p>Deep analytics including conversion funnels, ROI analysis, AI performance metrics, and sales outcomes. Export custom reports and track performance across time periods.</p>
+                    </div>
+                    <div class="card">
+                        <div class="card-icon">⚙️</div>
+                        <h3>System Configuration</h3>
+                        <p>Configure company info, messaging rules, AI behavior, team access, phone numbers, and knowledge base. Full control over system behavior and user permissions.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="feature-section">
+                <h2>📚 First Week Success Plan</h2>
+                
+                <div class="collapsible active">
+                    <div class="collapsible-header">
+                        <h3>Day 1: Initial Setup & Configuration</h3>
+                        <span class="collapsible-icon">▼</span>
+                    </div>
+                    <div class="collapsible-content">
+                        <ol style="margin-left: 1.5rem; color: #4a5568;">
+                            <li style="margin-bottom: 1rem;"><strong>Complete Company Settings:</strong> Navigate to Settings → Company Information. Fill in your business details, operating hours, and industry type. This helps AI tailor conversations.</li>
+                            <li style="margin-bottom: 1rem;"><strong>Purchase Phone Numbers:</strong> Go to Settings → Phone Numbers. Purchase at least one number for your first campaign. Consider getting numbers with local area codes for better response rates.</li>
+                            <li style="margin-bottom: 1rem;"><strong>Invite Your Team:</strong> Visit Settings → Sales Team. Add team members who will receive hot leads. Set their permissions and notification preferences.</li>
+                            <li style="margin-bottom: 1rem;"><strong>Configure AI Basics:</strong> Check Settings → AI & Automation. Review default escalation thresholds (when leads become "hot"). Start with defaults, optimize later.</li>
+                            <li style="margin-bottom: 1rem;"><strong>Upload Knowledge Base:</strong> In Settings → AI Knowledge Base, upload any PDFs, documents, or FAQs about your business. This helps AI answer specific questions.</li>
+                        </ol>
+                        
+                        <div class="best-practice">
+                            <h4>✅ Best Practice: Test Phone Number</h4>
+                            <p>After purchasing a phone number, text it from your personal phone to ensure it's working. You should receive an auto-response from the AI.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="collapsible">
+                    <div class="collapsible-header">
+                        <h3>Day 2-3: First Campaign Creation</h3>
+                        <span class="collapsible-icon">▼</span>
+                    </div>
+                    <div class="collapsible-content">
+                        <ol style="margin-left: 1.5rem; color: #4a5568;">
+                            <li style="margin-bottom: 1rem;"><strong>Create Test Campaign:</strong> Go to Campaign Management → Create Campaign. Name it "Test Campaign - [Your Business]"</li>
+                            <li style="margin-bottom: 1rem;"><strong>Select Campaign Goal:</strong> Choose the goal that matches your business:
+                                <ul style="margin-top: 0.5rem; margin-left: 1.5rem;">
+                                    <li>Real Estate: "Qualify Sellers"</li>
+                                    <li>Staffing: "Recruit Candidates"</li>
+                                    <li>B2B: "Book Demos"</li>
+                                    <li>General: "Lead Nurture"</li>
+                                </ul>
+                            </li>
+                            <li style="margin-bottom: 1rem;"><strong>Configure AI Personality:</strong> Select or create an AI personality. Start with "Professional" for B2B or "Friendly" for consumer-focused campaigns.</li>
+                            <li style="margin-bottom: 1rem;"><strong>Assign Resources:</strong> Select your purchased phone number and assign a sales team member who will receive hot leads.</li>
+                            <li style="margin-bottom: 1rem;"><strong>Upload Test Leads:</strong> Create a CSV with 10-20 test leads (can be fake numbers or team members). This lets you see the system in action safely.</li>
+                        </ol>
+                        
+                        <div class="warning-box">
+                            <h4>⚠️ Important: Start Small</h4>
+                            <p>Always test with a small batch before uploading hundreds of real leads. This helps you fine-tune messaging and ensure everything works as expected.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="collapsible">
+                    <div class="collapsible-header">
+                        <h3>Day 4-5: Monitor & Optimize</h3>
+                        <span class="collapsible-icon">▼</span>
+                    </div>
+                    <div class="collapsible-content">
+                        <ol style="margin-left: 1.5rem; color: #4a5568;">
+                            <li style="margin-bottom: 1rem;"><strong>Check Control Room:</strong> Visit Pipeline Control Room daily. Monitor:
+                                <ul style="margin-top: 0.5rem; margin-left: 1.5rem;">
+                                    <li>System Health indicators (all should be green)</li>
+                                    <li>Lead Journey funnel (see where leads drop off)</li>
+                                    <li>AI Optimization metrics (response rates, timing)</li>
+                                </ul>
+                            </li>
+                            <li style="margin-bottom: 1rem;"><strong>Review Conversations:</strong> Click on individual leads in the Dashboard to read AI conversations. Look for:
+                                <ul style="margin-top: 0.5rem; margin-left: 1.5rem;">
+                                    <li>Natural conversation flow</li>
+                                    <li>Appropriate responses to questions</li>
+                                    <li>Proper hot lead identification</li>
+                                </ul>
+                            </li>
+                            <li style="margin-bottom: 1rem;"><strong>Adjust AI Settings:</strong> Based on observations:
+                                <ul style="margin-top: 0.5rem; margin-left: 1.5rem;">
+                                    <li>If too many false "hot leads": Increase escalation threshold</li>
+                                    <li>If missing opportunities: Lower threshold or adjust AI instructions</li>
+                                    <li>If responses seem off: Update knowledge base or AI personality</li>
+                                </ul>
+                            </li>
+                            <li style="margin-bottom: 1rem;"><strong>Set Up A/B Test:</strong> Create your first A/B test to optimize performance:
+                                <ul style="margin-top: 0.5rem; margin-left: 1.5rem;">
+                                    <li>Test different opening messages</li>
+                                    <li>Compare professional vs friendly tone</li>
+                                    <li>Experiment with follow-up timing</li>
+                                </ul>
+                            </li>
+                        </ol>
+                    </div>
+                </div>
+
+                <div class="collapsible">
+                    <div class="collapsible-header">
+                        <h3>Day 6-7: Scale Up Operations</h3>
+                        <span class="collapsible-icon">▼</span>
+                    </div>
+                    <div class="collapsible-content">
+                        <ol style="margin-left: 1.5rem; color: #4a5568;">
+                            <li style="margin-bottom: 1rem;"><strong>Upload Real Leads:</strong> Now that you've tested and optimized, upload your first batch of real leads (50-200 recommended)</li>
+                            <li style="margin-bottom: 1rem;"><strong>Create Production Campaigns:</strong> Set up campaigns for different lead sources or goals:
+                                <ul style="margin-top: 0.5rem; margin-left: 1.5rem;">
+                                    <li>Separate campaigns for different lead types</li>
+                                    <li>Geographic segmentation if needed</li>
+                                    <li>Different approaches for cold vs warm leads</li>
+                                </ul>
+                            </li>
+                            <li style="margin-bottom: 1rem;"><strong>Train Your Team:</strong> Schedule a meeting to show sales team:
+                                <ul style="margin-top: 0.5rem; margin-left: 1.5rem;">
+                                    <li>How to access hot leads</li>
+                                    <li>How to read conversation history</li>
+                                    <li>Understanding lead scores and sentiment</li>
+                                    <li>Proper handoff procedures</li>
+                                </ul>
+                            </li>
+                            <li style="margin-bottom: 1rem;"><strong>Set Up Reporting:</strong> Configure weekly reports in Analytics to track:
+                                <ul style="margin-top: 0.5rem; margin-left: 1.5rem;">
+                                    <li>Conversion rates by campaign</li>
+                                    <li>Cost per hot lead</li>
+                                    <li>Sales team performance</li>
+                                    <li>ROI by lead source</li>
+                                </ul>
+                            </li>
+                        </ol>
+                        
+                        <div class="alert alert-success">
+                            <span>🎉</span>
+                            <div>
+                                <strong>Congratulations!</strong> By the end of week one, you'll have a fully operational AI lead engagement system. Most users see their first hot leads within 24-48 hours of launching.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="feature-section">
+                <h2>🎓 Platform Training Videos</h2>
+                <div class="video-placeholder">
+                    <p>📹 Complete Platform Walkthrough (Coming Soon)</p>
+                    <p style="font-size: 0.9rem; margin-top: 0.5rem;">20-minute comprehensive tour of all features</p>
+                </div>
+                <div class="video-placeholder">
+                    <p>📹 Setting Up Your First Campaign (Coming Soon)</p>
+                    <p style="font-size: 0.9rem; margin-top: 0.5rem;">Step-by-step campaign creation guide</p>
+                </div>
+                <div class="video-placeholder">
+                    <p>📹 Understanding AI Conversations (Coming Soon)</p>
+                    <p style="font-size: 0.9rem; margin-top: 0.5rem;">How to read and optimize AI interactions</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Lead Management Section -->
+        <section id="lead-management" class="content-section">
+            <div class="feature-section">
+                <h2>📋 Complete Lead Management Guide</h2>
+                <p style="margin-bottom: 2rem;">The lead management system is the heart of your platform. Here's everything you need to know about managing, tracking, and optimizing your lead pipeline.</p>
+
+                <h3>Understanding Lead Statuses</h3>
+                <p style="margin-bottom: 1rem;">Every lead in the system has a status that automatically updates based on their interaction with your AI:</p>
+                
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Status</th>
+                            <th>Indicator</th>
+                            <th>Description</th>
+                            <th>Next Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><span class="status-pill status-hot">🔥 Hot Lead</span></td>
+                            <td>Red/Fire</td>
+                            <td>Lead shows high interest, urgency, or buying signals. AI has identified them as sales-ready.</td>
+                            <td>Immediate sales follow-up required</td>
+                        </tr>
+                        <tr>
+                            <td><span class="status-pill status-engaging">💬 Engaging</span></td>
+                            <td>Orange</td>
+                            <td>Lead is actively conversing with AI, asking questions, showing interest.</td>
+                            <td>Let AI continue nurturing</td>
+                        </tr>
+                        <tr>
+                            <td><span class="status-pill status-responding">↩️ Responding</span></td>
+                            <td>Green</td>
+                            <td>Lead has responded to initial outreach, conversation is active.</td>
+                            <td>Monitor for escalation</td>
+                        </tr>
+                        <tr>
+                            <td><span class="status-pill status-cold">❄️ Cold Lead</span></td>
+                            <td>Blue</td>
+                            <td>No response yet or minimal engagement. May need different approach.</td>
+                            <td>Wait for follow-up sequence</td>
+                        </tr>
+                        <tr>
+                            <td><span class="status-pill" style="background: #f3f4f6; color: #6b7280;">🚫 Unsubscribed</span></td>
+                            <td>Gray</td>
+                            <td>Lead has opted out of communications. No further contact allowed.</td>
+                            <td>Remove from active campaigns</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="feature-section">
+                <h2>🎯 AI Lead Scoring System</h2>
+                <p style="margin-bottom: 1.5rem;">Our proprietary AI scoring algorithm analyzes every message to determine lead quality on a 0-100 scale:</p>
+                
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
+                    <div class="score-badge score-high" style="padding: 1.5rem;">
+                        <div>
+                            <div style="font-size: 2rem;">🔥</div>
+                            <div style="font-size: 1.5rem; margin: 0.5rem 0;">76-100</div>
+                            <div style="font-weight: normal;">On Fire</div>
+                            <div style="font-size: 0.875rem; margin-top: 0.5rem; font-weight: normal;">Immediate sales opportunity. High urgency, clear need, budget confirmed.</div>
+                        </div>
+                    </div>
+                    <div class="score-badge score-high" style="padding: 1.5rem;">
+                        <div>
+                            <div style="font-size: 2rem;">🌶️</div>
+                            <div style="font-size: 1.5rem; margin: 0.5rem 0;">51-75</div>
+                            <div style="font-weight: normal;">Hot</div>
+                            <div style="font-size: 0.875rem; margin-top: 0.5rem; font-weight: normal;">Strong interest shown. Asking specific questions, timeline discussed.</div>
+                        </div>
+                    </div>
+                    <div class="score-badge score-medium" style="padding: 1.5rem;">
+                        <div>
+                            <div style="font-size: 2rem;">☀️</div>
+                            <div style="font-size: 1.5rem; margin: 0.5rem 0;">26-50</div>
+                            <div style="font-weight: normal;">Warm</div>
+                            <div style="font-size: 0.875rem; margin-top: 0.5rem; font-weight: normal;">Engaged but early stage. Gathering information, no urgency yet.</div>
+                        </div>
+                    </div>
+                    <div class="score-badge score-low" style="padding: 1.5rem;">
+                        <div>
+                            <div style="font-size: 2rem;">❄️</div>
+                            <div style="font-size: 1.5rem; margin: 0.5rem 0;">0-25</div>
+                            <div style="font-weight: normal;">Cold</div>
+                            <div style="font-size: 0.875rem; margin-top: 0.5rem; font-weight: normal;">Minimal engagement. Short responses, no clear interest signals.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <h3>Factors That Influence Lead Score</h3>
+                <div class="feature-list">
+                    <li>
+                        <span class="feature-icon">✅</span>
+                        <div class="feature-content">
+                            <h4>Response Time & Frequency</h4>
+                            <p>Leads who respond quickly and maintain conversation flow score higher. Multiple exchanges indicate genuine interest.</p>
+                        </div>
+                    </li>
+                    <li>
+                        <span class="feature-icon">✅</span>
+                        <div class="feature-content">
+                            <h4>Message Length & Quality</h4>
+                            <p>Detailed responses with questions score higher than one-word answers. AI analyzes engagement depth.</p>
+                        </div>
+                    </li>
+                    <li>
+                        <span class="feature-icon">✅</span>
+                        <div class="feature-content">
+                            <h4>Sentiment Analysis</h4>
+                            <p>Positive language, enthusiasm, and agreement signals increase score. Negative sentiment or objections lower it.</p>
+                        </div>
+                    </li>
+                    <li>
+                        <span class="feature-icon">✅</span>
+                        <div class="feature-content">
+                            <h4>Buying Signals</h4>
+                            <p>Keywords like "how much", "when can we start", "interested in learning more" significantly boost scores.</p>
+                        </div>
+                    </li>
+                    <li>
+                        <span class="feature-icon">✅</span>
+                        <div class="feature-content">
+                            <h4>Urgency Indicators</h4>
+                            <p>Time-sensitive language ("need this soon", "by next month") increases hot lead probability.</p>
+                        </div>
+                    </li>
+                </div>
+            </div>
+
+            <div class="feature-section">
+                <h2>📤 Bulk Lead Import Guide</h2>
+                
+                <h3>Preparing Your CSV File</h3>
+                <p style="margin-bottom: 1rem;">Follow these guidelines for successful bulk imports:</p>
+                
+                <div class="collapsible">
+                    <div class="collapsible-header">
+                        <h3>Required CSV Format</h3>
+                        <span class="collapsible-icon">▼</span>
+                    </div>
+                    <div class="collapsible-content">
+                        <p style="margin-bottom: 1rem;">Your CSV must include these columns (download template from dashboard):</p>
+                        
+                        <div class="code-block">
+name,phone,email,property_address,status,campaign,notes
+John Smith,+1-555-123-4567,john@email.com,123 Main St,Cold Lead,Q2 Sellers,Interested in selling
+Jane Doe,+15551234568,jane@email.com,456 Oak Ave,Cold Lead,Q2 Sellers,Timeline 3-6 months
+                        </div>
+                        
+                        <h4 style="margin-top: 1.5rem;">Column Requirements:</h4>
+                        <ul style="margin-left: 1.5rem; color: #4a5568;">
+                            <li style="margin-bottom: 0.5rem;"><strong>name:</strong> Full name (required)</li>
+                            <li style="margin-bottom: 0.5rem;"><strong>phone:</strong> Include country code (+1 for US). Accepts multiple formats.</li>
+                            <li style="margin-bottom: 0.5rem;"><strong>email:</strong> Valid email address (optional but recommended)</li>
+                            <li style="margin-bottom: 0.5rem;"><strong>property_address:</strong> For real estate. Other industries can customize fields.</li>
+                            <li style="margin-bottom: 0.5rem;"><strong>status:</strong> Usually "Cold Lead" for new imports</li>
+                            <li style="margin-bottom: 0.5rem;"><strong>campaign:</strong> Must match existing campaign name exactly</li>
+                            <li style="margin-bottom: 0.5rem;"><strong>notes:</strong> Any additional context for AI or sales team</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="collapsible">
+                    <div class="collapsible-header">
+                        <h3>Custom Fields Configuration</h3>
+                        <span class="collapsible-icon">▼</span>
+                    </div>
+                    <div class="collapsible-content">
+                        <p style="margin-bottom: 1rem;">Different industries can configure custom fields:</p>
+                        
+                        <h4>Real Estate Fields:</h4>
+                        <ul style="margin-left: 1.5rem; color: #4a5568; margin-bottom: 1rem;">
+                            <li>property_address</li>
+                            <li>property_type (SFH, Condo, Multi-family)</li>
+                            <li>asking_price</li>
+                            <li>bedrooms</li>
+                            <li>square_footage</li>
+                            <li>listing_date</li>
+                        </ul>
+                        
+                        <h4>Staffing/Recruiting Fields:</h4>
+                        <ul style="margin-left: 1.5rem; color: #4a5568; margin-bottom: 1rem;">
+                            <li>current_position</li>
+                            <li>years_experience</li>
+                            <li>desired_salary</li>
+                            <li>skills</li>
+                            <li>availability</li>
+                            <li>location_preference</li>
+                        </ul>
+                        
+                        <h4>B2B Sales Fields:</h4>
+                        <ul style="margin-left: 1.5rem; color: #4a5568;">
+                            <li>company_name</li>
+                            <li>industry</li>
+                            <li>company_size</li>
+                            <li>annual_revenue</li>
+                            <li>decision_maker</li>
+                            <li>current_solution</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="best-practice">
+                    <h4>✅ Import Best Practices</h4>
+                    <ul style="margin-left: 1.5rem;">
+                        <li>Clean your data first - remove duplicates, fix formatting</li>
+                        <li>Start with 50-100 leads to test your campaign settings</li>
+                        <li>Use UTF-8 encoding if your data contains special characters</li>
+                        <li>Include as much context as possible in the notes field</li>
+                        <li>Segment your lists by quality - run separate campaigns for different lead types</li>
+                    </ul>
+                </div>
+
+                <div class="warning-box">
+                    <h4>⚠️ Common Import Errors</h4>
+                    <ul style="margin-left: 1.5rem;">
+                        <li>Phone numbers without country codes</li>
+                        <li>Campaign names that don't match exactly (case-sensitive)</li>
+                        <li>Special characters in phone numbers (remove parentheses, dashes)</li>
+                        <li>Extra columns not in the template</li>
+                        <li>Headers with trailing spaces</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="feature-section">
+                <h2>🔍 Advanced Lead Filtering & Search</h2>
+                
+                <h3>Search Capabilities</h3>
+                <p style="margin-bottom: 1rem;">The platform offers powerful search and filtering to find exactly the leads you need:</p>
+                
+                <div class="feature-list">
+                    <li>
+                        <span class="feature-icon">✅</span>
+                        <div class="feature-content">
+                            <h4>Global Search</h4>
+                            <p>Search across all lead fields including name, phone, email, and custom fields. Search is case-insensitive and supports partial matches.</p>
+                        </div>
+                    </li>
+                    <li>
+                        <span class="feature-icon">✅</span>
+                        <div class="feature-content">
+                            <h4>Status Filters</h4>
+                            <p>Quick filter buttons for each status type. Click multiple statuses to see combined results. Status counts update in real-time.</p>
+                        </div>
+                    </li>
+                    <li>
+                        <span class="feature-icon">✅</span>
+                        <div class="feature-content">
+                            <h4>Campaign Filters</h4>
+                            <p>Filter leads by campaign assignment. Useful for campaign-specific follow-up or performance analysis.</p>
+                        </div>
+                    </li>
+                    <li>
+                        <span class="feature-icon">✅</span>
+                        <div class="feature-content">
+                            <h4>Date Range Filters</h4>
+                            <p>Filter by creation date, last interaction, or custom date fields. Find leads from specific time periods.</p>
+                        </div>
+                    </li>
+                    <li>
+                        <span class="feature-icon">✅</span>
+                        <div class="feature-content">
+                            <h4>Score-Based Filtering</h4>
+                            <p>Filter leads by AI score ranges to focus on your hottest opportunities or identify leads needing attention.</p>
+                        </div>
+                    </li>
+                </div>
+
+                <h3>Bulk Actions</h3>
+                <p style="margin-bottom: 1rem;">Perform actions on multiple leads simultaneously:</p>
+                
+                <ul style="margin-left: 1.5rem; color: #4a5568;">
+                    <li style="margin-bottom: 0.5rem;"><strong>Export Selected:</strong> Download filtered leads as CSV</li>
+                    <li style="margin-bottom: 0.5rem;"><strong>Assign to Campaign:</strong> Move leads between campaigns</li>
+                    <li style="margin-bottom: 0.5rem;"><strong>Update Status:</strong> Manually change status for multiple leads</li>
+                    <li style="margin-bottom: 0.5rem;"><strong>Add Tags:</strong> Apply routing tags for organization</li>
+                    <li style="margin-bottom: 0.5rem;"><strong>Assign to Team Member:</strong> Distribute leads to sales reps</li>
+                </ul>
+            </div>
+
+            <div class="feature-section">
+                <h2>💬 Understanding Lead Conversations</h2>
+                
+                <h3>Conversation View Features</h3>
+                <p style="margin-bottom: 1rem;">Click any lead to access the detailed conversation view:</p>
+                
+                <div class="feature-list">
+                    <li>
+                        <span class="feature-icon">✅</span>
+                        <div class="feature-content">
+                            <h4>Message Timeline</h4>
+                            <p>See all messages in chronological order with timestamps. AI messages show with bot indicator, lead messages with user icon.</p>
+                        </div>
+                    </li>
+                    <li>
+                        <span class="feature-icon">✅</span>
+                        <div class="feature-content">
+                            <h4>Real-Time Scoring</h4>
+                            <p>Watch lead scores update after each message. Hover over scores to see factors that influenced the calculation.</p>
+                        </div>
+                    </li>
+                    <li>
+                        <span class="feature-icon">✅</span>
+                        <div class="feature-content">
+                            <h4>Sentiment Indicators</h4>
+                            <p>Each inbound message shows sentiment analysis: 😍 Very Positive, 😊 Positive, 😐 Neutral, 😠 Negative</p>
+                        </div>
+                    </li>
+                    <li>
+                        <span class="feature-icon">✅</span>
+                        <div class="feature-content">
+                            <h4>Engagement Metrics</h4>
+                            <p>View response time, message frequency, and engagement level. Track when lead was last active.</p>
+                        </div>
+                    </li>
+                    <li>
+                        <span class="feature-icon">✅</span>
+                        <div class="feature-content">
+                            <h4>Lead Score Chart</h4>
+                            <p>Visual chart showing score progression over time. Identify trends and conversation turning points.</p>
+                        </div>
+                    </li>
+                </div>
+
+                <h3>Manual Intervention Options</h3>
+                <p style="margin-bottom: 1rem;">While AI handles most conversations, you can intervene when needed:</p>
+                
+                <div class="alert alert-warning">
+                    <span>⚠️</span>
+                    <div>
+                        <strong>Coming Soon:</strong> Manual message sending is in development. Currently, all messages go through AI to maintain conversation consistency.
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Campaigns Section -->
+        <section id="campaigns" class="content-section">
+            <div class="feature-section">
+                <h2>🚀 Complete Campaign Management Guide</h2>
+                <p style="margin-bottom: 2rem;">Campaigns are the engine that drives your lead engagement. Master campaign creation and management to maximize your AI's effectiveness.</p>
+
+                <h3>Campaign Fundamentals</h3>
+                
+                <div class="metric-grid">
+                    <div class="metric-card">
+                        <div class="metric-value">120</div>
+                        <div class="metric-label">Leads processed per hour per active campaign</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value">∞</div>
+                        <div class="metric-label">Unlimited campaigns you can create</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value">24/7</div>
+                        <div class="metric-label">AI works around the clock</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value">1:1</div>
+                        <div class="metric-label">Each campaign needs its own phone number</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="feature-section">
+                <h2>🎯 Campaign Goals & Use Cases</h2>
+                <p style="margin-bottom: 1.5rem;">Choose the right goal for your campaign to optimize AI behavior:</p>
+                
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Goal Type</th>
+                            <th>Best For</th>
+                            <th>AI Approach</th>
+                            <th>Success Metrics</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>Qualify Sellers</strong></td>
+                            <td>Real Estate - Finding motivated sellers</td>
+                            <td>Asks about timeline, motivation, condition, price expectations</td>
+                            <td>Hot lead = Ready to sell in 0-3 months</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Recruit Candidates</strong></td>
+                            <td>Staffing - Finding job seekers</td>
+                            <td>Discusses experience, availability, salary expectations, location</td>
+                            <td>Hot lead = Actively looking, qualified</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Book Demos</strong></td>
+                            <td>B2B SaaS - Software sales</td>
+                            <td>Identifies pain points, decision makers, timeline, budget</td>
+                            <td>Hot lead = Requests demo/meeting</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Lead Nurture</strong></td>
+                            <td>Long-term relationship building</td>
+                            <td>Provides value, stays top-of-mind, educates gradually</td>
+                            <td>Hot lead = Shows buying signals</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Follow-up Sequence</strong></td>
+                            <td>Re-engaging old leads</td>
+                            <td>References previous interaction, checks current status</td>
+                            <td>Hot lead = Re-engaged and interested</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Appointment Setting</strong></td>
+                            <td>Service businesses</td>
+                            <td>Qualifies need, checks availability, schedules calls</td>
+                            <td>Hot lead = Agrees to appointment</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <div class="best-practice">
+                    <h4>✅ Pro Tip: Goal Selection</h4>
+                    <p>Your campaign goal directly influences how AI conversations flow. Choose carefully based on your actual business objective, not just what sounds good. You can always create multiple campaigns with different goals for the same lead list.</p>
+                </div>
+            </div>
+
+            <div class="feature-section">
+                <h2>📱 Phone Number Management</h2>
+                
+                <h3>Phone Number Requirements</h3>
+                <div class="feature-list">
+                    <li>
+                        <span class="feature-icon">✅</span>
+                        <div class="feature-content">
+                            <h4>One Number Per Campaign</h4>
+                            <p>Each campaign requires a dedicated phone number. This ensures consistent conversations and proper tracking. Numbers can't be shared between campaigns.</p>
+                        </div>
+                    </li>
+                    <li>
+                        <span class="feature-icon">✅</span>
+                        <div class="feature-content">
+                            <h4>Local Area Codes</h4>
+                            <p>Choose numbers with area codes matching your target market. Local numbers get 3x better response rates than toll-free numbers.</p>
+                        </div>
+                    </li>
+                    <li>
+                        <span class="feature-icon">✅</span>
+                        <div class="feature-content">
+                            <h4>Number Porting</h4>
+                            <p>You can port existing business numbers into the platform. Process takes 7-10 business days. Maintain your established presence.</p>
+                        </div>
+                    </li>
+                    <li>
+                        <span class="feature-icon">✅</span>
+                        <div class="feature-content">
+                            <h4>Compliance Built-In</h4>
+                            <p>All numbers automatically handle opt-outs (STOP) and comply with TCPA regulations. Unsubscribes are processed instantly.</p>
+                        </div>
+                    </li>
+                </div>
+
+                <div class="warning-box">
+                    <h4>⚠️ Phone Number Best Practices</h4>
+                    <ul style="margin-left: 1.5rem;">
+                        <li>Purchase numbers before creating campaigns</li>
+                        <li>Don't use the same number for different types of campaigns</li>
+                        <li>Consider getting multiple numbers for high-volume campaigns</li>
+                        <li>Test numbers by texting them yourself first</li>
+                        <li>Keep some numbers in reserve for quick campaign launches</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="feature-section">
+                <h2>🤖 AI Personality Configuration</h2>
+                <p style="margin-bottom: 1.5rem;">Match your AI's personality to your audience and campaign goals:</p>
+                
+                <div class="collapsible">
+                    <div class="collapsible-header">
+                        <h3>Professional Personality</h3>
+                        <span class="collapsible-icon">▼</span>
+                    </div>
+                    <div class="collapsible-content">
+                        <h4>Characteristics:</h4>
+                        <ul style="margin-left: 1.5rem; color: #4a5568; margin-bottom: 1rem;">
+                            <li>Formal language and proper grammar</li>
+                            <li>Industry-specific terminology</li>
+                            <li>Focuses on value propositions</li>
+                            <li>Respectful of time constraints</li>
+                        </ul>
+                        
+                        <h4>Best For:</h4>
+                        <ul style="margin-left: 1.5rem; color: #4a5568; margin-bottom: 1rem;">
+                            <li>B2B campaigns</li>
+                            <li>High-value services</li>
+                            <li>Executive decision makers</li>
+                            <li>Industries like legal, financial, medical</li>
+                        </ul>
+                        
+                        <h4>Example Opening:</h4>
+                        <div class="code-block">
+"Hey [Name]! 👋 I saw you were looking into [Service] and wanted to reach out personally. How's your day going? I'd love to chat about how we can help make your life easier!"
+                        </div>
+                    </div>
+                </div>
+
+                <div class="collapsible">
+                    <div class="collapsible-header">
+                        <h3>Casual Personality</h3>
+                        <span class="collapsible-icon">▼</span>
+                    </div>
+                    <div class="collapsible-content">
+                        <h4>Characteristics:</h4>
+                        <ul style="margin-left: 1.5rem; color: #4a5568; margin-bottom: 1rem;">
+                            <li>Very relaxed, conversational tone</li>
+                            <li>Uses slang and colloquialisms appropriately</li>
+                            <li>Feels like texting with a friend</li>
+                            <li>Short, punchy messages</li>
+                        </ul>
+                        
+                        <h4>Best For:</h4>
+                        <ul style="margin-left: 1.5rem; color: #4a5568; margin-bottom: 1rem;">
+                            <li>Younger audiences (Gen Z, Millennials)</li>
+                            <li>Creative industries</li>
+                            <li>Lifestyle brands</li>
+                            <li>Event promotions</li>
+                        </ul>
+                        
+                        <h4>Example Opening:</h4>
+                        <div class="code-block">
+"Yo [Name]! Saw you checking out our stuff - pretty cool right? 😎 Got any questions or just browsing around?"
+                        </div>
+                    </div>
+                </div>
+
+                <div class="collapsible">
+                    <div class="collapsible-header">
+                        <h3>Custom AI Personalities</h3>
+                        <span class="collapsible-icon">▼</span>
+                    </div>
+                    <div class="collapsible-content">
+                        <p style="margin-bottom: 1rem;">Create unique AI personalities tailored to your brand:</p>
+                        
+                        <h4>How to Create Custom Personalities:</h4>
+                        <ol style="margin-left: 1.5rem; color: #4a5568;">
+                            <li style="margin-bottom: 0.5rem;">Go to Settings → AI Instruction Hub</li>
+                            <li style="margin-bottom: 0.5rem;">Click "Create New Personality"</li>
+                            <li style="margin-bottom: 0.5rem;">Define tone, style, and vocabulary</li>
+                            <li style="margin-bottom: 0.5rem;">Add example conversations</li>
+                            <li style="margin-bottom: 0.5rem;">Set dos and don'ts</li>
+                            <li style="margin-bottom: 0.5rem;">Test with sample leads</li>
+                        </ol>
+                    </div>
+                </div>
+            </div>
+
+            <div class="feature-section">
+                <h2>⚡ Campaign Creation Step-by-Step</h2>
+                
+                <div class="collapsible active">
+                    <div class="collapsible-header">
+                        <h3>Step 1: Campaign Basics</h3>
+                        <span class="collapsible-icon">▼</span>
+                    </div>
+                    <div class="collapsible-content">
+                        <ol style="margin-left: 1.5rem; color: #4a5568;">
+                            <li style="margin-bottom: 1rem;"><strong>Campaign Name:</strong> Use descriptive names like "Q2 2024 Home Sellers - Phoenix" or "Tech Recruiting - Senior Devs". This helps with organization and reporting.</li>
+                            <li style="margin-bottom: 1rem;"><strong>Description:</strong> Add details about lead source, expected volume, and any special instructions. Your team will thank you later.</li>
+                            <li style="margin-bottom: 1rem;"><strong>Campaign Goal:</strong> Select from the 6 pre-configured goals. This determines AI conversation flow and hot lead criteria.</li>
+                            <li style="margin-bottom: 1rem;"><strong>Campaign Color:</strong> Choose a color for visual organization in analytics and dashboards. Group similar campaigns with similar colors.</li>
+                        </ol>
+                    </div>
+                </div>
+
+                <div class="collapsible">
+                    <div class="collapsible-header">
+                        <h3>Step 2: AI Configuration</h3>
+                        <span class="collapsible-icon">▼</span>
+                    </div>
+                    <div class="collapsible-content">
+                        <ol style="margin-left: 1.5rem; color: #4a5568;">
+                            <li style="margin-bottom: 1rem;"><strong>Select AI Personality:</strong> Choose from Professional, Friendly, Casual, or custom personalities you've created.</li>
+                            <li style="margin-bottom: 1rem;"><strong>AI On/Off Toggle:</strong> You can create campaigns with AI disabled if you only want to collect responses without automated replies.</li>
+                            <li style="margin-bottom: 1rem;"><strong>Response Speed:</strong> Default is immediate. Can be adjusted in Settings → Messaging for more human-like delays.</li>
+                            <li style="margin-bottom: 1rem;"><strong>Escalation Rules:</strong> Set when leads should be marked as "hot" - uses global settings by default but can be customized per campaign.</li>
+                        </ol>
+                    </div>
+                </div>
+
+                <div class="collapsible">
+                    <div class="collapsible-header">
+                        <h3>Step 3: Resources & Assignment</h3>
+                        <span class="collapsible-icon">▼</span>
+                    </div>
+                    <div class="collapsible-content">
+                        <ol style="margin-left: 1.5rem; color: #4a5568;">
+                            <li style="margin-bottom: 1rem;"><strong>Phone Number:</strong> Select from available numbers or purchase new one. Remember: one campaign = one number.</li>
+                            <li style="margin-bottom: 1rem;"><strong>Sales Team Assignment:</strong> Choose which team member receives hot leads from this campaign. Can be changed later.</li>
+                            <li style="margin-bottom: 1rem;"><strong>Routing Tags:</strong> Add tags like "spanish-speaking" or "high-value" to automatically route special leads.</li>
+                            <li style="margin-bottom: 1rem;"><strong>Launch Settings:</strong> Campaign starts active by default. You can create in paused state to upload leads first.</li>
+                        </ol>
+                        
+                        <div class="alert alert-info">
+                            <span>💡</span>
+                            <div>
+                                <strong>Pro Move:</strong> Create campaigns in paused state, upload all leads, review settings one more time, then activate. This prevents accidental messages while you're still setting up.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="feature-section">
+                <h2>🎮 Campaign Control Panel</h2>
+                
+                <h3>Campaign States Explained</h3>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>State</th>
+                            <th>What It Means</th>
+                            <th>AI Behavior</th>
+                            <th>Common Use Case</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><span style="color: #16a34a; font-weight: 600;">▶️ Active + AI On</span></td>
+                            <td>Fully operational campaign</td>
+                            <td>Processing new leads, sending messages, responding to replies</td>
+                            <td>Normal production campaigns</td>
+                        </tr>
+                        <tr>
+                            <td><span style="color: #ea580c; font-weight: 600;">⏸️ Paused + AI On</span></td>
+                            <td>Temporarily stopped</td>
+                            <td>Not processing new leads, but still responding to incoming messages</td>
+                            <td>Adjusting settings, upload issues</td>
+                        </tr>
+                        <tr>
+                            <td><span style="color: #6b7280; font-weight: 600;">▶️ Active + AI Off</span></td>
+                            <td>Collection mode only</td>
+                            <td>Records responses but doesn't reply automatically</td>
+                            <td>Manual follow-up campaigns</td>
+                        </tr>
+                        <tr>
+                            <td><span style="color: #6b7280; font-weight: 600;">📁 Archived</span></td>
+                            <td>Hidden from main view</td>
+                            <td>No activity, preserves historical data</td>
+                            <td>Completed campaigns</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <h3>Real-Time Campaign Metrics</h3>
+                <div class="metric-grid">
+                    <div class="metric-card">
+                        <div class="metric-label">Total Leads</div>
+                        <div class="metric-value" style="font-size: 1.5rem;">1,247</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">Messages Sent</div>
+                        <div class="metric-value" style="font-size: 1.5rem;">892</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">Response Rate</div>
+                        <div class="metric-value" style="font-size: 1.5rem;">34%</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">Hot Leads</div>
+                        <div class="metric-value" style="font-size: 1.5rem;">47</div>
+                    </div>
+                </div>
+
+                <div class="warning-box">
+                    <h4>⚠️ Processing Limits</h4>
+                    <p>Each active campaign processes ~120 leads per hour. With 5 active campaigns, you're processing 600 leads/hour. Plan accordingly for large uploads - a 10,000 lead list with one campaign takes ~83 hours to fully process.</p>
+                </div>
+            </div>
+
+            <div class="feature-section">
+                <h2>📊 Campaign Performance Optimization</h2>
+                
+                <h3>Key Performance Indicators</h3>
+                <div class="feature-list">
+                    <li>
+                        <span class="feature-icon">✅</span>
+                        <div class="feature-content">
+                            <h4>Initial Response Rate</h4>
+                            <p>Percentage of leads who reply to first message. Industry average: 15-25%. Below 10%? Check your opening message and timing.</p>
+                        </div>
+                    </li>
+                    <li>
+                        <span class="feature-icon">✅</span>
+                        <div class="feature-content">
+                            <h4>Conversation Depth</h4>
+                            <p>Average messages exchanged per lead. More messages = higher engagement. Aim for 4-6 messages before hot lead status.</p>
+                        </div>
+                    </li>
+                    <li>
+                        <span class="feature-icon">✅</span>
+                        <div class="feature-content">
+                            <h4>Hot Lead Conversion</h4>
+                            <p>Percentage of engaged leads that become hot. Should be 10-20% of responders. Too high? You might be missing opportunities. Too low? Tighten criteria.</p>
+                        </div>
+                    </li>
+                    <li>
+                        <span class="feature-icon">✅</span>
+                        <div class="feature-content">
+                            <h4>Speed to Hot</h4>
+                            <p>Time from first contact to hot lead status. Faster is usually better - indicates strong initial messaging and proper lead targeting.</p>
+                        </div>
+                    </li>
+                    <li>
+                        <span class="feature-icon">✅</span>
+                        <div class="feature-content">
+                            <h4>Sales Acceptance Rate</h4>
+                            <p>Percentage of hot leads your sales team confirms as qualified. Below 70%? Adjust AI escalation criteria.</p>
+                        </div>
+                    </li>
+                </div>
+
+                <div class="best-practice">
+                    <h4>✅ Optimization Checklist</h4>
+                    <ul style="margin-left: 1.5rem;">
+                        <li>Run A/B tests on opening messages monthly</li>
+                        <li>Review AI conversations weekly for quality</li>
+                        <li>Get sales team feedback on lead quality</li>
+                        <li>Adjust escalation thresholds based on outcomes</li>
+                        <li>Test different AI personalities with same list</li>
+                        <li>Monitor unsubscribe rates (should be under 2%)</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <!-- AI Features Section -->
+        <section id="ai-features" class="content-section">
+            <div class="feature-section">
+                <h2>🤖 AI Engine Deep Dive</h2>
+                <p style="margin-bottom: 2rem;">Understanding how the AI works helps you optimize performance and get better results. Here's everything you need to know about the AI engine powering your conversations.</p>
+
+                <h3>Core AI Capabilities</h3>
+                <div class="cards-grid">
+                    <div class="card">
+                        <h3>🧠 Natural Language Processing</h3>
+                        <p>AI understands context, intent, and nuance in conversations. It remembers previous messages, adapts responses based on lead behavior, and maintains consistent personality throughout.</p>
+                    </div>
+                    <div class="card">
+                        <h3>📊 Real-Time Analysis</h3>
+                        <p>Every message is analyzed for sentiment, urgency, buying signals, and objections. Scores update instantly, helping identify hot leads the moment they show interest.</p>
+                    </div>
+                    <div class="card">
+                        <h3>🎯 Smart Escalation</h3>
+                        <p>AI knows when to hand off to humans. It detects complex questions, high-value opportunities, and perfect timing for sales intervention.</p>
+                    </div>
+                    <div class="card">
+                        <h3>📚 Knowledge Integration</h3>
+                        <p>Upload your company docs, FAQs, and product info. AI references this knowledge to answer specific questions accurately without hallucination.</p>
+                    </div>
+                    <div class="card">
+                        <h3>🔄 Continuous Learning</h3>
+                        <p>While AI doesn't learn from individual conversations, you can update its knowledge base and instructions based on performance data.</p>
+                    </div>
+                    <div class="card">
+                        <h3>🛡️ Compliance Built-In</h3>
+                        <p>Automatic handling of opt-outs, TCPA compliance, and appropriate response timing. AI never texts outside business hours unless configured.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="feature-section">
+                <h2>💬 Conversation Intelligence</h2>
+                
+                <h3>What AI Analyzes in Every Message</h3>
+                <div class="feature-list">
+                    <li>
+                        <span class="feature-icon">✅</span>
+                        <div class="feature-content">
+                            <h4>Sentiment Score (-1 to +1)</h4>
+                            <p>Measures emotional tone of the message. Positive sentiment (>0.5) indicates interest and engagement. Negative sentiment (<-0.3) might indicate frustration or disinterest. AI adjusts approach based on sentiment trends.</p>
+                        </div>
+                    </li>
+                    <li>
+                        <span class="feature-icon">✅</span>
+                        <div class="feature-content">
+                            <h4>Urgency Detection</h4>
+                            <p>Identifies time-sensitive language like "need this soon", "by next week", "ASAP". High urgency combined with positive sentiment fast-tracks hot lead status.</p>
+                        </div>
+                    </li>
+                    <li>
+                        <span class="feature-icon">✅</span>
+                        <div class="feature-content">
+                            <h4>Hesitation Indicators</h4>
+                            <p>Detects uncertainty phrases like "not sure", "maybe", "I'll think about it". AI responds with reassurance and addresses concerns without being pushy.</p>
+                        </div>
+                    </li>
+                    <li>
+                        <span class="feature-icon">✅</span>
+                        <div class="feature-content">
+                            <h4>Qualification Signals</h4>
+                            <p>Looks for budget mentions, timeline discussions, decision-maker identification. These signals increase lead score dramatically.</p>
+                        </div>
+                    </li>
+                    <li>
+                        <span class="feature-icon">✅</span>
+                        <div class="feature-content">
+                            <h4>Engagement Depth</h4>
+                            <p>Measures message length, question asking, and topic exploration. Deeper engagement indicates genuine interest vs. polite responses.</p>
+                        </div>
+                    </li>
+                </div>
+
+                <h3>AI Response Strategies</h3>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Lead Behavior</th>
+                            <th>AI Strategy</th>
+                            <th>Example Response</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Short, minimal responses</td>
+                            <td>Ask open-ended questions</td>
+                            <td>"I'd love to understand more about what you're looking for. What's most important to you in [solution]?"</td>
+                        </tr>
+                        <tr>
+                            <td>Asking specific questions</td>
+                            <td>Provide detailed answers + soft CTA</td>
+                            <td>"Great question! [Detailed answer]. Would you like to discuss how this could work for your specific situation?"</td>
+                        </tr>
+                        <tr>
+                            <td>Expressing concerns</td>
+                            <td>Address directly + social proof</td>
+                            <td>"I understand your concern about [issue]. Many of our clients felt the same way initially. Here's how we address that..."</td>
+                        </tr>
+                        <tr>
+                            <td>High interest signals</td>
+                            <td>Move toward commitment</td>
+                            <td>"It sounds like this could be a great fit! The best next step would be a quick call with our specialist. What's your availability like this week?"</td>
+                        </tr>
+                        <tr>
+                            <td>Going cold/delayed responses</td>
+                            <td>Re-engagement attempt</td>
+                            <td>"Hey [Name], just wanted to check back in. I know things get busy. Is this still something you're interested in exploring?"</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="feature-section">
+                <h2>🧪 A/B Testing Mastery</h2>
+                <p style="margin-bottom: 1.5rem;">The A/B testing framework lets you optimize every aspect of your AI conversations with scientific precision.</p>
+
+                <h3>What You Can Test</h3>
+                <div class="feature-list">
+                    <li>
+                        <span class="feature-icon">✅</span>
+                        <div class="feature-content">
+                            <h4>Opening Messages</h4>
+                            <p>Test different hooks, value propositions, and approaches. Example: Professional intro vs. casual greeting vs. question-based opener.</p>
+                        </div>
+                    </li>
+                    <li>
+                        <span class="feature-icon">✅</span>
+                        <div class="feature-content">
+                            <h4>AI Tone Variations</h4>
+                            <p>Compare conversion rates between Professional, Friendly, Casual, or Custom personalities on the same lead list.</p>
+                        </div>
+                    </li>
+                    <li>
+                        <span class="feature-icon">✅</span>
+                        <div class="feature-content">
+                            <h4>Follow-up Timing</h4>
+                            <p>Test immediate vs. 1-hour vs. next-day follow-ups. Find the sweet spot for your audience.</p>
+                        </div>
+                    </li>
+                    <li>
+                        <span class="feature-icon">✅</span>
+                        <div class="feature-content">
+                            <h4>Message Sequences</h4>
+                            <p>Compare different conversation flows. Should you ask for contact info early or build rapport first?</p>
+                        </div>
+                    </li>
+                    <li>
+                        <span class="feature-icon">✅</span>
+                        <div class="feature-content">
+                            <h4>Value Propositions</h4>
+                            <p>Test different benefits and pain points. Price-focused vs. service-focused vs. results-focused messaging.</p>
+                        </div>
+                    </li>
+                </div>
+
+                <h3>A/B Testing Best Practices</h3>
+                <div class="best-practice">
+                    <h4>✅ Testing Guidelines</h4>
+                    <ul style="margin-left: 1.5rem;">
+                        <li><strong>One Variable at a Time:</strong> Only test one element to clearly identify what drives results</li>
+                        <li><strong>Sufficient Sample Size:</strong> Need at least 100-200 leads per variant for statistical significance</li>
+                        <li><strong>Run Full Cycle:</strong> Let tests run 7-14 days to account for different response patterns</li>
+                        <li><strong>Document Everything:</strong> Keep notes on what you tested and why for future reference</li>
+                        <li><strong>Apply Learnings:</strong> Winner becomes new control for next test</li>
+                    </ul>
+                </div>
+
+                <h3>Understanding Test Results</h3>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Confidence Level</th>
+                            <th>What It Means</th>
+                            <th>Action to Take</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>95%+ ✅</td>
+                            <td>Statistically significant winner</td>
+                            <td>Implement winning variant across all campaigns</td>
+                        </tr>
+                        <tr>
+                            <td>70-94% 🟡</td>
+                            <td>Trending toward significance</td>
+                            <td>Continue test for more data</td>
+                        </tr>
+                        <tr>
+                            <td>Below 70% ⏳</td>
+                            <td>Insufficient data</td>
+                            <td>Need more participants or time</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="feature-section">
+                <h2>🎯 AI Instructions & Customization</h2>
+                
+                <h3>Creating Custom AI Instructions</h3>
+                <p style="margin-bottom: 1rem;">Navigate to Settings → AI Instruction Hub to create custom behaviors:</p>
+                
+                <div class="collapsible">
+                    <div class="collapsible-header">
+                        <h3>Industry-Specific Templates</h3>
+                        <span class="collapsible-icon">▼</span>
+                    </div>
+                    <div class="collapsible-content">
+                        <h4>Real Estate Investor Template:</h4>
+                        <div class="code-block">
+You are a friendly real estate investment specialist focused on helping homeowners who need to sell quickly. 
+
+Your approach is empathetic and solution-oriented. You understand that selling a home can be stressful, and you're here to make it easier.
+
+Key Discovery Questions:
+1. "What's motivating you to sell at this time?"
+2. "What's your ideal timeline for moving?"
+3. "Tell me a bit about the property - how long have you owned it?"
+4. "Are there any repairs or updates needed?"
+5. "Have you already looked into traditional listing?"
+
+Qualifying Indicators for Hot Lead:
+- Timeline of 0-3 months
+- Motivated by: relocation, financial distress, inherited property, divorce
+- Open to cash offer
+- Concerned about condition/repairs
+- Wants to avoid realtor hassles
+
+Value Props to Emphasize:
+- Cash offer within 24-48 hours
+- Close in as little as 7 days
+- No repairs or cleaning needed
+- No realtor commissions or fees
+- We handle all the paperwork
+
+Common Objections & Responses:
+"Price too low" → "I understand price is important. Our cash offers account for the speed and convenience we provide. No repairs, no showings, no uncertainty. What aspects are most important to you - price, speed, or convenience?"
+
+"Need to think about it" → "Of course! This is a big decision. What specific concerns can I address? I'm here to answer any questions, with no pressure."
+
+Escalate to human when:
+- They express strong interest in getting an offer
+- Timeline is under 30 days
+- They provide property address
+- They ask detailed process questions
+- Sentiment is highly positive after 3+ exchanges
+                        </div>
+
+                        <h4>Staffing/Recruiting Template:</h4>
+                        <div class="code-block">
+You are a professional recruiter helping connect talented professionals with great opportunities.
+
+Your tone is enthusiastic yet professional. You genuinely care about finding the right fit for both candidates and clients.
+
+Key Discovery Questions:
+1. "What type of role would be ideal for your next career move?"
+2. "What's most important to you in your next position?"
+3. "Are you actively looking or just exploring options?"
+4. "What's your availability for starting a new position?"
+5. "What salary range would make a move worthwhile for you?"
+
+Qualifying Indicators for Hot Lead:
+- Actively interviewing
+- Can start within 30 days
+- Realistic salary expectations
+- Skills match current openings
+- Open to contract or permanent placement
+
+Value Props to Emphasize:
+- Exclusive access to hidden opportunities
+- Direct relationships with hiring managers
+- Interview coaching and resume optimization
+- Competitive compensation packages
+- Long-term career partnership
+
+Common Objections & Responses:
+"Happy where I am" → "That's great to hear! Even when happy, it's smart to know your market value. Would you be open to hearing about opportunities that could advance your career?"
+
+"Not looking right now" → "I understand. Many of our best placements weren't actively looking. Can I share what we're seeing in the market for someone with your background?"
+
+Escalate to human when:
+- Actively looking and qualified
+- Asks about specific positions
+- Provides detailed work history
+- Available for immediate placement
+- Shows high interest in multiple exchanges
+                        </div>
+
+                        <h4>B2B SaaS Template:</h4>
+                        <div class="code-block">
+You are a solutions consultant helping businesses streamline their operations with innovative software.
+
+Your approach is consultative and educational. Focus on understanding their challenges before presenting solutions.
+
+Key Discovery Questions:
+1. "What challenges are you facing with [current process]?"
+2. "How is your team currently handling [specific task]?"
+3. "What would ideal solution look like for you?"
+4. "Who else would be involved in evaluating solutions?"
+5. "What's your timeline for implementing a solution?"
+
+Qualifying Indicators for Hot Lead:
+- Clear pain point identified
+- Budget allocated or available
+- Decision maker engaged
+- Timeline within 3 months
+- Current solution inadequate
+
+Value Props to Emphasize:
+- ROI within 6 months
+- Seamless integration
+- Dedicated success team
+- Industry-leading features
+- Proven results with similar companies
+
+Common Objections & Responses:
+"Already have a solution" → "How's that working for you? We often help companies enhance their existing tools. What would make your current solution perfect?"
+
+"No budget" → "I understand. Many clients find our ROI justifies the investment. Would it be helpful to see how similar companies funded their implementation?"
+
+Escalate to human when:
+- Requests demo or trial
+- Provides specific requirements
+- Multiple stakeholders involved
+- Budget conversation initiated
+- Technical questions beyond basics
+                        </div>
+                    </div>
+                </div>
+
+                <div class="warning-box">
+                    <h4>⚠️ AI Instruction Pitfalls to Avoid</h4>
+                    <ul style="margin-left: 1.5rem;">
+                        <li>Over-scripting: Too rigid instructions make conversations robotic</li>
+                        <li>Aggressive tactics: Pushy language increases unsubscribes</li>
+                        <li>False claims: Don't promise what you can't deliver</li>
+                        <li>Ignoring regulations: Include required disclosures</li>
+                        <li>One-size-fits-all: Different lead sources need different approaches</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="feature-section">
+                <h2>📚 AI Knowledge Base Best Practices</h2>
+                
+                <h3>Document Organization</h3>
+                <div class="feature-list">
+                    <li>
+                        <span class="feature-icon">✅</span>
+                        <div class="feature-content">
+                            <h4>Master FAQ Document</h4>
+                            <p>Create one comprehensive FAQ covering all common questions. Format with clear headers and concise answers. Update monthly based on actual conversations.</p>
+                        </div>
+                    </li>
+                    <li>
+                        <span class="feature-icon">✅</span>
+                        <div class="feature-content">
+                            <h4>Product/Service Details</h4>
+                            <p>Include features, benefits, pricing (if public), process steps, timeline, and requirements. Use bullet points for easy AI parsing.</p>
+                        </div>
+                    </li>
+                    <li>
+                        <span class="feature-icon">✅</span>
+                        <div class="feature-content">
+                            <h4>Company Background</h4>
+                            <p>Brief history, credentials, awards, differentiators, team size, locations. Helps AI build credibility naturally in conversations.</p>
+                        </div>
+                    </li>
+                    <li>
+                        <span class="feature-icon">✅</span>
+                        <div class="feature-content">
+                            <h4>Case Studies & Testimonials</h4>
+                            <p>3-5 success stories AI can reference. Include client type, challenge, solution, and results. Powerful for objection handling.</p>
+                        </div>
+                    </li>
+                </div>
+
+                <h3>Knowledge Base Formatting</h3>
+                <div class="code-block">
+# COMPANY FAQ - ABC Real Estate Investments
+
+## About Our Company
+ABC Investments has been purchasing homes for cash since 2010. We've helped over 5,000 homeowners sell quickly and easily.
+
+## Frequently Asked Questions
+
+### How quickly can you close?
+We can close in as little as 7 days, but we work on your timeline. The average closing is 2-3 weeks.
+
+### Do I need to make repairs?
+No repairs needed. We buy houses as-is, saving you time and money.
+
+### How do you determine your offer?
+We consider:
+- Property location and condition
+- Recent comparable sales
+- Repair costs needed
+- Current market conditions
+
+### Are there any fees?
+No fees or commissions. We even cover closing costs.
+
+## DO NOT SHARE - Internal Only
+- Our typical offer is 70-80% of ARV minus repairs
+- Minimum deal size is $50,000 profit potential
+- We avoid properties with major foundation issues
+                </div>
+
+                <div class="best-practice">
+                    <h4>✅ Knowledge Base Maintenance</h4>
+                    <ul style="margin-left: 1.5rem;">
+                        <li>Review AI conversations weekly for knowledge gaps</li>
+                        <li>Update FAQ based on real questions from leads</li>
+                        <li>Version control: Keep document history</li>
+                        <li>Test by asking AI questions after updates</li>
+                        <li>Keep documents under 10 pages for best results</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="feature-section">
+                <h2>🔧 System Tools & Maintenance</h2>
+                
+                <h3>Data Export Options</h3>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Export Type</th>
+                            <th>Includes</th>
+                            <th>Format</th>
+                            <th>Use Case</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>Lead Export</strong></td>
+                            <td>All lead data, custom fields, status, scores</td>
+                            <td>CSV, Excel</td>
+                            <td>CRM sync, analysis, backup</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Conversation Export</strong></td>
+                            <td>Full message history with timestamps</td>
+                            <td>PDF, Text</td>
+                            <td>Compliance, training, quality review</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Analytics Export</strong></td>
+                            <td>Performance metrics, trends, ROI data</td>
+                            <td>CSV, Excel</td>
+                            <td>Executive reporting, deep analysis</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Billing Export</strong></td>
+                            <td>Usage, costs, invoices</td>
+                            <td>PDF</td>
+                            <td>Accounting, budgeting</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <h3>API Access (Coming Soon)</h3>
+                <div class="alert alert-info">
+                    <span>🔌</span>
+                    <div>
+                        <strong>API Integration:</strong> REST API for custom integrations is in development. Will support lead creation, status updates, conversation access, and analytics retrieval.
+                    </div>
+                </div>
+
+                <h3>Backup Best Practices</h3>
+                <div class="best-practice">
+                    <h4>✅ Recommended Backup Schedule</h4>
+                    <ul style="margin-left: 1.5rem;">
+                        <li><strong>Daily:</strong> Hot leads and active conversations</li>
+                        <li><strong>Weekly:</strong> All leads and campaign settings</li>
+                        <li><strong>Monthly:</strong> Complete system backup including analytics</li>
+                        <li><strong>Quarterly:</strong> Archive old conversations to external storage</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <!-- Integrations Section -->
+        <section id="integrations" class="content-section">
+            <div class="feature-section">
+                <h2>🔌 Integrations & Workflows</h2>
+                <p style="margin-bottom: 2rem;">Connect your AI texting platform with your existing tech stack for seamless operations.</p>
+
+                <h3>Current Integration Methods</h3>
+                <div class="cards-grid">
+                    <div class="card">
+                        <h3>📊 CSV Import/Export</h3>
+                        <p>Bulk data transfer between systems. Import leads from any source, export results to any CRM. Manual but reliable for all platforms.</p>
+                    </div>
+                    <div class="card">
+                        <h3>📧 Email Notifications</h3>
+                        <p>Real-time alerts for hot leads sent to your team. Includes conversation summary and quick action links.</p>
+                    </div>
+                    <div class="card">
+                        <h3>📱 SMS Alerts</h3>
+                        <p>Instant text notifications for urgent hot leads. Ensures your sales team never misses an opportunity.</p>
+                    </div>
+                    <div class="card">
+                        <h3>🔗 Webhook Events (Coming)</h3>
+                        <p>Real-time data push to your systems. Trigger workflows in Zapier, Make, or custom applications.</p>
+                    </div>
+                    <div class="card">
+                        <h3>🚀 API Access (Coming)</h3>
+                        <p>Full programmatic access to create leads, read conversations, update statuses, and pull analytics.</p>
+                    </div>
+                    <div class="card">
+                        <h3>🤝 Native Integrations (Planned)</h3>
+                        <p>Direct connections to popular CRMs like Salesforce, HubSpot, and Pipedrive coming soon.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="feature-section">
+                <h2>🔄 Common Integration Workflows</h2>
+                
+                <div class="collapsible">
+                    <div class="collapsible-header">
+                        <h3>CRM Synchronization Workflow</h3>
+                        <span class="collapsible-icon">▼</span>
+                    </div>
+                    <div class="collapsible-content">
+                        <h4>Current Manual Process:</h4>
+                        <ol style="margin-left: 1.5rem; color: #4a5568; margin-bottom: 1rem;">
+                            <li>Export leads from CRM as CSV</li>
+                            <li>Map fields to platform template</li>
+                            <li>Import to AI texting platform</li>
+                            <li>AI engages and qualifies leads</li>
+                            <li>Export hot leads daily</li>
+                            <li>Import back to CRM with updated status</li>
+                        </ol>
+                        
+                        <h4>Automation Tips:</h4>
+                        <ul style="margin-left: 1.5rem; color: #4a5568;">
+                            <li>Set up scheduled exports from CRM</li>
+                            <li>Use spreadsheet tools for field mapping</li>
+                            <li>Create import templates for consistency</li>
+                            <li>Establish daily sync routines</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="collapsible">
+                    <div class="collapsible-header">
+                        <h3>Marketing Automation Integration</h3>
+                        <span class="collapsible-icon">▼</span>
+                    </div>
+                    <div class="collapsible-content">
+                        <h4>Lead Flow Architecture:</h4>
+                        <div class="process-flow" style="margin: 1.5rem 0;">
+                            <div class="process-step">
+                                <div class="process-icon">📧</div>
+                                <div class="process-label">Email Campaign</div>
+                            </div>
+                            <div class="process-step">
+                                <div class="process-icon">📝</div>
+                                <div class="process-label">Form Submission</div>
+                            </div>
+                            <div class="process-step">
+                                <div class="process-icon">🤖</div>
+                                <div class="process-label">AI Texting</div>
+                            </div>
+                            <div class="process-step">
+                                <div class="process-icon">🔥</div>
+                                <div class="process-label">Hot Lead</div>
+                            </div>
+                            <div class="process-step">
+                                <div class="process-icon">💼</div>
+                                <div class="process-label">CRM Deal</div>
+                            </div>
+                        </div>
+                        
+                        <h4>Integration Points:</h4>
+                        <ul style="margin-left: 1.5rem; color: #4a5568;">
+                            <li><strong>Form Submissions:</strong> Auto-add to AI texting with web form integration</li>
+                            <li><strong>Email Responders:</strong> Trigger SMS outreach for engaged email leads</li>
+                            <li><strong>Lead Scoring:</strong> Combine email + SMS engagement scores</li>
+                            <li><strong>Suppression Lists:</strong> Sync opt-outs across all channels</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="collapsible">
+                    <div class="collapsible-header">
+                        <h3>Sales Tool Stack Integration</h3>
+                        <span class="collapsible-icon">▼</span>
+                    </div>
+                    <div class="collapsible-content">
+                        <h4>Common Sales Stack Connections:</h4>
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Tool Type</th>
+                                    <th>Integration Method</th>
+                                    <th>Data Flow</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><strong>Calendar (Calendly, etc)</strong></td>
+                                    <td>Share booking links in AI conversations</td>
+                                    <td>AI provides link → Lead books → Notification to platform</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Dialer (PowerDialer, etc)</strong></td>
+                                    <td>Export hot lead phone numbers</td>
+                                    <td>Hot lead → CSV export → Import to dialer queue</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Email Sequences</strong></td>
+                                    <td>Trigger based on AI outcome</td>
+                                    <td>Cold in SMS → Add to email nurture campaign</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Proposal Tools</strong></td>
+                                    <td>Generate from qualified lead data</td>
+                                    <td>Export lead details → Create proposal → Track engagement</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="feature-section">
+                <h2>🚀 Future Integration Roadmap</h2>
+                
+                <div class="alert alert-info">
+                    <span>🔮</span>
+                    <div>
+                        <strong>Coming in 2024:</strong> Native integrations with major CRMs, webhook support, Zapier app, and full REST API. Stay tuned for updates!
+                    </div>
+                </div>
+
+                <h3>Planned Integrations</h3>
+                <div class="metric-grid">
+                    <div class="metric-card">
+                        <div class="metric-value">🔗</div>
+                        <div class="metric-label">
+                            <strong>Salesforce</strong><br>
+                            Bi-directional sync, custom objects, workflow triggers
+                        </div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value">🔗</div>
+                        <div class="metric-label">
+                            <strong>HubSpot</strong><br>
+                            Contact sync, deal creation, timeline events
+                        </div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value">🔗</div>
+                        <div class="metric-label">
+                            <strong>Zapier</strong><br>
+                            1000+ app connections, custom workflows
+                        </div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value">🔗</div>
+                        <div class="metric-label">
+                            <strong>Slack</strong><br>
+                            Hot lead alerts, team notifications, conversation summaries
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Troubleshooting Section -->
+        <section id="troubleshooting" class="content-section">
+            <div class="feature-section">
+                <h2>🔧 Troubleshooting Guide</h2>
+                <p style="margin-bottom: 2rem;">Quick solutions to common issues. Most problems can be resolved in minutes with these troubleshooting steps.</p>
+
+                <h3>🚨 Critical Issues - Immediate Action Required</h3>
+                
+                <div class="collapsible">
+                    <div class="collapsible-header">
+                        <h3>AI Not Sending Any Messages</h3>
+                        <span class="collapsible-icon">▼</span>
+                    </div>
+                    <div class="collapsible-content">
+                        <div class="alert alert-danger">
+                            <span>🚨</span>
+                            <div>
+                                <strong>Impact:</strong> No lead engagement, potential revenue loss
+                            </div>
+                        </div>
+                        
+                        <h4>Diagnostic Steps:</h4>
+                        <ol style="margin-left: 1.5rem; color: #4a5568; margin-bottom: 1rem;">
+                            <li style="margin-bottom: 0.5rem;"><strong>Check Campaign Status:</strong> Is it Active? Is AI turned ON?</li>
+                            <li style="margin-bottom: 0.5rem;"><strong>Verify Phone Number:</strong> Is one assigned? Is it active/verified?</li>
+                            <li style="margin-bottom: 0.5rem;"><strong>Review Lead Status:</strong> Are leads assigned to the campaign?</li>
+                            <li style="margin-bottom: 0.5rem;"><strong>Check Time Settings:</strong> Are you within business hours?</li>
+                            <li style="margin-bottom: 0.5rem;"><strong>Message Throttle:</strong> Have you hit daily/hourly limits?</li>
+                            <li style="margin-bottom: 0.5rem;"><strong>System Health:</strong> Check Control Room for red indicators</li>
+                        </ol>
+                        
+                        <h4>Quick Fixes:</h4>
+                        <ul style="margin-left: 1.5rem; color: #4a5568;">
+                            <li>Toggle campaign off/on to reset</li>
+                            <li>Verify phone number by texting it yourself</li>
+                            <li>Check Settings → Messaging for throttle limits</li>
+                            <li>Ensure leads have valid phone numbers with country code</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="collapsible">
+                    <div class="collapsible-header">
+                        <h3>Hot Leads Not Being Detected</h3>
+                        <span class="collapsible-icon">▼</span>
+                    </div>
+                    <div class="collapsible-content">
+                        <h4>Common Causes:</h4>
+                        <ul style="margin-left: 1.5rem; color: #4a5568; margin-bottom: 1rem;">
+                            <li>Escalation threshold set too high (>85)</li>
+                            <li>AI personality mismatch with audience</li>
+                            <li>Campaign goal doesn't match lead intent</li>
+                            <li>Conversations ending too early</li>
+                        </ul>
+                        
+                        <h4>Solutions:</h4>
+                        <ol style="margin-left: 1.5rem; color: #4a5568;">
+                            <li style="margin-bottom: 0.5rem;">Review recent conversations - are leads showing interest?</li>
+                            <li style="margin-bottom: 0.5rem;">Lower threshold to 70 temporarily and monitor</li>
+                            <li style="margin-bottom: 0.5rem;">Check if AI is asking qualifying questions</li>
+                            <li style="margin-bottom: 0.5rem;">Ensure follow-up messages are enabled</li>
+                            <li style="margin-bottom: 0.5rem;">Run A/B test with different approach</li>
+                        </ol>
+                    </div>
+                </div>
+
+                <div class="collapsible">
+                    <div class="collapsible-header">
+                        <h3>High Unsubscribe Rate (>3%)</h3>
+                        <span class="collapsible-icon">▼</span>
+                    </div>
+                    <div class="collapsible-content">
+                        <div class="warning-box">
+                            <h4>⚠️ Risk: High unsubscribes can damage sender reputation</h4>
+                            <p>Address immediately to prevent delivery issues</p>
+                        </div>
+                        
+                        <h4>Diagnostic Questions:</h4>
+                        <ul style="margin-left: 1.5rem; color: #4a5568; margin-bottom: 1rem;">
+                            <li>Is your opening message too aggressive?</li>
+                            <li>Are you texting outside business hours?</li>
+                            <li>Is lead source quality poor?</li>
+                            <li>Frequency too high? (>1 message/day)</li>
+                            <li>Message content spammy or misleading?</li>
+                        </ul>
+                        
+                        <h4>Immediate Actions:</h4>
+                        <ol style="margin-left: 1.5rem; color: #4a5568;">
+                            <li style="margin-bottom: 0.5rem;">Pause campaign temporarily</li>
+                            <li style="margin-bottom: 0.5rem;">Review and soften opening message</li>
+                            <li style="margin-bottom: 0.5rem;">Verify lead consent/source quality</li>
+                            <li style="margin-bottom: 0.5rem;">Reduce follow-up frequency</li>
+                            <li style="margin-bottom: 0.5rem;">A/B test friendlier approach</li>
+                        </ol>
+                    </div>
+                </div>
+            </div>
+
+            <div class="feature-section">
+                <h2>⚠️ Common Issues & Solutions</h2>
+                
+                <div class="collapsible">
+                    <div class="collapsible-header">
+                        <h3>CSV Import Failing</h3>
+                        <span class="collapsible-icon">▼</span>
+                    </div>
+                    <div class="collapsible-content">
+                        <h4>Error: "Invalid file format"</h4>
+                        <ul style="margin-left: 1.5rem; color: #4a5568; margin-bottom: 1rem;">
+                            <li>Save as CSV (not Excel format)</li>
+                            <li>Use UTF-8 encoding</li>
+                            <li>Remove any formulas or formatting</li>
+                            <li>Check for hidden columns/rows</li>
+                        </ul>
+                        
+                        <h4>Error: "Headers don't match"</h4>
+                        <ul style="margin-left: 1.5rem; color: #4a5568; margin-bottom: 1rem;">
+                            <li>Download fresh template from platform</li>
+                            <li>Headers are case-sensitive</li>
+                            <li>Remove any trailing spaces</li>
+                            <li>Don't add/remove columns</li>
+                        </ul>
+                        
+                        <h4>Error: "Invalid phone numbers"</h4>
+                        <ul style="margin-left: 1.5rem; color: #4a5568;">
+                            <li>Include country code (+1 for US)</li>
+                            <li>Remove special characters: ()-.</li>
+                            <li>Format: +15551234567</li>
+                            <li>No extensions or letters</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="collapsible">
+                    <div class="collapsible-header">
+                        <h3>Sales Team Not Getting Notifications</h3>
+                        <span class="collapsible-icon">▼</span>
+                    </div>
+                    <div class="collapsible-content">
+                        <h4>Check These Settings:</h4>
+                        <ol style="margin-left: 1.5rem; color: #4a5568;">
+                            <li style="margin-bottom: 0.5rem;"><strong>Team Member Status:</strong> Active and Available?</li>
+                            <li style="margin-bottom: 0.5rem;"><strong>Campaign Assignment:</strong> Assigned to specific team member?</li>
+                            <li style="margin-bottom: 0.5rem;"><strong>Notification Settings:</strong> Email/SMS enabled in their profile?</li>
+                            <li style="margin-bottom: 0.5rem;"><strong>Email Delivery:</strong> Check spam folder</li>
+                            <li style="margin-bottom: 0.5rem;"><strong>Phone Number:</strong> Correct number with country code?</li>
+                        </ol>
+                        
+                        <h4>Test Notification System:</h4>
+                        <p style="margin-bottom: 0.5rem;">Create a test lead and manually mark as hot to trigger notifications</p>
+                    </div>
+                </div>
+
+                <div class="collapsible">
+                    <div class="collapsible-header">
+                        <h3>AI Giving Incorrect Information</h3>
+                        <span class="collapsible-icon">▼</span>
+                    </div>
+                    <div class="collapsible-content">
+                        <h4>Root Causes:</h4>
+                        <ul style="margin-left: 1.5rem; color: #4a5568; margin-bottom: 1rem;">
+                            <li>Outdated knowledge base documents</li>
+                            <li>Conflicting information in multiple docs</li>
+                            <li>AI instructions too vague</li>
+                            <li>No relevant info in knowledge base</li>
+                        </ul>
+                        
+                        <h4>Fix Process:</h4>
+                        <ol style="margin-left: 1.5rem; color: #4a5568;">
+                            <li style="margin-bottom: 0.5rem;">Review conversation to identify incorrect info</li>
+                            <li style="margin-bottom: 0.5rem;">Update knowledge base with correct details</li>
+                            <li style="margin-bottom: 0.5rem;">Add specific instructions to prevent recurrence</li>
+                            <li style="margin-bottom: 0.5rem;">Test by asking AI the same question</li>
+                            <li style="margin-bottom: 0.5rem;">Monitor future conversations</li>
+                        </ol>
+                    </div>
+                </div>
+
+                <div class="collapsible">
+                    <div class="collapsible-header">
+                        <h3>Poor AI Conversation Quality</h3>
+                        <span class="collapsible-icon">▼</span>
+                    </div>
+                    <div class="collapsible-content">
+                        <h4>Symptoms:</h4>
+                        <ul style="margin-left: 1.5rem; color: #4a5568; margin-bottom: 1rem;">
+                            <li>Repetitive responses</li>
+                            <li>Not answering questions directly</li>
+                            <li>Too pushy or too passive</li>
+                            <li>Losing conversation context</li>
+                        </ul>
+                        
+                        <h4>Optimization Steps:</h4>
+                        <ol style="margin-left: 1.5rem; color: #4a5568;">
+                            <li style="margin-bottom: 0.5rem;"><strong>Review AI Personality:</strong> Does it match your audience?</li>
+                            <li style="margin-bottom: 0.5rem;"><strong>Update Instructions:</strong> Add examples of good responses</li>
+                            <li style="margin-bottom: 0.5rem;"><strong>Knowledge Base:</strong> Ensure comprehensive FAQ coverage</li>
+                            <li style="margin-bottom: 0.5rem;"><strong>A/B Test:</strong> Try different conversation styles</li>
+                            <li style="margin-bottom: 0.5rem;"><strong>Human Review:</strong> Have sales team review and provide feedback</li>
+                        </ol>
+                    </div>
+                </div>
+            </div>
+
+            <div class="feature-section">
+                <h2>🔍 Performance Issues</h2>
+                
+                <div class="collapsible">
+                    <div class="collapsible-header">
+                        <h3>Slow Message Delivery</h3>
+                        <span class="collapsible-icon">▼</span>
+                    </div>
+                    <div class="collapsible-content">
+                        <h4>Normal vs Abnormal Delays:</h4>
+                        <ul style="margin-left: 1.5rem; color: #4a5568; margin-bottom: 1rem;">
+                            <li><strong>Normal:</strong> 5-30 second AI response delay (configured)</li>
+                            <li><strong>Normal:</strong> 1-2 minute delay during high volume</li>
+                            <li><strong>Abnormal:</strong> >5 minute delays consistently</li>
+                            <li><strong>Abnormal:</strong> Messages arriving hours later</li>
+                        </ul>
+                        
+                        <h4>Troubleshooting:</h4>
+                        <ol style="margin-left: 1.5rem; color: #4a5568;">
+                            <li>Check System Metrics in Control Room</li>
+                            <li>Verify message throttle settings</li>
+                            <li>Reduce active campaign count temporarily</li>
+                            <li>Contact support if delays persist</li>
+                        </ol>
+                    </div>
+                </div>
+
+                <div class="collapsible">
+                    <div class="collapsible-header">
+                        <h3>Dashboard Loading Slowly</h3>
+                        <span class="collapsible-icon">▼</span>
+                    </div>
+                    <div class="collapsible-content">
+                        <h4>Quick Fixes:</h4>
+                        <ul style="margin-left: 1.5rem; color: #4a5568;">
+                            <li>Clear browser cache and cookies</li>
+                            <li>Try different browser (Chrome recommended)</li>
+                            <li>Reduce date range in analytics views</li>
+                            <li>Close unnecessary browser tabs</li>
+                            <li>Check internet connection speed</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="feature-section">
+                <h2>📞 Getting Help</h2>
+                
+                <div class="cards-grid">
+                    <div class="card">
+                        <h3>💬 Live Chat Support</h3>
+                        <p>Available Monday-Friday 9AM-6PM EST. Average response time: 2 minutes. Click the chat bubble in the platform.</p>
+                    </div>
+                    <div class="card">
+                        <h3>📧 Email Support</h3>
+                        <p>support@yourplatform.com<br>Response within 24 hours. Include account name and detailed issue description.</p>
+                    </div>
+                    <div class="card">
+                        <h3>📚 Knowledge Base</h3>
+                        <p>Search our online help center for instant answers. Updated weekly with new articles and solutions.</p>
+                    </div>
+                    <div class="card">
+                        <h3>🎓 Training Sessions</h3>
+                        <p>Weekly group training sessions for new users. Book 1-on-1 onboarding for enterprise accounts.</p>
+                    </div>
+                    <div class="card">
+                        <h3>🚨 Emergency Support</h3>
+                        <p>For critical issues affecting business operations. Available 24/7 for enterprise customers.</p>
+                    </div>
+                    <div class="card">
+                        <h3>👥 User Community</h3>
+                        <p>Join our Slack community to connect with other users, share tips, and get peer support.</p>
+                    </div>
+                </div>
+
+                <div class="alert alert-success">
+                    <span>💡</span>
+                    <div>
+                        <strong>Pro Tip:</strong> When contacting support, include: Campaign ID, example lead ID, screenshot of issue, and steps to reproduce. This speeds up resolution by 80%!
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        // Tab Navigation
+        document.querySelectorAll('.nav-tab').forEach(tab => {
+            tab.addEventListener('click', (e) => {
+                e.preventDefault();
+                
+                // Update active tab
+                document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                
+                // Show corresponding content
+                const targetId = tab.getAttribute('data-tab');
+                document.querySelectorAll('.content-section').forEach(section => {
+                    section.classList.remove('active');
+                });
+                document.getElementById(targetId).classList.add('active');
+            });
+        });
+
+        // Collapsible Sections
+        document.querySelectorAll('.collapsible-header').forEach(header => {
+            header.addEventListener('click', () => {
+                const collapsible = header.parentElement;
+                collapsible.classList.toggle('active');
+            });
+        });
+
+        // Search Functionality
+        const searchInput = document.getElementById('searchInput');
+        searchInput.addEventListener('input', (e) => {
+            const searchTerm = e.target.value.toLowerCase();
+            
+            if (searchTerm.length > 2) {
+                // Simple search through all content
+                const allSections = document.querySelectorAll('.content-section');
+                let found = false;
+                
+                allSections.forEach(section => {
+                    const text = section.textContent.toLowerCase();
+                    if (text.includes(searchTerm)) {
+                        // Show this section
+                        document.querySelectorAll('.content-section').forEach(s => s.classList.remove('active'));
+                        section.classList.add('active');
+                        
+                        // Update nav
+                        const sectionId = section.id;
+                        document.querySelectorAll('.nav-tab').forEach(tab => {
+                            tab.classList.remove('active');
+                            if (tab.getAttribute('data-tab') === sectionId) {
+                                tab.classList.add('active');
+                            }
+                        });
+                        
+                        // Highlight search term
+                        highlightSearchTerm(section, searchTerm);
+                        
+                        found = true;
+                        return;
+                    }
+                });
+                
+                if (!found) {
+                    // Show no results message
+                    console.log('No results found for:', searchTerm);
+                }
+            }
+        });
+
+        // Highlight search terms
+        function highlightSearchTerm(section, term) {
+            // Remove existing highlights
+            section.querySelectorAll('.search-highlight').forEach(el => {
+                el.outerHTML = el.innerHTML;
+            });
+            
+            // Add new highlights (simplified version)
+            // In production, use a more sophisticated highlighting library
+        }
+
+        // Card click animations
+        document.querySelectorAll('.card').forEach(card => {
+            card.addEventListener('click', () => {
+                card.style.transform = 'scale(0.98)';
+                setTimeout(() => {
+                    card.style.transform = '';
+                }, 200);
+            });
+        });
+
+        // Print functionality
+        function printSection(sectionId) {
+            const content = document.getElementById(sectionId).innerHTML;
+            const printWindow = window.open('', '_blank');
+            printWindow.document.write(`
+                <html>
+                <head>
+                    <title>AI Lead Platform Help - ${sectionId}</title>
+                    <style>
+                        body { font-family: Arial, sans-serif; line-height: 1.6; padding: 20px; }
+                        h1, h2, h3 { color: #2d3748; }
+                        .no-print { display: none; }
+                    </style>
+                </head>
+                <body>${content}</body>
+                </html>
+            `);
+            printWindow.document.close();
+            printWindow.print();
+        }
+
+        // Smooth scroll for anchor links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            });
+        });
+    </script>
+</body>
+</html>content">
+                        <h4>Real Estate Investor Template:</h4>
+                        <div class="code-block">
+You are a friendly real estate investment specialist. Your goal is to identify motivated sellers who need to sell quickly. 
+
+Key qualifying questions:
+- Why are you thinking of selling?
+- What's your ideal timeline?
+- Is the property currently occupied?
+- Are there any repairs needed?
+
+When someone shows urgency (inherited property, relocation, financial distress), mark as hot lead.
+Emphasize: Cash offers, quick closing, as-is purchase, no realtor fees.
+                        </div>
+
+                        <h4>Staffing Agency Template:</h4>
+                        <div class="code-block">
+You are a professional recruiter helping connect talent with opportunities.
+
+Key qualifying questions:
+- What type of role are you seeking?
+- What's your availability to start?
+- What are your salary expectations?
+- Are you open to contract/permanent/both?
+
+Hot lead indicators: Actively interviewing, immediate availability, realistic expectations.
+Emphasize: Quality clients, competitive pay, benefits, career growth.
+                        </div>
+
+                        <h4>B2B Software Template:</h4>
+                        <div class="code-block">
+You are a solutions consultant for [Company] software. Focus on understanding their pain points before pitching.
+
+Discovery questions:
+- What challenges are you facing with [current process]?
+- How many users would need access?
+- What's your budget range for this solution?
+- Who else is involved in the decision?
+
+Hot lead indicators: Clear pain point, budget allocated, decision maker engaged.
+Emphasize: ROI, ease of implementation, customer success stories.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="collapsible">
+                    <div class="collapsible-header">
+                        <h3>Advanced AI Behaviors</h3>
+                        <span class="collapsible-icon">▼</span>
+                    </div>
+                    <div class="collapsible-content">
+                        <h4>Objection Handling:</h4>
+                        <p style="margin-bottom: 1rem;">Train AI to handle common objections:</p>
+                        <ul style="margin-left: 1.5rem; color: #4a5568; margin-bottom: 1rem;">
+                            <li><strong>"Too expensive"</strong> → "I understand price is important. Let's discuss the value and ROI you'd see..."</li>
+                            <li><strong>"Not interested"</strong> → "No problem! Just curious - is it timing, or is there something specific that doesn't fit your needs?"</li>
+                            <li><strong>"Already have a solution"</strong> → "That's great! How's that working for you? We often help companies enhance their existing setup..."</li>
+                        </ul>
+
+                        <h4>Escalation Triggers:</h4>
+                        <p style="margin-bottom: 1rem;">Define when AI should mark leads as hot:</p>
+                        <ul style="margin-left: 1.5rem; color: #4a5568;">
+                            <li>Specific phrases: "ready to move forward", "send me a quote", "when can we start"</li>
+                            <li>Question patterns: Asking about price, process, timeline multiple times</li>
+                            <li>Engagement level: 5+ message exchanges with positive sentiment</li>
+                            <li>Information provided: Shares budget, timeline, decision criteria voluntarily</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="warning-box">
+                    <h4>⚠️ AI Instruction Don'ts</h4>
+                    <ul style="margin-left: 1.5rem;">
+                        <li>Don't make promises AI can't keep ("I'll call you in 5 minutes")</li>
+                        <li>Don't use aggressive or pushy language</li>
+                        <li>Don't claim to be human or give AI a human name</li>
+                        <li>Don't discuss competitors negatively</li>
+                        <li>Don't share confidential information</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="feature-section">
+                <h2>📚 Knowledge Base Management</h2>
+                
+                <h3>What to Upload</h3>
+                <div class="feature-list">
+                    <li>
+                        <span class="feature-icon">✅</span>
+                        <div class="feature-content">
+                            <h4>Company Overview</h4>
+                            <p>Basic info about your business, mission, values, and unique selling propositions. Helps AI represent your brand accurately.</p>
+                        </div>
+                    </li>
+                    <li>
+                        <span class="feature-icon">✅</span>
+                        <div class="feature-content">
+                            <h4>Product/Service Details</h4>
+                            <p>Specifications, pricing (if public), features, benefits. AI references this when answering specific questions.</p>
+                        </div>
+                    </li>
+                    <li>
+                        <span class="feature-icon">✅</span>
+                        <div class="feature-content">
+                            <h4>FAQs</h4>
+                            <p>Common questions and approved answers. This is the most important document - AI uses it as primary reference.</p>
+                        </div>
+                    </li>
+                    <li>
+                        <span class="feature-icon">✅</span>
+                        <div class="feature-content">
+                            <h4>Case Studies</h4>
+                            <p>Success stories and testimonials. AI can reference these to build credibility and handle objections.</p>
+                        </div>
+                    </li>
+                    <li>
+                        <span class="feature-icon">✅</span>
+                        <div class="feature-content">
+                            <h4>Process Documents</h4>
+                            <p>How your service works, timelines, what to expect. Helps AI set proper expectations.</p>
+                        </div>
+                    </li>
+                </div>
+
+                <div class="best-practice">
+                    <h4>✅ Knowledge Base Tips</h4>
+                    <ul style="margin-left: 1.5rem;">
+                        <li>Update quarterly or when major changes occur</li>
+                        <li>Keep documents concise and well-organized</li>
+                        <li>Use clear headings and bullet points</li>
+                        <li>Include "DO NOT SHARE" sections for internal info</li>
+                        <li>Test by asking AI questions after uploading</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <!-- Analytics Section -->
+        <section id="analytics" class="content-section">
+            <div class="feature-section">
+                <h2>📊 Analytics & Intelligence Platform</h2>
+                <p style="margin-bottom: 2rem;">Transform your lead engagement data into actionable insights. The analytics platform provides real-time visibility into every aspect of your AI-powered outreach.</p>
+
+                <h3>Analytics Dashboard Hierarchy</h3>
+                <div class="process-flow">
+                    <div class="process-step">
+                        <div class="process-icon">🎯</div>
+                        <div class="process-label">Pipeline Control Room</div>
+                        <div style="font-size: 0.875rem; color: #6b7280; margin-top: 0.25rem;">Real-time Operations</div>
+                    </div>
+                    <div class="process-step">
+                        <div class="process-icon">🧠</div>
+                        <div class="process-label">AI Strategy Hub</div>
+                        <div style="font-size: 0.875rem; color: #6b7280; margin-top: 0.25rem;">Performance Analysis</div>
+                    </div>
+                    <div class="process-step">
+                        <div class="process-icon">📈</div>
+                        <div class="process-label">Business Analytics</div>
+                        <div style="font-size: 0.875rem; color: #6b7280; margin-top: 0.25rem;">Strategic Insights</div>
+                    </div>
+                    <div class="process-step">
+                        <div class="process-icon">🏢</div>
+                        <div class="process-label">Enterprise View</div>
+                        <div style="font-size: 0.875rem; color: #6b7280; margin-top: 0.25rem;">Multi-tenant Overview</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="feature-section">
+                <h2>🎯 Pipeline Control Room</h2>
+                <p style="margin-bottom: 1.5rem;">Your real-time command center for monitoring system health and lead flow:</p>
+
+                <h3>System Health Indicators</h3>
+                <div class="feature-list">
+                    <li>
+                        <span class="feature-icon">✅</span>
+                        <div class="feature-content">
+                            <h4>Overview & Health Panel</h4>
+                            <p>Monitor total lead volume, weekly trends, active campaigns, and system performance. Green/yellow/red indicators show component health at a glance.</p>
+                        </div>
+                    </li>
+                    <li>
+                        <span class="feature-icon">✅</span>
+                        <div class="feature-content">
+                            <h4>Hot Lead Handoff Tracking</h4>
+                            <p>Real-time view of hot leads awaiting contact, average response time, and sales team performance. Alerts for leads waiting too long.</p>
+                        </div>
+                    </li>
+                    <li>
+                        <span class="feature-icon">✅</span>
+                        <div class="feature-content">
+                            <h4>Lead Journey Funnel</h4>
+                            <p>Visual funnel showing conversion at each stage. Identify bottlenecks and optimization opportunities in your lead flow.</p>
+                        </div>
+                    </li>
+                    <li>
+                        <span class="feature-icon">✅</span>
+                        <div class="feature-content">
+                            <h4>AI Optimization Metrics</h4>
+                            <p>Message analysis, keyword performance, conversation success rates. See which AI approaches work best.</p>
+                        </div>
+                    </li>
+                    <li>
+                        <span class="feature-icon">✅</span>
+                        <div class="feature-content">
+                            <h4>System Performance</h4>
+                            <p>API uptime, message delivery rates, processing speed. Technical metrics ensure smooth operation.</p>
+                        </div>
+                    </li>
+                </div>
+
+                <div class="metric-grid">
+                    <div class="metric-card">
+                        <div class="metric-label">Typical Metrics</div>
+                        <div style="font-size: 0.875rem; color: #6b7280;">
+                            <div>• 95%+ Message Delivery</div>
+                            <div>• <15min Hot Lead Response</div>
+                            <div>• 99.9% System Uptime</div>
+                        </div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">Warning Thresholds</div>
+                        <div style="font-size: 0.875rem; color: #6b7280;">
+                            <div>• >30min Hot Lead Wait</div>
+                            <div>• <90% Delivery Rate</div>
+                            <div>• >5% Error Rate</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="feature-section">
+                <h2>🧠 AI Strategy Hub (Admin Only)</h2>
+                <p style="margin-bottom: 1.5rem;">Deep analytics for optimizing your AI performance:</p>
+
+                <h3>Key Analytics Views</h3>
+                
+                <div class="collapsible">
+                    <div class="collapsible-header">
+                        <h3>Overview Reports</h3>
+                        <span class="collapsible-icon">▼</span>
+                    </div>
+                    <div class="collapsible-content">
+                        <h4>Macro Conversion Funnel:</h4>
+                        <p style="margin-bottom: 1rem;">Track leads through 7 stages with conversion rates at each step:</p>
+                        <ol style="margin-left: 1.5rem; color: #4a5568;">
+                            <li>Leads Uploaded (100%)</li>
+                            <li>AI Engaged (85-95% typical)</li>
+                            <li>Replied (20-40% typical)</li>
+                            <li>Hot Lead (5-15% of total)</li>
+                            <li>Sales Connected (80% of hot)</li>
+                            <li>Qualified (60% of connected)</li>
+                            <li>Deal Won (20-30% of qualified)</li>
+                        </ol>
+                        
+                        <h4>Historical Performance:</h4>
+                        <p>Track trends over time including hot lead rate, reply rate, and cost per hot lead. Identify seasonal patterns and optimization opportunities.</p>
+                    </div>
+                </div>
+
+                <div class="collapsible">
+                    <div class="collapsible-header">
+                        <h3>AI Performance Analysis</h3>
+                        <span class="collapsible-icon">▼</span>
+                    </div>
+                    <div class="collapsible-content">
+                        <h4>Confidence vs Outcome:</h4>
+                        <p style="margin-bottom: 1rem;">Scatter plot showing AI's confidence scores against actual outcomes. Helps calibrate scoring algorithms.</p>
+                        
+                        <h4>Message Effectiveness:</h4>
+                        <ul style="margin-left: 1.5rem; color: #4a5568;">
+                            <li>Response rates by message template</li>
+                            <li>Sentiment progression through conversations</li>
+                            <li>Drop-off points in conversations</li>
+                            <li>Most effective question types</li>
+                        </ul>
+                        
+                        <h4>Optimal Timing Analysis:</h4>
+                        <p>Data-driven insights on best times to send initial messages and follow-ups based on your actual response data.</p>
+                    </div>
+                </div>
+
+                <div class="collapsible">
+                    <div class="collapsible-header">
+                        <h3>Performance Analytics</h3>
+                        <span class="collapsible-icon">▼</span>
+                    </div>
+                    <div class="collapsible-content">
+                        <h4>Campaign Comparison:</h4>
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Metric</th>
+                                    <th>What It Shows</th>
+                                    <th>Use Case</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>Messages Sent</td>
+                                    <td>Outreach volume</td>
+                                    <td>Capacity planning</td>
+                                </tr>
+                                <tr>
+                                    <td>Open Rate</td>
+                                    <td>Message visibility</td>
+                                    <td>Timing optimization</td>
+                                </tr>
+                                <tr>
+                                    <td>Reply Rate</td>
+                                    <td>Message effectiveness</td>
+                                    <td>Content optimization</td>
+                                </tr>
+                                <tr>
+                                    <td>Conversion Rate</td>
+                                    <td>Overall success</td>
+                                    <td>ROI calculation</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        
+                        <h4>AI Persona Performance:</h4>
+                        <p>Compare conversion rates across different AI personalities to find what resonates with your audience.</p>
+                    </div>
+                </div>
+
+                <div class="collapsible">
+                    <div class="collapsible-header">
+                        <h3>ROI & Revenue Analytics</h3>
+                        <span class="collapsible-icon">▼</span>
+                    </div>
+                    <div class="collapsible-content">
+                        <h4>Lead Source ROI:</h4>
+                        <p style="margin-bottom: 1rem;">Track performance by lead source:</p>
+                        <ul style="margin-left: 1.5rem; color: #4a5568;">
+                            <li>Cost per lead by source</li>
+                            <li>Conversion rates by source</li>
+                            <li>Revenue generated by source</li>
+                            <li>Lifetime value by source</li>
+                        </ul>
+                        
+                        <h4>Sales Team Performance:</h4>
+                        <ul style="margin-left: 1.5rem; color: #4a5568;">
+                            <li>Hot leads received vs. converted</li>
+                            <li>Average deal size by rep</li>
+                            <li>Response time to hot leads</li>
+                            <li>Win rate by rep</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="feature-section">
+                <h2>📈 Using Analytics for Optimization</h2>
+                
+                <h3>Weekly Analytics Review Checklist</h3>
+                <div class="best-practice">
+                    <h4>✅ Monday Morning Review Process</h4>
+                    <ol style="margin-left: 1.5rem;">
+                        <li style="margin-bottom: 0.5rem;"><strong>Check Control Room:</strong> All systems green? Any overnight issues?</li>
+                        <li style="margin-bottom: 0.5rem;"><strong>Review Hot Leads:</strong> How many generated? All contacted by sales?</li>
+                        <li style="margin-bottom: 0.5rem;"><strong>Analyze Funnel:</strong> Where are leads dropping off? Any stage below benchmark?</li>
+                        <li style="margin-bottom: 0.5rem;"><strong>Campaign Performance:</strong> Which campaigns over/under performing?</li>
+                        <li style="margin-bottom: 0.5rem;"><strong>A/B Test Results:</strong> Any tests ready to call? New tests to start?</li>
+                        <li style="margin-bottom: 0.5rem;"><strong>Sales Feedback:</strong> Lead quality meeting expectations?</li>
+                        <li style="margin-bottom: 0.5rem;"><strong>Action Items:</strong> Document changes to make this week</li>
+                    </ol>
+                </div>
+
+                <h3>Key Performance Benchmarks</h3>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Metric</th>
+                            <th>Poor</th>
+                            <th>Average</th>
+                            <th>Excellent</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Initial Response Rate</td>
+                            <td><10%</td>
+                            <td>15-25%</td>
+                            <td>>30%</td>
+                        </tr>
+                        <tr>
+                            <td>Lead to Hot Lead</td>
+                            <td><2%</td>
+                            <td>3-8%</td>
+                            <td>>10%</td>
+                        </tr>
+                        <tr>
+                            <td>Hot Lead to Sale</td>
+                            <td><10%</td>
+                            <td>15-25%</td>
+                            <td>>30%</td>
+                        </tr>
+                        <tr>
+                            <td>Cost per Hot Lead</td>
+                            <td>>$50</td>
+                            <td>$20-40</td>
+                            <td><$15</td>
+                        </tr>
+                        <tr>
+                            <td>Sales Response Time</td>
+                            <td>>1 hour</td>
+                            <td>15-30 min</td>
+                            <td><10 min</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <div class="alert alert-info">
+                    <span>💡</span>
+                    <div>
+                        <strong>Analytics Pro Tip:</strong> Export your data weekly and build trend charts in Excel/Google Sheets. Look for patterns over 4-8 week periods rather than daily fluctuations.
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Settings Section -->
+        <section id="settings" class="content-section">
+            <div class="feature-section">
+                <h2>⚙️ Complete Settings Guide</h2>
+                <p style="margin-bottom: 2rem;">Master your platform configuration to maximize performance and ensure smooth operations. Each setting impacts how your AI engages leads.</p>
+
+                <div class="cards-grid">
+                    <div class="card">
+                        <h3>🏢 Company Information</h3>
+                        <p>Foundation settings that personalize your entire platform experience and help AI represent your brand accurately.</p>
+                    </div>
+                    <div class="card">
+                        <h3>💬 Messaging & Communication</h3>
+                        <p>Control how and when your AI communicates. Set throttles, delays, and conversation limits.</p>
+                    </div>
+                    <div class="card">
+                        <h3>📞 Phone Numbers</h3>
+                        <p>Purchase, port, and manage your communication channels. Each campaign needs its own number.</p>
+                    </div>
+                    <div class="card">
+                        <h3>👥 Sales Team</h3>
+                        <p>Add team members, set permissions, configure hot lead routing and notifications.</p>
+                    </div>
+                    <div class="card">
+                        <h3>🧠 AI & Automation</h3>
+                        <p>Fine-tune AI behavior, escalation rules, and scoring thresholds for optimal performance.</p>
+                    </div>
+                    <div class="card">
+                        <h3>📝 AI Instruction Hub</h3>
+                        <p>Create custom AI personalities, conversation flows, and industry-specific behaviors.</p>
+                    </div>
+                    <div class="card">
+                        <h3>📚 AI Knowledge Base</h3>
+                        <p>Upload documents that AI references to answer questions accurately about your business.</p>
+                    </div>
+                    <div class="card">
+                        <h3>🔧 System Tools</h3>
+                        <p>Data export, backups, API access, and advanced system maintenance utilities.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="feature-section">
+                <h2>🏢 Company Information Settings</h2>
+                
+                <div class="collapsible">
+                    <div class="collapsible-header">
+                        <h3>Basic Company Details</h3>
+                        <span class="collapsible-icon">▼</span>
+                    </div>
+                    <div class="collapsible-content">
+                        <h4>Required Fields:</h4>
+                        <ul style="margin-left: 1.5rem; color: #4a5568; margin-bottom: 1rem;">
+                            <li><strong>Company Name:</strong> Appears in UI and AI conversations</li>
+                            <li><strong>Industry Type:</strong> Optimizes AI language and examples</li>
+                            <li><strong>Business Hours:</strong> AI only texts during these hours</li>
+                            <li><strong>Time Zone:</strong> Critical for proper scheduling</li>
+                            <li><strong>Website:</strong> AI can reference for credibility</li>
+                        </ul>
+                        
+                        <h4>Optional but Recommended:</h4>
+                        <ul style="margin-left: 1.5rem; color: #4a5568;">
+                            <li><strong>Company Description:</strong> 2-3 sentences AI uses to describe your business</li>
+                            <li><strong>Unique Value Proposition:</strong> What makes you different</li>
+                            <li><strong>Target Customer:</strong> Helps AI qualify leads better</li>
+                            <li><strong>Company Size:</strong> Builds appropriate credibility</li>
+                        </ul>
+                        
+                        <div class="alert alert-warning">
+                            <span>⚠️</span>
+                            <div>
+                                <strong>Business Hours Matter:</strong> AI will NEVER text outside your configured hours unless you explicitly enable 24/7 mode. Most users see better results respecting normal hours.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="feature-section">
+                <h2>💬 Messaging & Communication Settings</h2>
+                
+                <h3>Critical Messaging Controls</h3>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Setting</th>
+                            <th>Default</th>
+                            <th>Impact</th>
+                            <th>Recommendation</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>Message Throttle</strong></td>
+                            <td>120/hour</td>
+                            <td>Prevents overwhelming your phone numbers</td>
+                            <td>Keep default unless you have carrier approval</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Response Delay</strong></td>
+                            <td>0-30 seconds</td>
+                            <td>Makes AI seem more human</td>
+                            <td>5-15 seconds optimal</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Conversation Limit</strong></td>
+                            <td>20 messages</td>
+                            <td>Prevents endless loops</td>
+                            <td>Increase for complex sales</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Follow-up Attempts</strong></td>
+                            <td>3</td>
+                            <td>Re-engagement without spam</td>
+                            <td>3-4 is ideal</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Follow-up Timing</strong></td>
+                            <td>Day 1, 3, 7</td>
+                            <td>Spacing prevents annoyance</td>
+                            <td>Adjust based on urgency</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <div class="best-practice">
+                    <h4>✅ Messaging Best Practices</h4>
+                    <ul style="margin-left: 1.5rem;">
+                        <li>Start conservative with throttles - increase gradually</li>
+                        <li>Random delays (5-30 sec) appear most natural</li>
+                        <li>Longer delays for complex questions show "thinking"</li>
+                        <li>Test settings with small batches first</li>
+                        <li>Monitor unsubscribe rates - adjust if >2%</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="feature-section">
+                <h2>📞 Phone Number Management</h2>
+                
+                <h3>Phone Number Strategy</h3>
+                <div class="feature-list">
+                    <li>
+                        <span class="feature-icon">✅</span>
+                        <div class="feature-content">
+                            <h4>Local vs Toll-Free</h4>
+                            <p>Local numbers get 3x better response rates. Get numbers in your target market's area codes. Toll-free good for national brands only.</p>
+                        </div>
+                    </li>
+                    <li>
+                        <span class="feature-icon">✅</span>
+                        <div class="feature-content">
+                            <h4>Number Rotation</h4>
+                            <p>For high-volume campaigns, rotate between multiple numbers to maintain deliverability. 500-1000 messages/day per number maximum.</p>
+                        </div>
+                    </li>
+                    <li>
+                        <span class="feature-icon">✅</span>
+                        <div class="feature-content">
+                            <h4>Dedicated vs Shared</h4>
+                            <p>Each campaign needs its own number. Never share numbers between different campaign types - confuses leads and AI.</p>
+                        </div>
+                    </li>
+                    <li>
+                        <span class="feature-icon">✅</span>
+                        <div class="feature-content">
+                            <h4>Number Warming</h4>
+                            <p>New numbers should start slow. Begin with 50-100 messages/day, increase by 50 daily until target volume.</p>
+                        </div>
+                    </li>
+                </div>
+
+                <div class="warning-box">
+                    <h4>⚠️ Compliance Requirements</h4>
+                    <ul style="margin-left: 1.5rem;">
+                        <li>Only text numbers with explicit or implied consent</li>
+                        <li>Honor opt-outs immediately (automatic)</li>
+                        <li>Include business identification in first message</li>
+                        <li>Respect quiet hours (no texts 9pm-8am local time)</li>
+                        <li>Maintain records of consent for 4 years</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="feature-section">
+                <h2>👥 Sales Team Configuration</h2>
+                
+                <h3>Team Setup Process</h3>
+                <div class="collapsible">
+                    <div class="collapsible-header">
+                        <h3>Adding Team Members</h3>
+                        <span class="collapsible-icon">▼</span>
+                    </div>
+                    <div class="collapsible-content">
+                        <ol style="margin-left: 1.5rem; color: #4a5568;">
+                            <li style="margin-bottom: 1rem;"><strong>Send Invitation:</strong> Enter email address and select role. They'll receive setup instructions.</li>
+                            <li style="margin-bottom: 1rem;"><strong>Assign Role:</strong>
+                                <ul style="margin-top: 0.5rem; margin-left: 1.5rem;">
+                                    <li><strong>Sales User:</strong> Can view assigned leads, conversations</li>
+                                    <li><strong>Sales Manager:</strong> Above + view all leads, basic analytics</li>
+                                    <li><strong>Admin:</strong> Full access except billing</li>
+                                </ul>
+                            </li>
+                            <li style="margin-bottom: 1rem;"><strong>Configure Notifications:</strong>
+                                <ul style="margin-top: 0.5rem; margin-left: 1.5rem;">
+                                    <li>Email alerts for new hot leads</li>
+                                    <li>SMS notifications (optional)</li>
+                                    <li>In-app notifications</li>
+                                    <li>Daily summary emails</li>
+                                </ul>
+                            </li>
+                            <li style="margin-bottom: 1rem;"><strong>Set Availability:</strong> Mark vacation days, working hours, and capacity limits.</li>
+                        </ol>
+                    </div>
+                </div>
+
+                <div class="collapsible">
+                    <div class="collapsible-header">
+                        <h3>Hot Lead Routing Rules</h3>
+                        <span class="collapsible-icon">▼</span>
+                    </div>
+                    <div class="collapsible-content">
+                        <h4>Routing Methods:</h4>
+                        <ul style="margin-left: 1.5rem; color: #4a5568; margin-bottom: 1rem;">
+                            <li><strong>Round Robin:</strong> Distributes evenly across available team</li>
+                            <li><strong>Performance-Based:</strong> Top performers get more leads</li>
+                            <li><strong>Skill-Based:</strong> Match lead types to rep expertise</li>
+                            <li><strong>Geographic:</strong> Route by territory or time zone</li>
+                            <li><strong>Campaign-Specific:</strong> Dedicate reps to certain campaigns</li>
+                        </ul>
+                        
+                        <h4>Routing Priority:</h4>
+                        <ol style="margin-left: 1.5rem; color: #4a5568;">
+                            <li>Campaign assignment (if specified)</li>
+                            <li>Skill/tag matching</li>
+                            <li>Availability status</li>
+                            <li>Current workload</li>
+                            <li>Performance score</li>
+                        </ol>
+                    </div>
+                </div>
+            </div>
+
+            <div class="feature-section">
+                <h2>🧠 AI & Automation Settings</h2>
+                
+                <h3>Escalation Thresholds</h3>
+                <p style="margin-bottom: 1rem;">Configure when leads are marked as "hot" and handed to sales:</p>
+                
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Threshold Type</th>
+                            <th>Default Value</th>
+                            <th>Adjust When...</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>Lead Score Threshold</strong></td>
+                            <td>75/100</td>
+                            <td>Too many false positives: Increase to 80-85<br>Missing opportunities: Decrease to 65-70</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Sentiment Threshold</strong></td>
+                            <td>0.6 (-1 to 1)</td>
+                            <td>Highly positive language required for your industry</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Message Count</strong></td>
+                            <td>3 exchanges</td>
+                            <td>Complex sales need more qualification: Increase<br>Simple services: Can decrease</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Keyword Triggers</strong></td>
+                            <td>"ready to buy", "send quote"</td>
+                            <td>Add industry-specific buying signals</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <h3>Automation Rules</h3>
+                <div class="feature-list">
+                    <li>
+                        <span class="feature-icon">✅</span>
+                        <div class="feature-content">
+                            <h4>Auto-Assignment Rules</h4>
+                            <p>Define conditions that automatically assign leads to specific team members or campaigns. Based on lead source, keywords, or custom fields.</p>
+                        </div>
+                    </li>
+                    <li>
+                        <span class="feature-icon">✅</span>
+                        <div class="feature-content">
+                            <h4>Re-Engagement Automation</h4>
+                            <p>Set rules for following up with cold leads after X days. Different approaches for leads that never responded vs. those who went cold mid-conversation.</p>
+                        </div>
+                    </li>
+                    <li>
+                        <span class="feature-icon">✅</span>
+                        <div class="feature-content">
+                            <h4>Workflow Triggers</h4>
+                            <p>Create if-then rules: If lead mentions competitor, add tag. If lead asks about pricing, send resource. If lead goes cold, try different approach.</p>
+                        </div>
+                    </li>
+                    <li>
+                        <span class="feature-icon">✅</span>
+                        <div class="feature-content">
+                            <h4>Smart Scheduling</h4>
+                            <p>AI automatically schedules follow-ups based on lead behavior. More aggressive for hot leads, patient approach for nurture leads.</p>
+                        </div>
+                    </li>
+                </div>
+
+                <div class="best-practice">
+                    <h4>✅ AI Configuration Tips</h4>
+                    <ul style="margin-left: 1.5rem;">
+                        <li>Start with default thresholds for 2 weeks, then adjust based on data</li>
+                        <li>Review false positives weekly - leads marked hot but sales says not qualified</li>
+                        <li>Different campaigns may need different thresholds</li>
+                        <li>Document threshold changes and their impact</li>
+                        <li>Get sales team feedback on lead quality regularly</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="feature-section">
+                <h2>📝 AI Instruction Hub</h2>
+                
+                <h3>Creating Effective AI Instructions</h3>
+                <div class="collapsible">
+                    <div class="collapsible-header">
+                        <h3>Instruction Components</h3>
+                        <span class="collapsible-icon">▼</span>
+                    </div>
+                    <div class="collapsible-content">
+                        <h4>1. Base Personality</h4>
+                        <div class="code-block">
+You are a [friendly/professional/casual] [role] for [Company]. 
+Your communication style is [description].
+Always maintain a [adjective] tone while being [adjective].
+
+Example:
+You are a friendly real estate consultant for ABC Investments.
+Your communication style is warm but professional.
+Always maintain a helpful tone while being respectful of their time.
+                        </div>
+
+                        <h4>2. Goals & Objectives</h4>
+                        <div class="code-block">
+Primary Goal: [What you want to achieve]
+Secondary Goals: 
+- [Supporting objective 1]
+- [Supporting objective 2]
+
+Qualify leads by determining:
+- [Qualification criteria 1]
+- [Qualification criteria 2]
+- [Qualification criteria 3]
+
+Example:
+Primary Goal: Identify motivated home sellers
+Secondary Goals:
+- Build rapport and trust
+- Understand their timeline
+- Identify pain points
+
+Qualify leads by determining:
+- Reason for selling
+- Desired timeline
+- Asking price expectations
+- Property condition
+                        </div>
+
+                        <h4>3. Conversation Flow</h4>
+                        <div class="code-block">
+Opening: [How to start conversations]
+Discovery: [What questions to ask]
+Value Proposition: [What to emphasize]
+Objection Handling: [How to address concerns]
+Call to Action: [What you want them to do]
+
+Example:
+Opening: Acknowledge their property and express genuine interest
+Discovery: Ask about their selling goals and timeline
+Value Proposition: Emphasize cash offer, quick closing, no repairs needed
+Objection Handling: Address price concerns with market data and convenience factor
+Call to Action: Schedule a no-obligation property assessment
+                        </div>
+                    </div>
+                </div>
+
+                <div class="collapsible">
+                    <div class="collapsible-header">
+                        <h3>Industry-Specific Templates</h3>
+                        <span class="collapsible-icon">▼</span>
+                    </div>
+                    <div class="collapsible-="code-block">
+"Good morning [Name], I'm reaching out from [Company] regarding your interest in [Service]. I wanted to see if you had a few moments to discuss how we might be able to help with [Specific Need]."
+                        </div>
+                    </div>
+                </div>
+
+                <div class="collapsible">
+                    <div class="collapsible-header">
+                        <h3>Friendly Personality</h3>
+                        <span class="collapsible-icon">▼</span>
+                    </div>
+                    <div class="collapsible-content">
+                        <h4>Characteristics:</h4>
+                        <ul style="margin-left: 1.5rem; color: #4a5568; margin-bottom: 1rem;">
+                            <li>Conversational and warm tone</li>
+                            <li>Uses first names and casual language</li>
+                            <li>Emoji usage where appropriate</li>
+                            <li>Builds rapport before business</li>
+                        </ul>
+                        
+                        <h4>Best For:</h4>
+                        <ul style="margin-left: 1.5rem; color: #4a5568; margin-bottom: 1rem;">
+                            <li>Consumer services</li>
+                            <li>Real estate</li>
+                            <li>Local businesses</li>
+                            <li>Younger demographics</li>
+                        </ul>
+                        
+                        <h4>Example Opening:</h4>
+                        <div class
