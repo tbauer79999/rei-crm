@@ -82,12 +82,15 @@ const AuthProvider = ({ children }) => {
         
         // If we have both from metadata, use them but still verify with database
         if (role && tenant_id) {
-          setUser({
+          const enrichedUser = {
             ...authUser,
             email: authUser.email,
             role: role,
             tenant_id: tenant_id
-          });
+          };
+          
+          console.log('✅ Setting user with metadata:', { email: enrichedUser.email, role: enrichedUser.role, tenant_id: enrichedUser.tenant_id });
+          setUser(enrichedUser);
           
           // Optionally verify in background (don't wait for this)
           verifyUserProfile(authUser.id, role, tenant_id);
@@ -107,23 +110,29 @@ const AuthProvider = ({ children }) => {
           
           // Fallback: If profile doesn't exist, assume it's a new business admin
           console.log('⚡ Using fallback: business_admin role');
-          setUser({
+          const fallbackUser = {
             ...authUser,
             email: authUser.email,
             role: 'business_admin',
             tenant_id: authUser.id // Use user ID as tenant ID for new business admins
-          });
+          };
+          
+          console.log('✅ Setting fallback user:', { email: fallbackUser.email, role: fallbackUser.role, tenant_id: fallbackUser.tenant_id });
+          setUser(fallbackUser);
           return;
         }
 
         if (profile) {
           console.log('✅ Profile loaded:', profile);
-          setUser({
+          const enrichedUser = {
             ...authUser,
             email: authUser.email,
             role: profile.role || 'business_admin',
             tenant_id: profile.tenant_id || authUser.id
-          });
+          };
+          
+          console.log('✅ Setting user with profile data:', { email: enrichedUser.email, role: enrichedUser.role, tenant_id: enrichedUser.tenant_id });
+          setUser(enrichedUser);
           
           // Update auth metadata if it's missing
           if (!role || !tenant_id) {
@@ -135,12 +144,15 @@ const AuthProvider = ({ children }) => {
         console.error('❌ Error loading user info:', error);
         
         // Ultimate fallback
-        setUser({
+        const ultimateFallbackUser = {
           ...authUser,
           email: authUser.email,
           role: 'business_admin',
           tenant_id: authUser.id
-        });
+        };
+        
+        console.log('✅ Setting ultimate fallback user:', { email: ultimateFallbackUser.email, role: ultimateFallbackUser.role, tenant_id: ultimateFallbackUser.tenant_id });
+        setUser(ultimateFallbackUser);
       }
     };
 
@@ -283,27 +295,44 @@ const updateAuthMetadata = async (userId, role, tenantId) => {
           .single();
 
         if (profile && !profileError) {
-          setUser({
+          const refreshedUser = {
             ...data.user,
             email: data.user.email,
             role: profile.role || 'business_admin',
             tenant_id: profile.tenant_id || data.user.id
-          });
-          console.log('✅ User refreshed with role:', profile.role);
+          };
+          
+          console.log('✅ User refreshed:', { email: refreshedUser.email, role: refreshedUser.role, tenant_id: refreshedUser.tenant_id });
+          setUser(refreshedUser);
         } else {
           console.log('⚠️ Profile refresh failed, using fallback');
-          setUser({
+          const fallbackRefreshUser = {
             ...data.user,
             email: data.user.email,
             role: 'business_admin',
             tenant_id: data.user.id
-          });
+          };
+          
+          console.log('✅ Fallback user set:', { email: fallbackRefreshUser.email, role: fallbackRefreshUser.role, tenant_id: fallbackRefreshUser.tenant_id });
+          setUser(fallbackRefreshUser);
         }
       }
     } catch (error) {
       console.error('❌ Error refreshing user:', error);
     }
   };
+
+  // Add debugging log for user state changes
+  useEffect(() => {
+    if (user) {
+      console.log('👤 User state updated:', { 
+        email: user.email, 
+        role: user.role, 
+        tenant_id: user.tenant_id,
+        hasAllRequiredFields: !!(user.email && user.role && user.tenant_id)
+      });
+    }
+  }, [user]);
 
   const value = { 
     user, 
