@@ -342,15 +342,7 @@ export default function CompanySettings() {
         </div>
       )}
 
-      {/* Debug Information */}
-      <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4">
-        <div className="text-sm text-yellow-800">
-          <div><strong>Debug Info:</strong></div>
-          <div>API Base URL: {getApiBaseUrl()}</div>
-          <div>User Role: {user?.role}</div>
-          <div>Tenant ID: {user?.tenant_id}</div>
-        </div>
-      </div>
+
 
       {/* Basic Company Information */}
       <div className="bg-white rounded-xl border border-gray-200 p-6">
