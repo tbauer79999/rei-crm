@@ -29,15 +29,18 @@ if (!supabaseKey) throw new Error('supabaseKey is required.');
 if (!globalScope._supabaseClient) {
   console.log('✨ Creating new Supabase client instance');
 
-  globalScope._supabaseClient = createClient(supabaseUrl, supabaseKey, {
-    auth: {
-      persistSession: true,
-      storageKey: 'supabase.auth.token',
-      storage: isBrowser ? window.localStorage : undefined,
-      detectSessionInUrl: true,
-      autoRefreshToken: true
-    }
-  });
+ globalScope._supabaseClient = createClient(supabaseUrl, supabaseKey, {
+  auth: {
+    persistSession: true,
+    storageKey: 'supabase.auth.token',
+    storage: isBrowser ? window.localStorage : undefined,
+    detectSessionInUrl: true,
+    autoRefreshToken: true
+  },  // ← ADD THIS COMMA HERE
+  realtime: {
+    disabled: true
+  }
+});
 } else {
   console.log('♻️  Reusing existing Supabase client instance');
 }
