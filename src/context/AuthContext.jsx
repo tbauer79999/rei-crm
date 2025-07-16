@@ -86,9 +86,12 @@ const AuthProvider = ({ children }) => {
       try {
         console.log('📊 Loading user profile for:', authUser.email);
         
-        // Try to get role and tenant_id from BOTH app_metadata AND user_metadata
-        let role = authUser.app_metadata?.role || authUser.user_metadata?.role;
-        let tenant_id = authUser.app_metadata?.tenant_id || authUser.user_metadata?.tenant_id;
+// Try to get role and tenant_id from BOTH app_metadata AND user_metadata
+let role = authUser.user_metadata?.role || authUser.app_metadata?.role;
+let tenant_id = authUser.user_metadata?.tenant_id || authUser.app_metadata?.tenant_id;
+
+console.log('🔍 Raw authUser.user_metadata:', authUser.user_metadata);
+console.log('🔍 Raw authUser.app_metadata:', authUser.app_metadata);
         
         console.log('🔍 Auth app_metadata - role:', authUser.app_metadata?.role, 'tenant_id:', authUser.app_metadata?.tenant_id);
         console.log('🔍 Auth user_metadata - role:', authUser.user_metadata?.role, 'tenant_id:', authUser.user_metadata?.tenant_id);
