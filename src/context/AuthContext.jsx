@@ -39,6 +39,18 @@ const AuthProvider = ({ children }) => {
           console.log('✅ Session found for:', session.user.email);
           console.log('🔑 Session expires at:', new Date(session.expires_at * 1000).toLocaleString());
           
+          // Debug JWT payload
+          if (session.access_token) {
+            try {
+              const payload = JSON.parse(atob(session.access_token.split('.')[1]));
+              console.log('JWT payload:', payload);
+              console.log('tenant_id in JWT:', payload.tenant_id);
+              console.log('role in JWT:', payload.role);
+            } catch (e) {
+              console.warn('Could not decode JWT:', e);
+            }
+          }
+          
           // Store the full session
           setSession(session);
           
@@ -74,11 +86,13 @@ const AuthProvider = ({ children }) => {
       try {
         console.log('📊 Loading user profile for:', authUser.email);
         
-        // Try to get role and tenant_id from auth metadata first (fastest)
-        let role = authUser.app_metadata?.role;
-        let tenant_id = authUser.app_metadata?.tenant_id;
+        // Try to get role and tenant_id from BOTH app_metadata AND user_metadata
+        let role = authUser.app_metadata?.role || authUser.user_metadata?.role;
+        let tenant_id = authUser.app_metadata?.tenant_id || authUser.user_metadata?.tenant_id;
         
-        console.log('🔍 Auth metadata - role:', role, 'tenant_id:', tenant_id);
+        console.log('🔍 Auth app_metadata - role:', authUser.app_metadata?.role, 'tenant_id:', authUser.app_metadata?.tenant_id);
+        console.log('🔍 Auth user_metadata - role:', authUser.user_metadata?.role, 'tenant_id:', authUser.user_metadata?.tenant_id);
+        console.log('🔍 Final metadata values - role:', role, 'tenant_id:', tenant_id);
         
         // If we have both from metadata, use them but still verify with database
         if (role && tenant_id) {
@@ -134,7 +148,7 @@ const AuthProvider = ({ children }) => {
           console.log('✅ Setting user with profile data:', { email: enrichedUser.email, role: enrichedUser.role, tenant_id: enrichedUser.tenant_id });
           setUser(enrichedUser);
           
-          // Update auth metadata if it's missing
+          // Update auth metadata if it's missing - UPDATE BOTH user_metadata AND app_metadata
           if (!role || !tenant_id) {
             updateAuthMetadata(authUser.id, profile.role, profile.tenant_id);
           }
@@ -179,29 +193,61 @@ const AuthProvider = ({ children }) => {
       }
     };
 
-// Update auth metadata to sync with database
-const updateAuthMetadata = async (userId, role, tenantId) => {
-  try {
-    await supabase.auth.updateUser({
-      data: { role, tenant_id: tenantId }
-    });
-    console.log('✅ Auth metadata updated');
+    // Update auth metadata to sync with database - ENHANCED VERSION
+    const updateAuthMetadata = async (userId, role, tenantId) => {
+      try {
+        console.log('🔄 Updating auth metadata for user:', userId, 'role:', role, 'tenant_id:', tenantId);
+        
+        // Update user metadata (this gets included in JWT more reliably)
+        await supabase.auth.updateUser({
+          data: { 
+            role: role, 
+            tenant_id: tenantId 
+          }
+        });
+        console.log('✅ User metadata updated');
 
-    // 🔄 Force session refresh to apply new metadata to JWT
-    const { data: refreshedSession, error: refreshError } = await supabase.auth.refreshSession();
-    if (refreshedSession?.session) {
-      console.log('🔁 Session refreshed to reflect new metadata');
-      setSession(refreshedSession.session);
-      localStorage.setItem('auth_token', refreshedSession.session.access_token);
-      await loadUserInfo(refreshedSession.session.user); // rehydrate user state
-    } else {
-      console.warn('⚠️ Session refresh failed after metadata update:', refreshError?.message);
-    }
+        // Also update via SQL to ensure both app_metadata and user_metadata are set
+        const { error: sqlError } = await supabase.rpc('update_user_metadata', {
+          user_id: userId,
+          new_role: role,
+          new_tenant_id: tenantId
+        });
 
-  } catch (error) {
-    console.log('⚠️ Failed to update auth metadata:', error);
-  }
-};
+        if (sqlError) {
+          console.warn('⚠️ SQL metadata update failed:', sqlError.message);
+          // Not critical, continue with normal flow
+        } else {
+          console.log('✅ SQL metadata update successful');
+        }
+
+        // 🔄 Force session refresh to apply new metadata to JWT
+        const { data: refreshedSession, error: refreshError } = await supabase.auth.refreshSession();
+        if (refreshedSession?.session) {
+          console.log('🔁 Session refreshed to reflect new metadata');
+          setSession(refreshedSession.session);
+          localStorage.setItem('auth_token', refreshedSession.session.access_token);
+          
+          // Debug the refreshed JWT
+          if (refreshedSession.session.access_token) {
+            try {
+              const payload = JSON.parse(atob(refreshedSession.session.access_token.split('.')[1]));
+              console.log('🔍 Refreshed JWT payload:', payload);
+              console.log('🔍 Refreshed tenant_id in JWT:', payload.tenant_id);
+            } catch (e) {
+              console.warn('Could not decode refreshed JWT:', e);
+            }
+          }
+          
+          await loadUserInfo(refreshedSession.session.user); // rehydrate user state
+        } else {
+          console.warn('⚠️ Session refresh failed after metadata update:', refreshError?.message);
+        }
+
+      } catch (error) {
+        console.log('⚠️ Failed to update auth metadata:', error);
+      }
+    };
 
     // Initialize immediately
     initializeAuth();
@@ -221,6 +267,15 @@ const updateAuthMetadata = async (userId, role, tenantId) => {
         setSession(newSession);
         if (newSession?.access_token) {
           localStorage.setItem('auth_token', newSession.access_token);
+          
+          // Debug refreshed token
+          try {
+            const payload = JSON.parse(atob(newSession.access_token.split('.')[1]));
+            console.log('🔍 Token refresh - JWT payload:', payload);
+            console.log('🔍 Token refresh - tenant_id in JWT:', payload.tenant_id);
+          } catch (e) {
+            console.warn('Could not decode refreshed JWT:', e);
+          }
         }
       } else if (newSession?.user) {
         setSession(newSession);
@@ -331,6 +386,8 @@ const updateAuthMetadata = async (userId, role, tenantId) => {
         tenant_id: user.tenant_id,
         hasAllRequiredFields: !!(user.email && user.role && user.tenant_id)
       });
+    } else {
+      console.log('👤 User state is null/undefined');
     }
   }, [user]);
 
