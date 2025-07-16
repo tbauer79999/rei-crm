@@ -2,10 +2,11 @@
 const { createClient } = require('@supabase/supabase-js');
 require('dotenv').config();
 
-const supabase = createClient(
-  process.env.REACT_APP_SUPABASE_URL,  // Added REACT_APP_ prefix
+createClient(
+  process.env.SUPABASE_URL, // ✅ backend uses SUPABASE_URL
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
+
 
 
 const fetchRecordById = async (table, id) => {
