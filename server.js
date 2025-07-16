@@ -72,7 +72,7 @@ app.post('/api/settings/instructions', async (req, res) => {
 
   try {
     // Get knowledge base data
-    const bundleRes = await fetch('http://localhost:5000/api/knowledge-bundle');
+    const bundleRes = await fetch(`${process.env.API_URL}/api/knowledge-bundle`);
     const { bundle: knowledgeBlock } = await bundleRes.json();
 
     // Generate final instruction bundle
