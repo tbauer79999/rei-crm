@@ -167,22 +167,29 @@ const AuthProvider = ({ children }) => {
       }
     };
 
-    // Update auth metadata to sync with database
-    const updateAuthMetadata = async (userId, role, tenantId) => {
-      try {
-await supabase.auth.updateUser({
-  data: { role, tenant_id: tenantId }
-});
-console.log('✅ Auth metadata updated');
+// Update auth metadata to sync with database
+const updateAuthMetadata = async (userId, role, tenantId) => {
+  try {
+    await supabase.auth.updateUser({
+      data: { role, tenant_id: tenantId }
+    });
+    console.log('✅ Auth metadata updated');
 
-// 🔄 Force session refresh to pick up new claims
-const { data: refreshedSession, error } = await supabase.auth.refreshSession();
-if (refreshedSession?.session) {
-  console.log('🔁 Session refreshed to reflect new metadata');
-  setSession(refreshedSession.session);
-  localStorage.setItem('auth_token', refreshedSession.session.access_token);
-  await loadUserInfo(refreshedSession.session.user); // rehydrate user state
-}
+    // 🔄 Force session refresh to apply new metadata to JWT
+    const { data: refreshedSession, error: refreshError } = await supabase.auth.refreshSession();
+    if (refreshedSession?.session) {
+      console.log('🔁 Session refreshed to reflect new metadata');
+      setSession(refreshedSession.session);
+      localStorage.setItem('auth_token', refreshedSession.session.access_token);
+      await loadUserInfo(refreshedSession.session.user); // rehydrate user state
+    } else {
+      console.warn('⚠️ Session refresh failed after metadata update:', refreshError?.message);
+    }
+
+  } catch (error) {
+    console.log('⚠️ Failed to update auth metadata:', error);
+  }
+};
 
     // Initialize immediately
     initializeAuth();
