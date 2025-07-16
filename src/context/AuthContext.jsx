@@ -170,14 +170,19 @@ const AuthProvider = ({ children }) => {
     // Update auth metadata to sync with database
     const updateAuthMetadata = async (userId, role, tenantId) => {
       try {
-        await supabase.auth.updateUser({
-          data: { role, tenant_id: tenantId }
-        });
-        console.log('✅ Auth metadata updated');
-      } catch (error) {
-        console.log('⚠️ Failed to update auth metadata:', error);
-      }
-    };
+await supabase.auth.updateUser({
+  data: { role, tenant_id: tenantId }
+});
+console.log('✅ Auth metadata updated');
+
+// 🔄 Force session refresh to pick up new claims
+const { data: refreshedSession, error } = await supabase.auth.refreshSession();
+if (refreshedSession?.session) {
+  console.log('🔁 Session refreshed to reflect new metadata');
+  setSession(refreshedSession.session);
+  localStorage.setItem('auth_token', refreshedSession.session.access_token);
+  await loadUserInfo(refreshedSession.session.user); // rehydrate user state
+}
 
     // Initialize immediately
     initializeAuth();
