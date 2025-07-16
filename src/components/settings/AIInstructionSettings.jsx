@@ -39,8 +39,6 @@ import {
   buildInitialInstruction
 } from '../../lib/instructionBuilder.js';
 
-
-
 const EnterpriseAIStrategyHub = () => {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -217,7 +215,23 @@ const EnterpriseAIStrategyHub = () => {
     'Final Attempt'
   ];
 
-  // API helper function
+  // Get the correct API base URL
+  const getApiBaseUrl = () => {
+    // Use the environment variable you already have set
+    if (process.env.REACT_APP_API_URL) {
+      return process.env.REACT_APP_API_URL;
+    }
+    
+    // For development
+    if (process.env.NODE_ENV === 'development') {
+      return 'http://localhost:3001';
+    }
+    
+    // Fallback
+    return 'https://api.getsurfox.com/api';
+  };
+
+  // API helper function with better error handling
   const callAPI = async (endpoint, options = {}) => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -226,7 +240,12 @@ const EnterpriseAIStrategyHub = () => {
         throw new Error('Authentication required');
       }
 
-      const response = await fetch(endpoint, {
+      const apiBaseUrl = getApiBaseUrl();
+      const fullUrl = `${apiBaseUrl}${endpoint}`;
+
+      console.log('Making API call to:', fullUrl);
+
+      const response = await fetch(fullUrl, {
         ...options,
         headers: {
           'Authorization': `Bearer ${session.access_token}`,
@@ -235,11 +254,38 @@ const EnterpriseAIStrategyHub = () => {
         },
       });
 
+      console.log('Response status:', response.status);
+
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        // Check if response is HTML (common when API endpoint doesn't exist)
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('text/html')) {
+          throw new Error(`API endpoint not found. Expected JSON but received HTML. Check your API URL: ${fullUrl}`);
+        }
+
+        const errorText = await response.text();
+        let errorData;
+        try {
+          errorData = JSON.parse(errorText);
+        } catch (e) {
+          errorData = { error: `Server error (${response.status}): ${errorText}` };
+        }
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
       }
 
-      return await response.json();
+      const responseText = await response.text();
+      
+      // Check if response is actually JSON
+      if (!responseText) {
+        return {};
+      }
+
+      try {
+        return JSON.parse(responseText);
+      } catch (parseError) {
+        console.error('Failed to parse JSON response:', responseText);
+        throw new Error(`Invalid JSON response from API: ${responseText.substring(0, 200)}...`);
+      }
     } catch (error) {
       console.error('API call failed:', error);
       throw error;
@@ -252,7 +298,8 @@ const EnterpriseAIStrategyHub = () => {
       if (!user?.tenant_id) return;
 
       try {
-        const settings = await callAPI(`/api/settings?tenant_id=${user.tenant_id}`);
+        // Updated to use the correct endpoint format
+        const settings = await callAPI(`/settings?tenant_id=${user.tenant_id}`);
         
         // Extract configuration from existing settings
         const extractLine = (bundle, label) => {
@@ -276,7 +323,7 @@ const EnterpriseAIStrategyHub = () => {
 
       } catch (err) {
         console.error('Error loading configuration:', err);
-        setError('Failed to load existing configuration');
+        setError(`Failed to load existing configuration: ${err.message}`);
       }
     };
 
@@ -293,6 +340,16 @@ const EnterpriseAIStrategyHub = () => {
 
     return (
       <div className="space-y-8">
+        {/* Debug Information - Remove once everything works */}
+        <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4">
+          <div className="text-sm text-yellow-800">
+            <div><strong>Debug Info:</strong></div>
+            <div>API Base URL: {getApiBaseUrl()}</div>
+            <div>User Role: {user?.role}</div>
+            <div>Tenant ID: {user?.tenant_id}</div>
+          </div>
+        </div>
+
         {/* Performance Overview Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           <div className="bg-gradient-to-r from-blue-500 to-blue-600 rounded-2xl p-6 text-white">
@@ -506,14 +563,14 @@ const EnterpriseAIStrategyHub = () => {
         }
 
         // Build instruction bundles
-const initialBundle = buildInitialInstruction({
-  tone: strategyConfig.initialTone,
-  persona: strategyConfig.initialPersona,
-  industry: strategyConfig.industry,
-  role: strategyConfig.role,
-  leadDetails: strategyConfig.leadDetails || {},
-  knowledgeBase: strategyConfig.knowledgeBase || '',
-  campaignMetadata: strategyConfig.campaignMetadata || {}
+        const initialBundle = buildInitialInstruction({
+          tone: strategyConfig.initialTone,
+          persona: strategyConfig.initialPersona,
+          industry: strategyConfig.industry,
+          role: strategyConfig.role,
+          leadDetails: strategyConfig.leadDetails || {},
+          knowledgeBase: strategyConfig.knowledgeBase || '',
+          campaignMetadata: strategyConfig.campaignMetadata || {}
         });
 
         const engagementBundle = buildInstructionBundle({
@@ -546,7 +603,8 @@ const initialBundle = buildInitialInstruction({
           followup_delay_3: { value: strategyConfig.followups[2]?.day.toString() || '14' }
         };
 
-        await callAPI('/api/settings', {
+        // Updated to use the correct endpoint format
+        await callAPI('/settings', {
           method: 'PUT',
           body: JSON.stringify({ 
             settings: settingsPayload, 

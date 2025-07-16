@@ -28,8 +28,24 @@ export default function AISettings() {
   const delayOptions = ['1', '3', '7', '14', '30', '60', '90', '180'];
   const methodOptions = ['Email', 'SMS', 'Dashboard Only', 'All'];
 
-  // Enhanced API call helper
-  const makeAuthenticatedRequest = async (url, options = {}) => {
+  // Get the correct API base URL
+  const getApiBaseUrl = () => {
+    // Use the environment variable you already have set
+    if (process.env.REACT_APP_API_URL) {
+      return process.env.REACT_APP_API_URL;
+    }
+    
+    // For development
+    if (process.env.NODE_ENV === 'development') {
+      return 'http://localhost:3001';
+    }
+    
+    // Fallback
+    return 'https://api.getsurfox.com/api';
+  };
+
+  // Enhanced API call helper with better error handling
+  const makeAuthenticatedRequest = async (endpoint, options = {}) => {
     try {
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
       
@@ -41,29 +57,56 @@ export default function AISettings() {
         throw new Error('No valid session found. Please log in again.');
       }
 
+      const apiBaseUrl = getApiBaseUrl();
+      const fullUrl = `${apiBaseUrl}${endpoint}`;
+
       const headers = {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${session.access_token}`,
         ...options.headers
       };
 
-      const response = await fetch(url, {
+      console.log('Making API request to:', fullUrl);
+
+      const response = await fetch(fullUrl, {
         ...options,
         headers
       });
 
+      console.log('Response status:', response.status);
+
       if (!response.ok) {
+        // Check if response is HTML (common when API endpoint doesn't exist)
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('text/html')) {
+          throw new Error(`API endpoint not found. Expected JSON but received HTML. Check your API URL: ${fullUrl}`);
+        }
+
         let errorMessage = `Request failed: ${response.status} ${response.statusText}`;
         try {
           const errorData = await response.json();
           errorMessage = errorData.error || errorData.message || errorMessage;
-        } catch {
-          // If we can't parse error response, use the default message
+        } catch (parseError) {
+          // If we can't parse the error response, include more details
+          const responseText = await response.text();
+          errorMessage = `${errorMessage}. Response: ${responseText.substring(0, 200)}...`;
         }
         throw new Error(errorMessage);
       }
 
-      return await response.json();
+      const responseText = await response.text();
+      
+      // Check if response is actually JSON
+      if (!responseText) {
+        return {};
+      }
+
+      try {
+        return JSON.parse(responseText);
+      } catch (parseError) {
+        console.error('Failed to parse JSON response:', responseText);
+        throw new Error(`Invalid JSON response from API: ${responseText.substring(0, 200)}...`);
+      }
     } catch (error) {
       console.error('API Request failed:', error);
       throw error;
@@ -86,7 +129,8 @@ export default function AISettings() {
       setSettingsLoading(true);
       setError('');
       try {
-        const settings = await makeAuthenticatedRequest(`/api/settings?tenant_id=${user.tenant_id}`);
+        // Updated to use the correct endpoint format
+        const settings = await makeAuthenticatedRequest(`/settings?tenant_id=${user.tenant_id}`);
 
         setMinScore(settings['ai_min_escalation_score']?.value || '75');
         setFollowupDelay(settings['ai_cold_followup_delay_days']?.value || '3');
@@ -124,7 +168,8 @@ export default function AISettings() {
     };
 
     try {
-      await makeAuthenticatedRequest('/api/settings', {
+      // Updated to use the correct endpoint format
+      await makeAuthenticatedRequest('/settings', {
         method: 'PUT',
         body: JSON.stringify({ settings: settingsPayload, tenant_id: user.tenant_id })
       });
@@ -180,6 +225,16 @@ export default function AISettings() {
           <span className="text-green-800 font-medium">{success}</span>
         </div>
       )}
+
+      {/* Debug Information - Remove once everything works */}
+      <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4">
+        <div className="text-sm text-yellow-800">
+          <div><strong>Debug Info:</strong></div>
+          <div>API Base URL: {getApiBaseUrl()}</div>
+          <div>User Role: {user?.role}</div>
+          <div>Tenant ID: {user?.tenant_id}</div>
+        </div>
+      </div>
 
       {/* Escalation Score Settings */}
       <div className="bg-white rounded-xl border border-gray-200 p-6">

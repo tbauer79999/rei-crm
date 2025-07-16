@@ -49,6 +49,22 @@ export default function SalesTeamSettings() {
   const [teamMembers, setTeamMembers] = useState([]);
   const [pendingInvites, setPendingInvites] = useState([]);
 
+  // Get the correct API base URL
+  const getApiBaseUrl = () => {
+    // Use the environment variable you already have set
+    if (process.env.REACT_APP_API_URL) {
+      return process.env.REACT_APP_API_URL;
+    }
+    
+    // For development
+    if (process.env.NODE_ENV === 'development') {
+      return 'http://localhost:3001';
+    }
+    
+    // Fallback
+    return 'https://api.getsurfox.com/api';
+  };
+
   // Updated function to get fresh auth token
   const getAuthToken = async () => {
     try {
@@ -67,7 +83,7 @@ export default function SalesTeamSettings() {
     }
   };
 
-  // Updated function to create auth headers with fresh token
+  // Updated function to create auth headers with fresh token and full URL
   const getAuthHeaders = async () => {
     const token = await getAuthToken();
     if (!token) {
@@ -79,6 +95,53 @@ export default function SalesTeamSettings() {
     };
   };
 
+  // Helper function to make API calls with full URLs
+  const makeApiCall = async (endpoint, options = {}) => {
+    const headers = await getAuthHeaders();
+    const apiBaseUrl = getApiBaseUrl();
+    const fullUrl = `${apiBaseUrl}${endpoint}`;
+    
+    console.log('Making API call to:', fullUrl);
+    
+    const response = await fetch(fullUrl, {
+      ...options,
+      headers: {
+        ...headers,
+        ...options.headers
+      }
+    });
+
+    console.log('Response status:', response.status);
+    
+    if (!response.ok) {
+      const contentType = response.headers.get('content-type');
+      if (contentType && contentType.includes('text/html')) {
+        throw new Error(`API endpoint not found. Expected JSON but received HTML. Check your API URL: ${fullUrl}`);
+      }
+      
+      const errorText = await response.text();
+      let errorData;
+      try {
+        errorData = JSON.parse(errorText);
+      } catch (e) {
+        errorData = { error: `Server error (${response.status}): ${errorText}` };
+      }
+      throw new Error(errorData.error || `Request failed (${response.status})`);
+    }
+
+    const responseText = await response.text();
+    if (!responseText) {
+      return {};
+    }
+
+    try {
+      return JSON.parse(responseText);
+    } catch (parseError) {
+      console.error('Failed to parse JSON response:', responseText);
+      throw new Error(`Invalid JSON response from API: ${responseText.substring(0, 200)}...`);
+    }
+  };
+
   useEffect(() => {
     loadTeamData();
   }, []);
@@ -88,22 +151,20 @@ export default function SalesTeamSettings() {
     setError('');
     
     try {
-      const headers = await getAuthHeaders();
       console.log('Making API calls with fresh token');
 
       // Load data with better error handling using Promise.allSettled
       const [statsRes, membersRes] = await Promise.allSettled([
-        fetch('/api/team/stats', { headers }),
-        fetch('/api/team/members', { headers })
+        makeApiCall('/team/stats'),
+        makeApiCall('/team/members')
       ]);
 
       // Handle stats
-      if (statsRes.status === 'fulfilled' && statsRes.value.ok) {
-        const stats = await statsRes.value.json();
-        setTeamStats(stats);
-        console.log('Stats loaded successfully:', stats);
+      if (statsRes.status === 'fulfilled') {
+        setTeamStats(statsRes.value);
+        console.log('Stats loaded successfully:', statsRes.value);
       } else {
-        console.warn('Failed to load stats:', statsRes.reason || 'Network error');
+        console.warn('Failed to load stats:', statsRes.reason);
         setTeamStats({
           totalMembers: 0,
           activeUsers: 0,
@@ -113,26 +174,19 @@ export default function SalesTeamSettings() {
       }
 
       // Handle members
-      if (membersRes.status === 'fulfilled' && membersRes.value.ok) {
-        const members = await membersRes.value.json();
-        setTeamMembers(members);
-        console.log('Members loaded successfully:', members.length);
+      if (membersRes.status === 'fulfilled') {
+        setTeamMembers(membersRes.value);
+        console.log('Members loaded successfully:', membersRes.value.length);
       } else {
-        console.warn('Failed to load members:', membersRes.reason || 'Network error');
+        console.warn('Failed to load members:', membersRes.reason);
         setTeamMembers([]);
       }
 
       // Handle invitations separately (non-blocking)
       try {
-        const invitesRes = await fetch('/api/team/invitations', { headers });
-        if (invitesRes.ok) {
-          const invites = await invitesRes.json();
-          setPendingInvites(invites);
-          console.log('Invitations loaded successfully:', invites.length);
-        } else {
-          console.warn('Failed to load invitations, but continuing...');
-          setPendingInvites([]);
-        }
+        const invites = await makeApiCall('/team/invitations');
+        setPendingInvites(invites);
+        console.log('Invitations loaded successfully:', invites.length);
       } catch (inviteError) {
         console.warn('Invitations endpoint error:', inviteError);
         setPendingInvites([]);
@@ -142,7 +196,7 @@ export default function SalesTeamSettings() {
 
     } catch (error) {
       console.error('Error loading team data:', error);
-      setError('Failed to load team data. Please refresh and try again.');
+      setError(`Failed to load team data: ${error.message}`);
     } finally {
       setLoading(false);
     }
@@ -171,19 +225,8 @@ export default function SalesTeamSettings() {
     setSuccess('');
     
     try {
-      const headers = await getAuthHeaders();
-
-      // First, get the user's tenant_id from their profile
-      const profileRes = await fetch('/api/team/stats', { headers });
-      if (!profileRes.ok) {
-        throw new Error('Failed to get user profile');
-      }
-      
-      // The tenant_id is used in the stats endpoint, so we know the user has one
-
-      const response = await fetch('/api/team/invite', {
+      const data = await makeApiCall('/team/invite', {
         method: 'POST',
-        headers,
         body: JSON.stringify({
           email: inviteEmail,
           role: inviteRole,
@@ -191,19 +234,7 @@ export default function SalesTeamSettings() {
           lastName: inviteLastName
         })
       });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        let errorData;
-        try {
-          errorData = JSON.parse(errorText);
-        } catch (e) {
-          errorData = { error: `Server error (${response.status}): ${errorText}` };
-        }
-        throw new Error(errorData.error || `Failed to send invitation (${response.status})`);
-      }
       
-      const data = await response.json();
       setSuccess('Invitation created successfully!');
       setInviteEmail('');
       setInviteFirstName('');
@@ -231,25 +262,10 @@ export default function SalesTeamSettings() {
 
   const handleToggleUserStatus = async (userId, currentStatus) => {
     try {
-      const headers = await getAuthHeaders();
-
-      const response = await fetch(`/api/team/members/${userId}/toggle-status`, {
-        method: 'PATCH',
-        headers
+      const data = await makeApiCall(`/team/members/${userId}/toggle-status`, {
+        method: 'PATCH'
       });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        let errorData;
-        try {
-          errorData = JSON.parse(errorText);
-        } catch (e) {
-          errorData = { error: `Server error (${response.status}): ${errorText}` };
-        }
-        throw new Error(errorData.error || `Failed to update user status (${response.status})`);
-      }
       
-      const data = await response.json();
       setSuccess(data.message || 'User status updated successfully!');
       
       // Reload the data
@@ -264,30 +280,11 @@ export default function SalesTeamSettings() {
   const handleResendInvite = async (invitationId) => {
     try {
       console.log('Resending invitation:', invitationId);
-      const headers = await getAuthHeaders();
-
-      const response = await fetch(`/api/invitations/${invitationId}/resend`, {
-        method: 'POST',
-        headers
+      
+      const data = await makeApiCall(`/invitations/${invitationId}/resend`, {
+        method: 'POST'
       });
 
-      console.log('Resend response status:', response.status);
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Resend error response:', errorText);
-        
-        let errorData;
-        try {
-          errorData = JSON.parse(errorText);
-        } catch (e) {
-          errorData = { error: `Server error (${response.status}): ${errorText}` };
-        }
-        
-        throw new Error(errorData.error || `Failed to resend invitation (${response.status})`);
-      }
-
-      const data = await response.json();
       console.log('Resend success:', data);
       setSuccess('Invitation resent successfully!');
       await loadTeamData();
@@ -300,30 +297,11 @@ export default function SalesTeamSettings() {
   const handleCancelInvite = async (invitationId) => {
     try {
       console.log('Canceling invitation:', invitationId);
-      const headers = await getAuthHeaders();
-
-      const response = await fetch(`/api/team/invitations/${invitationId}`, {
-        method: 'DELETE',
-        headers
+      
+      const data = await makeApiCall(`/team/invitations/${invitationId}`, {
+        method: 'DELETE'
       });
 
-      console.log('Cancel response status:', response.status);
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Cancel error response:', errorText);
-        
-        let errorData;
-        try {
-          errorData = JSON.parse(errorText);
-        } catch (e) {
-          errorData = { error: `Server error (${response.status}): ${errorText}` };
-        }
-        
-        throw new Error(errorData.error || `Failed to cancel invitation (${response.status})`);
-      }
-
-      const data = await response.json();
       console.log('Cancel success:', data);
       setSuccess('Invitation canceled successfully!');
       await loadTeamData();
@@ -439,6 +417,16 @@ export default function SalesTeamSettings() {
           </div>
         </div>
       )}
+
+      {/* Debug Information - Remove once everything works */}
+      <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4">
+        <div className="text-sm text-yellow-800">
+          <div><strong>Debug Info:</strong></div>
+          <div>API Base URL: {getApiBaseUrl()}</div>
+          <div>User Role: {user?.role}</div>
+          <div>Tenant ID: {user?.tenant_id}</div>
+        </div>
+      </div>
 
       {/* Invitation Link Modal */}
       {invitationLink && (
