@@ -129,7 +129,7 @@ export default function Layout({ children }) {
     fetchCompanyInfo();
   }, [user?.tenant_id]);
 
-  // Fetch notifications based on user role
+  // Fetch notifications based on user role - FIXED: No WebSocket connections
   useEffect(() => {
     if (!user?.id || !user?.tenant_id) return;
 
@@ -203,67 +203,18 @@ export default function Layout({ children }) {
       }
     };
 
+    // Initial fetch
     fetchNotifications();
 
-    // Set up real-time subscription
-    const channel = supabase
-      .channel('notification-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'notifications',
-          filter: `tenant_id=eq.${user.tenant_id}`
-        },
-        async (payload) => {
-          console.log('New notification received:', payload);
-          
-          // Fetch the complete notification with lead data
-          const { data: newNotification } = await supabase
-            .from('notifications')
-            .select(`
-              id,
-              lead_id,
-              title,
-              message,
-              priority,
-              read,
-              created_at,
-              data,
-              leads!inner (
-                id,
-                name,
-                phone,
-                campaign_id,
-                campaigns!inner (
-                  id,
-                  name,
-                  assigned_sales_person
-                )
-              )
-            `)
-            .eq('id', payload.new.id)
-            .single();
+    // 🔥 FIXED: Use polling instead of real-time WebSocket subscriptions
+    // Poll for new notifications every 30 seconds
+    const pollInterval = setInterval(() => {
+      fetchNotifications();
+    }, 30000); // 30 seconds
 
-          if (newNotification) {
-            // Check if user should see this notification
-            if (role === 'business_admin' || role === 'global_admin' ||
-                newNotification.leads.campaigns.assigned_sales_person === user.id) {
-              setNotifications(prev => [newNotification, ...prev].slice(0, 20));
-              setUnreadCount(prev => prev + 1);
-              
-              // Optional: Play notification sound
-              const audio = new Audio('/notification-sound.mp3');
-              audio.play().catch(e => console.log('Could not play notification sound'));
-            }
-          }
-        }
-      )
-      .subscribe();
-
+    // Cleanup function
     return () => {
-      channel.unsubscribe();
+      clearInterval(pollInterval);
     };
   }, [user?.id, user?.tenant_id, role]);
 
