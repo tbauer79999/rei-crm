@@ -238,7 +238,7 @@ setInterval(() => {
   const path = require('path');
   
   // Construct the correct path relative to the current file
-  const workerPath = path.join(__dirname, '../workers/scrapeAndEmbedPendingWebsites.js');
+  const workerPath = path.join(__dirname, 'workers/scrapeAndEmbedPendingWebsites.js');
   
   exec(`node ${workerPath}`, (error, stdout) => {
     if (error) console.error('Scraper error:', error);
