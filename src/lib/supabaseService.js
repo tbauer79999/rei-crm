@@ -2,12 +2,10 @@
 const { createClient } = require('@supabase/supabase-js');
 require('dotenv').config();
 
-createClient(
-  process.env.SUPABASE_URL, // ✅ backend uses SUPABASE_URL
+const supabase = createClient(
+  process.env.REACT_APP_SUPABASE_URL || process.env.SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
-
-
 
 const fetchRecordById = async (table, id) => {
   const { data, error } = await supabase.from(table).select('*').eq('id', id).single();
@@ -32,8 +30,8 @@ const fetchSettingValue = async (key) => {
 };
 
 module.exports = {
-  supabase,
   fetchRecordById,
   fetchAllRecords,
   fetchSettingValue,
+  supabase, // move this to the end
 };
