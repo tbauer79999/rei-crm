@@ -38,10 +38,22 @@ const teamRoutes = require('./src/api_routes/team');
 const invitationsRoutes = require('./src/api_routes/invitations');
 const userRoutes = require('./src/api_routes/user'); // ADD THIS LINE
 
-
 const app = express();
 
-app.use(cors());
+// Updated CORS configuration to allow your frontend domain
+app.use(cors({
+  origin: [
+    'http://localhost:3000',           // For local development
+    'http://localhost:3001',           // Alternative local port
+    'https://app.getsurfox.com',       // Your production frontend
+    'https://getsurfox.com',           // In case you have this domain too
+    'https://www.getsurfox.com'        // With www subdomain
+  ],
+  credentials: true,                   // Allow cookies/auth headers
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+}));
+
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use('/api/hot-summary', hotSummaryRoutes);
