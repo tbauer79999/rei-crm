@@ -1,7 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import supabase from '../lib/supabaseClient';
-import { ROLE_PERMISSIONS, hasPermission as checkPermission, getRolePermissions } from '../lib/permissions';
-import { PLAN_FEATURES, hasFeature as checkFeature, getFeatureValue, checkLimit, PLAN_METADATA } from '../lib/plans';
 
 const AuthContext = createContext();
 
@@ -88,12 +86,12 @@ const AuthProvider = ({ children }) => {
       try {
         console.log('📊 Loading user profile for:', authUser.email);
         
-        // Try to get role and tenant_id from BOTH app_metadata AND user_metadata
-        let role = authUser.user_metadata?.role || authUser.app_metadata?.role;
-        let tenant_id = authUser.user_metadata?.tenant_id || authUser.app_metadata?.tenant_id;
+// Try to get role and tenant_id from BOTH app_metadata AND user_metadata
+let role = authUser.user_metadata?.role || authUser.app_metadata?.role;
+let tenant_id = authUser.user_metadata?.tenant_id || authUser.app_metadata?.tenant_id;
 
-        console.log('🔍 Raw authUser.user_metadata:', authUser.user_metadata);
-        console.log('🔍 Raw authUser.app_metadata:', authUser.app_metadata);
+console.log('🔍 Raw authUser.user_metadata:', authUser.user_metadata);
+console.log('🔍 Raw authUser.app_metadata:', authUser.app_metadata);
         
         console.log('🔍 Auth app_metadata - role:', authUser.app_metadata?.role, 'tenant_id:', authUser.app_metadata?.tenant_id);
         console.log('🔍 Auth user_metadata - role:', authUser.user_metadata?.role, 'tenant_id:', authUser.user_metadata?.tenant_id);
@@ -101,42 +99,14 @@ const AuthProvider = ({ children }) => {
         
         // If we have both from metadata, use them but still verify with database
         if (role && tenant_id) {
-          // Fetch tenant plan information
-          let tenantPlan = 'starter'; // default
-          let planFeatures = PLAN_FEATURES.starter;
-          
-          try {
-            const { data: tenantData, error: tenantError } = await supabase
-              .from('tenants')
-              .select('plan')
-              .eq('id', tenant_id)
-              .single();
-              
-            if (!tenantError && tenantData?.plan) {
-              tenantPlan = tenantData.plan;
-              planFeatures = PLAN_FEATURES[tenantPlan] || PLAN_FEATURES.starter;
-            }
-          } catch (tenantErr) {
-            console.warn('⚠️ Could not fetch tenant plan, using default:', tenantErr);
-          }
-          
           const enrichedUser = {
             ...authUser,
             email: authUser.email,
             role: role,
-            tenant_id: tenant_id,
-            currentPlan: tenantPlan,
-            planFeatures: planFeatures,
-            permissions: getRolePermissions(role)
+            tenant_id: tenant_id
           };
           
-          console.log('✅ Setting user with metadata:', { 
-            email: enrichedUser.email, 
-            role: enrichedUser.role, 
-            tenant_id: enrichedUser.tenant_id,
-            currentPlan: enrichedUser.currentPlan,
-            permissionCount: enrichedUser.permissions.length
-          });
+          console.log('✅ Setting user with metadata:', { email: enrichedUser.email, role: enrichedUser.role, tenant_id: enrichedUser.tenant_id });
           setUser(enrichedUser);
           
           // Optionally verify in background (don't wait for this)
@@ -161,63 +131,24 @@ const AuthProvider = ({ children }) => {
             ...authUser,
             email: authUser.email,
             role: 'business_admin',
-            tenant_id: authUser.id, // Use user ID as tenant ID for new business admins
-            currentPlan: 'starter',
-            planFeatures: PLAN_FEATURES.starter,
-            permissions: getRolePermissions('business_admin')
+            tenant_id: authUser.id // Use user ID as tenant ID for new business admins
           };
           
-          console.log('✅ Setting fallback user:', { 
-            email: fallbackUser.email, 
-            role: fallbackUser.role, 
-            tenant_id: fallbackUser.tenant_id,
-            currentPlan: fallbackUser.currentPlan
-          });
+          console.log('✅ Setting fallback user:', { email: fallbackUser.email, role: fallbackUser.role, tenant_id: fallbackUser.tenant_id });
           setUser(fallbackUser);
           return;
         }
 
         if (profile) {
           console.log('✅ Profile loaded:', profile);
-          
-          // Fetch tenant plan information
-          let tenantPlan = 'starter'; // default
-          let planFeatures = PLAN_FEATURES.starter;
-          
-          if (profile.tenant_id) {
-            try {
-              const { data: tenantData, error: tenantError } = await supabase
-                .from('tenants')
-                .select('plan')
-                .eq('id', profile.tenant_id)
-                .single();
-                
-              if (!tenantError && tenantData?.plan) {
-                tenantPlan = tenantData.plan;
-                planFeatures = PLAN_FEATURES[tenantPlan] || PLAN_FEATURES.starter;
-              }
-            } catch (tenantErr) {
-              console.warn('⚠️ Could not fetch tenant plan, using default:', tenantErr);
-            }
-          }
-          
           const enrichedUser = {
             ...authUser,
             email: authUser.email,
             role: profile.role || 'business_admin',
-            tenant_id: profile.tenant_id || authUser.id,
-            currentPlan: tenantPlan,
-            planFeatures: planFeatures,
-            permissions: getRolePermissions(profile.role || 'business_admin')
+            tenant_id: profile.tenant_id || authUser.id
           };
           
-          console.log('✅ Setting user with profile data:', { 
-            email: enrichedUser.email, 
-            role: enrichedUser.role, 
-            tenant_id: enrichedUser.tenant_id,
-            currentPlan: enrichedUser.currentPlan,
-            permissionCount: enrichedUser.permissions.length
-          });
+          console.log('✅ Setting user with profile data:', { email: enrichedUser.email, role: enrichedUser.role, tenant_id: enrichedUser.tenant_id });
           setUser(enrichedUser);
           
           // Update auth metadata if it's missing - UPDATE BOTH user_metadata AND app_metadata
@@ -234,18 +165,10 @@ const AuthProvider = ({ children }) => {
           ...authUser,
           email: authUser.email,
           role: 'business_admin',
-          tenant_id: authUser.id,
-          currentPlan: 'starter',
-          planFeatures: PLAN_FEATURES.starter,
-          permissions: getRolePermissions('business_admin')
+          tenant_id: authUser.id
         };
         
-        console.log('✅ Setting ultimate fallback user:', { 
-          email: ultimateFallbackUser.email, 
-          role: ultimateFallbackUser.role, 
-          tenant_id: ultimateFallbackUser.tenant_id,
-          currentPlan: ultimateFallbackUser.currentPlan
-        });
+        console.log('✅ Setting ultimate fallback user:', { email: ultimateFallbackUser.email, role: ultimateFallbackUser.role, tenant_id: ultimateFallbackUser.tenant_id });
         setUser(ultimateFallbackUser);
       }
     };
@@ -262,35 +185,10 @@ const AuthProvider = ({ children }) => {
         // If database differs from metadata, update user state
         if (profile && (profile.role !== currentRole || profile.tenant_id !== currentTenantId)) {
           console.log('🔄 Profile changed, updating user...');
-          
-          // Fetch updated tenant plan
-          let tenantPlan = 'starter';
-          let planFeatures = PLAN_FEATURES.starter;
-          
-          if (profile.tenant_id) {
-            try {
-              const { data: tenantData, error: tenantError } = await supabase
-                .from('tenants')
-                .select('plan')
-                .eq('id', profile.tenant_id)
-                .single();
-                
-              if (!tenantError && tenantData?.plan) {
-                tenantPlan = tenantData.plan;
-                planFeatures = PLAN_FEATURES[tenantPlan] || PLAN_FEATURES.starter;
-              }
-            } catch (tenantErr) {
-              console.warn('⚠️ Could not fetch updated tenant plan:', tenantErr);
-            }
-          }
-          
           setUser(prev => ({
             ...prev,
             role: profile.role,
-            tenant_id: profile.tenant_id,
-            currentPlan: tenantPlan,
-            planFeatures: planFeatures,
-            permissions: getRolePermissions(profile.role)
+            tenant_id: profile.tenant_id
           }));
         }
       } catch (error) {
@@ -455,44 +353,14 @@ const AuthProvider = ({ children }) => {
           .single();
 
         if (profile && !profileError) {
-          // Fetch tenant plan information
-          let tenantPlan = 'starter';
-          let planFeatures = PLAN_FEATURES.starter;
-          
-          if (profile.tenant_id) {
-            try {
-              const { data: tenantData, error: tenantError } = await supabase
-                .from('tenants')
-                .select('plan')
-                .eq('id', profile.tenant_id)
-                .single();
-                
-              if (!tenantError && tenantData?.plan) {
-                tenantPlan = tenantData.plan;
-                planFeatures = PLAN_FEATURES[tenantPlan] || PLAN_FEATURES.starter;
-              }
-            } catch (tenantErr) {
-              console.warn('⚠️ Could not fetch tenant plan during refresh:', tenantErr);
-            }
-          }
-          
           const refreshedUser = {
             ...data.user,
             email: data.user.email,
             role: profile.role || 'business_admin',
-            tenant_id: profile.tenant_id || data.user.id,
-            currentPlan: tenantPlan,
-            planFeatures: planFeatures,
-            permissions: getRolePermissions(profile.role || 'business_admin')
+            tenant_id: profile.tenant_id || data.user.id
           };
           
-          console.log('✅ User refreshed:', { 
-            email: refreshedUser.email, 
-            role: refreshedUser.role, 
-            tenant_id: refreshedUser.tenant_id,
-            currentPlan: refreshedUser.currentPlan,
-            permissionCount: refreshedUser.permissions.length
-          });
+          console.log('✅ User refreshed:', { email: refreshedUser.email, role: refreshedUser.role, tenant_id: refreshedUser.tenant_id });
           setUser(refreshedUser);
         } else {
           console.log('⚠️ Profile refresh failed, using fallback');
@@ -500,18 +368,10 @@ const AuthProvider = ({ children }) => {
             ...data.user,
             email: data.user.email,
             role: 'business_admin',
-            tenant_id: data.user.id,
-            currentPlan: 'starter',
-            planFeatures: PLAN_FEATURES.starter,
-            permissions: getRolePermissions('business_admin')
+            tenant_id: data.user.id
           };
           
-          console.log('✅ Fallback user set:', { 
-            email: fallbackRefreshUser.email, 
-            role: fallbackRefreshUser.role, 
-            tenant_id: fallbackRefreshUser.tenant_id,
-            currentPlan: fallbackRefreshUser.currentPlan
-          });
+          console.log('✅ Fallback user set:', { email: fallbackRefreshUser.email, role: fallbackRefreshUser.role, tenant_id: fallbackRefreshUser.tenant_id });
           setUser(fallbackRefreshUser);
         }
       }
@@ -527,8 +387,6 @@ const AuthProvider = ({ children }) => {
         email: user.email, 
         role: user.role, 
         tenant_id: user.tenant_id,
-        currentPlan: user.currentPlan,
-        permissionCount: user.permissions?.length || 0,
         hasAllRequiredFields: !!(user.email && user.role && user.tenant_id)
       });
     } else {
@@ -536,49 +394,7 @@ const AuthProvider = ({ children }) => {
     }
   }, [user]);
 
-  // NEW: Permission checking functions
-  const hasPermission = (permission) => {
-    if (!user?.role) return false;
-    return checkPermission(user.role, permission);
-  };
-
-  const hasAllPermissions = (permissions) => {
-    return permissions.every(permission => hasPermission(permission));
-  };
-
-  const hasAnyPermission = (permissions) => {
-    return permissions.some(permission => hasPermission(permission));
-  };
-
-  // NEW: Plan feature checking functions  
-  const hasFeature = (feature) => {
-    if (!user?.currentPlan) return false;
-    return checkFeature(user.currentPlan, feature);
-  };
-
-  const getFeatureLimit = (feature) => {
-    if (!user?.currentPlan) return 0;
-    return getFeatureValue(user.currentPlan, feature);
-  };
-
-  const checkFeatureLimit = (feature, currentUsage) => {
-    if (!user?.currentPlan) return { allowed: false, unlimited: false };
-    return checkLimit(user.currentPlan, feature, currentUsage);
-  };
-
-  // NEW: Plan information
-  const getPlanMetadata = () => {
-    if (!user?.currentPlan) return null;
-    return PLAN_METADATA[user.currentPlan];
-  };
-
-  const isUnlimitedFeature = (feature) => {
-    const limit = getFeatureLimit(feature);
-    return limit === -1;
-  };
-
   const value = { 
-    // Existing values
     user, 
     loading,
     session,
@@ -587,22 +403,7 @@ const AuthProvider = ({ children }) => {
     tenantId: user?.tenant_id,
     canAccessEnterprise,
     canAccessAdmin,
-    refreshUser,
-    
-    // NEW: Permission checking
-    hasPermission,
-    hasAllPermissions, 
-    hasAnyPermission,
-    permissions: user?.permissions || [],
-    
-    // NEW: Plan feature checking
-    currentPlan: user?.currentPlan || 'starter',
-    planFeatures: user?.planFeatures || PLAN_FEATURES.starter,
-    hasFeature,
-    getFeatureLimit,
-    checkFeatureLimit,
-    getPlanMetadata,
-    isUnlimitedFeature
+    refreshUser
   };
 
   return (
