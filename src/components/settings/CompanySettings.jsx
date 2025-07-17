@@ -4,6 +4,8 @@ import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { Textarea } from "../ui/textarea";
 import { Select, SelectItem } from "../ui/select";
+// ADD THIS IMPORT
+import { PERMISSIONS } from "../../lib/permissions";
 import supabase from "../../lib/supabaseClient";
 import Button from '../ui/button';
 import { 
@@ -20,7 +22,8 @@ import {
 } from 'lucide-react';
 
 export default function CompanySettings() {
-  const { user, loading: authLoading } = useAuth();
+  // ADD hasPermission to the destructuring
+  const { user, loading: authLoading, hasPermission } = useAuth();
   const [data, setData] = useState({});
   const [settingsLoading, setSettingsLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -30,6 +33,96 @@ export default function CompanySettings() {
   const [startHour, setStartHour] = useState("");
   const [endHour, setEndHour] = useState("");
   const [dayPreset, setDayPreset] = useState("");
+
+  // REPLACE the role check in handleSave with permission check
+  const handleSave = async () => {
+    if (!user || !user.tenant_id) {
+      setError("Cannot save settings: User or tenant_id not available.");
+      return;
+    }
+    
+    // OLD: if (!['global_admin', 'business_admin'].includes(user.role)) {
+    // NEW: Use semantic permission check
+    if (!hasPermission(PERMISSIONS.VIEW_EDIT_COMPANY_INFO)) {
+      setError("You don't have permission to save company settings.");
+      return;
+    }
+
+    try {
+      setSaving(true);
+      setError('');
+      setSuccess('');
+
+      const dayMap = {
+        "M–F": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
+        "M–Sat": [
+          "Monday",
+          "Tuesday",
+          "Wednesday",
+          "Thursday",
+          "Friday",
+          "Saturday",
+        ],
+        Everyday: [
+          "Monday",
+          "Tuesday",
+          "Wednesday",
+          "Thursday",
+          "Friday",
+          "Saturday",
+          "Sunday",
+        ],
+      };
+
+      const translatedDays = dayPreset ? dayMap[dayPreset] || [] : [];
+
+      const settingsPayload = {
+        ...data,
+        officeOpenHour: { value: startHour },
+        officeCloseHour: { value: endHour },
+        officeDays: { value: translatedDays.join(",") },
+      };
+
+      // Filter out undefined values and prepare for API
+      const cleanedSettings = {};
+      Object.entries(settingsPayload).forEach(([key, entry]) => {
+        if (entry && typeof entry.value !== 'undefined') {
+          cleanedSettings[key] = entry;
+        }
+      });
+
+      if (Object.keys(cleanedSettings).length === 0) {
+        console.log("No data to save.");
+        setSaving(false);
+        return;
+      }
+
+      console.log("Saving company settings:", cleanedSettings);
+      
+      await makeAuthenticatedRequest('/settings', {
+        method: 'PUT',
+        body: JSON.stringify({ 
+          settings: cleanedSettings, 
+          tenant_id: user.tenant_id 
+        })
+      });
+
+      // Update local state
+      const newData = { ...settingsPayload };
+      if (newData.officeDays) {
+        newData.officeDays = { ...newData.officeDays, value: translatedDays.join(",") };
+      }
+      setData(newData);
+
+      setSuccess('Settings saved successfully!');
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (err) {
+      console.error("Save failed", err);
+      setError(`Save failed: ${err.message}`);
+    } finally {
+      setSaving(false);
+    }
+  };
 
   // Get the correct API base URL
   const getApiBaseUrl = () => {
@@ -188,93 +281,6 @@ export default function CompanySettings() {
     }));
   };
 
-  const handleSave = async () => {
-    if (!user || !user.tenant_id) {
-      setError("Cannot save settings: User or tenant_id not available.");
-      return;
-    }
-    
-    if (!['global_admin', 'business_admin'].includes(user.role)) {
-      setError("Admin role required to save settings.");
-      return;
-    }
-
-    try {
-      setSaving(true);
-      setError('');
-      setSuccess('');
-
-      const dayMap = {
-        "M–F": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
-        "M–Sat": [
-          "Monday",
-          "Tuesday",
-          "Wednesday",
-          "Thursday",
-          "Friday",
-          "Saturday",
-        ],
-        Everyday: [
-          "Monday",
-          "Tuesday",
-          "Wednesday",
-          "Thursday",
-          "Friday",
-          "Saturday",
-          "Sunday",
-        ],
-      };
-
-      const translatedDays = dayPreset ? dayMap[dayPreset] || [] : [];
-
-      const settingsPayload = {
-        ...data,
-        officeOpenHour: { value: startHour },
-        officeCloseHour: { value: endHour },
-        officeDays: { value: translatedDays.join(",") },
-      };
-
-      // Filter out undefined values and prepare for API
-      const cleanedSettings = {};
-      Object.entries(settingsPayload).forEach(([key, entry]) => {
-        if (entry && typeof entry.value !== 'undefined') {
-          cleanedSettings[key] = entry;
-        }
-      });
-
-      if (Object.keys(cleanedSettings).length === 0) {
-        console.log("No data to save.");
-        setSaving(false);
-        return;
-      }
-
-      console.log("Saving company settings:", cleanedSettings);
-      
-      await makeAuthenticatedRequest('/settings', {
-        method: 'PUT',
-        body: JSON.stringify({ 
-          settings: cleanedSettings, 
-          tenant_id: user.tenant_id 
-        })
-      });
-
-      // Update local state
-      const newData = { ...settingsPayload };
-      if (newData.officeDays) {
-        newData.officeDays = { ...newData.officeDays, value: translatedDays.join(",") };
-      }
-      setData(newData);
-
-      setSuccess('Settings saved successfully!');
-      setTimeout(() => setSuccess(''), 3000);
-    } catch (err) {
-      console.error("Save failed", err);
-      setError(`Save failed: ${err.message}`);
-    } finally {
-      setSaving(false);
-    }
-  };
-
   const hourOptions = [
     { label: "8:00 AM", value: "8" },
     { label: "9:00 AM", value: "9" },
@@ -298,6 +304,9 @@ export default function CompanySettings() {
     { label: "Mountain Standard Time (MST)", value: "MST" },
     { label: "Pacific Standard Time (PST)", value: "PST" },
   ];
+
+  // ADD: Check if user can edit settings
+  const canEditSettings = hasPermission(PERMISSIONS.VIEW_EDIT_COMPANY_INFO);
 
   if (authLoading) return (
     <div className="flex items-center justify-center py-12">
@@ -342,7 +351,15 @@ export default function CompanySettings() {
         </div>
       )}
 
-
+      {/* Permission Check Alert */}
+      {!canEditSettings && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 flex items-center space-x-3">
+          <AlertCircle className="w-5 h-5 text-yellow-600 flex-shrink-0" />
+          <span className="text-yellow-800">
+            You have read-only access to company settings. Admin permissions required to make changes.
+          </span>
+        </div>
+      )}
 
       {/* Basic Company Information */}
       <div className="bg-white rounded-xl border border-gray-200 p-6">
@@ -367,6 +384,7 @@ export default function CompanySettings() {
               value={data.company_name?.value || ""}
               onChange={(e) => handleChange("company_name", e.target.value)}
               placeholder="Your Company Name"
+              disabled={!canEditSettings}
             />
           </div>
 
@@ -378,6 +396,7 @@ export default function CompanySettings() {
             <Select
               value={data.business_type?.value || ""}
               onValueChange={(val) => handleChange("business_type", val)}
+              disabled={!canEditSettings}
             >
               <SelectItem value="llc">LLC</SelectItem>
               <SelectItem value="corp">Corporation</SelectItem>
@@ -397,6 +416,7 @@ export default function CompanySettings() {
               value={data.primary_contact?.value || ""}
               onChange={(e) => handleChange("primary_contact", e.target.value)}
               placeholder="Contact Person"
+              disabled={!canEditSettings}
             />
           </div>
 
@@ -410,6 +430,7 @@ export default function CompanySettings() {
               value={data.phone?.value || ""}
               onChange={(e) => handleChange("phone", e.target.value)}
               placeholder="(555) 123-4567"
+              disabled={!canEditSettings}
             />
           </div>
 
@@ -423,6 +444,7 @@ export default function CompanySettings() {
               value={data.email?.value || ""}
               onChange={(e) => handleChange("email", e.target.value)}
               placeholder="support@yourcompany.com"
+              disabled={!canEditSettings}
             />
           </div>
 
@@ -432,9 +454,10 @@ export default function CompanySettings() {
               <span>Time Zone</span>
             </Label>
             <select
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
               value={data.timezone?.value || ""}
               onChange={(e) => handleChange("timezone", e.target.value)}
+              disabled={!canEditSettings}
             >
               <option value="">Select timezone</option>
               {timezoneOptions.map((tz) => (
@@ -466,9 +489,10 @@ export default function CompanySettings() {
               <span>Opening Time</span>
             </Label>
             <select
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
               value={startHour}
               onChange={(e) => setStartHour(e.target.value)}
+              disabled={!canEditSettings}
             >
               <option value="">Select opening time</option>
               {hourOptions.map((hr) => (
@@ -485,9 +509,10 @@ export default function CompanySettings() {
               <span>Closing Time</span>
             </Label>
             <select
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
               value={endHour}
               onChange={(e) => setEndHour(e.target.value)}
+              disabled={!canEditSettings}
             >
               <option value="">Select closing time</option>
               {closingHourOptions.map((hr) => (
@@ -504,9 +529,10 @@ export default function CompanySettings() {
               <span>Active Days</span>
             </Label>
             <select
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
               value={dayPreset}
               onChange={(e) => setDayPreset(e.target.value)}
+              disabled={!canEditSettings}
             >
               <option value="">Select days</option>
               {dayOptions.map((opt) => (
@@ -543,6 +569,7 @@ export default function CompanySettings() {
               onChange={(e) => handleChange("address", e.target.value)}
               placeholder="123 Main Street, City, State, ZIP"
               rows={3}
+              disabled={!canEditSettings}
             />
           </div>
 
@@ -557,6 +584,7 @@ export default function CompanySettings() {
               onChange={(e) => handleChange("regions", e.target.value)}
               placeholder="List the cities, counties, or regions you serve"
               rows={3}
+              disabled={!canEditSettings}
             />
           </div>
         </div>
@@ -599,15 +627,15 @@ export default function CompanySettings() {
       {/* Save Button */}
       <div className="flex justify-end">
         <div className="flex items-center space-x-4">
-          {!['global_admin', 'business_admin'].includes(user?.role) && !authLoading && !settingsLoading && (
+          {!canEditSettings && !authLoading && !settingsLoading && (
             <div className="flex items-center space-x-2 text-red-600">
               <AlertCircle className="w-4 h-4" />
-              <span className="text-sm">Admin role required to save changes</span>
+              <span className="text-sm">Admin permissions required to save changes</span>
             </div>
           )}
           <Button
             onClick={handleSave}
-            disabled={saving || !['global_admin', 'business_admin'].includes(user?.role) || settingsLoading || authLoading}
+            disabled={saving || !canEditSettings || settingsLoading || authLoading}
             className="px-6 py-2"
           >
             {saving ? (
