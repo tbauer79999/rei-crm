@@ -1,5 +1,8 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import supabase from '../lib/supabaseClient';
+// ONLY ADD THESE TWO IMPORTS - everything else stays the same
+import { ROLE_PERMISSIONS, hasPermission as checkPermission, getRolePermissions } from '../lib/permissions';
+import { PLAN_FEATURES, hasFeature as checkFeature, getFeatureValue, checkLimit, PLAN_METADATA } from '../lib/plans';
 
 const AuthContext = createContext();
 
@@ -86,12 +89,12 @@ const AuthProvider = ({ children }) => {
       try {
         console.log('📊 Loading user profile for:', authUser.email);
         
-// Try to get role and tenant_id from BOTH app_metadata AND user_metadata
-let role = authUser.user_metadata?.role || authUser.app_metadata?.role;
-let tenant_id = authUser.user_metadata?.tenant_id || authUser.app_metadata?.tenant_id;
+        // Try to get role and tenant_id from BOTH app_metadata AND user_metadata
+        let role = authUser.user_metadata?.role || authUser.app_metadata?.role;
+        let tenant_id = authUser.user_metadata?.tenant_id || authUser.app_metadata?.tenant_id;
 
-console.log('🔍 Raw authUser.user_metadata:', authUser.user_metadata);
-console.log('🔍 Raw authUser.app_metadata:', authUser.app_metadata);
+        console.log('🔍 Raw authUser.user_metadata:', authUser.user_metadata);
+        console.log('🔍 Raw authUser.app_metadata:', authUser.app_metadata);
         
         console.log('🔍 Auth app_metadata - role:', authUser.app_metadata?.role, 'tenant_id:', authUser.app_metadata?.tenant_id);
         console.log('🔍 Auth user_metadata - role:', authUser.user_metadata?.role, 'tenant_id:', authUser.user_metadata?.tenant_id);
@@ -394,6 +397,33 @@ console.log('🔍 Raw authUser.app_metadata:', authUser.app_metadata);
     }
   }, [user]);
 
+  // NEW: Add these helper functions (they work even if plan/permission data isn't loaded yet)
+  const hasPermission = (permission) => {
+    if (!user?.role) return false;
+    try {
+      return checkPermission(user.role, permission);
+    } catch (error) {
+      console.warn('Permission check failed:', error);
+      return false;
+    }
+  };
+
+  const hasFeature = (feature) => {
+    try {
+      // Default to 'starter' plan if we don't have plan data yet
+      return checkFeature('starter', feature);
+    } catch (error) {
+      console.warn('Feature check failed:', error);
+      return false;
+    }
+  };
+
+  const getCurrentPlan = () => {
+    // For now, return 'starter' - we can enhance this later
+    return 'starter';
+  };
+
+  // ONLY EXTEND the existing value object - don't change anything else
   const value = { 
     user, 
     loading,
@@ -403,7 +433,13 @@ console.log('🔍 Raw authUser.app_metadata:', authUser.app_metadata);
     tenantId: user?.tenant_id,
     canAccessEnterprise,
     canAccessAdmin,
-    refreshUser
+    refreshUser,
+    
+    // NEW: Add these minimal helpers
+    hasPermission,
+    hasFeature,
+    currentPlan: getCurrentPlan(),
+    permissions: user?.role ? getRolePermissions(user.role) : []
   };
 
   return (
