@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import supabase from '../../lib/supabaseClient';
+// ADD THIS IMPORT
+import { PERMISSIONS } from '../../lib/permissions';
 import { Label } from '../ui/label';
 import Button from '../ui/button';
 import { Input } from '../ui/input';
@@ -15,7 +17,8 @@ import {
 } from 'lucide-react';
 
 export default function AISettings() {
-  const { user, loading: authLoading } = useAuth();
+  // ADD hasPermission to the destructuring
+  const { user, loading: authLoading, hasPermission } = useAuth();
   const [settingsLoading, setSettingsLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState('');
@@ -27,6 +30,9 @@ export default function AISettings() {
 
   const delayOptions = ['1', '3', '7', '14', '30', '60', '90', '180'];
   const methodOptions = ['Email', 'SMS', 'Dashboard Only', 'All'];
+
+  // ADD: Check if user can edit AI settings
+  const canEditAISettings = hasPermission(PERMISSIONS.VIEW_EDIT_AI_SETTINGS);
 
   // Get the correct API base URL
   const getApiBaseUrl = () => {
@@ -152,8 +158,10 @@ export default function AISettings() {
       return;
     }
     
-    if (!['global_admin', 'business_admin'].includes(user.role)) {
-      setError('Admin role required to save settings.');
+    // OLD: if (!['global_admin', 'business_admin'].includes(user.role)) {
+    // NEW: Use semantic permission check
+    if (!hasPermission(PERMISSIONS.VIEW_EDIT_AI_SETTINGS)) {
+      setError('You don\'t have permission to save AI settings.');
       return;
     }
 
@@ -226,7 +234,15 @@ export default function AISettings() {
         </div>
       )}
 
-  
+      {/* Permission Check Alert */}
+      {!canEditAISettings && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 flex items-center space-x-3">
+          <AlertCircle className="w-5 h-5 text-yellow-600 flex-shrink-0" />
+          <span className="text-yellow-800">
+            You have read-only access to AI settings. Admin permissions required to make changes.
+          </span>
+        </div>
+      )}
 
       {/* Escalation Score Settings */}
       <div className="bg-white rounded-xl border border-gray-200 p-6">
@@ -274,7 +290,8 @@ export default function AISettings() {
               max="100"
               value={minScore}
               onChange={(e) => setMinScore(e.target.value)}
-              className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
+              disabled={!canEditAISettings}
+              className={`w-full h-2 bg-gray-200 rounded-lg appearance-none slider ${!canEditAISettings ? 'cursor-not-allowed' : 'cursor-pointer'}`}
               style={{
                 background: `linear-gradient(to right, 
                   #3b82f6 0%, 
@@ -348,9 +365,10 @@ export default function AISettings() {
             <div className="max-w-xs">
               <select
                 id="followupDelay"
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
                 value={followupDelay}
                 onChange={(e) => setFollowupDelay(e.target.value)}
+                disabled={!canEditAISettings}
               >
                 {delayOptions.map((d) => (
                   <option key={d} value={d}>
@@ -387,9 +405,10 @@ export default function AISettings() {
             <div className="max-w-xs">
               <select
                 id="escalationMethod"
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
                 value={escalationMethod}
                 onChange={(e) => setEscalationMethod(e.target.value)}
+                disabled={!canEditAISettings}
               >
                 {methodOptions.map((opt) => (
                   <option key={opt} value={opt}>{opt}</option>
@@ -465,15 +484,15 @@ export default function AISettings() {
       {/* Save Button */}
       <div className="flex justify-end">
         <div className="flex items-center space-x-4">
-          {!['global_admin', 'business_admin'].includes(user?.role) && !authLoading && (
+          {!canEditAISettings && !authLoading && (
             <div className="flex items-center space-x-2 text-red-600">
               <AlertCircle className="w-4 h-4" />
-              <span className="text-sm">Admin role required to save changes</span>
+              <span className="text-sm">Admin permissions required to save changes</span>
             </div>
           )}
           <Button
             onClick={handleSave}
-            disabled={saving || !['global_admin', 'business_admin'].includes(user?.role) || settingsLoading || authLoading}
+            disabled={saving || !canEditAISettings || settingsLoading || authLoading}
             className="px-6 py-2"
           >
             {saving ? (
@@ -510,6 +529,18 @@ export default function AISettings() {
           cursor: pointer;
           box-shadow: 0 2px 4px rgba(0,0,0,0.1);
           border: none;
+        }
+        
+        .slider:disabled::-webkit-slider-thumb {
+          background: #e5e7eb;
+          border-color: #9ca3af;
+          cursor: not-allowed;
+        }
+        
+        .slider:disabled::-moz-range-thumb {
+          background: #e5e7eb;
+          border-color: #9ca3af;
+          cursor: not-allowed;
         }
       `}</style>
     </div>
