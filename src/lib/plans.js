@@ -205,7 +205,17 @@ export const FeatureGate = ({ plan, feature, children, fallback = null, showUpgr
   }
   
   if (showUpgrade) {
-    return <UpgradePrompt feature={feature} currentPlan={plan} />;
+    // Simple upgrade prompt - you can replace this with your actual UpgradePrompt component later
+    return (
+      <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg text-center">
+        <p className="text-sm text-blue-800 mb-2">
+          This feature requires a plan upgrade
+        </p>
+        <p className="text-xs text-blue-600">
+          Feature: {feature} | Current plan: {plan}
+        </p>
+      </div>
+    );
   }
   
   return fallback;
@@ -213,12 +223,12 @@ export const FeatureGate = ({ plan, feature, children, fallback = null, showUpgr
 
 // Usage examples:
 // if (!hasFeature(currentPlan, 'funnelModule')) {
-//   return <UpgradePrompt />
+//   return <div>This feature requires an upgrade</div>
 // }
 //
 // const teamSeatsCheck = checkLimit(currentPlan, 'teamSeats', currentTeamSize);
 // if (!teamSeatsCheck.allowed) {
-//   return <TeamLimitReached />
+//   return <div>Team limit reached</div>
 // }
 //
 // <FeatureGate plan={currentPlan} feature="chromeExtension" showUpgrade>
