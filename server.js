@@ -239,11 +239,10 @@ const printRoutes = (stack, prefix = '') => {
   });
 };
 
-console.log('✅ ROUTES LOADED:');
-printRoutes(app._router.stack);
-
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
+  console.log('✅ ROUTES LOADED:');
+  printRoutes(app._router.stack);
 });
 
 // Run website scraper every 2 minutes
