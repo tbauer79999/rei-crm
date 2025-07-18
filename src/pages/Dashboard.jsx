@@ -44,16 +44,18 @@ export default function Dashboard() {
   const [parsedRecords, setParsedRecords] = useState([]);
   const [uploadMessage, setUploadMessage] = useState('');
   const [uploadError, setUploadError] = useState(false);
-  const [sortBy, setSortBy] = useState('hot_score'); // Changed from 'created_at'
+  const [sortBy, setSortBy] = useState('hot_score');
   const [sortDirection, setSortDirection] = useState('desc');
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const navigate = useNavigate();
 
   // Get leads that need immediate attention - EXCLUDE already handled leads
   const alertLeads = leads.filter(lead => 
     lead.requires_immediate_attention && 
-    !(lead.status === 'Hot Lead' && lead.assigned_to_sales_team_id) // Exclude hot leads that are assigned
+    !(lead.status === 'Hot Lead' && lead.assigned_to_sales_team_id)
   );
   
   const criticalAlerts = alertLeads.filter(lead => 
@@ -79,13 +81,19 @@ export default function Dashboard() {
   };
 
   useEffect(() => {
-    fetchLeadFields();
-    fetchLeads();
+    if (user) {
+      fetchLeadFields();
+      fetchLeads();
+    }
   }, [user]);
 
   // Fetch the dynamic field configuration for this tenant
   const fetchLeadFields = async () => {
-    if (!user?.tenant_id) return;
+    if (!user?.tenant_id) {
+      // Set default fields if no tenant_id or if global admin
+      setDefaultLeadFields();
+      return;
+    }
 
     try {
       const { data, error } = await supabase
@@ -95,11 +103,12 @@ export default function Dashboard() {
         .order('field_name');
 
       if (error) {
-        console.error('Error fetching lead fields:', error);
+        console.warn('Error fetching lead fields, using defaults:', error);
+        setDefaultLeadFields();
         return;
       }
 
-      // ✅ Remove duplicates by field_name
+      // Remove duplicates by field_name
       const uniqueFields = data?.reduce((acc, field) => {
         const exists = acc.find(f => f.field_name === field.field_name);
         if (!exists) {
@@ -108,88 +117,141 @@ export default function Dashboard() {
         return acc;
       }, []) || [];
 
-      console.log(`Loaded ${data?.length} total fields, ${uniqueFields.length} unique fields`);
-      setLeadFields(uniqueFields);
+      if (uniqueFields.length === 0) {
+        setDefaultLeadFields();
+      } else {
+        console.log(`Loaded ${data?.length} total fields, ${uniqueFields.length} unique fields`);
+        setLeadFields(uniqueFields);
+      }
     } catch (err) {
-      console.error('Error fetching lead fields:', err);
+      console.warn('Error fetching lead fields, using defaults:', err);
+      setDefaultLeadFields();
     }
   };
 
+  const setDefaultLeadFields = () => {
+    const defaultFields = [
+      { field_name: 'owner_name', field_label: 'Name', field_type: 'text' },
+      { field_name: 'phone', field_label: 'Phone', field_type: 'phone' },
+      { field_name: 'email', field_label: 'Email', field_type: 'email' },
+      { field_name: 'property_address', field_label: 'Address', field_type: 'text' }
+    ];
+    setLeadFields(defaultFields);
+  };
+
   const fetchLeads = async () => {
-    // Check if user is logged in
-    if (!user) return; // Only proceed if user object exists
-
-    let query = supabase
-      .from('leads')
-      .select(`
-        *,
-        campaigns(name)
-      `)
-      .order(sortBy === 'hot_score' ? 'created_at' : sortBy, { ascending: sortDirection === 'asc' });
-
-    // --- MODIFIED LOGIC FOR GLOBAL ADMIN ACCESS ---
-    const isGlobalAdmin = user?.role === 'global_admin' || user?.user_metadata?.role === 'global_admin';
-
-    if (!isGlobalAdmin) {
-      // For regular tenant users, filter by their tenant_id
-      if (!user.tenant_id) { // Still ensure tenant_id exists for regular users
-        console.warn("User is not admin and tenant_id is missing. Cannot fetch leads.");
-        return; // Exit if not admin and tenant_id is missing
-      }
-      query = query.eq('tenant_id', user.tenant_id);
-      console.log("Fetching leads for tenant_id:", user.tenant_id);
-    } else {
-      console.log("Fetching ALL leads as Global Admin.");
-    }
-    // --- END MODIFIED LOGIC ---
-
-    const { data, error } = await query;
-
-    if (error) {
-      console.error('Error fetching leads:', error);
+    if (!user) {
+      setLoading(false);
       return;
     }
 
-    // Fetch lead scores separately
-    const leadIds = data?.map(lead => lead.id) || [];
-    
-    if (leadIds.length > 0) {
-      const { data: leadScores, error: scoresError } = await supabase
-        .from('lead_scores')
-        .select('*')
-        .in('lead_id', leadIds);
+    setLoading(true);
+    setError('');
 
-      if (scoresError) {
-        console.error('Error fetching lead scores:', scoresError);
+    try {
+      let query = supabase
+        .from('leads')
+        .select(`
+          *,
+          campaigns(name)
+        `)
+        .order(sortBy === 'hot_score' ? 'created_at' : sortBy, { ascending: sortDirection === 'asc' });
+
+      // Check if user is global admin
+      const isGlobalAdmin = user?.role === 'global_admin' || user?.user_metadata?.role === 'global_admin';
+
+      if (!isGlobalAdmin) {
+        // For regular tenant users, filter by their tenant_id
+        if (!user.tenant_id) {
+          console.warn("User is not admin and tenant_id is missing. Cannot fetch leads.");
+          setError("Unable to load leads: missing tenant information");
+          setLoading(false);
+          return;
+        }
+        query = query.eq('tenant_id', user.tenant_id);
+        console.log("Fetching leads for tenant_id:", user.tenant_id);
+      } else {
+        console.log("Fetching ALL leads as Global Admin.");
       }
 
-      // Create a map for quick lookup
-      const scoresMap = {};
-      leadScores?.forEach(score => {
-        scoresMap[score.lead_id] = score;
-      });
+      const { data, error } = await query;
 
-      // Transform the data to include campaign name and lead scores
-      const transformedData = data?.map(lead => ({
-        ...lead,
-        campaign: lead.campaigns?.name || 'No Campaign',
-        // Merge all score data if it exists
-        ...(scoresMap[lead.id] || {}),
-        // Ensure hot_score has a default value
-        hot_score: scoresMap[lead.id]?.hot_score || 0,
-        requires_immediate_attention: scoresMap[lead.id]?.requires_immediate_attention || false,
-        alert_priority: scoresMap[lead.id]?.alert_priority || 'none',
-        alert_triggers: scoresMap[lead.id]?.alert_triggers || {},
-        attention_reasons: scoresMap[lead.id]?.attention_reasons || [],
-        funnel_stage: scoresMap[lead.id]?.funnel_stage || lead.status
-      })) || [];
+      if (error) {
+        console.error('Error fetching leads:', error);
+        setError('Failed to load leads: ' + error.message);
+        setLoading(false);
+        return;
+      }
 
-      setLeads(transformedData);
-      setFilteredLeads(transformedData);
-    } else {
-      // No leads found
-      setLeads([]);
-      setFilteredLeads([]);
+      // Try to fetch lead scores, but don't fail if the table doesn't exist
+      let leadsWithScores = data || [];
+      const leadIds = data?.map(lead => lead.id) || [];
+      
+      if (leadIds.length > 0) {
+        try {
+          const { data: leadScores, error: scoresError } = await supabase
+            .from('lead_scores')
+            .select('*')
+            .in('lead_id', leadIds);
+
+          if (!scoresError && leadScores) {
+            // Create a map for quick lookup
+            const scoresMap = {};
+            leadScores.forEach(score => {
+              scoresMap[score.lead_id] = score;
+            });
+
+            // Transform the data to include campaign name and lead scores
+            leadsWithScores = data.map(lead => ({
+              ...lead,
+              campaign: lead.campaigns?.name || 'No Campaign',
+              // Merge all score data if it exists
+              ...(scoresMap[lead.id] || {}),
+              // Ensure hot_score has a default value
+              hot_score: scoresMap[lead.id]?.hot_score || 0,
+              requires_immediate_attention: scoresMap[lead.id]?.requires_immediate_attention || false,
+              alert_priority: scoresMap[lead.id]?.alert_priority || 'none',
+              alert_triggers: scoresMap[lead.id]?.alert_triggers || {},
+              attention_reasons: scoresMap[lead.id]?.attention_reasons || [],
+              funnel_stage: scoresMap[lead.id]?.funnel_stage || lead.status
+            }));
+          } else {
+            console.warn('Lead scores table not available or empty, using basic lead data');
+            // Just use basic lead data with default values
+            leadsWithScores = data.map(lead => ({
+              ...lead,
+              campaign: lead.campaigns?.name || 'No Campaign',
+              hot_score: 0,
+              requires_immediate_attention: false,
+              alert_priority: 'none',
+              alert_triggers: {},
+              attention_reasons: [],
+              funnel_stage: lead.status
+            }));
+          }
+        } catch (scoresError) {
+          console.warn('Error fetching lead scores, using basic lead data:', scoresError);
+          // Continue with basic lead data
+          leadsWithScores = data.map(lead => ({
+            ...lead,
+            campaign: lead.campaigns?.name || 'No Campaign',
+            hot_score: 0,
+            requires_immediate_attention: false,
+            alert_priority: 'none',
+            alert_triggers: {},
+            attention_reasons: [],
+            funnel_stage: lead.status
+          }));
+        }
+      }
+
+      setLeads(leadsWithScores);
+      setFilteredLeads(leadsWithScores);
+    } catch (err) {
+      console.error('Error in fetchLeads:', err);
+      setError('Failed to load leads: ' + err.message);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -408,6 +470,7 @@ export default function Dashboard() {
     const sampleData = leadFields.map(field => {
       // Provide example data based on field name
       const exampleData = {
+        'owner_name': 'John Doe',
         'name': 'John Doe',
         'phone': '+1-555-123-4567',
         'email': 'john.doe@example.com',
@@ -521,7 +584,7 @@ export default function Dashboard() {
 
   // Get the primary display fields (first few most important ones)
   const getDisplayFields = () => {
-    const priorityOrder = ['name', 'phone', 'email', 'property_address', 'company_name', 'current_vehicle'];
+    const priorityOrder = ['owner_name', 'name', 'phone', 'email', 'property_address', 'company_name', 'current_vehicle'];
     const configuredFields = leadFields.filter(field => 
       !['status', 'campaign', 'created_at'].includes(field.field_name)
     );
@@ -592,6 +655,40 @@ export default function Dashboard() {
     }
   };
 
+  // Show loading state
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading your leads...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center max-w-md">
+          <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">Failed to Load Dashboard</h3>
+          <p className="text-gray-600 mb-4">{error}</p>
+          <button
+            onClick={() => {
+              setError('');
+              fetchLeads();
+            }}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          >
+            Try Again
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -638,9 +735,6 @@ export default function Dashboard() {
       {showForm && (
         <div className="bg-white border-b border-gray-200 px-6 py-6">
           <div className="max-w-4xl">
-            <div className="flex items-center gap-4 mb-6">
-             
-            </div>
             <AddLead 
               onSuccess={() => {
                 fetchLeads();
@@ -654,8 +748,7 @@ export default function Dashboard() {
 
       {/* Main Content */}
       <div className="p-6">
-
-        {/* Stats Cards - UPDATED */}
+        {/* Stats Cards */}
         <div className="tour-stats grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
           {/* Critical Alerts */}
           <div className="bg-red-50 border border-red-200 rounded-xl p-6 relative group">
@@ -785,7 +878,7 @@ export default function Dashboard() {
               />
             </div>
 
-            {/* Status Filters - UPDATED */}
+            {/* Status Filters */}
             <div className="tour-filters flex flex-wrap gap-2">
               {actualStatuses.map((status) => {
                 const count = getStatusCount(status);
@@ -816,7 +909,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Leads Table - UPDATED */}
+        {/* Leads Table */}
         <div className="tour-leads-table bg-white rounded-xl border border-gray-200 overflow-hidden">
           {/* Table Header */}
           <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
