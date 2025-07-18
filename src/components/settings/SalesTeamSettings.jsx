@@ -22,10 +22,11 @@ import {
   X
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { PERMISSIONS } from '../../lib/permissions';
 import supabase from '../../lib/supabaseClient';
 
 export default function SalesTeamSettings() {
-  const { user } = useAuth();
+  const { user, hasPermission } = useAuth();
   const [loading, setLoading] = useState(true);
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteFirstName, setInviteFirstName] = useState('');
@@ -48,6 +49,11 @@ export default function SalesTeamSettings() {
 
   const [teamMembers, setTeamMembers] = useState([]);
   const [pendingInvites, setPendingInvites] = useState([]);
+
+  // Permission checks
+  const canInviteUsers = hasPermission(PERMISSIONS.INVITE_REMOVE_USERS);
+  const canManageUsers = hasPermission(PERMISSIONS.MANAGE_USERS);
+  const canViewTeam = hasPermission(PERMISSIONS.VIEW_TEAM_MEMBERS);
 
   // Get the correct API base URL
   const getApiBaseUrl = () => {
@@ -143,8 +149,12 @@ export default function SalesTeamSettings() {
   };
 
   useEffect(() => {
-    loadTeamData();
-  }, []);
+    if (canViewTeam) {
+      loadTeamData();
+    } else {
+      setLoading(false);
+    }
+  }, [canViewTeam]);
 
   const loadTeamData = async () => {
     setLoading(true);
@@ -203,6 +213,11 @@ export default function SalesTeamSettings() {
   };
 
   const handleSendInvite = async () => {
+    if (!canInviteUsers) {
+      setError("You don't have permission to invite users.");
+      return;
+    }
+
     if (!inviteEmail.trim()) {
       setError('Please enter an email address');
       return;
@@ -261,6 +276,11 @@ export default function SalesTeamSettings() {
   };
 
   const handleToggleUserStatus = async (userId, currentStatus) => {
+    if (!canManageUsers) {
+      setError("You don't have permission to manage user status.");
+      return;
+    }
+
     try {
       const data = await makeApiCall(`/team/members/${userId}/toggle-status`, {
         method: 'PATCH'
@@ -278,6 +298,11 @@ export default function SalesTeamSettings() {
   };
 
   const handleResendInvite = async (invitationId) => {
+    if (!canInviteUsers) {
+      setError("You don't have permission to resend invitations.");
+      return;
+    }
+
     try {
       console.log('Resending invitation:', invitationId);
       
@@ -295,6 +320,11 @@ export default function SalesTeamSettings() {
   };
 
   const handleCancelInvite = async (invitationId) => {
+    if (!canInviteUsers) {
+      setError("You don't have permission to cancel invitations.");
+      return;
+    }
+
     try {
       console.log('Canceling invitation:', invitationId);
       
@@ -389,6 +419,17 @@ export default function SalesTeamSettings() {
     }
   }, [error, success]);
 
+  // Permission check - show access denied if user can't view team
+  if (!canViewTeam) {
+    return (
+      <div className="text-center py-12">
+        <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+        <h3 className="text-lg font-semibold text-gray-900 mb-2">Access Restricted</h3>
+        <p className="text-gray-600">You don't have permission to view team management.</p>
+      </div>
+    );
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -418,6 +459,15 @@ export default function SalesTeamSettings() {
         </div>
       )}
 
+      {/* Permission Check Alert */}
+      {!canInviteUsers && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 flex items-center space-x-3">
+          <AlertCircle className="w-5 h-5 text-yellow-600 flex-shrink-0" />
+          <span className="text-yellow-800">
+            You have read-only access to team management. Admin permissions required to invite or manage users.
+          </span>
+        </div>
+      )}
 
       {/* Invitation Link Modal */}
       {invitationLink && (
@@ -495,13 +545,15 @@ export default function SalesTeamSettings() {
           <h2 className="text-2xl font-bold text-gray-900">Sales Team Management</h2>
           <p className="text-gray-600 mt-1">Invite team members and manage user access to your CRM</p>
         </div>
-        <button
-          onClick={() => setShowInviteModal(true)}
-          className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
-        >
-          <UserPlus className="w-4 h-4 mr-2" />
-          Invite User
-        </button>
+        {canInviteUsers && (
+          <button
+            onClick={() => setShowInviteModal(true)}
+            className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+          >
+            <UserPlus className="w-4 h-4 mr-2" />
+            Invite User
+          </button>
+        )}
       </div>
 
       {/* Team Stats */}
@@ -616,7 +668,7 @@ export default function SalesTeamSettings() {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Joined
                 </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Actions
                 </th>
               </tr>
@@ -663,7 +715,7 @@ export default function SalesTeamSettings() {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <div className="flex items-center justify-end space-x-2">
-                      {member.status === 'pending' ? (
+                      {member.status === 'pending' && canInviteUsers ? (
                         <button
                           onClick={() => {
                             console.log('Resending invite for member:', member);
@@ -675,7 +727,7 @@ export default function SalesTeamSettings() {
                         >
                           <Send className="w-4 h-4" />
                         </button>
-                      ) : (
+                      ) : canManageUsers ? (
                         <button
                           onClick={() => {
                             console.log('Toggling status for member:', member);
@@ -690,7 +742,7 @@ export default function SalesTeamSettings() {
                         >
                           {member.status === 'active' ? <UserX className="w-4 h-4" /> : <UserCheck className="w-4 h-4" />}
                         </button>
-                      )}
+                      ) : null}
                       <button className="text-gray-400 hover:text-gray-600 transition-colors">
                         <MoreVertical className="w-4 h-4" />
                       </button>
@@ -724,24 +776,26 @@ export default function SalesTeamSettings() {
                     </div>
                   </div>
                 </div>
-                <div className="flex items-center space-x-2">
-                  <button
-                    onClick={() => handleResendInvite(invite.id)}
-                    className="text-blue-600 hover:text-blue-900 text-sm font-medium transition-colors"
-                  >
-                    Resend
-                  </button>
-                  <button
-                    onClick={() => {
-                      console.log('Canceling invite:', invite);
-                      console.log('Using invite ID:', invite.id);
-                      handleCancelInvite(invite.id);
-                    }}
-                    className="text-red-600 hover:text-red-900 text-sm font-medium transition-colors"
-                  >
-                    Cancel
-                  </button>
-                </div>
+                {canInviteUsers && (
+                  <div className="flex items-center space-x-2">
+                    <button
+                      onClick={() => handleResendInvite(invite.id)}
+                      className="text-blue-600 hover:text-blue-900 text-sm font-medium transition-colors"
+                    >
+                      Resend
+                    </button>
+                    <button
+                      onClick={() => {
+                        console.log('Canceling invite:', invite);
+                        console.log('Using invite ID:', invite.id);
+                        handleCancelInvite(invite.id);
+                      }}
+                      className="text-red-600 hover:text-red-900 text-sm font-medium transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -749,7 +803,7 @@ export default function SalesTeamSettings() {
       )}
 
       {/* Invite Modal */}
-      {showInviteModal && (
+      {showInviteModal && canInviteUsers && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-xl shadow-xl max-w-md w-full mx-4">
             <div className="px-6 py-4 border-b border-gray-200">
