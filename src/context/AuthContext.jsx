@@ -418,10 +418,10 @@ const AuthProvider = ({ children }) => {
     }
   };
 
-  const getCurrentPlan = () => {
-    // For now, return 'starter' - we can enhance this later
-    return 'starter';
-  };
+const getCurrentPlan = () => {
+  // TODO: Query tenants table - for now hardcode scale for testing
+  return 'scale';
+};
 
   // ONLY EXTEND the existing value object - don't change anything else
   const value = { 
