@@ -10,7 +10,7 @@ import {
   StopCircle, Award, Zap, MessageSquare, TrendingUp as TrendUp
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import supabase from '../lib/supabaseClient';
+import { analyticsService } from '../lib/analyticsDataService';
 
 const ABTestingDashboard = () => {
   const { user } = useAuth();
@@ -37,150 +37,71 @@ const ABTestingDashboard = () => {
     variantB: { config: '' }
   });
 
-  // Helper function to apply tenant filter
-  const applyTenantFilter = (query) => {
-    if (!user?.user_metadata?.tenant_id) return query;
-    
-    const isGlobalAdmin = user?.role === 'global_admin' || user?.user_metadata?.role === 'global_admin';
-    
-    if (!isGlobalAdmin) {
-      return query.eq('tenant_id', user.user_metadata.tenant_id);
-    }
-    
-    return query;
-  };
+  // Initialize analytics service with user context
+  useEffect(() => {
+    const initializeService = async () => {
+      if (user) {
+        try {
+          await analyticsService.initialize(user);
+          console.log('✅ Analytics service initialized for A/B testing');
+        } catch (err) {
+          console.error('Failed to initialize analytics service:', err);
+          setError('Failed to initialize analytics service');
+        }
+      }
+    };
 
-  // Load active experiments
+    initializeService();
+  }, [user]);
+
+  // Load active experiments using analytics service
   const loadActiveExperiments = async () => {
     try {
-      let query = supabase
-        .from('experiments')
-        .select(`
-          id,
-          name,
-          test_type,
-          primary_metric,
-          status,
-          traffic_split,
-          experiment_type,
-          campaign_id,
-          total_participants,
-          confidence_level,
-          is_statistically_significant,
-          start_date,
-          end_date,
-          winner_variant,
-          campaigns(name)
-        `)
-        .in('status', ['active', 'running']);
-
-      query = applyTenantFilter(query);
-      
-      const { data, error } = await query;
-      
-      if (error) {
-        console.error('Error loading active experiments:', error);
-        return [];
-      }
-
-      return (data || []).map(exp => ({
-        id: exp.id,
-        name: exp.name,
-        testType: exp.test_type,
-        metric: exp.primary_metric,
-        status: exp.status,
-        trafficSplit: exp.traffic_split,
-        experimentType: exp.experiment_type,
-        campaignId: exp.campaign_id,
-        campaignName: exp.campaigns?.name || 'Global Test',
-        participants: exp.total_participants || 0,
-        confidence: exp.confidence_level || 0,
-        isSignificant: exp.is_statistically_significant,
-        startDate: exp.start_date,
-        endDate: exp.end_date,
-        winner: exp.winner_variant
-      }));
+      console.log('📊 Loading active experiments via analytics service...');
+      const experiments = await analyticsService.getActiveExperiments();
+      console.log('✅ Active experiments loaded:', experiments.length);
+      return experiments;
     } catch (err) {
-      console.error('Error in loadActiveExperiments:', err);
+      console.error('Error loading active experiments:', err);
+      setError('Failed to load active experiments');
       return [];
     }
   };
 
-  // Load completed experiments
+  // Load completed experiments using analytics service
   const loadCompletedExperiments = async () => {
     try {
-      let query = supabase
-        .from('experiments')
-        .select(`
-          id,
-          name,
-          test_type,
-          primary_metric,
-          status,
-          total_participants,
-          winner_variant,
-          campaigns(name),
-          completed_at
-        `)
-        .eq('status', 'completed')
-        .order('completed_at', { ascending: false })
-        .limit(10);
-
-      query = applyTenantFilter(query);
-      
-      const { data, error } = await query;
-      
-      if (error) {
-        console.error('Error loading completed experiments:', error);
-        return [];
-      }
-
-      return (data || []).map(exp => ({
-        id: exp.id,
-        name: exp.name,
-        metric: exp.primary_metric,
-        status: exp.status,
-        participants: exp.total_participants || 0,
-        winner: exp.winner_variant || 'A',
-        improvement: Math.random() * 15 + 5, // Mock improvement - replace with real calculation
-        campaignName: exp.campaigns?.name || 'Global Test',
-        completedAt: exp.completed_at
-      }));
+      console.log('📊 Loading completed experiments via analytics service...');
+      const experiments = await analyticsService.getCompletedExperiments();
+      console.log('✅ Completed experiments loaded:', experiments.length);
+      return experiments;
     } catch (err) {
-      console.error('Error in loadCompletedExperiments:', err);
+      console.error('Error loading completed experiments:', err);
+      setError('Failed to load completed experiments');
       return [];
     }
   };
 
-  // Load available campaigns
+  // Load available campaigns using analytics service
   const loadAvailableCampaigns = async () => {
     try {
-      let query = supabase
-        .from('campaigns')
-        .select('id, name, is_active')
-        .order('name');
-
-      query = applyTenantFilter(query);
-      
-      const { data, error } = await query;
-      
-      if (error) {
-        console.error('Error loading campaigns:', error);
-        return [];
-      }
-
-      return data || [];
+      console.log('📊 Loading campaigns for A/B testing via analytics service...');
+      const campaigns = await analyticsService.getCampaignsForABTesting();
+      console.log('✅ Campaigns loaded:', campaigns.length);
+      return campaigns;
     } catch (err) {
-      console.error('Error in loadAvailableCampaigns:', err);
+      console.error('Error loading campaigns:', err);
+      setError('Failed to load campaigns');
       return [];
     }
   };
 
-  // Load all experiment data
+  // Load all experiment data using analytics service
   const loadExperimentData = async () => {
     try {
       setLoading(true);
-      console.log('🧪 Loading A/B testing data...');
+      setError('');
+      console.log('🧪 Loading A/B testing data via analytics service...');
 
       const [activeExp, completedExp, campaigns] = await Promise.all([
         loadActiveExperiments(),
@@ -212,64 +133,39 @@ const ABTestingDashboard = () => {
     }
   }, [user]);
 
-  // Handle experiment creation
+  // Handle experiment creation using analytics service
   const handleCreateExperiment = async () => {
     try {
       setLoading(true);
-      console.log('Creating experiment:', newExperiment);
+      console.log('Creating experiment via analytics service:', newExperiment);
 
-      // Insert experiment
-      const experimentData = {
+      // Validate required fields
+      if (!newExperiment.name || !newExperiment.testType || !newExperiment.metric) {
+        throw new Error('Please fill in all required fields');
+      }
+
+      if (newExperiment.experimentType === 'campaign' && !newExperiment.campaignId) {
+        throw new Error('Please select a campaign for campaign-specific tests');
+      }
+
+      // Create experiment using analytics service
+      const result = await analyticsService.createExperiment({
         name: newExperiment.name,
-        test_type: newExperiment.testType,
-        primary_metric: newExperiment.metric,
-        status: 'active',
-        traffic_split: newExperiment.trafficSplit,
-        experiment_type: newExperiment.experimentType,
-        campaign_id: newExperiment.campaignId || null,
-        tenant_id: user?.user_metadata?.tenant_id || null,
-        user_id: user?.id || null,
-        created_by_user_id: user?.id || null,
-        start_date: new Date().toISOString(),
-        minimum_sample_size: 100,
-        confidence_level: 0,
-        is_statistically_significant: false,
-        total_participants: 0
-      };
+        testType: newExperiment.testType,
+        metric: newExperiment.metric,
+        trafficSplit: newExperiment.trafficSplit,
+        experimentType: newExperiment.experimentType,
+        campaignId: newExperiment.campaignId,
+        variantA: newExperiment.variantA,
+        variantB: newExperiment.variantB,
+        minimumSampleSize: 100
+      });
 
-      const { data: experiment, error: experimentError } = await supabase
-        .from('experiments')
-        .insert(experimentData)
-        .select()
-        .single();
-
-      if (experimentError) {
-        throw new Error(`Failed to create experiment: ${experimentError.message}`);
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to create experiment');
       }
 
-      // Insert variants
-      const variants = [
-        {
-          experiment_id: experiment.id,
-          variant_name: 'A',
-          configuration: { config: newExperiment.variantA.config }
-        },
-        {
-          experiment_id: experiment.id,
-          variant_name: 'B',
-          configuration: { config: newExperiment.variantB.config }
-        }
-      ];
-
-      const { error: variantsError } = await supabase
-        .from('experiment_variants')
-        .insert(variants);
-
-      if (variantsError) {
-        throw new Error(`Failed to create variants: ${variantsError.message}`);
-      }
-
-      console.log('✅ Experiment created successfully');
+      console.log('✅ Experiment created successfully via analytics service');
       
       // Reset form
       setActiveView('overview');
@@ -296,25 +192,18 @@ const ABTestingDashboard = () => {
     }
   };
 
-  // Handle experiment status updates
+  // Handle experiment status updates using analytics service
   const handleUpdateExperimentStatus = async (experimentId, newStatus) => {
     try {
-      const updateData = { status: newStatus };
+      console.log(`Updating experiment ${experimentId} to ${newStatus} via analytics service`);
       
-      if (newStatus === 'completed') {
-        updateData.completed_at = new Date().toISOString();
+      const result = await analyticsService.updateExperimentStatus(experimentId, newStatus);
+      
+      if (!result.success) {
+        throw new Error(result.error || `Failed to ${newStatus} experiment`);
       }
 
-      const { error } = await supabase
-        .from('experiments')
-        .update(updateData)
-        .eq('id', experimentId);
-
-      if (error) {
-        throw new Error(error.message);
-      }
-
-      console.log(`✅ Experiment ${experimentId} ${newStatus}`);
+      console.log(`✅ Experiment ${experimentId} ${newStatus} via analytics service`);
       await loadExperimentData(); // Refresh data
       
     } catch (err) {
@@ -323,27 +212,16 @@ const ABTestingDashboard = () => {
     }
   };
 
-  // Load experiment details for details view
+  // Load experiment details for details view using analytics service
   const handleViewDetails = async (experiment) => {
     try {
       setLoading(true);
+      console.log('Loading experiment details via analytics service:', experiment.id);
       
-      // Get experiment with variants
-      const { data: experimentData, error: expError } = await supabase
-        .from('experiments')
-        .select(`
-          *,
-          experiment_variants(*),
-          campaigns(name)
-        `)
-        .eq('id', experiment.id)
-        .single();
-
-      if (expError) {
-        throw new Error(expError.message);
-      }
-
-      // Mock performance data - replace with real results query
+      // Calculate detailed metrics using analytics service
+      const metrics = await analyticsService.calculateExperimentMetrics(experiment.id);
+      
+      // Mock performance data - this could be enhanced with actual time-series data from analytics service
       const mockPerformanceData = [
         { day: 'Day 1', variantA: 12.5, variantB: 15.2 },
         { day: 'Day 2', variantA: 13.1, variantB: 16.8 },
@@ -354,17 +232,13 @@ const ABTestingDashboard = () => {
 
       setSelectedTest({
         ...experiment,
-        ...experimentData,
-        experiment_variants: experimentData.experiment_variants,
         performanceOverTime: mockPerformanceData,
-        variants: {
-          a: 13.2,
-          b: 17.5
-        },
-        leader: {
-          variant: 'B',
-          improvement: 32.6
-        }
+        ...metrics,
+        // Use metrics from analytics service
+        confidence_level: metrics.confidence,
+        total_participants: metrics.totalParticipants,
+        variants: metrics.variants,
+        leader: metrics.leader
       });
       
       setPerformanceData(mockPerformanceData);
@@ -980,17 +854,17 @@ const ABTestingDashboard = () => {
           </div>
           <div>
             <p className="text-sm text-gray-600">Primary Metric</p>
-            <p className="font-semibold">{selectedTest?.primary_metric}</p>
+            <p className="font-semibold">{selectedTest?.metric}</p>
           </div>
           <div>
             <p className="text-sm text-gray-600">Participants</p>
-            <p className="font-semibold">{selectedTest?.total_participants?.toLocaleString() || 0}</p>
+            <p className="font-semibold">{selectedTest?.totalParticipants?.toLocaleString() || 0}</p>
           </div>
           <div>
             <p className="text-sm text-gray-600">Confidence Level</p>
             <div className="flex items-center gap-2">
-              <ConfidenceIndicator confidence={selectedTest?.confidence_level || 0} />
-              <span className="text-sm font-medium">{selectedTest?.confidence_level || 0}%</span>
+              <ConfidenceIndicator confidence={selectedTest?.confidence || 0} />
+              <span className="text-sm font-medium">{selectedTest?.confidence || 0}%</span>
             </div>
           </div>
           <div>
