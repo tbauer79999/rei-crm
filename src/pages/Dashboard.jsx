@@ -173,31 +173,47 @@ export default function Dashboard() {
         return;
       }
 
-      // Try to fetch lead scores, but don't fail if the table doesn't exist
+      // Try to fetch leads with scores using a JOIN to avoid 414 errors
       let leadsWithScores = data || [];
-      const leadIds = data?.map(lead => lead.id) || [];
       
-      if (leadIds.length > 0) {
+      if (data && data.length > 0) {
         try {
-          const { data: leadScores, error: scoresError } = await supabase
-            .from('lead_scores')
-            .select('*')
-            .in('lead_id', leadIds);
+          // Use a single query with LEFT JOIN to get leads and their scores
+          let scoresQuery = supabase
+            .from('leads')
+            .select(`
+              id,
+              lead_scores (
+                hot_score,
+                requires_immediate_attention,
+                alert_priority,
+                alert_triggers,
+                attention_reasons,
+                funnel_stage
+              )
+            `);
 
-          if (!scoresError && leadScores) {
+          // Apply same tenant filter as main query
+          if (!isGlobalAdmin) {
+            scoresQuery = scoresQuery.eq('tenant_id', user.tenant_id);
+          }
+
+          const { data: leadsWithScoresData, error: scoresError } = await scoresQuery;
+
+          if (!scoresError && leadsWithScoresData) {
             // Create a map for quick lookup
             const scoresMap = {};
-            leadScores.forEach(score => {
-              scoresMap[score.lead_id] = score;
+            leadsWithScoresData.forEach(leadWithScore => {
+              if (leadWithScore.lead_scores) {
+                scoresMap[leadWithScore.id] = leadWithScore.lead_scores;
+              }
             });
 
             // Transform the data to include campaign name and lead scores
             leadsWithScores = data.map(lead => ({
               ...lead,
               campaign: lead.campaigns?.name || 'No Campaign',
-              // Merge all score data if it exists
-              ...(scoresMap[lead.id] || {}),
-              // Ensure hot_score has a default value
+              // Merge score data if it exists
               hot_score: scoresMap[lead.id]?.hot_score || 0,
               requires_immediate_attention: scoresMap[lead.id]?.requires_immediate_attention || false,
               alert_priority: scoresMap[lead.id]?.alert_priority || 'none',
@@ -206,7 +222,7 @@ export default function Dashboard() {
               funnel_stage: scoresMap[lead.id]?.funnel_stage || lead.status
             }));
           } else {
-            console.log('Lead scores table not available or empty, using basic lead data');
+            console.log('Lead scores table not available, using basic lead data');
             // Just use basic lead data with default values
             leadsWithScores = data.map(lead => ({
               ...lead,
@@ -220,7 +236,7 @@ export default function Dashboard() {
             }));
           }
         } catch (scoresError) {
-          console.log('Error fetching lead scores, using basic lead data:', scoresError);
+          console.log('Lead scores not available, using basic lead data:', scoresError);
           // Continue with basic lead data
           leadsWithScores = data.map(lead => ({
             ...lead,
@@ -233,6 +249,8 @@ export default function Dashboard() {
             funnel_stage: lead.status
           }));
         }
+      } else {
+        leadsWithScores = [];
       }
 
       setLeads(leadsWithScores);
