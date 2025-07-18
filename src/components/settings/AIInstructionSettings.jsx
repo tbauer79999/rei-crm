@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext.jsx';
+import { PERMISSIONS } from '../../lib/permissions';
 import supabase from '../../lib/supabaseClient.js';
 import {
   Brain,
@@ -40,15 +41,23 @@ import {
 } from '../../lib/instructionBuilder.js';
 
 const EnterpriseAIStrategyHub = () => {
-  const { user } = useAuth();
+  const { user, hasPermission } = useAuth();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [selectedCampaign, setSelectedCampaign] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [unsavedChanges, setUnsavedChanges] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+
+  // Permission checks
+  const canViewAISettings = hasPermission(PERMISSIONS.VIEW_EDIT_AI_SETTINGS) || hasPermission(PERMISSIONS.VIEW_AI_BUNDLE_PREVIEW);
+  const canEditAISettings = hasPermission(PERMISSIONS.VIEW_EDIT_AI_SETTINGS);
+  const canEditInstructions = hasPermission(PERMISSIONS.EDIT_TONE_PERSONA_INDUSTRY_INSTRUCTIONS);
+  const canRebuildBundle = hasPermission(PERMISSIONS.REBUILD_AI_INSTRUCTION_BUNDLE);
+  const canViewBundlePreview = hasPermission(PERMISSIONS.VIEW_AI_BUNDLE_PREVIEW);
 
   // Strategy Configuration State
   const [strategyConfig, setStrategyConfig] = useState({
@@ -295,7 +304,10 @@ const EnterpriseAIStrategyHub = () => {
   // Load existing configuration
   useEffect(() => {
     const loadConfiguration = async () => {
-      if (!user?.tenant_id) return;
+      if (!user?.tenant_id || !canViewAISettings) {
+        setLoading(false);
+        return;
+      }
 
       try {
         // Updated to use the correct endpoint format
@@ -324,11 +336,13 @@ const EnterpriseAIStrategyHub = () => {
       } catch (err) {
         console.error('Error loading configuration:', err);
         setError(`Failed to load existing configuration: ${err.message}`);
+      } finally {
+        setLoading(false);
       }
     };
 
     loadConfiguration();
-  }, [user?.tenant_id]);
+  }, [user?.tenant_id, canViewAISettings]);
 
   // Dashboard Component
   const CampaignDashboard = () => {
@@ -340,7 +354,15 @@ const EnterpriseAIStrategyHub = () => {
 
     return (
       <div className="space-y-8">
-        
+        {/* Permission Check Alert */}
+        {!canEditAISettings && canViewAISettings && (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 flex items-center space-x-3">
+            <AlertTriangle className="w-5 h-5 text-yellow-600 flex-shrink-0" />
+            <span className="text-yellow-800">
+              You have read-only access to AI settings. Admin permissions required to modify AI strategies and instructions.
+            </span>
+          </div>
+        )}
 
         {/* Performance Overview Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
@@ -396,16 +418,18 @@ const EnterpriseAIStrategyHub = () => {
               <h2 className="text-2xl font-bold text-gray-900">Campaign Portfolio</h2>
               <p className="text-gray-600 mt-1">Manage AI strategies across all your campaigns</p>
             </div>
-            <button 
-              onClick={() => {
-                setSelectedCampaign(null);
-                setActiveTab('strategy');
-              }}
-              className="flex items-center space-x-2 px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 font-medium"
-            >
-              <Plus className="w-5 h-5" />
-              <span>Create New Strategy</span>
-            </button>
+            {canEditInstructions && (
+              <button 
+                onClick={() => {
+                  setSelectedCampaign(null);
+                  setActiveTab('strategy');
+                }}
+                className="flex items-center space-x-2 px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 font-medium"
+              >
+                <Plus className="w-5 h-5" />
+                <span>Create New Strategy</span>
+              </button>
+            )}
           </div>
 
           <div className="flex items-center space-x-4 mb-6">
@@ -437,10 +461,14 @@ const EnterpriseAIStrategyHub = () => {
               <div
                 key={campaign.id}
                 onClick={() => {
-                  setSelectedCampaign(campaign);
-                  setActiveTab('strategy');
+                  if (canViewAISettings) {
+                    setSelectedCampaign(campaign);
+                    setActiveTab('strategy');
+                  }
                 }}
-                className="bg-white rounded-xl border-2 border-gray-200 p-6 hover:shadow-lg hover:border-blue-300 transition-all cursor-pointer group"
+                className={`bg-white rounded-xl border-2 border-gray-200 p-6 hover:shadow-lg hover:border-blue-300 transition-all group ${
+                  canViewAISettings ? 'cursor-pointer' : 'cursor-not-allowed opacity-75'
+                }`}
               >
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center space-x-3">
@@ -458,7 +486,9 @@ const EnterpriseAIStrategyHub = () => {
                       {campaign.status.toUpperCase()}
                     </span>
                   </div>
-                  <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-blue-600" />
+                  {canViewAISettings && (
+                    <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-blue-600" />
+                  )}
                 </div>
 
                 <h3 className="font-bold text-lg text-gray-900 mb-3">{campaign.name}</h3>
@@ -519,6 +549,11 @@ const EnterpriseAIStrategyHub = () => {
   // Strategy Builder Component
   const StrategyBuilder = () => {
     const applyTemplate = (template) => {
+      if (!canEditInstructions) {
+        setError("You don't have permission to modify AI instructions.");
+        return;
+      }
+
       setStrategyConfig(prev => ({
         ...prev,
         initialTone: template.tone,
@@ -535,6 +570,11 @@ const EnterpriseAIStrategyHub = () => {
     };
 
     const updateFollowup = (index, field, value) => {
+      if (!canEditInstructions) {
+        setError("You don't have permission to modify AI instructions.");
+        return;
+      }
+
       setStrategyConfig(prev => ({
         ...prev,
         followups: prev.followups.map((followup, i) => 
@@ -544,7 +584,22 @@ const EnterpriseAIStrategyHub = () => {
       setUnsavedChanges(true);
     };
 
+    const updateStrategyConfig = (field, value) => {
+      if (!canEditInstructions) {
+        setError("You don't have permission to modify AI instructions.");
+        return;
+      }
+
+      setStrategyConfig(prev => ({ ...prev, [field]: value }));
+      setUnsavedChanges(true);
+    };
+
     const saveStrategy = async () => {
+      if (!canRebuildBundle) {
+        setError("You don't have permission to rebuild AI instruction bundles.");
+        return;
+      }
+
       setSaving(true);
       setError('');
       setSuccess('');
@@ -628,31 +683,43 @@ const EnterpriseAIStrategyHub = () => {
               <p className="text-gray-600 mt-1">Design your AI persona and automated follow-up sequence</p>
             </div>
             <div className="flex items-center space-x-3">
-              {unsavedChanges && (
+              {unsavedChanges && canEditInstructions && (
                 <div className="flex items-center space-x-2 text-orange-600 text-sm font-medium">
                   <AlertTriangle className="w-4 h-4" />
                   <span>Unsaved changes</span>
                 </div>
               )}
-              <button
-                onClick={saveStrategy}
-                disabled={saving}
-                className="flex items-center space-x-2 px-6 py-3 bg-green-600 text-white rounded-xl hover:bg-green-700 disabled:opacity-50 font-medium"
-              >
-                {saving ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                    <span>Saving...</span>
-                  </>
-                ) : (
-                  <>
-                    <Save className="w-4 h-4" />
-                    <span>Save Strategy</span>
-                  </>
-                )}
-              </button>
+              {canRebuildBundle && (
+                <button
+                  onClick={saveStrategy}
+                  disabled={saving || !canEditInstructions}
+                  className="flex items-center space-x-2 px-6 py-3 bg-green-600 text-white rounded-xl hover:bg-green-700 disabled:opacity-50 font-medium"
+                >
+                  {saving ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      <span>Saving...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4" />
+                      <span>Save Strategy</span>
+                    </>
+                  )}
+                </button>
+              )}
             </div>
           </div>
+
+          {/* Permission Check Alert */}
+          {!canEditInstructions && canViewAISettings && (
+            <div className="mb-6 bg-yellow-50 border border-yellow-200 rounded-xl p-4 flex items-center space-x-3">
+              <AlertTriangle className="w-5 h-5 text-yellow-600 flex-shrink-0" />
+              <span className="text-yellow-800">
+                You have read-only access to AI instructions. Admin permissions required to modify AI strategies.
+              </span>
+            </div>
+          )}
 
           {/* Core AI Configuration */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
@@ -663,11 +730,9 @@ const EnterpriseAIStrategyHub = () => {
               <input
                 type="text"
                 value={strategyConfig.businessName}
-                onChange={(e) => {
-                  setStrategyConfig(prev => ({ ...prev, businessName: e.target.value }));
-                  setUnsavedChanges(true);
-                }}
-                className="w-full border border-gray-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                onChange={(e) => updateStrategyConfig('businessName', e.target.value)}
+                disabled={!canEditInstructions}
+                className="w-full border border-gray-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
                 placeholder="e.g., Sarah Thompson, Mike Chen"
               />
             </div>
@@ -679,10 +744,13 @@ const EnterpriseAIStrategyHub = () => {
               <select
                 value={strategyConfig.industry}
                 onChange={(e) => {
-                  setStrategyConfig(prev => ({ ...prev, industry: e.target.value, role: '' }));
-                  setUnsavedChanges(true);
+                  if (canEditInstructions) {
+                    setStrategyConfig(prev => ({ ...prev, industry: e.target.value, role: '' }));
+                    setUnsavedChanges(true);
+                  }
                 }}
-                className="w-full border border-gray-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                disabled={!canEditInstructions}
+                className="w-full border border-gray-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
               >
                 <option value="">Select industry</option>
                 {Object.keys(industryOptions).map(industry => (
@@ -698,11 +766,9 @@ const EnterpriseAIStrategyHub = () => {
                 </label>
                 <select
                   value={strategyConfig.role}
-                  onChange={(e) => {
-                    setStrategyConfig(prev => ({ ...prev, role: e.target.value }));
-                    setUnsavedChanges(true);
-                  }}
-                  className="w-full border border-gray-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  onChange={(e) => updateStrategyConfig('role', e.target.value)}
+                  disabled={!canEditInstructions}
+                  className="w-full border border-gray-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
                 >
                   <option value="">Select role</option>
                   {industryOptions[strategyConfig.industry].map(role => (
@@ -734,11 +800,9 @@ const EnterpriseAIStrategyHub = () => {
                   </label>
                   <select
                     value={strategyConfig.initialTone}
-                    onChange={(e) => {
-                      setStrategyConfig(prev => ({ ...prev, initialTone: e.target.value }));
-                      setUnsavedChanges(true);
-                    }}
-                    className="w-full border border-blue-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                    onChange={(e) => updateStrategyConfig('initialTone', e.target.value)}
+                    disabled={!canEditInstructions}
+                    className="w-full border border-blue-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
                   >
                     <option value="">Select tone</option>
                     {toneOptions.map(tone => (
@@ -753,11 +817,9 @@ const EnterpriseAIStrategyHub = () => {
                   </label>
                   <select
                     value={strategyConfig.initialPersona}
-                    onChange={(e) => {
-                      setStrategyConfig(prev => ({ ...prev, initialPersona: e.target.value }));
-                      setUnsavedChanges(true);
-                    }}
-                    className="w-full border border-blue-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                    onChange={(e) => updateStrategyConfig('initialPersona', e.target.value)}
+                    disabled={!canEditInstructions}
+                    className="w-full border border-blue-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
                   >
                     <option value="">Select persona</option>
                     {initialPersonaOptions.map(persona => (
@@ -787,11 +849,9 @@ const EnterpriseAIStrategyHub = () => {
                   </label>
                   <select
                     value={strategyConfig.engagementTone}
-                    onChange={(e) => {
-                      setStrategyConfig(prev => ({ ...prev, engagementTone: e.target.value }));
-                      setUnsavedChanges(true);
-                    }}
-                    className="w-full border border-green-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white"
+                    onChange={(e) => updateStrategyConfig('engagementTone', e.target.value)}
+                    disabled={!canEditInstructions}
+                    className="w-full border border-green-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
                   >
                     <option value="">Select tone</option>
                     {toneOptions.map(tone => (
@@ -806,11 +866,9 @@ const EnterpriseAIStrategyHub = () => {
                   </label>
                   <select
                     value={strategyConfig.engagementPersona}
-                    onChange={(e) => {
-                      setStrategyConfig(prev => ({ ...prev, engagementPersona: e.target.value }));
-                      setUnsavedChanges(true);
-                    }}
-                    className="w-full border border-green-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white"
+                    onChange={(e) => updateStrategyConfig('engagementPersona', e.target.value)}
+                    disabled={!canEditInstructions}
+                    className="w-full border border-green-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
                   >
                     <option value="">Select persona</option>
                     {engagementPersonaOptions.map(persona => (
@@ -830,7 +888,11 @@ const EnterpriseAIStrategyHub = () => {
             {strategyTemplates.map((template) => (
               <div
                 key={template.id}
-                className="p-6 border border-gray-200 rounded-xl hover:border-blue-300 cursor-pointer transition-all hover:shadow-md"
+                className={`p-6 border border-gray-200 rounded-xl transition-all hover:shadow-md ${
+                  canEditInstructions 
+                    ? 'hover:border-blue-300 cursor-pointer' 
+                    : 'opacity-75 cursor-not-allowed'
+                }`}
               >
                 <div className="flex items-center space-x-3 mb-4">
                   <span className="text-3xl">{template.icon}</span>
@@ -846,9 +908,10 @@ const EnterpriseAIStrategyHub = () => {
                 </div>
                 <button 
                   onClick={() => applyTemplate(template)}
-                  className="w-full text-blue-600 hover:text-blue-700 font-medium text-sm py-2"
+                  disabled={!canEditInstructions}
+                  className="w-full text-blue-600 hover:text-blue-700 font-medium text-sm py-2 disabled:text-gray-400 disabled:cursor-not-allowed"
                 >
-                  Apply Template
+                  {canEditInstructions ? 'Apply Template' : 'View Only'}
                 </button>
               </div>
             ))}
@@ -877,7 +940,8 @@ const EnterpriseAIStrategyHub = () => {
                       type="checkbox"
                       checked={followup.enabled}
                       onChange={(e) => updateFollowup(index, 'enabled', e.target.checked)}
-                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      disabled={!canEditInstructions}
+                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 disabled:cursor-not-allowed"
                     />
                     <span className="text-sm font-medium text-gray-700">Active</span>
                   </label>
@@ -894,7 +958,8 @@ const EnterpriseAIStrategyHub = () => {
                       max="90"
                       value={followup.day}
                       onChange={(e) => updateFollowup(index, 'day', parseInt(e.target.value))}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      disabled={!canEditInstructions}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
                     />
                   </div>
 
@@ -905,7 +970,8 @@ const EnterpriseAIStrategyHub = () => {
                     <select
                       value={followup.tone || strategyConfig.engagementTone}
                       onChange={(e) => updateFollowup(index, 'tone', e.target.value)}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      disabled={!canEditInstructions}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
                     >
                       <option value="">Use engagement tone</option>
                       {toneOptions.map(tone => (
@@ -921,7 +987,8 @@ const EnterpriseAIStrategyHub = () => {
                     <select
                       value={followup.persona}
                       onChange={(e) => updateFollowup(index, 'persona', e.target.value)}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      disabled={!canEditInstructions}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
                     >
                       <option value="">Select persona</option>
                       {followupPersonaOptions.map(persona => (
@@ -988,6 +1055,27 @@ const EnterpriseAIStrategyHub = () => {
     );
   };
 
+  // Permission check - show access denied if user can't view AI settings
+  if (!canViewAISettings) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center py-12">
+          <AlertTriangle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">Access Restricted</h3>
+          <p className="text-gray-600">You don't have permission to view AI instruction settings.</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Top Navigation */}
@@ -1013,7 +1101,8 @@ const EnterpriseAIStrategyHub = () => {
                 </button>
                 <button
                   onClick={() => setActiveTab('strategy')}
-                  className={`px-3 py-2 text-sm font-medium border-b-2 transition-colors ${
+                  disabled={!canViewAISettings}
+                  className={`px-3 py-2 text-sm font-medium border-b-2 transition-colors disabled:cursor-not-allowed disabled:text-gray-400 ${
                     activeTab === 'strategy'
                       ? 'border-blue-500 text-blue-600'
                       : 'border-transparent text-gray-500 hover:text-gray-700'
