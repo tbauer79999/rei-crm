@@ -1,3 +1,4 @@
+import './lib/suppressLogs'; // 👈 Add this
 import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 
