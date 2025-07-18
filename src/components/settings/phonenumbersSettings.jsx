@@ -90,37 +90,49 @@ export default function PhoneNumbersSettings() {
     if (!canViewPhoneNumbers) return;
     
     try {
-      // Load A2P status
-      const { data: statusData, error: statusError } = await supabase.functions.invoke('get-a2p-status');
-      if (!statusError && statusData.success) {
-        setA2pStatus(statusData);
-        setA2pCampaigns(statusData.campaigns || []);
+      // Load A2P status with better error handling
+      try {
+        const { data: statusData, error: statusError } = await supabase.functions.invoke('get-a2p-status');
+        if (!statusError && statusData && statusData.success) {
+          setA2pStatus(statusData);
+          setA2pCampaigns(statusData.campaigns || []);
+        } else {
+          console.warn('A2P status not available:', statusError);
+        }
+      } catch (a2pError) {
+        console.warn('A2P status function not available:', a2pError);
       }
 
-      // Load phone number A2P assignments
-      const { data: assignmentData, error: assignmentError } = await supabase
-        .from('phone_number_campaigns')
-        .select(`
-          phone_number_id,
-          a2p_campaign_id,
-          a2p_campaigns (
-            id,
-            campaign_id,
-            status
-          )
-        `);
+      // Load phone number A2P assignments with better error handling
+      try {
+        const { data: assignmentData, error: assignmentError } = await supabase
+          .from('phone_number_campaigns')
+          .select(`
+            phone_number_id,
+            a2p_campaign_id,
+            a2p_campaigns (
+              id,
+              campaign_id,
+              status
+            )
+          `);
 
-      if (!assignmentError && assignmentData) {
-        // Update phone numbers with A2P assignments
-        setPhoneNumbers(prevNumbers => 
-          prevNumbers.map(phone => ({
-            ...phone,
-            a2p_assignment: assignmentData.find(a => a.phone_number_id === phone.id)
-          }))
-        );
+        if (!assignmentError && assignmentData) {
+          // Update phone numbers with A2P assignments
+          setPhoneNumbers(prevNumbers => 
+            prevNumbers.map(phone => ({
+              ...phone,
+              a2p_assignment: assignmentData.find(a => a.phone_number_id === phone.id)
+            }))
+          );
+        } else {
+          console.warn('A2P assignments not available:', assignmentError);
+        }
+      } catch (assignmentError) {
+        console.warn('A2P campaign assignments table not available:', assignmentError);
       }
     } catch (error) {
-      console.error('Error loading A2P data:', error);
+      console.warn('Error loading A2P data:', error);
     }
   };
 
@@ -129,28 +141,33 @@ export default function PhoneNumbersSettings() {
     
     setLoading(true);
     try {
-      // Use Supabase functions invoke
+      // Use Supabase functions invoke with better error handling
       const { data, error } = await supabase.functions.invoke('phone_numbers', {
         body: { action: 'list' }
       });
       
-      if (error) throw error;
+      if (error) {
+        console.error('Phone numbers function error:', error);
+        throw new Error('Failed to load phone numbers: ' + error.message);
+      }
       
-      setPhoneNumbers(data.phoneNumbers || []);
+      // Handle both direct array and object with phoneNumbers property
+      const phoneNumbersData = Array.isArray(data) ? data : (data?.phoneNumbers || []);
+      setPhoneNumbers(phoneNumbersData);
       
-      // Calculate stats (will be updated after A2P data loads)
-      const assigned = data.phoneNumbers?.filter(n => n.user_id).length || 0;
+      // Calculate stats
+      const assigned = phoneNumbersData.filter(n => n.user_id).length;
       setStats(prevStats => ({
         ...prevStats,
-        totalNumbers: data.phoneNumbers?.length || 0,
+        totalNumbers: phoneNumbersData.length,
         assignedNumbers: assigned,
-        unassignedNumbers: (data.phoneNumbers?.length || 0) - assigned,
-        monthlyCost: (data.phoneNumbers?.length || 0) * 1.15
+        unassignedNumbers: phoneNumbersData.length - assigned,
+        monthlyCost: phoneNumbersData.length * 1.15
       }));
 
     } catch (error) {
       console.error('Error loading phone numbers:', error);
-      setError('Failed to load phone numbers');
+      setError('Failed to load phone numbers. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -175,16 +192,18 @@ export default function PhoneNumbersSettings() {
 
       if (error) throw error;
 
-      if (data.success) {
+      if (data && data.success) {
         setSuccess('Phone number assigned to A2P campaign successfully!');
         setShowA2pModal(false);
         setAssigningA2pNumber(null);
         setSelectedA2pCampaign('');
-        loadA2pData(); // Reload A2P assignments
+        loadA2pData();
+      } else {
+        throw new Error(data?.message || 'Assignment failed');
       }
     } catch (error) {
       console.error('Error assigning phone to A2P campaign:', error);
-      setError('Failed to assign phone number to A2P campaign');
+      setError('Failed to assign phone number to A2P campaign: ' + error.message);
     }
   };
 
@@ -205,13 +224,15 @@ export default function PhoneNumbersSettings() {
 
       if (error) throw error;
 
-      if (data.success) {
+      if (data && data.success) {
         setSuccess('Phone number unassigned from A2P campaign successfully!');
-        loadA2pData(); // Reload A2P assignments
+        loadA2pData();
+      } else {
+        throw new Error(data?.message || 'Unassignment failed');
       }
     } catch (error) {
       console.error('Error unassigning phone from A2P campaign:', error);
-      setError('Failed to unassign phone number from A2P campaign');
+      setError('Failed to unassign phone number from A2P campaign: ' + error.message);
     }
   };
 
@@ -219,8 +240,12 @@ export default function PhoneNumbersSettings() {
     if (!canAssignPhoneNumbers) return;
     
     try {
-      // Still use the existing team API for now
       const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        console.warn('No session available for team member loading');
+        return;
+      }
+
       const response = await fetch('/api/team/members', {
         headers: {
           'Authorization': `Bearer ${session.access_token}`,
@@ -230,10 +255,12 @@ export default function PhoneNumbersSettings() {
       
       if (response.ok) {
         const data = await response.json();
-        setTeamMembers(data.filter(member => member.status === 'active'));
+        setTeamMembers(Array.isArray(data) ? data.filter(member => member.status === 'active') : []);
+      } else {
+        console.warn('Team members API not available:', response.status);
       }
     } catch (error) {
-      console.error('Error loading team members:', error);
+      console.warn('Error loading team members:', error);
     }
   };
 
@@ -245,10 +272,26 @@ export default function PhoneNumbersSettings() {
         body: { action: 'popular-area-codes' }
       });
       
-      if (error) throw error;
-      setPopularAreaCodes(data.areaCodes || []);
+      if (error) {
+        console.warn('Popular area codes not available:', error);
+        setPopularAreaCodes([
+          { code: '212', city: 'New York, NY', available: true },
+          { code: '415', city: 'San Francisco, CA', available: true },
+          { code: '305', city: 'Miami, FL', available: true },
+          { code: '972', city: 'Dallas, TX', available: true }
+        ]);
+        return;
+      }
+      
+      setPopularAreaCodes(data?.areaCodes || []);
     } catch (error) {
-      console.error('Error loading area codes:', error);
+      console.warn('Error loading area codes:', error);
+      setPopularAreaCodes([
+        { code: '212', city: 'New York, NY', available: true },
+        { code: '415', city: 'San Francisco, CA', available: true },
+        { code: '305', city: 'Miami, FL', available: true },
+        { code: '972', city: 'Dallas, TX', available: true }
+      ]);
     }
   };
 
@@ -268,16 +311,17 @@ export default function PhoneNumbersSettings() {
       
       if (error) throw error;
       
-      if (data.availableNumbers.length === 0) {
+      const availableNumbersData = data?.availableNumbers || [];
+      if (availableNumbersData.length === 0) {
         setError(`No phone numbers available in area code ${areaCode}. Try a different area code.`);
         return;
       }
 
-      setAvailableNumbers(data.availableNumbers);
+      setAvailableNumbers(availableNumbersData);
       setSelectedAreaCode(areaCode);
     } catch (error) {
       console.error('Error searching phone numbers:', error);
-      setError('Failed to search phone numbers. Please try again.');
+      setError('Failed to search phone numbers: ' + error.message);
     } finally {
       setSearchingNumbers(false);
     }
@@ -302,16 +346,18 @@ export default function PhoneNumbersSettings() {
 
       if (error) throw error;
 
-      if (data.success) {
+      if (data && data.success) {
         setSuccess('Phone number purchased successfully!');
         setShowPurchaseModal(false);
         setAvailableNumbers([]);
         setSelectedAreaCode('');
         loadPhoneNumbers();
+      } else {
+        throw new Error(data?.message || 'Purchase failed');
       }
     } catch (error) {
       console.error('Error purchasing phone number:', error);
-      setError('Failed to purchase phone number. Please try again.');
+      setError('Failed to purchase phone number: ' + error.message);
     } finally {
       setPurchasing(false);
     }
@@ -336,17 +382,19 @@ export default function PhoneNumbersSettings() {
 
       if (error) throw error;
 
-      if (data.success) {
+      if (data && data.success) {
         setSuccess('Phone number assigned successfully!');
         setShowAssignModal(false);
         setAssigningNumber(null);
         setSelectedUserId('');
         setAssignmentNote('');
         loadPhoneNumbers();
+      } else {
+        throw new Error(data?.message || 'Assignment failed');
       }
     } catch (error) {
       console.error('Error assigning phone number:', error);
-      setError('Failed to assign phone number. Please try again.');
+      setError('Failed to assign phone number: ' + error.message);
     }
   };
 
@@ -363,13 +411,15 @@ export default function PhoneNumbersSettings() {
 
       if (error) throw error;
 
-      if (data.success) {
+      if (data && data.success) {
         setSuccess('Phone number unassigned successfully!');
         loadPhoneNumbers();
+      } else {
+        throw new Error(data?.message || 'Unassignment failed');
       }
     } catch (error) {
       console.error('Error unassigning phone number:', error);
-      setError('Failed to unassign phone number. Please try again.');
+      setError('Failed to unassign phone number: ' + error.message);
     }
   };
 
@@ -390,17 +440,20 @@ export default function PhoneNumbersSettings() {
 
       if (error) throw error;
 
-      if (data.success) {
+      if (data && data.success) {
         setSuccess('Phone number released successfully!');
         loadPhoneNumbers();
+      } else {
+        throw new Error(data?.message || 'Release failed');
       }
     } catch (error) {
       console.error('Error releasing phone number:', error);
-      setError('Failed to release phone number. Please try again.');
+      setError('Failed to release phone number: ' + error.message);
     }
   };
 
   const formatPhoneNumber = (phoneNumber) => {
+    if (!phoneNumber) return '';
     const cleaned = phoneNumber.replace(/\D/g, '');
     if (cleaned.length === 11 && cleaned.startsWith('1')) {
       const number = cleaned.substring(1);
@@ -411,8 +464,12 @@ export default function PhoneNumbersSettings() {
 
   const formatDate = (dateString) => {
     if (!dateString) return 'Never';
-    const date = new Date(dateString);
-    return date.toLocaleDateString();
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString();
+    } catch {
+      return 'Invalid Date';
+    }
   };
 
   const handleCustomAreaCodeSubmit = (e) => {
@@ -425,9 +482,12 @@ export default function PhoneNumbersSettings() {
   };
 
   const filteredNumbers = phoneNumbers.filter(number => {
-    const matchesSearch = number.phone_number.includes(searchTerm) ||
-                         number.profiles?.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         number.profiles?.email?.toLowerCase().includes(searchTerm.toLowerCase());
+    if (!number) return false;
+    
+    const phoneMatch = number.phone_number?.includes(searchTerm) || false;
+    const nameMatch = number.profiles?.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) || false;
+    const emailMatch = number.profiles?.email?.toLowerCase().includes(searchTerm.toLowerCase()) || false;
+    const matchesSearch = phoneMatch || nameMatch || emailMatch;
     
     const matchesFilter = filterAssigned === 'all' || 
                          (filterAssigned === 'assigned' && number.user_id) ||
@@ -655,165 +715,187 @@ export default function PhoneNumbersSettings() {
         </div>
 
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Phone Number
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Assigned To
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  A2P Campaign
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Capabilities
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Usage This Month
-                </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {filteredNumbers.map((number) => (
-                <tr key={number.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
-                      <Phone className="w-4 h-4 text-gray-400 mr-3" />
-                      <div>
-                        <div className="text-sm font-medium text-gray-900">
-                          {formatPhoneNumber(number.phone_number)}
-                        </div>
-                        <div className="text-xs text-gray-500">
-                          ID: {number.twilio_sid.slice(-6)}
-                        </div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {number.user_id ? (
+          {filteredNumbers.length === 0 ? (
+            <div className="text-center py-12">
+              <Phone className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">No Phone Numbers</h3>
+              <p className="text-gray-600 mb-4">
+                {phoneNumbers.length === 0 
+                  ? "You haven't purchased any phone numbers yet."
+                  : "No phone numbers match your search criteria."
+                }
+              </p>
+              {canManagePhoneNumbers && phoneNumbers.length === 0 && (
+                <button
+                  onClick={() => setShowPurchaseModal(true)}
+                  className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Purchase Your First Number
+                </button>
+              )}
+            </div>
+          ) : (
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Phone Number
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Assigned To
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    A2P Campaign
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Capabilities
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Usage This Month
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {filteredNumbers.map((number) => (
+                  <tr key={number.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
-                        <div className="flex-shrink-0 h-8 w-8">
-                          <div className="h-8 w-8 rounded-full bg-gray-300 flex items-center justify-center">
-                            <span className="text-xs font-medium text-gray-700">
-                              {(number.profiles?.full_name || 'U').split(' ').map(n => n[0]).join('')}
-                            </span>
+                        <Phone className="w-4 h-4 text-gray-400 mr-3" />
+                        <div>
+                          <div className="text-sm font-medium text-gray-900">
+                            {formatPhoneNumber(number.phone_number)}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            ID: {number.twilio_sid?.slice(-6) || 'N/A'}
                           </div>
                         </div>
-                        <div className="ml-3">
-                          <p className="text-sm font-medium text-gray-900">
-                            {number.profiles?.full_name || 'Unknown User'}
-                          </p>
-                          <p className="text-xs text-gray-500">{number.profiles?.email}</p>
-                        </div>
                       </div>
-                    ) : (
-                      <span className="text-sm text-gray-500">Unassigned</span>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {number.a2p_assignment ? (
-                      <div className="flex items-center justify-between">
-                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                          number.a2p_assignment.a2p_campaigns.status === 'VERIFIED' 
-                            ? 'bg-green-100 text-green-800' 
-                            : 'bg-yellow-100 text-yellow-800'
-                        }`}>
-                          <Shield className="w-3 h-3 mr-1" />
-                          {number.a2p_assignment.a2p_campaigns.campaign_id}
-                        </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {number.user_id ? (
+                        <div className="flex items-center">
+                          <div className="flex-shrink-0 h-8 w-8">
+                            <div className="h-8 w-8 rounded-full bg-gray-300 flex items-center justify-center">
+                              <span className="text-xs font-medium text-gray-700">
+                                {(number.profiles?.full_name || 'U').split(' ').map(n => n[0]).join('')}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="ml-3">
+                            <p className="text-sm font-medium text-gray-900">
+                              {number.profiles?.full_name || 'Unknown User'}
+                            </p>
+                            <p className="text-xs text-gray-500">{number.profiles?.email}</p>
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="text-sm text-gray-500">Unassigned</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {number.a2p_assignment ? (
+                        <div className="flex items-center justify-between">
+                          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                            number.a2p_assignment.a2p_campaigns?.status === 'VERIFIED' 
+                              ? 'bg-green-100 text-green-800' 
+                              : 'bg-yellow-100 text-yellow-800'
+                          }`}>
+                            <Shield className="w-3 h-3 mr-1" />
+                            {number.a2p_assignment.a2p_campaigns?.campaign_id || 'Campaign'}
+                          </span>
+                          {canManagePhoneNumbers && (
+                            <button
+                              onClick={() => unassignPhoneFromA2p(number.id, number.a2p_assignment.a2p_campaign_id)}
+                              className="text-red-600 hover:text-red-900 transition-colors ml-2"
+                              title="Unassign from A2P campaign"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          )}
+                        </div>
+                      ) : (
+                        canManagePhoneNumbers ? (
+                          <button
+                            onClick={() => {
+                              setAssigningA2pNumber(number);
+                              setShowA2pModal(true);
+                            }}
+                            disabled={a2pCampaigns.filter(c => c.status === 'VERIFIED').length === 0}
+                            className="text-blue-600 hover:text-blue-900 transition-colors text-sm disabled:text-gray-400 disabled:cursor-not-allowed"
+                          >
+                            {a2pCampaigns.filter(c => c.status === 'VERIFIED').length > 0 ? 'Assign A2P' : 'No campaigns'}
+                          </button>
+                        ) : (
+                          <span className="text-sm text-gray-500">Not assigned</span>
+                        )
+                      )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center space-x-2">
+                        {number.capabilities?.sms && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
+                            <MessageSquare className="w-3 h-3 mr-1" />
+                            SMS
+                          </span>
+                        )}
+                        {number.capabilities?.voice && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                            <PhoneCall className="w-3 h-3 mr-1" />
+                            Voice
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">
+                        {Math.floor(Math.random() * 500) + 100} messages
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        {Math.floor(Math.random() * 50) + 10} calls
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                      <div className="flex items-center justify-end space-x-2">
+                        {!number.user_id && canAssignPhoneNumbers ? (
+                          <button
+                            onClick={() => {
+                              setAssigningNumber(number);
+                              setShowAssignModal(true);
+                            }}
+                            className="text-blue-600 hover:text-blue-900 transition-colors"
+                            title="Assign to user"
+                          >
+                            <UserPlus className="w-4 h-4" />
+                          </button>
+                        ) : number.user_id && canAssignPhoneNumbers ? (
+                          <button
+                            onClick={() => unassignPhoneNumber(number.id)}
+                            className="text-orange-600 hover:text-orange-900 transition-colors"
+                            title="Unassign from user"
+                          >
+                            <UserPlus className="w-4 h-4 rotate-45" />
+                          </button>
+                        ) : null}
                         {canManagePhoneNumbers && (
                           <button
-                            onClick={() => unassignPhoneFromA2p(number.id, number.a2p_assignment.a2p_campaign_id)}
-                            className="text-red-600 hover:text-red-900 transition-colors ml-2"
-                            title="Unassign from A2P campaign"
+                            onClick={() => releasePhoneNumber(number.id)}
+                            className="text-red-600 hover:text-red-900 transition-colors"
+                            title="Release number"
                           >
-                            <X className="w-3 h-3" />
+                            <Trash2 className="w-4 h-4" />
                           </button>
                         )}
                       </div>
-                    ) : (
-                      canManagePhoneNumbers ? (
-                        <button
-                          onClick={() => {
-                            setAssigningA2pNumber(number);
-                            setShowA2pModal(true);
-                          }}
-                          disabled={a2pCampaigns.filter(c => c.status === 'VERIFIED').length === 0}
-                          className="text-blue-600 hover:text-blue-900 transition-colors text-sm disabled:text-gray-400 disabled:cursor-not-allowed"
-                        >
-                          {a2pCampaigns.filter(c => c.status === 'VERIFIED').length > 0 ? 'Assign A2P' : 'No campaigns'}
-                        </button>
-                      ) : (
-                        <span className="text-sm text-gray-500">Not assigned</span>
-                      )
-                    )}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center space-x-2">
-                      {number.capabilities?.sms && (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
-                          <MessageSquare className="w-3 h-3 mr-1" />
-                          SMS
-                        </span>
-                      )}
-                      {number.capabilities?.voice && (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
-                          <PhoneCall className="w-3 h-3 mr-1" />
-                          Voice
-                        </span>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">
-                      {Math.floor(Math.random() * 500) + 100} messages
-                    </div>
-                    <div className="text-xs text-gray-500">
-                      {Math.floor(Math.random() * 50) + 10} calls
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <div className="flex items-center justify-end space-x-2">
-                      {!number.user_id && canAssignPhoneNumbers ? (
-                        <button
-                          onClick={() => {
-                            setAssigningNumber(number);
-                            setShowAssignModal(true);
-                          }}
-                          className="text-blue-600 hover:text-blue-900 transition-colors"
-                          title="Assign to user"
-                        >
-                          <UserPlus className="w-4 h-4" />
-                        </button>
-                      ) : number.user_id && canAssignPhoneNumbers ? (
-                        <button
-                          onClick={() => unassignPhoneNumber(number.id)}
-                          className="text-orange-600 hover:text-orange-900 transition-colors"
-                          title="Unassign from user"
-                        >
-                          <UserPlus className="w-4 h-4 rotate-45" />
-                        </button>
-                      ) : null}
-                      {canManagePhoneNumbers && (
-                        <button
-                          onClick={() => releasePhoneNumber(number.id)}
-                          className="text-red-600 hover:text-red-900 transition-colors"
-                          title="Release number"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
       </div>
 
@@ -1012,10 +1094,10 @@ export default function PhoneNumbersSettings() {
                             </div>
                           )}
                           <div className="flex items-center space-x-3 mt-2">
-                            {number.capabilities.sms && (
+                            {number.capabilities?.sms && (
                               <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">SMS</span>
                             )}
-                            {number.capabilities.voice && (
+                            {number.capabilities?.voice && (
                               <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">Voice</span>
                             )}
                           </div>
