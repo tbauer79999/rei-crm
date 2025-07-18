@@ -530,7 +530,7 @@ export default function BusinessAnalytics() {
       setLoading(false);
       isLoadingData.current = false;
     }
-  }, [hasAnalyticsAccess, canViewFunnelStats, canViewPerformanceAnalytics, canViewEscalationSummaries, getDateFilter, applyTenantFilter]);
+  }, []); // Remove all dependencies to prevent infinite loop
 
   // Initialize and load data
   useEffect(() => {
@@ -544,7 +544,7 @@ export default function BusinessAnalytics() {
 
     isInitialized.current = true;
     loadAllData();
-  }, [user, loadAllData, hasAnalyticsAccess]);
+  }, [user?.id, hasAnalyticsAccess]); // Only depend on stable values
 
   // Handle date range changes
   useEffect(() => {
@@ -552,7 +552,7 @@ export default function BusinessAnalytics() {
     
     console.log('📅 Date range changed to:', dateRange);
     loadAllData();
-  }, [dateRange, loadAllData, canFilterCampaigns, user, loading]);
+  }, [dateRange]); // Only depend on dateRange
 
   // Handle view changes
   const handleViewChange = useCallback((newView) => {
