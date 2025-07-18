@@ -62,20 +62,17 @@ export default function Dashboard() {
     lead.alert_priority === 'critical'
   );
 
-  // Icon mapping for field types
+  // Icon mapping for field types based on your actual leads table columns
   const getFieldIcon = (fieldName) => {
     const iconMap = {
       'name': Users,
       'phone': Phone, 
       'email': Mail,
-      'property_address': MapPin,
-      'company_name': Building2,
-      'current_vehicle': 'Car',
-      'salary_expectations': DollarSign,
-      'budget_range': DollarSign,
-      'timeline': Clock,
+      'notes': FileText,
+      'summary': FileText,
+      'campaign': 'Rocket',
       'status': TrendingUp,
-      'campaign': 'Rocket'
+      'ai_status': TrendingUp
     };
     return iconMap[fieldName] || FileText;
   };
@@ -87,54 +84,47 @@ export default function Dashboard() {
     }
   }, [user]);
 
-  // Fetch the dynamic field configuration for this tenant
+  // Fetch the dynamic field configuration for this tenant, or use actual leads table columns as fallback
   const fetchLeadFields = async () => {
-    if (!user?.tenant_id) {
-      // Set default fields if no tenant_id or if global admin
-      setDefaultLeadFields();
-      return;
-    }
+    // First try to get configured fields
+    if (user?.tenant_id) {
+      try {
+        const { data, error } = await supabase
+          .from('lead_field_config')
+          .select('*')
+          .eq('tenant_id', user.tenant_id)
+          .order('field_name');
 
-    try {
-      const { data, error } = await supabase
-        .from('lead_field_config')
-        .select('*')
-        .eq('tenant_id', user.tenant_id)
-        .order('field_name');
+        if (!error && data && data.length > 0) {
+          // Remove duplicates by field_name
+          const uniqueFields = data.reduce((acc, field) => {
+            const exists = acc.find(f => f.field_name === field.field_name);
+            if (!exists) {
+              acc.push(field);
+            }
+            return acc;
+          }, []);
 
-      if (error) {
-        console.warn('Error fetching lead fields, using defaults:', error);
-        setDefaultLeadFields();
-        return;
-      }
-
-      // Remove duplicates by field_name
-      const uniqueFields = data?.reduce((acc, field) => {
-        const exists = acc.find(f => f.field_name === field.field_name);
-        if (!exists) {
-          acc.push(field);
+          console.log(`Loaded ${data.length} total fields, ${uniqueFields.length} unique fields`);
+          setLeadFields(uniqueFields);
+          return;
         }
-        return acc;
-      }, []) || [];
-
-      if (uniqueFields.length === 0) {
-        setDefaultLeadFields();
-      } else {
-        console.log(`Loaded ${data?.length} total fields, ${uniqueFields.length} unique fields`);
-        setLeadFields(uniqueFields);
+      } catch (err) {
+        console.log('Lead field config not available, using schema defaults:', err);
       }
-    } catch (err) {
-      console.warn('Error fetching lead fields, using defaults:', err);
-      setDefaultLeadFields();
     }
+
+    // Fallback to actual leads table columns from your schema
+    setDefaultLeadFields();
   };
 
   const setDefaultLeadFields = () => {
+    // Based on your actual leads table schema
     const defaultFields = [
-      { field_name: 'owner_name', field_label: 'Name', field_type: 'text' },
+      { field_name: 'name', field_label: 'Name', field_type: 'text' },
       { field_name: 'phone', field_label: 'Phone', field_type: 'phone' },
       { field_name: 'email', field_label: 'Email', field_type: 'email' },
-      { field_name: 'property_address', field_label: 'Address', field_type: 'text' }
+      { field_name: 'notes', field_label: 'Notes', field_type: 'text' }
     ];
     setLeadFields(defaultFields);
   };
@@ -216,7 +206,7 @@ export default function Dashboard() {
               funnel_stage: scoresMap[lead.id]?.funnel_stage || lead.status
             }));
           } else {
-            console.warn('Lead scores table not available or empty, using basic lead data');
+            console.log('Lead scores table not available or empty, using basic lead data');
             // Just use basic lead data with default values
             leadsWithScores = data.map(lead => ({
               ...lead,
@@ -230,7 +220,7 @@ export default function Dashboard() {
             }));
           }
         } catch (scoresError) {
-          console.warn('Error fetching lead scores, using basic lead data:', scoresError);
+          console.log('Error fetching lead scores, using basic lead data:', scoresError);
           // Continue with basic lead data
           leadsWithScores = data.map(lead => ({
             ...lead,
@@ -281,10 +271,21 @@ export default function Dashboard() {
     if (search.trim()) {
       const lower = search.toLowerCase();
       updated = updated.filter(lead => {
-        return leadFields.some(field => {
-          const value = lead[field.field_name];
-          return value && value.toString().toLowerCase().includes(lower);
-        });
+        // Search across actual lead table columns that are likely to contain searchable text
+        const searchableFields = [
+          lead.name,
+          lead.phone,
+          lead.email,
+          lead.notes,
+          lead.summary,
+          lead.campaign,
+          lead.status,
+          lead.ai_status
+        ];
+        
+        return searchableFields.some(value => 
+          value && value.toString().toLowerCase().includes(lower)
+        );
       });
     }
     
@@ -444,7 +445,7 @@ export default function Dashboard() {
     return configs[status] || configs['Cold Lead'];
   };
 
-  // Generate CSV headers based on configured fields
+  // Generate CSV headers based on configured fields or actual schema
   const downloadSampleCSV = () => {
     if (!leadFields || leadFields.length === 0) {
       console.error('No field configuration loaded');
@@ -468,22 +469,16 @@ export default function Dashboard() {
     
     // Create a sample row with example data for each field type
     const sampleData = leadFields.map(field => {
-      // Provide example data based on field name
+      // Provide example data based on actual schema field names
       const exampleData = {
-        'owner_name': 'John Doe',
         'name': 'John Doe',
         'phone': '+1-555-123-4567',
         'email': 'john.doe@example.com',
-        'property_address': '123 Main St, City, State 12345',
-        'company_name': 'ABC Company',
-        'current_vehicle': '2020 Toyota Camry',
-        'salary_expectations': '$50,000-$70,000',
-        'budget_range': '$200,000-$300,000',
-        'timeline': '3-6 months',
-        'status': 'Hot Lead',
-        'campaign': 'Q1 Outreach',
         'notes': 'Interested in our services',
-        'assigned_to': 'Sales Team'
+        'summary': 'High-value prospect',
+        'status': 'Hot Lead',
+        'ai_status': 'Engaged',
+        'campaign': 'Q1 Outreach'
       };
       
       // Return example data or a placeholder
@@ -582,11 +577,11 @@ export default function Dashboard() {
     }
   };
 
-  // Get the primary display fields (first few most important ones)
+  // Get the primary display fields (first few most important ones) based on actual schema
   const getDisplayFields = () => {
-    const priorityOrder = ['owner_name', 'name', 'phone', 'email', 'property_address', 'company_name', 'current_vehicle'];
+    const priorityOrder = ['name', 'phone', 'email', 'notes', 'summary'];
     const configuredFields = leadFields.filter(field => 
-      !['status', 'campaign', 'created_at'].includes(field.field_name)
+      !['status', 'ai_status', 'campaign', 'created_at'].includes(field.field_name)
     );
     
     // Sort by priority, then by configured order
@@ -600,20 +595,20 @@ export default function Dashboard() {
       return 0;
     });
     
-    // Return first 3-4 most important fields for table display
-    return sorted.slice(0, 3); // Reduced to 3 to make room for hot score
+    // Return first 3 most important fields for table display
+    return sorted.slice(0, 3);
   };
 
   const displayFields = getDisplayFields();
 
-  // Render field value with appropriate formatting
+  // Render field value with appropriate formatting based on actual schema
   const renderFieldValue = (lead, field) => {
     const value = lead[field.field_name];
     const Icon = getFieldIcon(field.field_name);
     
     if (!value) return <span className="text-gray-400">—</span>;
 
-    // Special formatting for certain field types
+    // Special formatting for certain field types based on actual schema
     if (field.field_name === 'phone') {
       return (
         <div className="flex items-center text-sm text-gray-900">
@@ -632,10 +627,10 @@ export default function Dashboard() {
       );
     }
 
-    if (field.field_name === 'property_address') {
+    if (field.field_name === 'notes' || field.field_name === 'summary') {
       return (
         <div className="flex items-center text-sm text-gray-900">
-          <MapPin size={14} className="mr-2 text-gray-400" />
+          <FileText size={14} className="mr-2 text-gray-400" />
           <span className="truncate max-w-xs">{value}</span>
         </div>
       );
@@ -1053,7 +1048,7 @@ export default function Dashboard() {
                         {/* Created */}
                         <td className="px-6 py-4">
                           <span className="text-sm text-gray-500">
-                            {new Date(lead.created_at).toLocaleDateString()}
+                            {lead.created_at ? new Date(lead.created_at).toLocaleDateString() : '—'}
                           </span>
                         </td>
                         

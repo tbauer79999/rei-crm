@@ -1,36 +1,4 @@
-const loadTeamMembers = async () => {
-    if (!canAssignPhoneNumbers) return;
-    
-    // Load team members from your actual users_profile table
-    try {
-      const { data: teamData, error: teamError } = await supabase
-        .from('users_profile')
-        .select('id, email, first_name, last_name, full_name, role, is_active')
-        .eq('tenant_id', user?.tenant_id)
-        .eq('is_active', true)
-        .order('full_name');
-
-      if (!teamError && teamData) {
-        const formattedMembers = teamData.map(profile => ({
-          id: profile.id,
-          name: profile.full_name || `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || profile.email,
-          email: profile.email,
-          status: 'active',
-          role: profile.role
-        }));
-        setTeamMembers(formattedMembers);
-        console.log('Team members loaded from users_profile table:', formattedMembers.length);
-        return;
-      } else {
-        console.log('Error loading from users_profile table:', teamError);
-      }
-    } catch (profilesError) {
-      console.log('Error accessing users_profile table:', profilesError);
-    }
-
-    // Fallback: if no team members loaded, just set empty array
-    setTeamMembers([]);
-  };import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Phone, 
   Plus, 
@@ -51,7 +19,8 @@ import {
   Calendar,
   TrendingUp,
   ExternalLink,
-  Settings
+  Settings,
+  Target
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { PERMISSIONS } from '../../lib/permissions';
@@ -90,17 +59,16 @@ export default function PhoneNumbersSettings() {
   const [purchasing, setPurchasing] = useState(false);
   const [popularAreaCodes, setPopularAreaCodes] = useState([]);
   
-  // Assignment modal state
-  const [showAssignModal, setShowAssignModal] = useState(false);
+  // Campaign assignment modal state
+  const [showCampaignAssignModal, setShowCampaignAssignModal] = useState(false);
   const [assigningNumber, setAssigningNumber] = useState(null);
-  const [teamMembers, setTeamMembers] = useState([]);
-  const [selectedUserId, setSelectedUserId] = useState('');
-  const [assignmentNote, setAssignmentNote] = useState('');
+  const [campaigns, setCampaigns] = useState([]);
+  const [selectedCampaignId, setSelectedCampaignId] = useState('');
   
   // Stats
   const [stats, setStats] = useState({
     totalNumbers: 0,
-    assignedNumbers: 0,
+    assignedToCampaigns: 0,
     unassignedNumbers: 0,
     monthlyCost: 0,
     a2pAssigned: 0,
@@ -110,7 +78,7 @@ export default function PhoneNumbersSettings() {
   useEffect(() => {
     if (canViewPhoneNumbers) {
       loadPhoneNumbers();
-      loadTeamMembers();
+      loadCampaigns();
       loadPopularAreaCodes();
       loadA2pData();
     } else {
@@ -167,27 +135,36 @@ export default function PhoneNumbersSettings() {
     
     setLoading(true);
     try {
-      // Use Supabase functions invoke with better error handling
-      const { data, error } = await supabase.functions.invoke('phone_numbers', {
-        body: { action: 'list' }
-      });
+      // Load phone numbers for this tenant with campaign assignments
+      const { data: phoneData, error: phoneError } = await supabase
+        .from('phone_numbers')
+        .select(`
+          *,
+          campaigns (
+            id,
+            name,
+            is_active
+          )
+        `)
+        .eq('tenant_id', user?.tenant_id)
+        .order('created_at', { ascending: false });
       
-      if (error) {
-        console.error('Phone numbers function error:', error);
-        throw new Error('Failed to load phone numbers: ' + error.message);
+      if (phoneError) {
+        console.error('Error loading phone numbers:', phoneError);
+        setError('Failed to load phone numbers: ' + phoneError.message);
+        return;
       }
       
-      // Handle both direct array and object with phoneNumbers property
-      const phoneNumbersData = Array.isArray(data) ? data : (data?.phoneNumbers || []);
+      const phoneNumbersData = phoneData || [];
       setPhoneNumbers(phoneNumbersData);
       
       // Calculate stats
-      const assigned = phoneNumbersData.filter(n => n.user_id).length;
+      const assignedToCampaigns = phoneNumbersData.filter(n => n.campaigns && n.campaigns.length > 0).length;
       setStats(prevStats => ({
         ...prevStats,
         totalNumbers: phoneNumbersData.length,
-        assignedNumbers: assigned,
-        unassignedNumbers: phoneNumbersData.length - assigned,
+        assignedToCampaigns,
+        unassignedNumbers: phoneNumbersData.length - assignedToCampaigns,
         monthlyCost: phoneNumbersData.length * 1.15
       }));
 
@@ -196,6 +173,30 @@ export default function PhoneNumbersSettings() {
       setError('Failed to load phone numbers. Please try again.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadCampaigns = async () => {
+    if (!canAssignPhoneNumbers) return;
+    
+    try {
+      const { data: campaignData, error: campaignError } = await supabase
+        .from('campaigns')
+        .select('id, name, is_active, phone_number_id')
+        .eq('tenant_id', user?.tenant_id)
+        .eq('is_active', true)
+        .order('name');
+
+      if (!campaignError && campaignData) {
+        setCampaigns(campaignData);
+        console.log('Campaigns loaded:', campaignData.length);
+      } else {
+        console.log('Error loading campaigns:', campaignError);
+        setCampaigns([]);
+      }
+    } catch (error) {
+      console.log('Error accessing campaigns table:', error);
+      setCampaigns([]);
     }
   };
 
@@ -267,66 +268,6 @@ export default function PhoneNumbersSettings() {
     } catch (error) {
       console.log('A2P unassignment not available:', error);
       setError('A2P assignment features are not configured yet.');
-    }
-  };
-
-  const loadTeamMembers = async () => {
-    if (!canAssignPhoneNumbers) return;
-    
-    // Try to load team members from Supabase profiles instead of API
-    try {
-      const { data: profilesData, error: profilesError } = await supabase
-        .from('profiles')
-        .select('id, full_name, email')
-        .eq('tenant_id', user?.tenant_id)
-        .order('full_name');
-
-      if (!profilesError && profilesData) {
-        const formattedMembers = profilesData.map(profile => ({
-          id: profile.id,
-          name: profile.full_name,
-          email: profile.email,
-          status: 'active'
-        }));
-        setTeamMembers(formattedMembers);
-        console.log('Team members loaded from profiles:', formattedMembers.length);
-        return;
-      }
-    } catch (profilesError) {
-      console.log('Profiles table not available, trying API fallback');
-    }
-
-    // Fallback to API if profiles table doesn't work
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.access_token) {
-        console.log('No session available for team member loading - skipping team features');
-        return;
-      }
-
-      // Try the team API - but this endpoint may not exist yet
-      const response = await fetch('/api/team/members', {
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json',
-        }
-      });
-      
-      if (response.ok) {
-        const contentType = response.headers.get('content-type');
-        if (contentType && contentType.includes('application/json')) {
-          const data = await response.json();
-          setTeamMembers(Array.isArray(data) ? data.filter(member => member.status === 'active') : []);
-        } else {
-          console.log('Team API returned non-JSON response - team features not configured');
-        }
-      } else if (response.status === 404) {
-        console.log('Team API endpoint not found - team features not configured');
-      } else {
-        console.log('Team API not available:', response.status);
-      }
-    } catch (error) {
-      console.log('Team features not configured - skipping team member loading');
     }
   };
 
@@ -430,63 +371,58 @@ export default function PhoneNumbersSettings() {
     }
   };
 
-  const assignPhoneNumber = async () => {
+  const assignPhoneToCampaign = async () => {
     if (!canAssignPhoneNumbers) {
-      setError("You don't have permission to assign phone numbers to users.");
+      setError("You don't have permission to assign phone numbers to campaigns.");
       return;
     }
 
-    if (!selectedUserId || !assigningNumber) return;
+    if (!selectedCampaignId || !assigningNumber) return;
 
     try {
-      const { data, error } = await supabase.functions.invoke('phone_numbers', {
-        body: {
-          action: 'assign',
-          phoneId: assigningNumber.id,
-          userId: selectedUserId
-        }
-      });
+      // Update the campaign to use this phone number
+      const { data, error } = await supabase
+        .from('campaigns')
+        .update({ phone_number_id: assigningNumber.id })
+        .eq('id', selectedCampaignId)
+        .eq('tenant_id', user?.tenant_id);
 
       if (error) throw error;
 
-      if (data && data.success) {
-        setSuccess('Phone number assigned successfully!');
-        setShowAssignModal(false);
-        setAssigningNumber(null);
-        setSelectedUserId('');
-        setAssignmentNote('');
-        loadPhoneNumbers();
-      } else {
-        throw new Error(data?.message || 'Assignment failed');
-      }
+      setSuccess('Phone number assigned to campaign successfully!');
+      setShowCampaignAssignModal(false);
+      setAssigningNumber(null);
+      setSelectedCampaignId('');
+      loadPhoneNumbers();
+      loadCampaigns();
     } catch (error) {
-      console.error('Error assigning phone number:', error);
-      setError('Failed to assign phone number: ' + error.message);
+      console.error('Error assigning phone number to campaign:', error);
+      setError('Failed to assign phone number to campaign: ' + error.message);
     }
   };
 
-  const unassignPhoneNumber = async (phoneId) => {
+  const unassignPhoneFromCampaign = async (phoneId, campaignId) => {
     if (!canAssignPhoneNumbers) {
       setError("You don't have permission to unassign phone numbers.");
       return;
     }
 
     try {
-      const { data, error } = await supabase.functions.invoke('phone_numbers', {
-        body: { action: 'unassign', phoneId }
-      });
+      // Remove phone number from campaign
+      const { data, error } = await supabase
+        .from('campaigns')
+        .update({ phone_number_id: null })
+        .eq('id', campaignId)
+        .eq('tenant_id', user?.tenant_id);
 
       if (error) throw error;
 
-      if (data && data.success) {
-        setSuccess('Phone number unassigned successfully!');
-        loadPhoneNumbers();
-      } else {
-        throw new Error(data?.message || 'Unassignment failed');
-      }
+      setSuccess('Phone number unassigned from campaign successfully!');
+      loadPhoneNumbers();
+      loadCampaigns();
     } catch (error) {
-      console.error('Error unassigning phone number:', error);
-      setError('Failed to unassign phone number: ' + error.message);
+      console.error('Error unassigning phone number from campaign:', error);
+      setError('Failed to unassign phone number from campaign: ' + error.message);
     }
   };
 
@@ -496,7 +432,7 @@ export default function PhoneNumbersSettings() {
       return;
     }
 
-    if (!window.confirm('Are you sure you want to release this phone number? This action cannot be undone.')) {
+    if (!window.confirm('Are you sure you want to release this phone number? This action cannot be undone and will unassign it from any campaigns.')) {
       return;
     }
 
@@ -552,13 +488,14 @@ export default function PhoneNumbersSettings() {
     if (!number) return false;
     
     const phoneMatch = number.phone_number?.includes(searchTerm) || false;
-    const nameMatch = number.profiles?.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) || false;
-    const emailMatch = number.profiles?.email?.toLowerCase().includes(searchTerm.toLowerCase()) || false;
-    const matchesSearch = phoneMatch || nameMatch || emailMatch;
+    const campaignMatch = number.campaigns?.some(c => 
+      c.name?.toLowerCase().includes(searchTerm.toLowerCase())
+    ) || false;
+    const matchesSearch = phoneMatch || campaignMatch;
     
     const matchesFilter = filterAssigned === 'all' || 
-                         (filterAssigned === 'assigned' && number.user_id) ||
-                         (filterAssigned === 'unassigned' && !number.user_id);
+                         (filterAssigned === 'assigned' && number.campaigns && number.campaigns.length > 0) ||
+                         (filterAssigned === 'unassigned' && (!number.campaigns || number.campaigns.length === 0));
     
     return matchesSearch && matchesFilter;
   });
@@ -642,7 +579,7 @@ export default function PhoneNumbersSettings() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold text-gray-900">Phone Numbers</h2>
-          <p className="text-gray-600 mt-1">Manage your business phone numbers and assignments</p>
+          <p className="text-gray-600 mt-1">Manage your business phone numbers and campaign assignments</p>
         </div>
         <div className="flex items-center gap-3">
           {canManagePhoneNumbers && (
@@ -697,11 +634,11 @@ export default function PhoneNumbersSettings() {
         <div className="bg-gradient-to-r from-green-50 to-green-100 rounded-xl p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-green-600 text-sm font-medium">Team Assigned</p>
-              <p className="text-3xl font-bold text-green-900">{stats.assignedNumbers}</p>
-              <p className="text-xs text-green-600 mt-1">To team members</p>
+              <p className="text-green-600 text-sm font-medium">Campaign Assigned</p>
+              <p className="text-3xl font-bold text-green-900">{stats.assignedToCampaigns}</p>
+              <p className="text-xs text-green-600 mt-1">To active campaigns</p>
             </div>
-            <UserPlus className="w-10 h-10 text-green-600" />
+            <Target className="w-10 h-10 text-green-600" />
           </div>
         </div>
 
@@ -763,7 +700,7 @@ export default function PhoneNumbersSettings() {
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
               <input
                 type="text"
-                placeholder="Search by number or assigned user..."
+                placeholder="Search by number or campaign..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -775,7 +712,7 @@ export default function PhoneNumbersSettings() {
               className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
             >
               <option value="all">All Numbers</option>
-              <option value="assigned">Assigned</option>
+              <option value="assigned">Assigned to Campaigns</option>
               <option value="unassigned">Unassigned</option>
             </select>
           </div>
@@ -810,7 +747,7 @@ export default function PhoneNumbersSettings() {
                     Phone Number
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Assigned To
+                    Assigned Campaign
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     A2P Campaign
@@ -819,7 +756,7 @@ export default function PhoneNumbersSettings() {
                     Capabilities
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Usage This Month
+                    Status
                   </th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Actions
@@ -843,24 +780,40 @@ export default function PhoneNumbersSettings() {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      {number.user_id ? (
-                        <div className="flex items-center">
-                          <div className="flex-shrink-0 h-8 w-8">
-                            <div className="h-8 w-8 rounded-full bg-gray-300 flex items-center justify-center">
-                              <span className="text-xs font-medium text-gray-700">
-                                {(number.profiles?.full_name || 'U').split(' ').map(n => n[0]).join('')}
+                      {number.campaigns && number.campaigns.length > 0 ? (
+                        <div className="space-y-1">
+                          {number.campaigns.map((campaign) => (
+                            <div key={campaign.id} className="flex items-center justify-between">
+                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                <Target className="w-3 h-3 mr-1" />
+                                {campaign.name}
                               </span>
+                              {canAssignPhoneNumbers && (
+                                <button
+                                  onClick={() => unassignPhoneFromCampaign(number.id, campaign.id)}
+                                  className="text-red-600 hover:text-red-900 transition-colors ml-2"
+                                  title="Unassign from campaign"
+                                >
+                                  <X className="w-3 h-3" />
+                                </button>
+                              )}
                             </div>
-                          </div>
-                          <div className="ml-3">
-                            <p className="text-sm font-medium text-gray-900">
-                              {number.profiles?.full_name || 'Unknown User'}
-                            </p>
-                            <p className="text-xs text-gray-500">{number.profiles?.email}</p>
-                          </div>
+                          ))}
                         </div>
                       ) : (
-                        <span className="text-sm text-gray-500">Unassigned</span>
+                        canAssignPhoneNumbers && campaigns.length > 0 ? (
+                          <button
+                            onClick={() => {
+                              setAssigningNumber(number);
+                              setShowCampaignAssignModal(true);
+                            }}
+                            className="text-blue-600 hover:text-blue-900 transition-colors text-sm"
+                          >
+                            Assign to Campaign
+                          </button>
+                        ) : (
+                          <span className="text-sm text-gray-500">Unassigned</span>
+                        )
                       )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -918,35 +871,16 @@ export default function PhoneNumbersSettings() {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">
-                        {Math.floor(Math.random() * 500) + 100} messages
-                      </div>
-                      <div className="text-xs text-gray-500">
-                        {Math.floor(Math.random() * 50) + 10} calls
-                      </div>
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        number.status === 'active' 
+                          ? 'bg-green-100 text-green-800' 
+                          : 'bg-gray-100 text-gray-800'
+                      }`}>
+                        {number.status}
+                      </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <div className="flex items-center justify-end space-x-2">
-                        {!number.user_id && canAssignPhoneNumbers && teamMembers.length > 0 ? (
-                          <button
-                            onClick={() => {
-                              setAssigningNumber(number);
-                              setShowAssignModal(true);
-                            }}
-                            className="text-blue-600 hover:text-blue-900 transition-colors"
-                            title="Assign to user"
-                          >
-                            <UserPlus className="w-4 h-4" />
-                          </button>
-                        ) : number.user_id && canAssignPhoneNumbers ? (
-                          <button
-                            onClick={() => unassignPhoneNumber(number.id)}
-                            className="text-orange-600 hover:text-orange-900 transition-colors"
-                            title="Unassign from user"
-                          >
-                            <UserPlus className="w-4 h-4 rotate-45" />
-                          </button>
-                        ) : null}
                         {canManagePhoneNumbers && (
                           <button
                             onClick={() => releasePhoneNumber(number.id)}
@@ -972,10 +906,77 @@ export default function PhoneNumbersSettings() {
           <Info className="w-5 h-5 text-blue-600 mt-0.5 mr-3 flex-shrink-0" />
           <div className="text-sm text-blue-800">
             <p className="font-medium mb-1">Phone Number Management</p>
-            <p>You can purchase multiple phone numbers for different purposes: one per sales person, one per campaign, or for different regions. Each number costs approximately $1.15/month plus usage charges. For SMS compliance, assign numbers to A2P campaigns after creating them in A2P Compliance settings.</p>
+            <p>Phone numbers are purchased for your organization and can be assigned to campaigns. When users activate campaigns, they select which phone number to use. Each number costs approximately $1.15/month plus usage charges.</p>
           </div>
         </div>
       </div>
+
+      {/* Campaign Assignment Modal */}
+      {showCampaignAssignModal && assigningNumber && canAssignPhoneNumbers && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full mx-4">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900">Assign to Campaign</h3>
+              <p className="text-sm text-gray-600 mt-1">
+                Assign {formatPhoneNumber(assigningNumber.phone_number)} to a campaign
+              </p>
+            </div>
+            <div className="px-6 py-4">
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Select Campaign
+                  </label>
+                  <select
+                    value={selectedCampaignId}
+                    onChange={(e) => setSelectedCampaignId(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="">Choose a campaign...</option>
+                    {campaigns.filter(c => !c.phone_number_id).map((campaign) => (
+                      <option key={campaign.id} value={campaign.id}>
+                        {campaign.name}
+                      </option>
+                    ))}
+                  </select>
+                  {campaigns.filter(c => !c.phone_number_id).length === 0 && (
+                    <p className="text-sm text-amber-600 mt-2">
+                      No campaigns available for assignment. All active campaigns already have phone numbers assigned.
+                    </p>
+                  )}
+                </div>
+                <div className="bg-blue-50 rounded-lg p-4">
+                  <div className="flex items-start">
+                    <Info className="w-5 h-5 text-blue-600 mt-0.5 mr-3" />
+                    <div className="text-sm text-blue-800">
+                      <p>Assigning a phone number to a campaign allows users to send SMS and make calls using this number when the campaign is active.</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-end space-x-3">
+              <button
+                onClick={() => {
+                  setShowCampaignAssignModal(false);
+                  setAssigningNumber(null);
+                  setSelectedCampaignId('');
+                }}
+                className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={assignPhoneToCampaign}
+                disabled={!selectedCampaignId}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Assign to Campaign
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* A2P Assignment Modal */}
       {showA2pModal && assigningA2pNumber && canManagePhoneNumbers && (
@@ -1044,7 +1045,7 @@ export default function PhoneNumbersSettings() {
         </div>
       )}
 
-      {/* Purchase Modal */}
+      {/* Purchase Modal - keeping this the same as it works fine */}
       {showPurchaseModal && canManagePhoneNumbers && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
@@ -1188,86 +1189,6 @@ export default function PhoneNumbersSettings() {
                   </div>
                 </div>
               )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Assignment Modal */}
-      {showAssignModal && assigningNumber && canAssignPhoneNumbers && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-xl max-w-md w-full mx-4">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <h3 className="text-lg font-semibold text-gray-900">Assign Phone Number</h3>
-              <p className="text-sm text-gray-600 mt-1">
-                Assign {formatPhoneNumber(assigningNumber.phone_number)} to a team member
-              </p>
-            </div>
-            <div className="px-6 py-4">
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Select Team Member
-                  </label>
-                  <select
-                    value={selectedUserId}
-                    onChange={(e) => setSelectedUserId(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  >
-                    <option value="">Choose a team member...</option>
-                    {teamMembers.map((member) => (
-                      <option key={member.id} value={member.id}>
-                        {member.name || member.email} ({member.email})
-                      </option>
-                    ))}
-                  </select>
-                  {teamMembers.length === 0 && (
-                    <p className="text-sm text-amber-600 mt-2">
-                      No team members available. Team management features may not be configured yet.
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Assignment Note (Optional)
-                  </label>
-                  <textarea
-                    value={assignmentNote}
-                    onChange={(e) => setAssignmentNote(e.target.value)}
-                    placeholder="e.g., For California leads, Spanish-speaking clients, etc."
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    rows="3"
-                  />
-                </div>
-                <div className="bg-blue-50 rounded-lg p-4">
-                  <div className="flex items-start">
-                    <Info className="w-5 h-5 text-blue-600 mt-0.5 mr-3" />
-                    <div className="text-sm text-blue-800">
-                      <p>Assigned numbers will be used for all outbound communications from this team member.</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-end space-x-3">
-              <button
-                onClick={() => {
-                  setShowAssignModal(false);
-                  setAssigningNumber(null);
-                  setSelectedUserId('');
-                  setAssignmentNote('');
-                }}
-                className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={assignPhoneNumber}
-                disabled={!selectedUserId}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Assign Number
-              </button>
             </div>
           </div>
         </div>
