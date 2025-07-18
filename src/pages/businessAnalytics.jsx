@@ -1,13 +1,15 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ScatterChart, Scatter } from 'recharts';
-import { TrendingUp, Users, Target, DollarSign, Calendar, Filter, Download, RefreshCw, BarChart3, Brain, Settings, Plus, Eye, ArrowRight, Award, TestTube, Database, Activity, MessageSquare } from 'lucide-react';
+import { TrendingUp, Users, Target, DollarSign, Calendar, Filter, Download, RefreshCw, BarChart3, Brain, Settings, Plus, Eye, ArrowRight, Award, TestTube, Database, Activity, MessageSquare, Lock, AlertCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { PERMISSIONS } from '../lib/permissions';
+import { hasFeature, FeatureGate } from '../lib/plans';
 import { analyticsService } from '../lib/analyticsDataService';
 import ABTestingDashboard from '../components/ABTestingDashboard';
 import CustomReportsBuilder from '../components/CustomReportsBuilder';
 
 export default function BusinessAnalytics() {
-  const { user } = useAuth();
+  const { user, hasPermission, userPlan } = useAuth();
   const [activeView, setActiveView] = useState('overview');
   const [dateRange, setDateRange] = useState(30);
   const [selectedCampaign, setSelectedCampaign] = useState('all');
@@ -18,6 +20,13 @@ export default function BusinessAnalytics() {
   // Use refs to prevent multiple initializations
   const isInitialized = useRef(false);
   const isLoadingData = useRef(false);
+
+  // RBAC Permission Checks
+  const canViewFunnelStats = hasPermission(PERMISSIONS.VIEW_FUNNEL_STATS);
+  const canViewPerformanceAnalytics = hasPermission(PERMISSIONS.VIEW_AI_EFFICIENCY_BREAKDOWN);
+  const canExportData = hasPermission(PERMISSIONS.EXPORT_PERFORMANCE_STATS);
+  const canFilterCampaigns = hasPermission(PERMISSIONS.FILTER_BY_CAMPAIGN_OR_DATE);
+  const canViewEscalationSummaries = hasPermission(PERMISSIONS.VIEW_ESCALATION_SUMMARIES);
 
   // Real data state
   const [dashboardData, setDashboardData] = useState({
@@ -30,8 +39,18 @@ export default function BusinessAnalytics() {
     salesRepPerformance: []
   });
 
-  // Memoized load function to prevent recreation
+  // Check if user has access to analytics at all
+  const hasAnalyticsAccess = canViewFunnelStats || canViewPerformanceAnalytics;
+
+  // Memoized load function with error handling and RBAC checks
   const loadAllData = useCallback(async () => {
+    // Check permissions first
+    if (!hasAnalyticsAccess) {
+      setLoading(false);
+      setError('You do not have permission to view analytics data');
+      return;
+    }
+
     // Prevent concurrent loads
     if (isLoadingData.current) {
       console.log('⚠️ Already loading data, skipping...');
@@ -42,117 +61,253 @@ export default function BusinessAnalytics() {
     
     try {
       setLoading(true);
-      console.log('📊 Loading all analytics data...');
+      setError(''); // Clear previous errors
+      console.log('📊 Loading analytics data with RBAC checks...');
       
-      const [
-        campaigns,
-        performanceMetrics,
-        campaignPerformance,
-        aiInsights,
-        leadSourceROI,
-        historicalTrends,
-        salesRepPerformance,
-        totalPipelineValue
-      ] = await Promise.all([
-        analyticsService.getCampaignOverview(),
-        analyticsService.getPerformanceMetrics(),
-        analyticsService.getCampaignPerformanceData(),
-        analyticsService.getAIPerformanceInsights(),
-        analyticsService.getLeadSourceROI(),
-        analyticsService.getHistoricalTrends(),
-        analyticsService.getSalesRepPerformance(),
-        analyticsService.getTotalPipelineValue()
-      ]);
+      // Build requests array based on permissions
+      const requests = [];
+      const requestMap = {};
 
-      setDashboardData({
-        campaigns,
-        performanceMetrics,
-        campaignPerformance,
-        aiInsights,
-        leadSourceROI,
-        historicalTrends,
-        salesRepPerformance
-      });
+      if (canViewFunnelStats) {
+        requests.push(analyticsService.getCampaignOverview());
+        requestMap.campaigns = requests.length - 1;
+        
+        requests.push(analyticsService.getPerformanceMetrics());
+        requestMap.performanceMetrics = requests.length - 1;
+      }
 
-      setPipelineValue(totalPipelineValue);
+      if (canViewPerformanceAnalytics) {
+        requests.push(analyticsService.getCampaignPerformanceData());
+        requestMap.campaignPerformance = requests.length - 1;
+        
+        requests.push(analyticsService.getAIPerformanceInsights());
+        requestMap.aiInsights = requests.length - 1;
+        
+        requests.push(analyticsService.getHistoricalTrends());
+        requestMap.historicalTrends = requests.length - 1;
+      }
 
-      setError('');
+      if (canViewEscalationSummaries) {
+        requests.push(analyticsService.getLeadSourceROI());
+        requestMap.leadSourceROI = requests.length - 1;
+        
+        requests.push(analyticsService.getSalesRepPerformance());
+        requestMap.salesRepPerformance = requests.length - 1;
+        
+        requests.push(analyticsService.getTotalPipelineValue());
+        requestMap.totalPipelineValue = requests.length - 1;
+      }
+
+      if (requests.length === 0) {
+        setError('No analytics data available with your current permissions');
+        setLoading(false);
+        return;
+      }
+
+      // Execute all permitted requests
+      const results = await Promise.allSettled(requests);
+      
+      // Process results and handle individual failures
+      const newDashboardData = {
+        campaigns: [],
+        performanceMetrics: {},
+        campaignPerformance: [],
+        aiInsights: {},
+        leadSourceROI: [],
+        historicalTrends: [],
+        salesRepPerformance: []
+      };
+
+      // Map results back to data structure
+      if (requestMap.campaigns !== undefined && results[requestMap.campaigns].status === 'fulfilled') {
+        newDashboardData.campaigns = results[requestMap.campaigns].value || [];
+      }
+      
+      if (requestMap.performanceMetrics !== undefined && results[requestMap.performanceMetrics].status === 'fulfilled') {
+        newDashboardData.performanceMetrics = results[requestMap.performanceMetrics].value || {};
+      }
+      
+      if (requestMap.campaignPerformance !== undefined && results[requestMap.campaignPerformance].status === 'fulfilled') {
+        newDashboardData.campaignPerformance = results[requestMap.campaignPerformance].value || [];
+      }
+      
+      if (requestMap.aiInsights !== undefined && results[requestMap.aiInsights].status === 'fulfilled') {
+        newDashboardData.aiInsights = results[requestMap.aiInsights].value || {};
+      }
+      
+      if (requestMap.leadSourceROI !== undefined && results[requestMap.leadSourceROI].status === 'fulfilled') {
+        newDashboardData.leadSourceROI = results[requestMap.leadSourceROI].value || [];
+      }
+      
+      if (requestMap.historicalTrends !== undefined && results[requestMap.historicalTrends].status === 'fulfilled') {
+        newDashboardData.historicalTrends = results[requestMap.historicalTrends].value || [];
+      }
+      
+      if (requestMap.salesRepPerformance !== undefined && results[requestMap.salesRepPerformance].status === 'fulfilled') {
+        newDashboardData.salesRepPerformance = results[requestMap.salesRepPerformance].value || [];
+      }
+
+      if (requestMap.totalPipelineValue !== undefined && results[requestMap.totalPipelineValue].status === 'fulfilled') {
+        setPipelineValue(results[requestMap.totalPipelineValue].value || 0);
+      }
+
+      setDashboardData(newDashboardData);
+
+      // Check for any failed requests and log them
+      const failedRequests = results.filter(result => result.status === 'rejected');
+      if (failedRequests.length > 0) {
+        console.warn('Some analytics requests failed:', failedRequests);
+        // Don't set error state for partial failures, just log them
+      }
+
       console.log('✅ Analytics data loaded successfully');
     } catch (err) {
       console.error('Error loading analytics data:', err);
-      setError('Failed to load analytics data');
+      // Set more specific error messages based on error type
+      if (err.message?.includes('404')) {
+        setError('Analytics data not found. Please check your account setup.');
+      } else if (err.message?.includes('403')) {
+        setError('Access denied. You may not have permission to view this data.');
+      } else if (err.message?.includes('400')) {
+        setError('Invalid request. Please check your account configuration.');
+      } else {
+        setError('Failed to load analytics data. Please try again later.');
+      }
     } finally {
       setLoading(false);
       isLoadingData.current = false;
     }
-  }, []); // Empty deps, function never changes
+  }, [hasAnalyticsAccess, canViewFunnelStats, canViewPerformanceAnalytics, canViewEscalationSummaries]);
 
-  // Initialize analytics service only once
+  // Initialize analytics service only once with better error handling
   useEffect(() => {
     const initializeAndLoadData = async () => {
       if (!user || isInitialized.current) return;
+
+      // Check basic access first
+      if (!hasAnalyticsAccess) {
+        setLoading(false);
+        setError('You do not have permission to access analytics');
+        return;
+      }
 
       isInitialized.current = true;
       
       try {
         console.log('🔧 Initializing analytics service...');
+        
+        // Initialize with better error handling
         await analyticsService.initialize(user);
+        
+        // Set date range before loading data
+        analyticsService.setDateRange(dateRange);
+        
         await loadAllData();
       } catch (err) {
         console.error('Error initializing analytics:', err);
-        setError('Failed to load analytics data');
+        isInitialized.current = false; // Reset so we can try again
+        
+        if (err.message?.includes('tenant_id')) {
+          setError('Account setup incomplete. Please contact support.');
+        } else {
+          setError('Failed to initialize analytics. Please refresh the page.');
+        }
         setLoading(false);
       }
     };
 
     initializeAndLoadData();
-  }, [user, loadAllData]);
+  }, [user, loadAllData, hasAnalyticsAccess, dateRange]);
 
-  // Handle date range changes
+  // Handle date range changes with permission check
   useEffect(() => {
-    if (!user || !isInitialized.current || loading) return;
+    if (!user || !isInitialized.current || loading || !canFilterCampaigns) return;
     
     console.log('📅 Date range changed to:', dateRange);
-    analyticsService.setDateRange(dateRange);
-    loadAllData();
-  }, [dateRange, loadAllData]);
+    
+    try {
+      analyticsService.setDateRange(dateRange);
+      loadAllData();
+    } catch (err) {
+      console.error('Error updating date range:', err);
+      setError('Failed to update date range');
+    }
+  }, [dateRange, loadAllData, canFilterCampaigns]);
 
   // Prevent data reload on tab change
   const handleViewChange = useCallback((newView) => {
     console.log('🔄 Switching view to:', newView);
+    
+    // Check if user has permission for the requested view
+    const viewPermissions = {
+      'overview': canViewFunnelStats,
+      'lead-performance': canViewFunnelStats,
+      'ai-performance': canViewPerformanceAnalytics,
+      'performance-analytics': canViewPerformanceAnalytics,
+      'abtesting': hasFeature(userPlan, 'messageAbTesting') && canViewPerformanceAnalytics,
+      'sales-outcomes': canViewEscalationSummaries,
+      'custom-reports': canViewPerformanceAnalytics
+    };
+
+    if (!viewPermissions[newView]) {
+      setError(`You don't have permission to access the ${newView} view`);
+      return;
+    }
+
     setActiveView(newView);
-    // Don't reload data when switching tabs
-  }, []);
+    setError(''); // Clear any previous permission errors
+  }, [canViewFunnelStats, canViewPerformanceAnalytics, canViewEscalationSummaries, userPlan]);
+
+  // Render access denied screen
+  const renderAccessDenied = () => (
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="text-center max-w-md">
+        <Lock className="w-16 h-16 text-red-500 mx-auto mb-4" />
+        <h3 className="text-xl font-semibold text-gray-900 mb-2">Access Restricted</h3>
+        <p className="text-gray-600 mb-4">
+          You don't have permission to view analytics data. Contact your administrator to request access.
+        </p>
+        <div className="text-sm text-gray-500">
+          Required permissions: View Funnel Stats, View Performance Analytics, or View Escalation Summaries
+        </div>
+      </div>
+    </div>
+  );
 
   const GlobalFilterBar = () => (
     <div className="bg-white border-b border-gray-200 px-6 py-4 sticky top-0 z-50">
       <div className="flex flex-wrap items-center gap-4">
-        <div className="flex items-center space-x-2">
-          <Calendar className="w-4 h-4 text-gray-500" />
-          <select 
-            value={dateRange}
-            onChange={(e) => setDateRange(parseInt(e.target.value))}
-            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
-          >
-            <option value={7}>Last 7 Days</option>
-            <option value={30}>Last 30 Days</option>
-            <option value={60}>Last 60 Days</option>
-            <option value={90}>Last 90 Days</option>
-          </select>
-        </div>
-        <div className="flex items-center space-x-2">
-          <Target className="w-4 h-4 text-gray-500" />
-          <select 
-            value={selectedCampaign}
-            onChange={(e) => setSelectedCampaign(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
-          >
-            <option value="all">All Campaigns</option>
-            {dashboardData.campaigns.map(campaign => (
-              <option key={campaign.id} value={campaign.id}>{campaign.name}</option>
-            ))}
-          </select>
-        </div>
+        {canFilterCampaigns && (
+          <>
+            <div className="flex items-center space-x-2">
+              <Calendar className="w-4 h-4 text-gray-500" />
+              <select 
+                value={dateRange}
+                onChange={(e) => setDateRange(parseInt(e.target.value))}
+                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+              >
+                <option value={7}>Last 7 Days</option>
+                <option value={30}>Last 30 Days</option>
+                <option value={60}>Last 60 Days</option>
+                <option value={90}>Last 90 Days</option>
+              </select>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Target className="w-4 h-4 text-gray-500" />
+              <select 
+                value={selectedCampaign}
+                onChange={(e) => setSelectedCampaign(e.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+              >
+                <option value="all">All Campaigns</option>
+                {dashboardData.campaigns.map(campaign => (
+                  <option key={campaign.id} value={campaign.id}>{campaign.name}</option>
+                ))}
+              </select>
+            </div>
+          </>
+        )}
+        
         <div className="ml-auto flex items-center space-x-3">
           <button 
             onClick={loadAllData}
@@ -162,10 +317,13 @@ export default function BusinessAnalytics() {
             <RefreshCw className={`w-4 h-4 mr-1 ${loading ? 'animate-spin' : ''}`} />
             Refresh
           </button>
-          <button className="flex items-center px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm">
-            <Download className="w-4 h-4 mr-1" />
-            Export
-          </button>
+          
+          {canExportData && (
+            <button className="flex items-center px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm">
+              <Download className="w-4 h-4 mr-1" />
+              Export
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -173,19 +331,61 @@ export default function BusinessAnalytics() {
 
   const NavigationTabs = ({ activeView, setActiveView }) => {
     const tabs = [
-      { id: 'overview', name: 'Overview Reports', icon: BarChart3 },
-      { id: 'lead-performance', name: 'AI Conversion Metrics', icon: Users },
-      { id: 'performance-analytics', name: 'Performance Analytics', icon: Activity },
-      { id: 'abtesting', name: 'A/B Testing', icon: TestTube },
-      { id: 'sales-outcomes', name: 'Team Performance', icon: Award },
-      { id: 'custom-reports', name: 'Custom Reports', icon: Settings }
+      { 
+        id: 'overview', 
+        name: 'Overview Reports', 
+        icon: BarChart3,
+        permission: canViewFunnelStats,
+        planFeature: null
+      },
+      { 
+        id: 'lead-performance', 
+        name: 'AI Conversion Metrics', 
+        icon: Users,
+        permission: canViewFunnelStats,
+        planFeature: null
+      },
+      { 
+        id: 'performance-analytics', 
+        name: 'Performance Analytics', 
+        icon: Activity,
+        permission: canViewPerformanceAnalytics,
+        planFeature: null
+      },
+      { 
+        id: 'abtesting', 
+        name: 'A/B Testing', 
+        icon: TestTube,
+        permission: canViewPerformanceAnalytics,
+        planFeature: 'messageAbTesting'
+      },
+      { 
+        id: 'sales-outcomes', 
+        name: 'Team Performance', 
+        icon: Award,
+        permission: canViewEscalationSummaries,
+        planFeature: null
+      },
+      { 
+        id: 'custom-reports', 
+        name: 'Custom Reports', 
+        icon: Settings,
+        permission: canViewPerformanceAnalytics,
+        planFeature: null
+      }
     ];
+
+    const allowedTabs = tabs.filter(tab => {
+      const hasPermission = tab.permission;
+      const hasFeatureAccess = !tab.planFeature || hasFeature(userPlan, tab.planFeature);
+      return hasPermission && hasFeatureAccess;
+    });
 
     return (
       <div className="bg-white border-b border-gray-200">
         <div className="px-6">
           <nav className="flex space-x-8 overflow-x-auto">
-            {tabs.map((tab) => {
+            {allowedTabs.map((tab) => {
               const Icon = tab.icon;
               return (
                 <button
@@ -202,6 +402,22 @@ export default function BusinessAnalytics() {
                 </button>
               );
             })}
+            
+            {/* Show locked tabs for plan upgrades */}
+            {tabs.filter(tab => tab.planFeature && !hasFeature(userPlan, tab.planFeature)).map((tab) => {
+              const Icon = tab.icon;
+              return (
+                <div
+                  key={`locked-${tab.id}`}
+                  className="flex items-center py-4 px-1 border-b-2 border-transparent text-gray-300 cursor-not-allowed"
+                  title={`Requires plan upgrade for ${tab.planFeature}`}
+                >
+                  <Icon className="w-4 h-4 mr-2" />
+                  {tab.name}
+                  <Lock className="w-3 h-3 ml-1" />
+                </div>
+              );
+            })}
           </nav>
         </div>
       </div>
@@ -213,6 +429,15 @@ export default function BusinessAnalytics() {
       return (
         <div className="flex items-center justify-center py-12">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        </div>
+      );
+    }
+
+    if (!canViewFunnelStats) {
+      return (
+        <div className="text-center py-12">
+          <Lock className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+          <p className="text-gray-600">You don't have permission to view funnel statistics</p>
         </div>
       );
     }
@@ -330,65 +555,71 @@ export default function BusinessAnalytics() {
           </div>
         </div>
 
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
-          <div className="px-6 py-4 border-b border-gray-100">
-            <h3 className="text-lg font-semibold text-gray-900">Historical Performance Trends</h3>
-            <p className="text-sm text-gray-600 mt-1">Real cost and performance data from your campaigns</p>
+        {/* Historical Trends - only show if user has performance analytics permission */}
+        {canViewPerformanceAnalytics && (
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
+            <div className="px-6 py-4 border-b border-gray-100">
+              <h3 className="text-lg font-semibold text-gray-900">Historical Performance Trends</h3>
+              <p className="text-sm text-gray-600 mt-1">Real cost and performance data from your campaigns</p>
+            </div>
+            <div className="p-6">
+              <ResponsiveContainer width="100%" height={400}>
+                <LineChart data={dashboardData.historicalTrends}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                  <XAxis dataKey="period" stroke="#6b7280" fontSize={12} />
+                  <YAxis yAxisId="rate" orientation="left" stroke="#6b7280" fontSize={12} />
+                  <YAxis yAxisId="cost" orientation="right" stroke="#6b7280" fontSize={12} />
+                  <Tooltip />
+                  <Legend />
+                  <Line yAxisId="rate" dataKey="hotLeadRate" stroke="#10b981" strokeWidth={3} name="Hot Lead Rate %" />
+                  <Line yAxisId="rate" dataKey="replyRate" stroke="#3b82f6" strokeWidth={3} name="Reply Rate %" />
+                  <Line yAxisId="cost" dataKey="costPerHot" stroke="#f59e0b" strokeWidth={3} name="Cost per Hot Lead $" />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
           </div>
-          <div className="p-6">
-            <ResponsiveContainer width="100%" height={400}>
-              <LineChart data={dashboardData.historicalTrends}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis dataKey="period" stroke="#6b7280" fontSize={12} />
-                <YAxis yAxisId="rate" orientation="left" stroke="#6b7280" fontSize={12} />
-                <YAxis yAxisId="cost" orientation="right" stroke="#6b7280" fontSize={12} />
-                <Tooltip />
-                <Legend />
-                <Line yAxisId="rate" dataKey="hotLeadRate" stroke="#10b981" strokeWidth={3} name="Hot Lead Rate %" />
-                <Line yAxisId="rate" dataKey="replyRate" stroke="#3b82f6" strokeWidth={3} name="Reply Rate %" />
-                <Line yAxisId="cost" dataKey="costPerHot" stroke="#f59e0b" strokeWidth={3} name="Cost per Hot Lead $" />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
+        )}
 
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
-          <div className="px-6 py-4 border-b border-gray-100">
-            <h3 className="text-lg font-semibold text-gray-900">Lead Source ROI Analysis</h3>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Source</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Leads</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Hot Leads</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Revenue</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">ROI %</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {dashboardData.leadSourceROI.map((source, index) => (
-                  <tr key={index} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 text-sm font-medium text-gray-900">{source.source}</td>
-                    <td className="px-6 py-4 text-sm text-gray-900">{source.leads.toLocaleString()}</td>
-                    <td className="px-6 py-4 text-sm text-gray-900">{source.hotLeads}</td>
-                    <td className="px-6 py-4 text-sm text-gray-900">${source.revenue.toLocaleString()}</td>
-                    <td className="px-6 py-4">
-                      <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                        source.roi === null ? 'bg-green-100 text-green-800' :
-                        source.roi > 200 ? 'bg-green-100 text-green-800' :
-                        'bg-yellow-100 text-yellow-800'
-                      }`}>
-                        {source.roi === null ? 'Free' : `${source.roi}%`}
-                      </span>
-                    </td>
+        {/* Lead Source ROI - only show if user can view escalation summaries */}
+        {canViewEscalationSummaries && (
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
+            <div className="px-6 py-4 border-b border-gray-100">
+              <h3 className="text-lg font-semibold text-gray-900">Lead Source ROI Analysis</h3>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Source</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Leads</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Hot Leads</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Revenue</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">ROI %</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {dashboardData.leadSourceROI.map((source, index) => (
+                    <tr key={index} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 text-sm font-medium text-gray-900">{source.source}</td>
+                      <td className="px-6 py-4 text-sm text-gray-900">{source.leads.toLocaleString()}</td>
+                      <td className="px-6 py-4 text-sm text-gray-900">{source.hotLeads}</td>
+                      <td className="px-6 py-4 text-sm text-gray-900">${source.revenue.toLocaleString()}</td>
+                      <td className="px-6 py-4">
+                        <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                          source.roi === null ? 'bg-green-100 text-green-800' :
+                          source.roi > 200 ? 'bg-green-100 text-green-800' :
+                          'bg-yellow-100 text-yellow-800'
+                        }`}>
+                          {source.roi === null ? 'Free' : `${source.roi}%`}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
+        )}
       </div>
     );
   };
@@ -398,6 +629,15 @@ export default function BusinessAnalytics() {
       return (
         <div className="flex items-center justify-center py-12">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        </div>
+      );
+    }
+
+    if (!canViewPerformanceAnalytics) {
+      return (
+        <div className="text-center py-12">
+          <Lock className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+          <p className="text-gray-600">You don't have permission to view AI performance analytics</p>
         </div>
       );
     }
@@ -444,6 +684,15 @@ export default function BusinessAnalytics() {
       return (
         <div className="flex items-center justify-center py-12">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        </div>
+      );
+    }
+
+    if (!canViewFunnelStats) {
+      return (
+        <div className="text-center py-12">
+          <Lock className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+          <p className="text-gray-600">You don't have permission to view lead performance data</p>
         </div>
       );
     }
@@ -517,6 +766,15 @@ export default function BusinessAnalytics() {
       return (
         <div className="flex items-center justify-center py-12">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        </div>
+      );
+    }
+
+    if (!canViewPerformanceAnalytics) {
+      return (
+        <div className="text-center py-12">
+          <Lock className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+          <p className="text-gray-600">You don't have permission to view performance analytics</p>
         </div>
       );
     }
@@ -647,7 +905,7 @@ export default function BusinessAnalytics() {
           </div>
         </div>
 
-        {/* NEW Follow-up Timing Cards - Replacing AI Personas */}
+        {/* Follow-up Timing Cards */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Card 1: Cold Leads Follow-Up */}
           <div className="bg-white rounded-2xl border border-gray-200 p-6 hover:shadow-lg transition-shadow">
@@ -811,6 +1069,15 @@ export default function BusinessAnalytics() {
       );
     }
 
+    if (!canViewEscalationSummaries) {
+      return (
+        <div className="text-center py-12">
+          <Lock className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+          <p className="text-gray-600">You don't have permission to view team performance data</p>
+        </div>
+      );
+    }
+
     const { salesRepPerformance } = dashboardData;
 
     return (
@@ -913,18 +1180,37 @@ export default function BusinessAnalytics() {
     );
   };
 
+  const ABTestingView = () => (
+    <FeatureGate 
+      plan={userPlan} 
+      feature="messageAbTesting" 
+      showUpgrade={true}
+      fallback={
+        <div className="text-center py-12">
+          <TestTube className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+          <p className="text-gray-600 mb-4">A/B Testing requires a plan upgrade</p>
+          <p className="text-sm text-gray-500">This feature is available on Scale and Enterprise plans</p>
+        </div>
+      }
+    >
+      <ABTestingDashboard />
+    </FeatureGate>
+  );
+
   const CustomReports = () => <CustomReportsBuilder />;
 
   const renderActiveView = () => {
     if (error) {
       return (
         <div className="flex items-center justify-center py-12">
-          <div className="text-center">
+          <div className="text-center max-w-lg">
+            <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
             <div className="text-red-600 text-lg font-medium mb-2">Error Loading Data</div>
             <div className="text-gray-600 mb-4">{error}</div>
             <button 
               onClick={loadAllData}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              disabled={loading}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
             >
               Try Again
             </button>
@@ -943,7 +1229,7 @@ export default function BusinessAnalytics() {
       case 'performance-analytics':
         return <PerformanceAnalytics />;
       case 'abtesting':
-        return <ABTestingDashboard />;
+        return <ABTestingView />;
       case 'sales-outcomes':
         return <SalesOutcomes />;
       case 'custom-reports':
@@ -952,6 +1238,11 @@ export default function BusinessAnalytics() {
         return <OverviewReports />;
     }
   };
+
+  // Main render - check access first
+  if (!hasAnalyticsAccess) {
+    return renderAccessDenied();
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
