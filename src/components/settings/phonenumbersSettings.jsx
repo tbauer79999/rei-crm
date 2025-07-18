@@ -89,50 +89,44 @@ export default function PhoneNumbersSettings() {
   const loadA2pData = async () => {
     if (!canViewPhoneNumbers) return;
     
+    // A2P features are optional - but if tables exist, try to load them
     try {
-      // Load A2P status with better error handling
-      try {
-        const { data: statusData, error: statusError } = await supabase.functions.invoke('get-a2p-status');
-        if (!statusError && statusData && statusData.success) {
-          setA2pStatus(statusData);
-          setA2pCampaigns(statusData.campaigns || []);
-        } else {
-          console.warn('A2P status not available:', statusError);
-        }
-      } catch (a2pError) {
-        console.warn('A2P status function not available:', a2pError);
+      // Try to load A2P status - this function may not exist
+      const { data: statusData, error: statusError } = await supabase.functions.invoke('get-a2p-status');
+      if (!statusError && statusData && statusData.success) {
+        setA2pStatus(statusData);
+        setA2pCampaigns(statusData.campaigns || []);
       }
+    } catch (a2pError) {
+      // A2P function doesn't exist - this is fine, just skip A2P features
+      console.log('A2P features not configured - skipping A2P status loading');
+    }
 
-      // Load phone number A2P assignments with better error handling
-      try {
-        const { data: assignmentData, error: assignmentError } = await supabase
-          .from('phone_number_campaigns')
-          .select(`
-            phone_number_id,
-            a2p_campaign_id,
-            a2p_campaigns (
-              id,
-              campaign_id,
-              status
-            )
-          `);
+    try {
+      // Load phone number A2P assignments with correct column names
+      const { data: assignmentData, error: assignmentError } = await supabase
+        .from('phone_number_campaigns')
+        .select(`
+          phone_number_id,
+          a2p_campaign_id,
+          a2p_campaigns (
+            id,
+            campaign_name,
+            registration_status
+          )
+        `);
 
-        if (!assignmentError && assignmentData) {
-          // Update phone numbers with A2P assignments
-          setPhoneNumbers(prevNumbers => 
-            prevNumbers.map(phone => ({
-              ...phone,
-              a2p_assignment: assignmentData.find(a => a.phone_number_id === phone.id)
-            }))
-          );
-        } else {
-          console.warn('A2P assignments not available:', assignmentError);
-        }
-      } catch (assignmentError) {
-        console.warn('A2P campaign assignments table not available:', assignmentError);
+      if (!assignmentError && assignmentData && Array.isArray(assignmentData)) {
+        // Update phone numbers with A2P assignments
+        setPhoneNumbers(prevNumbers => 
+          prevNumbers.map(phone => ({
+            ...phone,
+            a2p_assignment: assignmentData.find(a => a.phone_number_id === phone.id)
+          }))
+        );
       }
-    } catch (error) {
-      console.warn('Error loading A2P data:', error);
+    } catch (assignmentError) {
+      console.log('A2P assignment tables not configured - skipping A2P assignments');
     }
   };
 
@@ -190,7 +184,11 @@ export default function PhoneNumbersSettings() {
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        console.log('A2P assignment function not available:', error);
+        setError('A2P assignment features are not configured yet.');
+        return;
+      }
 
       if (data && data.success) {
         setSuccess('Phone number assigned to A2P campaign successfully!');
@@ -199,11 +197,11 @@ export default function PhoneNumbersSettings() {
         setSelectedA2pCampaign('');
         loadA2pData();
       } else {
-        throw new Error(data?.message || 'Assignment failed');
+        setError(data?.message || 'A2P assignment failed');
       }
     } catch (error) {
-      console.error('Error assigning phone to A2P campaign:', error);
-      setError('Failed to assign phone number to A2P campaign: ' + error.message);
+      console.log('A2P assignment not available:', error);
+      setError('A2P assignment features are not configured yet.');
     }
   };
 
@@ -222,17 +220,21 @@ export default function PhoneNumbersSettings() {
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        console.log('A2P unassignment function not available:', error);
+        setError('A2P assignment features are not configured yet.');
+        return;
+      }
 
       if (data && data.success) {
         setSuccess('Phone number unassigned from A2P campaign successfully!');
         loadA2pData();
       } else {
-        throw new Error(data?.message || 'Unassignment failed');
+        setError(data?.message || 'A2P unassignment failed');
       }
     } catch (error) {
-      console.error('Error unassigning phone from A2P campaign:', error);
-      setError('Failed to unassign phone number from A2P campaign: ' + error.message);
+      console.log('A2P unassignment not available:', error);
+      setError('A2P assignment features are not configured yet.');
     }
   };
 
@@ -242,10 +244,11 @@ export default function PhoneNumbersSettings() {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token) {
-        console.warn('No session available for team member loading');
+        console.log('No session available for team member loading - skipping team features');
         return;
       }
 
+      // Try the team API - but this endpoint may not exist yet
       const response = await fetch('/api/team/members', {
         headers: {
           'Authorization': `Bearer ${session.access_token}`,
@@ -254,13 +257,20 @@ export default function PhoneNumbersSettings() {
       });
       
       if (response.ok) {
-        const data = await response.json();
-        setTeamMembers(Array.isArray(data) ? data.filter(member => member.status === 'active') : []);
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          const data = await response.json();
+          setTeamMembers(Array.isArray(data) ? data.filter(member => member.status === 'active') : []);
+        } else {
+          console.log('Team API returned non-JSON response - team features not configured');
+        }
+      } else if (response.status === 404) {
+        console.log('Team API endpoint not found - team features not configured');
       } else {
-        console.warn('Team members API not available:', response.status);
+        console.log('Team API not available:', response.status);
       }
     } catch (error) {
-      console.warn('Error loading team members:', error);
+      console.log('Team features not configured - skipping team member loading');
     }
   };
 
@@ -272,27 +282,28 @@ export default function PhoneNumbersSettings() {
         body: { action: 'popular-area-codes' }
       });
       
-      if (error) {
-        console.warn('Popular area codes not available:', error);
-        setPopularAreaCodes([
-          { code: '212', city: 'New York, NY', available: true },
-          { code: '415', city: 'San Francisco, CA', available: true },
-          { code: '305', city: 'Miami, FL', available: true },
-          { code: '972', city: 'Dallas, TX', available: true }
-        ]);
-        return;
+      if (!error && data && data.areaCodes && Array.isArray(data.areaCodes)) {
+        setPopularAreaCodes(data.areaCodes);
+      } else {
+        // Use default area codes if API doesn't support this feature
+        console.log('Popular area codes API not available - using defaults');
+        setDefaultAreaCodes();
       }
-      
-      setPopularAreaCodes(data?.areaCodes || []);
     } catch (error) {
-      console.warn('Error loading area codes:', error);
-      setPopularAreaCodes([
-        { code: '212', city: 'New York, NY', available: true },
-        { code: '415', city: 'San Francisco, CA', available: true },
-        { code: '305', city: 'Miami, FL', available: true },
-        { code: '972', city: 'Dallas, TX', available: true }
-      ]);
+      console.log('Area codes API not configured - using default area codes');
+      setDefaultAreaCodes();
     }
+  };
+
+  const setDefaultAreaCodes = () => {
+    setPopularAreaCodes([
+      { code: '212', city: 'New York, NY', available: true },
+      { code: '415', city: 'San Francisco, CA', available: true },
+      { code: '305', city: 'Miami, FL', available: true },
+      { code: '972', city: 'Dallas, TX', available: true },
+      { code: '404', city: 'Atlanta, GA', available: true },
+      { code: '602', city: 'Phoenix, AZ', available: true }
+    ]);
   };
 
   const searchPhoneNumbers = async (areaCode) => {
@@ -500,7 +511,7 @@ export default function PhoneNumbersSettings() {
   useEffect(() => {
     const a2pAssigned = phoneNumbers.filter(n => n.a2p_assignment).length;
     const a2pCompliant = phoneNumbers.filter(n => 
-      n.a2p_assignment?.a2p_campaigns?.status === 'VERIFIED'
+      n.a2p_assignment?.a2p_campaigns?.registration_status === 'approved'
     ).length;
     
     setStats(prevStats => ({
@@ -800,12 +811,12 @@ export default function PhoneNumbersSettings() {
                       {number.a2p_assignment ? (
                         <div className="flex items-center justify-between">
                           <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                            number.a2p_assignment.a2p_campaigns?.status === 'VERIFIED' 
+                            number.a2p_assignment.a2p_campaigns?.registration_status === 'approved' 
                               ? 'bg-green-100 text-green-800' 
                               : 'bg-yellow-100 text-yellow-800'
                           }`}>
                             <Shield className="w-3 h-3 mr-1" />
-                            {number.a2p_assignment.a2p_campaigns?.campaign_id || 'Campaign'}
+                            {number.a2p_assignment.a2p_campaigns?.campaign_name || 'Campaign'}
                           </span>
                           {canManagePhoneNumbers && (
                             <button
@@ -824,10 +835,10 @@ export default function PhoneNumbersSettings() {
                               setAssigningA2pNumber(number);
                               setShowA2pModal(true);
                             }}
-                            disabled={a2pCampaigns.filter(c => c.status === 'VERIFIED').length === 0}
+                            disabled={a2pCampaigns.filter(c => c.registration_status === 'approved').length === 0}
                             className="text-blue-600 hover:text-blue-900 transition-colors text-sm disabled:text-gray-400 disabled:cursor-not-allowed"
                           >
-                            {a2pCampaigns.filter(c => c.status === 'VERIFIED').length > 0 ? 'Assign A2P' : 'No campaigns'}
+                            {a2pCampaigns.filter(c => c.registration_status === 'approved').length > 0 ? 'Assign A2P' : 'No campaigns'}
                           </button>
                         ) : (
                           <span className="text-sm text-gray-500">Not assigned</span>
@@ -932,15 +943,15 @@ export default function PhoneNumbersSettings() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   >
                     <option value="">Choose an A2P campaign...</option>
-                    {a2pCampaigns.filter(campaign => campaign.status === 'VERIFIED').map((campaign) => (
+                    {a2pCampaigns.filter(campaign => campaign.registration_status === 'approved').map((campaign) => (
                       <option key={campaign.id} value={campaign.id}>
-                        {campaign.campaign_id} - {campaign.status}
+                        {campaign.campaign_name} - {campaign.registration_status}
                       </option>
                     ))}
                   </select>
-                  {a2pCampaigns.filter(c => c.status === 'VERIFIED').length === 0 && (
+                  {a2pCampaigns.filter(c => c.registration_status === 'approved').length === 0 && (
                     <p className="text-sm text-amber-600 mt-2">
-                      No verified A2P campaigns available. Create and verify campaigns in A2P Compliance settings first.
+                      No approved A2P campaigns available. Create and get campaigns approved in A2P Compliance settings first.
                     </p>
                   )}
                 </div>
