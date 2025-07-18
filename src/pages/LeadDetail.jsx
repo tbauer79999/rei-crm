@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { PERMISSIONS } from '../lib/permissions';
 import {
   ArrowLeft,
   Phone,
@@ -17,7 +18,8 @@ import {
   Calendar,
   ChevronDown,
   ChevronRight,
-  AlertTriangle
+  AlertTriangle,
+  Lock
 } from 'lucide-react';
 import {
   LineChart,
@@ -64,104 +66,92 @@ export default function LeadDetail() {
   const [loading, setLoading] = useState(true);
   const [newMessage, setNewMessage] = useState('');
   const [sendingMessage, setSendingMessage] = useState(false);
-  const [expandedRetries, setExpandedRetries] = useState(new Set()); // Track expanded retry groups
+  const [expandedRetries, setExpandedRetries] = useState(new Set());
 
-  const { user } = useAuth();
+  const { user, hasPermission } = useAuth();
   const [twilioDevice, setTwilioDevice] = useState(null);
   const [isCallInProgress, setIsCallInProgress] = useState(false);
   const [callStatus, setCallStatus] = useState('');
 
+  // RBAC Permission Checks
+  const canViewLeads = hasPermission(PERMISSIONS.VIEW_LEADS);
+  const canViewMessages = hasPermission(PERMISSIONS.VIEW_ALL_MESSAGES);
+  const canSendMessages = hasPermission(PERMISSIONS.TRIGGER_MANUAL_AI_REPLY);
+  const canEditLeads = hasPermission(PERMISSIONS.ADD_EDIT_LEAD_MANUALLY);
+  const canAddNotes = hasPermission(PERMISSIONS.ADD_MANUAL_NOTES_OR_COMMENTS);
+  const canOverrideStatus = hasPermission(PERMISSIONS.OVERRIDE_LEAD_STATUS);
+  const canTagAsHot = hasPermission(PERMISSIONS.TAG_LEAD_AS_HOT_ESCALATED);
+
   useEffect(() => {
+    // Check permissions before loading data
+    if (!canViewLeads) {
+      setLoading(false);
+      return;
+    }
+
     const fetchLeadAndMessages = async () => {
       try {
-        const { data: leadData, error: leadError } = await supabase
+        // First, load the basic lead data
+        let leadQuery = supabase
           .from('leads')
           .select('*')
-          .eq('id', id)
-          .single();
+          .eq('id', id);
 
-        if (leadError) throw leadError;
+        // Apply tenant filtering for non-global admins
+        const isGlobalAdmin = user?.role === 'global_admin' || user?.user_metadata?.role === 'global_admin';
+        if (!isGlobalAdmin && user?.tenant_id) {
+          leadQuery = leadQuery.eq('tenant_id', user.tenant_id);
+        }
+
+        const { data: leadData, error: leadError } = await leadQuery.single();
+
+        if (leadError) {
+          console.error('Error loading lead:', leadError);
+          throw leadError;
+        }
         
-        // Fetch lead scores to get enterprise alert data
-        const { data: leadScores } = await supabase
-          .from('lead_scores')
-          .select('*')
-          .eq('lead_id', id)
-          .single();
+        // Try to fetch lead scores using LEFT JOIN to avoid CORS issues
+        try {
+          let scoresQuery = supabase
+            .from('leads')
+            .select(`
+              id,
+              lead_scores (
+                hot_score,
+                requires_immediate_attention,
+                alert_priority,
+                alert_triggers,
+                attention_reasons,
+                funnel_stage,
+                stage_override_reason,
+                alert_details
+              )
+            `)
+            .eq('id', id);
 
-        // Merge lead data with scores
-        if (leadScores) {
-          setLead({ ...leadData, ...leadScores });
-        } else {
+          // Apply same tenant filtering
+          if (!isGlobalAdmin && user?.tenant_id) {
+            scoresQuery = scoresQuery.eq('tenant_id', user.tenant_id);
+          }
+
+          const { data: scoreData, error: scoreError } = await scoresQuery.single();
+
+          if (!scoreError && scoreData?.lead_scores) {
+            // Merge lead data with scores
+            setLead({ ...leadData, ...scoreData.lead_scores });
+          } else {
+            console.log('Lead scores not available, using basic lead data');
+            setLead(leadData);
+          }
+        } catch (scoreError) {
+          console.log('Lead scores table not accessible, using basic lead data');
           setLead(leadData);
         }
 
-        // Enhanced query to fetch messages with retry/status fields
-        const { data: msgData, error: msgError } = await supabase
-          .from('messages')
-          .select(`
-            *,
-            sentiment_score,
-            sentiment_magnitude,
-            openai_qualification_score,
-            hesitation_score,
-            urgency_score,
-            weighted_score,
-            response_score,
-            status,
-            error_code,
-            retry_eligible,
-            retry_count,
-            original_message_id
-          `)
-          .eq('lead_id', id)
-          .order('timestamp', { ascending: true });
-
-        if (msgError) throw msgError;
-        setMessages(msgData);
-      } catch (err) {
-        console.error('Error loading lead or messages:', err.message);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchLeadAndMessages();
-  }, [id]);
-
-  useEffect(() => {
-    // Smart refresh - only when user is actively viewing this page
-    const interval = setInterval(() => {
-      // Only refresh if tab is visible (user isn't on another tab/app)
-      if (!document.hidden) {
-        console.log('🔄 Auto-refreshing conversation data...');
-        
-        // Re-fetch the data (same function as initial load, but without loading state)
-        const refreshData = async () => {
+        // Load messages if user has permission
+        if (canViewMessages) {
           try {
-            const { data: leadData, error: leadError } = await supabase
-              .from('leads')
-              .select('*')
-              .eq('id', id)
-              .single();
-
-            if (leadError) throw leadError;
-            
-            // Fetch lead scores to get enterprise alert data
-            const { data: leadScores } = await supabase
-              .from('lead_scores')
-              .select('*')
-              .eq('lead_id', id)
-              .single();
-
-            // Merge lead data with scores
-            if (leadScores) {
-              setLead({ ...leadData, ...leadScores });
-            } else {
-              setLead(leadData);
-            }
-
-            const { data: msgData, error: msgError } = await supabase
+            let messageQuery = supabase
               .from('messages')
               .select(`
                 *,
@@ -181,8 +171,133 @@ export default function LeadDetail() {
               .eq('lead_id', id)
               .order('timestamp', { ascending: true });
 
-            if (msgError) throw msgError;
-            setMessages(msgData);
+            // Apply tenant filtering for messages if needed
+            if (!isGlobalAdmin && user?.tenant_id) {
+              messageQuery = messageQuery.eq('tenant_id', user.tenant_id);
+            }
+
+            const { data: msgData, error: msgError } = await messageQuery;
+
+            if (msgError) {
+              console.error('Error loading messages:', msgError);
+              setMessages([]); // Don't fail completely, just show no messages
+            } else {
+              setMessages(msgData || []);
+            }
+          } catch (msgError) {
+            console.log('Messages not accessible:', msgError);
+            setMessages([]);
+          }
+        } else {
+          setMessages([]);
+        }
+
+      } catch (err) {
+        console.error('Error loading lead:', err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchLeadAndMessages();
+  }, [id, user, canViewLeads, canViewMessages]);
+
+  useEffect(() => {
+    // Smart refresh - only when user is actively viewing this page and has permissions
+    if (!canViewLeads) return;
+
+    const interval = setInterval(() => {
+      // Only refresh if tab is visible (user isn't on another tab/app)
+      if (!document.hidden) {
+        console.log('🔄 Auto-refreshing conversation data...');
+        
+        // Re-fetch the data (same function as initial load, but without loading state)
+        const refreshData = async () => {
+          try {
+            let leadQuery = supabase
+              .from('leads')
+              .select('*')
+              .eq('id', id);
+
+            const isGlobalAdmin = user?.role === 'global_admin' || user?.user_metadata?.role === 'global_admin';
+            if (!isGlobalAdmin && user?.tenant_id) {
+              leadQuery = leadQuery.eq('tenant_id', user.tenant_id);
+            }
+
+            const { data: leadData, error: leadError } = await leadQuery.single();
+
+            if (leadError) throw leadError;
+            
+            // Try to fetch lead scores
+            try {
+              let scoresQuery = supabase
+                .from('leads')
+                .select(`
+                  id,
+                  lead_scores (
+                    hot_score,
+                    requires_immediate_attention,
+                    alert_priority,
+                    alert_triggers,
+                    attention_reasons,
+                    funnel_stage,
+                    stage_override_reason,
+                    alert_details
+                  )
+                `)
+                .eq('id', id);
+
+              if (!isGlobalAdmin && user?.tenant_id) {
+                scoresQuery = scoresQuery.eq('tenant_id', user.tenant_id);
+              }
+
+              const { data: scoreData, error: scoreError } = await scoresQuery.single();
+
+              if (!scoreError && scoreData?.lead_scores) {
+                setLead({ ...leadData, ...scoreData.lead_scores });
+              } else {
+                setLead(leadData);
+              }
+            } catch (scoreError) {
+              setLead(leadData);
+            }
+
+            // Refresh messages if user has permission
+            if (canViewMessages) {
+              try {
+                let messageQuery = supabase
+                  .from('messages')
+                  .select(`
+                    *,
+                    sentiment_score,
+                    sentiment_magnitude,
+                    openai_qualification_score,
+                    hesitation_score,
+                    urgency_score,
+                    weighted_score,
+                    response_score,
+                    status,
+                    error_code,
+                    retry_eligible,
+                    retry_count,
+                    original_message_id
+                  `)
+                  .eq('lead_id', id)
+                  .order('timestamp', { ascending: true });
+
+                if (!isGlobalAdmin && user?.tenant_id) {
+                  messageQuery = messageQuery.eq('tenant_id', user.tenant_id);
+                }
+
+                const { data: msgData, error: msgError } = await messageQuery;
+
+                if (!msgError) {
+                  setMessages(msgData || []);
+                }
+              } catch (msgError) {
+                console.log('Messages refresh failed:', msgError);
+              }
+            }
             
             console.log('✅ Auto-refresh complete');
           } catch (err) {
@@ -199,74 +314,73 @@ export default function LeadDetail() {
       console.log('🛑 Stopping auto-refresh');
       clearInterval(interval);
     };
-  }, [id]); // Restart interval if lead ID changes
+  }, [id, user, canViewLeads, canViewMessages]); // Restart interval if permissions change
 
-  // Add this useEffect after your existing useEffect hooks
-// Replace the entire Twilio useEffect with this:
-useEffect(() => {
-  const initializeTwilio = async () => {
-    try {
-      console.log('🔄 Initializing Twilio for user:', user?.id);
-      
-      // Get Twilio access token from edge function
-      const { data, error } = await supabase.functions.invoke('twilio-token', {
-        body: {
-          user_id: user?.id || 'unknown',
-          tenant_id: user?.tenant_id || 'unknown'
+  // Twilio initialization with permission check
+  useEffect(() => {
+    const initializeTwilio = async () => {
+      try {
+        console.log('🔄 Initializing Twilio for user:', user?.id);
+        
+        // Get Twilio access token from edge function
+        const { data, error } = await supabase.functions.invoke('twilio-token', {
+          body: {
+            user_id: user?.id || 'unknown',
+            tenant_id: user?.tenant_id || 'unknown'
+          }
+        });
+
+        console.log('📞 Twilio token response:', data);
+
+        if (error) {
+          console.error('Edge function error:', error);
+          throw error;
         }
-      });
 
-      console.log('📞 Twilio token response:', data);
-
-      if (error) {
-        console.error('Edge function error:', error);
-        throw error;
+        if (data && data.success) {
+          // Mock device is ready
+          setTwilioDevice({ ready: true, mock: true });
+          setCallStatus('Ready to call');
+          console.log('✅ Mock Twilio device ready');
+        } else {
+          throw new Error('Invalid response from edge function');
+        }
+        
+      } catch (err) {
+        console.error('❌ Failed to initialize Twilio:', err);
+        setCallStatus('Failed to initialize calling');
+        setTwilioDevice(null);
       }
+    };
 
-      if (data && data.success) {
-        // Mock device is ready
-        setTwilioDevice({ ready: true, mock: true });
+    // Initialize when user is available
+    if (user?.id) {
+      initializeTwilio();
+    }
+  }, [user]);
+
+  const handleCall = async (phoneNumber) => {
+    if (!twilioDevice) {
+      alert('Calling not available. Please refresh the page.');
+      return;
+    }
+
+    try {
+      console.log('📞 Initiating call to:', phoneNumber);
+      setCallStatus('Opening phone dialer...');
+      
+      // For now, use system dialer
+      window.open(`tel:${phoneNumber}`, '_self');
+      
+      setTimeout(() => {
         setCallStatus('Ready to call');
-        console.log('✅ Mock Twilio device ready');
-      } else {
-        throw new Error('Invalid response from edge function');
-      }
+      }, 2000);
       
     } catch (err) {
-      console.error('❌ Failed to initialize Twilio:', err);
-      setCallStatus('Failed to initialize calling');
-      setTwilioDevice(null);
+      console.error('Call failed:', err);
+      setCallStatus('Call failed: ' + err.message);
     }
   };
-
-  // Initialize when user is available
-  if (user?.id) {
-    initializeTwilio();
-  }
-}, [user]);
-
-const handleCall = async (phoneNumber) => {
-  if (!twilioDevice) {
-    alert('Calling not available. Please refresh the page.');
-    return;
-  }
-
-  try {
-    console.log('📞 Initiating call to:', phoneNumber);
-    setCallStatus('Opening phone dialer...');
-    
-    // For now, use system dialer
-    window.open(`tel:${phoneNumber}`, '_self');
-    
-    setTimeout(() => {
-      setCallStatus('Ready to call');
-    }, 2000);
-    
-  } catch (err) {
-    console.error('Call failed:', err);
-    setCallStatus('Call failed: ' + err.message);
-  }
-};
 
   // Helper function to group messages with their retries
   const groupMessagesWithRetries = (messages) => {
@@ -624,6 +738,11 @@ const handleCall = async (phoneNumber) => {
   };
 
   const handleSendMessage = async () => {
+    if (!canSendMessages) {
+      alert("You don't have permission to send messages.");
+      return;
+    }
+
     if (!newMessage.trim()) return;
 
     setSendingMessage(true);
@@ -642,6 +761,25 @@ const handleCall = async (phoneNumber) => {
   const retryStats = calculateRetryStats();
   const groupedMessages = groupMessagesWithRetries(messages);
 
+  // Permission check - show access denied if user can't view leads
+  if (!canViewLeads) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center max-w-md">
+          <Lock className="w-12 h-12 text-red-500 mx-auto mb-4" />
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">Access Restricted</h3>
+          <p className="text-gray-600 mb-4">You don't have permission to view lead details.</p>
+          <button
+            onClick={() => navigate('/dashboard')}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            Back to Dashboard
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -659,7 +797,7 @@ const handleCall = async (phoneNumber) => {
         <div className="text-center">
           <AlertCircle size={48} className="text-red-500 mx-auto mb-4" />
           <h2 className="text-xl font-semibold text-gray-900 mb-2">Lead not found</h2>
-          <p className="text-gray-600 mb-4">The conversation you're looking for doesn't exist.</p>
+          <p className="text-gray-600 mb-4">The conversation you're looking for doesn't exist or you don't have access to it.</p>
           <button
             onClick={() => navigate('/dashboard')}
             className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
@@ -729,20 +867,20 @@ const handleCall = async (phoneNumber) => {
                 </span>
               )}
             </span>
- {lead.phone && (
-  <button
-    onClick={() => handleCall(lead.phone)}
-    disabled={!twilioDevice || isCallInProgress}
-    className={`flex items-center gap-2 px-4 py-2 text-sm font-medium text-white rounded-lg transition-colors ${
-      isCallInProgress 
-        ? 'bg-red-600 hover:bg-red-700' 
-        : 'bg-green-600 hover:bg-green-700'
-    } ${!twilioDevice ? 'opacity-50 cursor-not-allowed' : ''}`}
-  >
-    <Phone size={16} />
-    {isCallInProgress ? 'End Call' : 'Call'}
-  </button>
-)}
+            {lead.phone && (
+              <button
+                onClick={() => handleCall(lead.phone)}
+                disabled={!twilioDevice || isCallInProgress}
+                className={`flex items-center gap-2 px-4 py-2 text-sm font-medium text-white rounded-lg transition-colors ${
+                  isCallInProgress 
+                    ? 'bg-red-600 hover:bg-red-700' 
+                    : 'bg-green-600 hover:bg-green-700'
+                } ${!twilioDevice ? 'opacity-50 cursor-not-allowed' : ''}`}
+              >
+                <Phone size={16} />
+                {isCallInProgress ? 'End Call' : 'Call'}
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -782,9 +920,11 @@ const handleCall = async (phoneNumber) => {
               <span className="text-xs text-gray-500">
                 Triggered {lead.alert_details?.triggered_at && new Date(lead.alert_details.triggered_at).toLocaleTimeString()}
               </span>
-              <button className="px-3 py-1 bg-red-600 text-white text-sm rounded-md hover:bg-red-700">
-                Take Action
-              </button>
+              {canTagAsHot && (
+                <button className="px-3 py-1 bg-red-600 text-white text-sm rounded-md hover:bg-red-700">
+                  Take Action
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -899,7 +1039,6 @@ const handleCall = async (phoneNumber) => {
                   <MessageCircle size={20} className="text-blue-600" />
                 </div>
                 <div>
-                  
                   <h2 className="text-lg font-semibold text-gray-900">AI Conversation</h2>
                   <p className="text-sm text-gray-500">
                     {messages.length} message{messages.length !== 1 ? 's' : ''} • Started{' '}
@@ -919,7 +1058,7 @@ const handleCall = async (phoneNumber) => {
           </div>
 
           {/* First Message Failure Banner */}
-          {hasFirstMessageFailure() && (
+          {canViewMessages && hasFirstMessageFailure() && (
             <div className="px-6 pt-4">
               <Alert variant="warning">
                 <div className="flex items-center gap-2">
@@ -932,16 +1071,26 @@ const handleCall = async (phoneNumber) => {
 
           {/* Messages */}
           <div className="flex-1 overflow-y-auto p-6 space-y-4">
-            {messages.length === 0 ? (
+            {!canViewMessages ? (
+              <div className="text-center py-12">
+                <div className="w-16 h-16 bg-gradient-to-br from-red-100 to-orange-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Lock size={24} className="text-red-600" />
+                </div>
+                <p className="text-lg font-medium text-gray-900 mb-2">Messages Restricted</p>
+                <p className="text-gray-500 mb-6">You don't have permission to view conversation messages</p>
+              </div>
+            ) : messages.length === 0 ? (
               <div className="text-center py-12">
                 <div className="w-16 h-16 bg-gradient-to-br from-blue-100 to-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
                   <Bot size={24} className="text-blue-600" />
                 </div>
                 <p className="text-lg font-medium text-gray-900 mb-2">No conversation yet</p>
                 <p className="text-gray-500 mb-6">This lead hasn't engaged with your AI assistant</p>
-                <button className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
-                  Send First Message
-                </button>
+                {canSendMessages && (
+                  <button className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                    Send First Message
+                  </button>
+                )}
               </div>
             ) : (
               groupedMessages.map((messageGroup, groupIndex) => {
@@ -1115,37 +1264,39 @@ const handleCall = async (phoneNumber) => {
           </div>
 
           {/* Message Input */}
-          <div className="p-6 border-t border-gray-200 bg-gray-50">
-            <div className="flex gap-3">
-              <input
-                type="text"
-                value={newMessage}
-                onChange={(e) => setNewMessage(e.target.value)}
-                placeholder="Send a message to this lead..."
-                className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
-                onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
-              />
-              <button
-                onClick={handleSendMessage}
-                disabled={!newMessage.trim() || sendingMessage}
-                className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                <Send size={16} />
-                {sendingMessage ? 'Sending...' : 'Send'}
-              </button>
+          {canSendMessages && (
+            <div className="p-6 border-t border-gray-200 bg-gray-50">
+              <div className="flex gap-3">
+                <input
+                  type="text"
+                  value={newMessage}
+                  onChange={(e) => setNewMessage(e.target.value)}
+                  placeholder="Send a message to this lead..."
+                  className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+                  onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+                />
+                <button
+                  onClick={handleSendMessage}
+                  disabled={!newMessage.trim() || sendingMessage}
+                  className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  <Send size={16} />
+                  {sendingMessage ? 'Sending...' : 'Send'}
+                </button>
+              </div>
+              <p className="text-xs text-gray-500 mt-2">
+                <Bot size={12} className="inline mr-1" />
+                Messages will be sent through your AI assistant
+              </p>
             </div>
-            <p className="text-xs text-gray-500 mt-2">
-              <Bot size={12} className="inline mr-1" />
-              Messages will be sent through your AI assistant
-            </p>
-          </div>
+          )}
         </div>
 
         {/* Sidebar */}
         <div className="w-80 bg-gray-50 border-l border-gray-200 overflow-y-auto">
           <div className="p-6 space-y-6">
             {/* Quick Actions for Alerts */}
-            {lead.requires_immediate_attention && (
+            {lead.requires_immediate_attention && canTagAsHot && (
               <div className="bg-yellow-50 rounded-xl border border-yellow-200 p-4">
                 <div className="flex items-center gap-2 mb-3">
                   <AlertCircle size={18} className="text-yellow-600" />
@@ -1282,114 +1433,112 @@ const handleCall = async (phoneNumber) => {
               </div>
             </div>
 
-            {/* Enhanced Conversation Stats with Retry Metrics */}
+            {/* Message Statistics */}
             <div className="bg-white rounded-xl border border-gray-200 p-4">
               <div className="flex items-center gap-2 mb-4">
                 <Activity size={18} className="text-blue-600" />
                 <h3 className="text-sm font-semibold text-gray-900">Conversation Stats</h3>
               </div>
 
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">Total Messages</span>
-                  <span className="text-sm font-semibold text-gray-900">{messages.length}</span>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-blue-600">{inboundMessages.length}</div>
+                  <div className="text-xs text-gray-500">Inbound</div>
                 </div>
-
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">Inbound Messages</span>
-                  <span className="text-sm font-semibold text-gray-900">{inboundMessages.length}</span>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-green-600">{outboundMessages.length}</div>
+                  <div className="text-xs text-gray-500">Outbound</div>
                 </div>
-
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">Outbound Messages</span>
-                  <span className="text-sm font-semibold text-gray-900">{outboundMessages.length}</span>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-orange-600">{retryStats.failedMessages}</div>
+                  <div className="text-xs text-gray-500">Failed</div>
                 </div>
-
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">Scored Inbound</span>
-                  <span className="text-sm font-semibold text-gray-900">
-                    {inboundMessages.filter(msg => msg.weighted_score !== null).length}
-                  </span>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-purple-600">{retryStats.retryMessages}</div>
+                  <div className="text-xs text-gray-500">Retries</div>
                 </div>
-
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">Response Rate</span>
-                  <span className="text-sm font-semibold text-gray-900">
-                    {inboundMessages.length > 0 ? Math.round((outboundMessages.length / inboundMessages.length) * 100) : 0}%
-                  </span>
-                </div>
-
-                {/* Retry Stats - Only show if retries exist */}
-                {retryStats.retryMessages > 0 && (
-                  <>
-                    <div className="border-t border-gray-100 pt-3">
-                      <div className="text-xs font-medium text-gray-700 mb-2">Delivery Stats:</div>
-                    </div>
-                    
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-600">Failed Messages</span>
-                      <span className="text-sm font-semibold text-red-600">{retryStats.failedMessages}</span>
-                    </div>
-
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-600">Retries Sent</span>
-                      <span className="text-sm font-semibold text-blue-600">{retryStats.retryMessages}</span>
-                    </div>
-
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-600">Retry Success Rate</span>
-                      <span className={`text-sm font-semibold ${
-                        retryStats.retrySuccessRate >= 70 ? 'text-green-600' :
-                        retryStats.retrySuccessRate >= 40 ? 'text-yellow-600' : 'text-red-600'
-                      }`}>
-                        {retryStats.retrySuccessRate}%
-                      </span>
-                    </div>
-                  </>
-                )}
               </div>
+
+              {retryStats.retryMessages > 0 && (
+                <div className="mt-4 pt-4 border-t border-gray-100">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-gray-600">Retry Success Rate</span>
+                    <span className="font-semibold text-gray-900">{retryStats.retrySuccessRate}%</span>
+                  </div>
+                  <div className="mt-2 w-full bg-gray-200 rounded-full h-2">
+                    <div 
+                      className="bg-green-500 h-2 rounded-full transition-all duration-300"
+                      style={{ width: `${retryStats.retrySuccessRate}%` }}
+                    />
+                  </div>
+                </div>
+              )}
             </div>
 
+            {/* Lead Information */}
             <div className="bg-white rounded-xl border border-gray-200 p-4">
               <div className="flex items-center gap-2 mb-4">
                 <User size={18} className="text-gray-600" />
-                <h3 className="text-sm font-semibold text-gray-900">Lead Details</h3>
+                <h3 className="text-sm font-semibold text-gray-900">Lead Information</h3>
               </div>
 
-              <div className="space-y-3 text-sm">
-                {lead.campaign && (
-                  <div>
-                    <span className="text-gray-600">Campaign:</span>
-                    <div className="mt-1">
-                      <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs">
-                        {lead.campaign}
-                      </span>
-                    </div>
+              <div className="space-y-3">
+                {lead.name && (
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-600">Name</span>
+                    <span className="text-sm font-medium text-gray-900">{lead.name}</span>
                   </div>
                 )}
-
-                <div>
-                  <span className="text-gray-600">Created:</span>
-                  <p className="text-gray-900 mt-1">{formatDate(lead.created_at)}</p>
+                
+                {lead.phone && (
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-600">Phone</span>
+                    <span className="text-sm font-medium text-gray-900">{lead.phone}</span>
+                  </div>
+                )}
+                
+                {lead.email && (
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-600">Email</span>
+                    <span className="text-sm font-medium text-gray-900">{lead.email}</span>
+                  </div>
+                )}
+                
+                <div className="flex justify-between">
+                  <span className="text-sm text-gray-600">Status</span>
+                  <span className={`text-sm font-medium ${statusConfig.textColor}`}>
+                    {statusConfig.icon} {displayStatus}
+                  </span>
                 </div>
-
-                {lead.last_interaction && (
-                  <div>
-                    <span className="text-gray-600">Last Active:</span>
-                    <p className="text-gray-900 mt-1">{formatDate(lead.last_interaction)}</p>
-                  </div>
-                )}
-
-                {lead.stage_override_reason && (
-                  <div>
-                    <span className="text-gray-600">Stage Override:</span>
-                    <p className="text-gray-900 mt-1 text-xs">
-                      {lead.stage_override_reason.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                    </p>
+                
+                <div className="flex justify-between">
+                  <span className="text-sm text-gray-600">Created</span>
+                  <span className="text-sm font-medium text-gray-900">
+                    {new Date(lead.created_at).toLocaleDateString()}
+                  </span>
+                </div>
+                
+                {lead.last_message_at && (
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-600">Last Message</span>
+                    <span className="text-sm font-medium text-gray-900">
+                      {new Date(lead.last_message_at).toLocaleDateString()}
+                    </span>
                   </div>
                 )}
               </div>
             </div>
+
+            {/* Call Status */}
+            {callStatus && (
+              <div className="bg-white rounded-xl border border-gray-200 p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <Phone size={18} className="text-green-600" />
+                  <h3 className="text-sm font-semibold text-gray-900">Call Status</h3>
+                </div>
+                <p className="text-sm text-gray-600">{callStatus}</p>
+              </div>
+            )}
           </div>
         </div>
       </div>
