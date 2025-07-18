@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { PERMISSIONS } from '../../lib/permissions';
 import { Label } from '../ui/label';
 import supabase from '../../lib/supabaseClient';
 import Button from '../ui/button';
@@ -14,11 +15,16 @@ import {
 } from 'lucide-react';
 
 export default function MessagingSettings() {
-  const { user, loading: authLoading } = useAuth();
+  const { user, hasPermission, loading: authLoading } = useAuth();
   const [settingsLoading, setSettingsLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState('');
   const [error, setError] = useState('');
+
+  // Permission checks
+  const canViewMessagingSettings = hasPermission(PERMISSIONS.VIEW_EDIT_AI_SETTINGS) || hasPermission(PERMISSIONS.MODIFY_AI_REPLY_MODE);
+  const canEditMessagingSettings = hasPermission(PERMISSIONS.VIEW_EDIT_AI_SETTINGS);
+  const canModifyReplyMode = hasPermission(PERMISSIONS.MODIFY_AI_REPLY_MODE);
 
   const [replyMode, setReplyMode] = useState('paced');
   const [hourlyLimit, setHourlyLimit] = useState('30');
@@ -133,6 +139,11 @@ export default function MessagingSettings() {
         return;
       }
 
+      if (!canViewMessagingSettings) {
+        setSettingsLoading(false);
+        return;
+      }
+
       setSettingsLoading(true);
       setError('');
       try {
@@ -150,16 +161,32 @@ export default function MessagingSettings() {
     };
 
     fetchSettings();
-  }, [user?.tenant_id, user?.role, authLoading]);
+  }, [user?.tenant_id, authLoading, canViewMessagingSettings]);
 
-  const handleSave = async () => {
-    if (!user || !user.tenant_id) {
-      setError('User or tenant information is missing. Cannot save settings.');
+  const handleReplyModeChange = (value) => {
+    if (!canModifyReplyMode) {
+      setError("You don't have permission to modify AI reply mode settings.");
       return;
     }
-    
-    if (!['global_admin', 'business_admin'].includes(user.role)) {
-      setError('Admin role required to save settings.');
+    setReplyMode(value);
+  };
+
+  const handleHourlyLimitChange = (value) => {
+    if (!canEditMessagingSettings) {
+      setError("You don't have permission to modify messaging throttle settings.");
+      return;
+    }
+    setHourlyLimit(value);
+  };
+
+  const handleSave = async () => {
+    if (!canEditMessagingSettings && !canModifyReplyMode) {
+      setError("You don't have permission to save messaging settings.");
+      return;
+    }
+
+    if (!user || !user.tenant_id) {
+      setError('User or tenant information is missing. Cannot save settings.');
       return;
     }
 
@@ -167,10 +194,16 @@ export default function MessagingSettings() {
     setSuccess('');
     setError('');
 
-    const settingsPayload = {
-      ai_reply_mode: { value: replyMode },
-      ai_hourly_throttle_limit: { value: hourlyLimit }
-    };
+    const settingsPayload = {};
+    
+    // Only include settings the user can modify
+    if (canModifyReplyMode) {
+      settingsPayload.ai_reply_mode = { value: replyMode };
+    }
+    
+    if (canEditMessagingSettings) {
+      settingsPayload.ai_hourly_throttle_limit = { value: hourlyLimit };
+    }
 
     try {
       // Updated to use the correct endpoint format
@@ -187,6 +220,17 @@ export default function MessagingSettings() {
       setSaving(false);
     }
   };
+
+  // Permission check - show access denied if user can't view messaging settings
+  if (!canViewMessagingSettings && !authLoading) {
+    return (
+      <div className="text-center py-12">
+        <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+        <h3 className="text-lg font-semibold text-gray-900 mb-2">Access Restricted</h3>
+        <p className="text-gray-600">You don't have permission to view messaging settings.</p>
+      </div>
+    );
+  }
 
   if (authLoading) return (
     <div className="flex items-center justify-center py-12">
@@ -231,7 +275,16 @@ export default function MessagingSettings() {
         </div>
       )}
 
- 
+      {/* Permission Check Alert */}
+      {!canEditMessagingSettings && canViewMessagingSettings && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 flex items-center space-x-3">
+          <AlertCircle className="w-5 h-5 text-yellow-600 flex-shrink-0" />
+          <span className="text-yellow-800">
+            You have {canModifyReplyMode ? 'limited' : 'read-only'} access to messaging settings. 
+            {canModifyReplyMode ? ' You can modify reply mode but not throttle settings.' : ' Admin permissions required to modify settings.'}
+          </span>
+        </div>
+      )}
 
       {/* AI Reply Mode */}
       <div className="bg-white rounded-xl border border-gray-200 p-6">
@@ -254,7 +307,9 @@ export default function MessagingSettings() {
           <div className="grid gap-4">
             {replyOptions.map((opt) => (
               <div key={opt.value} className="relative">
-                <label className={`block p-4 border-2 rounded-lg cursor-pointer transition-all ${
+                <label className={`block p-4 border-2 rounded-lg transition-all ${
+                  canModifyReplyMode ? 'cursor-pointer' : 'cursor-not-allowed opacity-75'
+                } ${
                   replyMode === opt.value 
                     ? 'border-blue-500 bg-blue-50' 
                     : 'border-gray-200 hover:border-gray-300'
@@ -265,8 +320,9 @@ export default function MessagingSettings() {
                       name="replyMode"
                       value={opt.value}
                       checked={replyMode === opt.value}
-                      onChange={(e) => setReplyMode(e.target.value)}
-                      className="mt-1 h-4 w-4 text-blue-600"
+                      onChange={(e) => handleReplyModeChange(e.target.value)}
+                      disabled={!canModifyReplyMode}
+                      className="mt-1 h-4 w-4 text-blue-600 disabled:cursor-not-allowed"
                     />
                     <div className="flex-1">
                       <div className="font-medium text-gray-900">{opt.label}</div>
@@ -277,6 +333,12 @@ export default function MessagingSettings() {
               </div>
             ))}
           </div>
+          
+          {!canModifyReplyMode && (
+            <p className="text-sm text-gray-500 italic">
+              Contact an admin to modify AI reply mode settings.
+            </p>
+          )}
         </div>
       </div>
 
@@ -305,10 +367,16 @@ export default function MessagingSettings() {
                 min="1"
                 max="100"
                 value={hourlyLimit}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                onChange={(e) => setHourlyLimit(e.target.value)}
+                disabled={!canEditMessagingSettings}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                onChange={(e) => handleHourlyLimitChange(e.target.value)}
               />
             </div>
+            {!canEditMessagingSettings && (
+              <p className="text-sm text-gray-500 italic mt-2">
+                Contact an admin to modify throttle settings.
+              </p>
+            )}
             <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
               <div className="flex items-start space-x-2">
                 <Shield className="w-4 h-4 text-yellow-600 mt-0.5 flex-shrink-0" />
@@ -360,26 +428,28 @@ export default function MessagingSettings() {
       {/* Save Button */}
       <div className="flex justify-end">
         <div className="flex items-center space-x-4">
-          {!['global_admin', 'business_admin'].includes(user?.role) && !authLoading && (
+          {!canEditMessagingSettings && !canModifyReplyMode && !authLoading && (
             <div className="flex items-center space-x-2 text-red-600">
               <AlertCircle className="w-4 h-4" />
-              <span className="text-sm">Admin role required to save changes</span>
+              <span className="text-sm">Admin permissions required to save changes</span>
             </div>
           )}
-          <Button
-            onClick={handleSave}
-            disabled={saving || !['global_admin', 'business_admin'].includes(user?.role) || settingsLoading || authLoading}
-            className="px-6 py-2"
-          >
-            {saving ? (
-              <div className="flex items-center space-x-2">
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                <span>Saving...</span>
-              </div>
-            ) : (
-              "Save Settings"
-            )}
-          </Button>
+          {(canEditMessagingSettings || canModifyReplyMode) && (
+            <Button
+              onClick={handleSave}
+              disabled={saving || settingsLoading || authLoading}
+              className="px-6 py-2"
+            >
+              {saving ? (
+                <div className="flex items-center space-x-2">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                  <span>Saving...</span>
+                </div>
+              ) : (
+                "Save Settings"
+              )}
+            </Button>
+          )}
         </div>
       </div>
     </div>
