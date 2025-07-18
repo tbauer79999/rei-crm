@@ -231,6 +231,10 @@ app.get('/', (req, res) => {
 });
 
 const PORT = process.env.PORT || 5000;
+console.log('✅ ROUTES:');
+app._router.stack.forEach(m => {
+  if (m.route) console.log(m.route.path);
+});
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
 });
