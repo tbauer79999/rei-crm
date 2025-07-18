@@ -230,11 +230,19 @@ app.get('/', (req, res) => {
   res.send('REI-CRM server running.');
 });
 
-const PORT = process.env.PORT || 5000;
-console.log('✅ ROUTES:');
-app._router.stack.forEach(m => {
-  if (m.route) console.log(m.route.path);
-});
+const printRoutes = (stack, prefix = '') => {
+  stack.forEach(m => {
+    if (m.route) {
+      console.log(`[${Object.keys(m.route.methods).join(', ').toUpperCase()}] ${prefix}${m.route.path}`);
+    } else if (m.name === 'router' && m.handle.stack) {
+      printRoutes(m.handle.stack, prefix);
+    }
+  });
+};
+
+console.log('✅ ROUTES LOADED:');
+printRoutes(app._router.stack);
+
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
 });
