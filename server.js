@@ -243,8 +243,13 @@ const PORT = process.env.PORT || 10000;
 
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
-  console.log('✅ ROUTES LOADED:');
-  printRoutes(app._router.stack);
+
+  if (app._router && app._router.stack) {
+    console.log('✅ ROUTES LOADED:');
+    printRoutes(app._router.stack);
+  } else {
+    console.log('⚠️ No routes registered at time of startup.');
+  }
 });
 
 // Run website scraper every 2 minutes
