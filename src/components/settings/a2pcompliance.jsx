@@ -20,12 +20,14 @@ import {
   Info
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { PERMISSIONS } from '../../lib/permissions';
 import supabase from '../../lib/supabaseClient';
 
 const A2PCompliance = () => {
-  const { user } = useAuth();
+  const { user, hasPermission, loading: authLoading } = useAuth();
   const [activeTab, setActiveTab] = useState('overview');
   const [loading, setLoading] = useState(false);
+  const [dataLoading, setDataLoading] = useState(true);
   const [brandData, setBrandData] = useState(null);
   const [campaigns, setCampaigns] = useState([]);
   const [phoneNumbers, setPhoneNumbers] = useState([]);
@@ -34,6 +36,11 @@ const A2PCompliance = () => {
   const [showCampaignDetails, setShowCampaignDetails] = useState(null);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+
+  // Permission checks
+  const canViewA2PSettings = hasPermission(PERMISSIONS.VIEW_EDIT_AI_SETTINGS) || hasPermission(PERMISSIONS.ACCESS_ALL_SETTINGS_TABS);
+  const canManageA2PSettings = hasPermission(PERMISSIONS.VIEW_EDIT_AI_SETTINGS) || hasPermission(PERMISSIONS.ACCESS_ALL_SETTINGS_TABS);
+  const canManagePhoneNumbers = hasPermission(PERMISSIONS.MANAGE_PHONE_NUMBERS) || hasPermission(PERMISSIONS.ASSIGN_PHONE_NUMBERS);
 
   // Brand form state
   const [brandForm, setBrandForm] = useState({
@@ -53,6 +60,11 @@ const A2PCompliance = () => {
 
   // Load A2P data function
   const loadA2pData = async () => {
+    if (!canViewA2PSettings) {
+      setDataLoading(false);
+      return;
+    }
+
     try {
       console.log('Loading A2P data...');
       
@@ -72,31 +84,37 @@ const A2PCompliance = () => {
       }
 
       // Load phone numbers for assignments
-      const { data: phoneData, error: phoneError } = await supabase.functions.invoke('phone_numbers', {
-        body: { action: 'list' }
-      });
-      
-      if (!phoneError && phoneData && phoneData.phoneNumbers) {
-        setPhoneNumbers(phoneData.phoneNumbers);
+      if (canManagePhoneNumbers) {
+        const { data: phoneData, error: phoneError } = await supabase.functions.invoke('phone_numbers', {
+          body: { action: 'list' }
+        });
+        
+        if (!phoneError && phoneData && phoneData.phoneNumbers) {
+          setPhoneNumbers(phoneData.phoneNumbers);
+        }
       }
 
     } catch (error) {
       console.error('Error loading A2P data:', error);
       setError('Failed to load A2P data');
+    } finally {
+      setDataLoading(false);
     }
   };
 
   // Auto-refresh when switching tabs
   useEffect(() => {
-    if (activeTab !== 'overview') {
+    if (activeTab !== 'overview' && canViewA2PSettings) {
       loadA2pData();
     }
-  }, [activeTab]);
+  }, [activeTab, canViewA2PSettings]);
 
   // Initial load
   useEffect(() => {
-    loadA2pData();
-  }, []);
+    if (!authLoading) {
+      loadA2pData();
+    }
+  }, [authLoading]);
 
   // Clear messages after 5 seconds
   useEffect(() => {
@@ -111,6 +129,11 @@ const A2PCompliance = () => {
 
   // Create brand API call
   const createBrand = async (data) => {
+    if (!canManageA2PSettings) {
+      setError("You don't have permission to register A2P brands.");
+      return { success: false, error: "Permission denied" };
+    }
+
     setLoading(true);
     setError('');
     try {
@@ -136,6 +159,11 @@ const A2PCompliance = () => {
   };
 
   const refreshStatus = async () => {
+    if (!canViewA2PSettings) {
+      setError("You don't have permission to refresh A2P status.");
+      return;
+    }
+
     setRefreshing(true);
     setError('');
     try {
@@ -150,6 +178,11 @@ const A2PCompliance = () => {
   };
 
   const assignPhoneToA2P = async (phoneId, campaignId, action) => {
+    if (!canManagePhoneNumbers) {
+      setError("You don't have permission to manage phone number assignments.");
+      return { success: false, error: "Permission denied" };
+    }
+
     try {
       setError('');
       const { data: result, error } = await supabase.functions.invoke('assign-phone-to-campaign', {
@@ -199,6 +232,11 @@ const A2PCompliance = () => {
   };
 
   const handleBrandSubmit = async () => {
+    if (!canManageA2PSettings) {
+      setError("You don't have permission to register A2P brands.");
+      return;
+    }
+
     // Validate required fields
     const requiredFields = ['company_name', 'company_type', 'phone', 'street', 'city', 'state', 'postal_code', 'email', 'vertical'];
     const missingFields = requiredFields.filter(field => !brandForm[field]);
@@ -229,6 +267,29 @@ const A2PCompliance = () => {
     return date.toLocaleDateString();
   };
 
+  // Permission check - show access denied if user can't view A2P settings
+  if (!canViewA2PSettings && !authLoading) {
+    return (
+      <div className="max-w-6xl mx-auto p-6">
+        <div className="text-center py-12">
+          <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">Access Restricted</h3>
+          <p className="text-gray-600">You don't have permission to access A2P compliance settings.</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (authLoading || dataLoading) {
+    return (
+      <div className="max-w-6xl mx-auto p-6">
+        <div className="flex items-center justify-center py-12">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-6xl mx-auto p-6 space-y-6">
       {/* Messages */}
@@ -250,6 +311,16 @@ const A2PCompliance = () => {
         </div>
       )}
 
+      {/* Permission Check Alert */}
+      {!canManageA2PSettings && canViewA2PSettings && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 flex items-center space-x-3">
+          <AlertCircle className="w-5 h-5 text-yellow-600 flex-shrink-0" />
+          <span className="text-yellow-800">
+            You have read-only access to A2P compliance settings. Admin permissions required to register brands or manage campaigns.
+          </span>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -263,7 +334,7 @@ const A2PCompliance = () => {
         </div>
         <button
           onClick={refreshStatus}
-          disabled={refreshing}
+          disabled={refreshing || !canViewA2PSettings}
           className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
         >
           <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
@@ -341,21 +412,28 @@ const A2PCompliance = () => {
           {[
             { id: 'overview', label: 'Overview', icon: Building2 },
             { id: 'campaigns', label: 'Auto Campaigns', icon: Zap },
-            { id: 'assignments', label: 'Phone Assignments', icon: Phone }
-          ].map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`py-2 px-1 border-b-2 font-medium text-sm flex items-center gap-2 ${
-                activeTab === tab.id
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-            >
-              <tab.icon className="h-4 w-4" />
-              {tab.label}
-            </button>
-          ))}
+            { id: 'assignments', label: 'Phone Assignments', icon: Phone, requiresPhonePermission: true }
+          ].map((tab) => {
+            // Hide phone assignments tab if user doesn't have phone management permissions
+            if (tab.requiresPhonePermission && !canManagePhoneNumbers) {
+              return null;
+            }
+            
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`py-2 px-1 border-b-2 font-medium text-sm flex items-center gap-2 ${
+                  activeTab === tab.id
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                <tab.icon className="h-4 w-4" />
+                {tab.label}
+              </button>
+            );
+          })}
         </nav>
       </div>
 
@@ -377,7 +455,7 @@ const A2PCompliance = () => {
                   <p className="text-sm mt-1">EIN: {brandData.ein || 'Not provided'} | {brandData.vertical}</p>
                   <p className="text-sm text-gray-600 mt-2">
                     {brandData.status === 'VERIFIED' 
-                      ? '✅ Your business is verified for A2P messaging. Campaigns will be created automatically when you send messages.'
+                      ? '✅ Your business is verified for A2P messaging. Campaigns will be created automatically when needed.'
                       : brandData.status === 'PENDING'
                       ? '⏳ Brand registration is under review. This typically takes 1-5 business days.'
                       : brandData.status === 'FAILED'
@@ -428,7 +506,7 @@ const A2PCompliance = () => {
           )}
 
           {/* Brand Registration Form */}
-          {!brandData && (
+          {!brandData && canManageA2PSettings && (
             <div className="bg-white p-6 rounded-lg border border-gray-200">
               <div className="flex items-center gap-3 mb-4">
                 <Building2 className="h-6 w-6 text-blue-600" />
@@ -596,6 +674,17 @@ const A2PCompliance = () => {
             </div>
           )}
 
+          {/* Show message if user can't manage A2P but brand doesn't exist */}
+          {!brandData && !canManageA2PSettings && (
+            <div className="bg-white p-6 rounded-lg border border-gray-200 text-center">
+              <Building2 className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Brand Registration Required</h3>
+              <p className="text-gray-600 mb-4">
+                A2P brand registration is required for SMS compliance. Contact an admin to register your business brand.
+              </p>
+            </div>
+          )}
+
           {/* Info Box */}
           <div className="bg-gray-50 border border-gray-200 rounded-lg p-6">
             <div className="flex items-start gap-3">
@@ -715,7 +804,7 @@ const A2PCompliance = () => {
         </div>
       )}
 
-      {activeTab === 'assignments' && (
+      {activeTab === 'assignments' && canManagePhoneNumbers && (
         <div className="space-y-6">
           <h3 className="text-lg font-semibold">Phone Number A2P Assignments</h3>
           
