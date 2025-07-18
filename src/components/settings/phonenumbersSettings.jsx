@@ -1,4 +1,36 @@
-import React, { useState, useEffect } from 'react';
+const loadTeamMembers = async () => {
+    if (!canAssignPhoneNumbers) return;
+    
+    // Load team members from your actual users_profile table
+    try {
+      const { data: teamData, error: teamError } = await supabase
+        .from('users_profile')
+        .select('id, email, first_name, last_name, full_name, role, is_active')
+        .eq('tenant_id', user?.tenant_id)
+        .eq('is_active', true)
+        .order('full_name');
+
+      if (!teamError && teamData) {
+        const formattedMembers = teamData.map(profile => ({
+          id: profile.id,
+          name: profile.full_name || `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || profile.email,
+          email: profile.email,
+          status: 'active',
+          role: profile.role
+        }));
+        setTeamMembers(formattedMembers);
+        console.log('Team members loaded from users_profile table:', formattedMembers.length);
+        return;
+      } else {
+        console.log('Error loading from users_profile table:', teamError);
+      }
+    } catch (profilesError) {
+      console.log('Error accessing users_profile table:', profilesError);
+    }
+
+    // Fallback: if no team members loaded, just set empty array
+    setTeamMembers([]);
+  };import React, { useState, useEffect } from 'react';
 import { 
   Phone, 
   Plus, 
@@ -241,6 +273,30 @@ export default function PhoneNumbersSettings() {
   const loadTeamMembers = async () => {
     if (!canAssignPhoneNumbers) return;
     
+    // Try to load team members from Supabase profiles instead of API
+    try {
+      const { data: profilesData, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, full_name, email')
+        .eq('tenant_id', user?.tenant_id)
+        .order('full_name');
+
+      if (!profilesError && profilesData) {
+        const formattedMembers = profilesData.map(profile => ({
+          id: profile.id,
+          name: profile.full_name,
+          email: profile.email,
+          status: 'active'
+        }));
+        setTeamMembers(formattedMembers);
+        console.log('Team members loaded from profiles:', formattedMembers.length);
+        return;
+      }
+    } catch (profilesError) {
+      console.log('Profiles table not available, trying API fallback');
+    }
+
+    // Fallback to API if profiles table doesn't work
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token) {
@@ -871,7 +927,7 @@ export default function PhoneNumbersSettings() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <div className="flex items-center justify-end space-x-2">
-                        {!number.user_id && canAssignPhoneNumbers ? (
+                        {!number.user_id && canAssignPhoneNumbers && teamMembers.length > 0 ? (
                           <button
                             onClick={() => {
                               setAssigningNumber(number);
@@ -1165,6 +1221,11 @@ export default function PhoneNumbersSettings() {
                       </option>
                     ))}
                   </select>
+                  {teamMembers.length === 0 && (
+                    <p className="text-sm text-amber-600 mt-2">
+                      No team members available. Team management features may not be configured yet.
+                    </p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
