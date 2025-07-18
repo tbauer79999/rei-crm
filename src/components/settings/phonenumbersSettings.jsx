@@ -22,13 +22,19 @@ import {
   Settings
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { PERMISSIONS } from '../../lib/permissions';
 import supabase from '../../lib/supabaseClient';
 
 export default function PhoneNumbersSettings() {
-  const { user } = useAuth();
+  const { user, hasPermission } = useAuth();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  
+  // Permission checks
+  const canViewPhoneNumbers = hasPermission(PERMISSIONS.VIEW_PHONE_NUMBERS);
+  const canManagePhoneNumbers = hasPermission(PERMISSIONS.MANAGE_PHONE_NUMBERS);
+  const canAssignPhoneNumbers = hasPermission(PERMISSIONS.ASSIGN_PHONE_NUMBERS);
   
   // Phone numbers state
   const [phoneNumbers, setPhoneNumbers] = useState([]);
@@ -70,13 +76,19 @@ export default function PhoneNumbersSettings() {
   });
 
   useEffect(() => {
-    loadPhoneNumbers();
-    loadTeamMembers();
-    loadPopularAreaCodes();
-    loadA2pData();
-  }, []);
+    if (canViewPhoneNumbers) {
+      loadPhoneNumbers();
+      loadTeamMembers();
+      loadPopularAreaCodes();
+      loadA2pData();
+    } else {
+      setLoading(false);
+    }
+  }, [canViewPhoneNumbers]);
 
   const loadA2pData = async () => {
+    if (!canViewPhoneNumbers) return;
+    
     try {
       // Load A2P status
       const { data: statusData, error: statusError } = await supabase.functions.invoke('get-a2p-status');
@@ -113,6 +125,8 @@ export default function PhoneNumbersSettings() {
   };
 
   const loadPhoneNumbers = async () => {
+    if (!canViewPhoneNumbers) return;
+    
     setLoading(true);
     try {
       // Use Supabase functions invoke
@@ -143,6 +157,11 @@ export default function PhoneNumbersSettings() {
   };
 
   const assignPhoneToA2p = async () => {
+    if (!canManagePhoneNumbers) {
+      setError("You don't have permission to manage phone number assignments.");
+      return;
+    }
+
     if (!selectedA2pCampaign || !assigningA2pNumber) return;
 
     try {
@@ -170,6 +189,11 @@ export default function PhoneNumbersSettings() {
   };
 
   const unassignPhoneFromA2p = async (phoneId, a2pCampaignId) => {
+    if (!canManagePhoneNumbers) {
+      setError("You don't have permission to manage phone number assignments.");
+      return;
+    }
+
     try {
       const { data, error } = await supabase.functions.invoke('assign-phone-to-campaign', {
         body: {
@@ -192,6 +216,8 @@ export default function PhoneNumbersSettings() {
   };
 
   const loadTeamMembers = async () => {
+    if (!canAssignPhoneNumbers) return;
+    
     try {
       // Still use the existing team API for now
       const { data: { session } } = await supabase.auth.getSession();
@@ -212,6 +238,8 @@ export default function PhoneNumbersSettings() {
   };
 
   const loadPopularAreaCodes = async () => {
+    if (!canViewPhoneNumbers) return;
+    
     try {
       const { data, error } = await supabase.functions.invoke('phone_numbers', {
         body: { action: 'popular-area-codes' }
@@ -225,6 +253,11 @@ export default function PhoneNumbersSettings() {
   };
 
   const searchPhoneNumbers = async (areaCode) => {
+    if (!canManagePhoneNumbers) {
+      setError("You don't have permission to purchase phone numbers.");
+      return;
+    }
+
     try {
       setSearchingNumbers(true);
       setError('');
@@ -251,6 +284,11 @@ export default function PhoneNumbersSettings() {
   };
 
   const purchasePhoneNumber = async (phoneNumber) => {
+    if (!canManagePhoneNumbers) {
+      setError("You don't have permission to purchase phone numbers.");
+      return;
+    }
+
     try {
       setPurchasing(true);
       setError('');
@@ -280,6 +318,11 @@ export default function PhoneNumbersSettings() {
   };
 
   const assignPhoneNumber = async () => {
+    if (!canAssignPhoneNumbers) {
+      setError("You don't have permission to assign phone numbers to users.");
+      return;
+    }
+
     if (!selectedUserId || !assigningNumber) return;
 
     try {
@@ -308,6 +351,11 @@ export default function PhoneNumbersSettings() {
   };
 
   const unassignPhoneNumber = async (phoneId) => {
+    if (!canAssignPhoneNumbers) {
+      setError("You don't have permission to unassign phone numbers.");
+      return;
+    }
+
     try {
       const { data, error } = await supabase.functions.invoke('phone_numbers', {
         body: { action: 'unassign', phoneId }
@@ -326,6 +374,11 @@ export default function PhoneNumbersSettings() {
   };
 
   const releasePhoneNumber = async (phoneId) => {
+    if (!canManagePhoneNumbers) {
+      setError("You don't have permission to release phone numbers.");
+      return;
+    }
+
     if (!window.confirm('Are you sure you want to release this phone number? This action cannot be undone.')) {
       return;
     }
@@ -408,6 +461,17 @@ export default function PhoneNumbersSettings() {
     }
   }, [error, success]);
 
+  // Permission check - show access denied if user can't view phone numbers
+  if (!canViewPhoneNumbers) {
+    return (
+      <div className="text-center py-12">
+        <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+        <h3 className="text-lg font-semibold text-gray-900 mb-2">Access Restricted</h3>
+        <p className="text-gray-600">You don't have permission to view phone number management.</p>
+      </div>
+    );
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -437,6 +501,16 @@ export default function PhoneNumbersSettings() {
         </div>
       )}
 
+      {/* Permission Check Alert */}
+      {!canManagePhoneNumbers && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 flex items-center space-x-3">
+          <AlertCircle className="w-5 h-5 text-yellow-600 flex-shrink-0" />
+          <span className="text-yellow-800">
+            You have read-only access to phone number management. Admin permissions required to purchase, assign, or release phone numbers.
+          </span>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -444,13 +518,15 @@ export default function PhoneNumbersSettings() {
           <p className="text-gray-600 mt-1">Manage your business phone numbers and assignments</p>
         </div>
         <div className="flex items-center gap-3">
-          <button
-            onClick={() => setShowPurchaseModal(true)}
-            className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            Add Phone Number
-          </button>
+          {canManagePhoneNumbers && (
+            <button
+              onClick={() => setShowPurchaseModal(true)}
+              className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Add Phone Number
+            </button>
+          )}
         </div>
       </div>
 
@@ -650,25 +726,31 @@ export default function PhoneNumbersSettings() {
                           <Shield className="w-3 h-3 mr-1" />
                           {number.a2p_assignment.a2p_campaigns.campaign_id}
                         </span>
-                        <button
-                          onClick={() => unassignPhoneFromA2p(number.id, number.a2p_assignment.a2p_campaign_id)}
-                          className="text-red-600 hover:text-red-900 transition-colors ml-2"
-                          title="Unassign from A2P campaign"
-                        >
-                          <X className="w-3 h-3" />
-                        </button>
+                        {canManagePhoneNumbers && (
+                          <button
+                            onClick={() => unassignPhoneFromA2p(number.id, number.a2p_assignment.a2p_campaign_id)}
+                            className="text-red-600 hover:text-red-900 transition-colors ml-2"
+                            title="Unassign from A2P campaign"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        )}
                       </div>
                     ) : (
-                      <button
-                        onClick={() => {
-                          setAssigningA2pNumber(number);
-                          setShowA2pModal(true);
-                        }}
-                        disabled={a2pCampaigns.filter(c => c.status === 'VERIFIED').length === 0}
-                        className="text-blue-600 hover:text-blue-900 transition-colors text-sm disabled:text-gray-400 disabled:cursor-not-allowed"
-                      >
-                        {a2pCampaigns.filter(c => c.status === 'VERIFIED').length > 0 ? 'Assign A2P' : 'No campaigns'}
-                      </button>
+                      canManagePhoneNumbers ? (
+                        <button
+                          onClick={() => {
+                            setAssigningA2pNumber(number);
+                            setShowA2pModal(true);
+                          }}
+                          disabled={a2pCampaigns.filter(c => c.status === 'VERIFIED').length === 0}
+                          className="text-blue-600 hover:text-blue-900 transition-colors text-sm disabled:text-gray-400 disabled:cursor-not-allowed"
+                        >
+                          {a2pCampaigns.filter(c => c.status === 'VERIFIED').length > 0 ? 'Assign A2P' : 'No campaigns'}
+                        </button>
+                      ) : (
+                        <span className="text-sm text-gray-500">Not assigned</span>
+                      )
                     )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
@@ -697,7 +779,7 @@ export default function PhoneNumbersSettings() {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <div className="flex items-center justify-end space-x-2">
-                      {!number.user_id ? (
+                      {!number.user_id && canAssignPhoneNumbers ? (
                         <button
                           onClick={() => {
                             setAssigningNumber(number);
@@ -708,7 +790,7 @@ export default function PhoneNumbersSettings() {
                         >
                           <UserPlus className="w-4 h-4" />
                         </button>
-                      ) : (
+                      ) : number.user_id && canAssignPhoneNumbers ? (
                         <button
                           onClick={() => unassignPhoneNumber(number.id)}
                           className="text-orange-600 hover:text-orange-900 transition-colors"
@@ -716,14 +798,16 @@ export default function PhoneNumbersSettings() {
                         >
                           <UserPlus className="w-4 h-4 rotate-45" />
                         </button>
+                      ) : null}
+                      {canManagePhoneNumbers && (
+                        <button
+                          onClick={() => releasePhoneNumber(number.id)}
+                          className="text-red-600 hover:text-red-900 transition-colors"
+                          title="Release number"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
                       )}
-                      <button
-                        onClick={() => releasePhoneNumber(number.id)}
-                        className="text-red-600 hover:text-red-900 transition-colors"
-                        title="Release number"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
                     </div>
                   </td>
                 </tr>
@@ -745,7 +829,7 @@ export default function PhoneNumbersSettings() {
       </div>
 
       {/* A2P Assignment Modal */}
-      {showA2pModal && assigningA2pNumber && (
+      {showA2pModal && assigningA2pNumber && canManagePhoneNumbers && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-xl shadow-xl max-w-md w-full mx-4">
             <div className="px-6 py-4 border-b border-gray-200">
@@ -811,8 +895,8 @@ export default function PhoneNumbersSettings() {
         </div>
       )}
 
-      {/* Existing Purchase Modal */}
-      {showPurchaseModal && (
+      {/* Purchase Modal */}
+      {showPurchaseModal && canManagePhoneNumbers && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
             <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
@@ -960,8 +1044,8 @@ export default function PhoneNumbersSettings() {
         </div>
       )}
 
-      {/* Existing Assign Modal */}
-      {showAssignModal && assigningNumber && (
+      {/* Assignment Modal */}
+      {showAssignModal && assigningNumber && canAssignPhoneNumbers && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-xl shadow-xl max-w-md w-full mx-4">
             <div className="px-6 py-4 border-b border-gray-200">
