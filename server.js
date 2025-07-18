@@ -54,6 +54,9 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
 }));
 
+// ADD THIS LINE RIGHT HERE:
+app.options('*', cors()); // Handle preflight requests for all routes
+
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use('/api/hot-summary', hotSummaryRoutes);
