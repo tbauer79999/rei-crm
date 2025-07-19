@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { getFeatureValue } from '../../lib/plans';
 import { callEdgeFunction } from '../../lib/edgeFunctionAuth';
 import { 
   X, TrendingUp, Users, Calendar, Clock, CheckCircle, Phone, 
   AlertTriangle, BarChart3, Activity, Timer, Target, XCircle,
-  PhoneCall, PhoneOff, UserCheck, UserX, MessageSquare
+  PhoneCall, PhoneOff, UserCheck, UserX, MessageSquare, Lock
 } from 'lucide-react';
 
 // Edge Function URL - Update this with your actual Supabase project URL
@@ -34,6 +35,51 @@ const MODAL_CONFIG = {
     features: ['outcomesTrend', 'outcomeDistribution', 'performanceByRep', 'disqualificationReasons', 'conversionRate']
   }
 };
+
+// Upgrade Prompt Component
+const UpgradePrompt = ({ metricName, onClose }) => (
+  <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div 
+      className="absolute inset-0 bg-black bg-opacity-50 backdrop-blur-sm"
+      onClick={onClose}
+    />
+    
+    <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md m-4 overflow-hidden">
+      <div className="p-6 text-center">
+        <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <Lock className="w-8 h-8 text-blue-600" />
+        </div>
+        <h3 className="text-xl font-semibold text-gray-900 mb-2">
+          Detailed {metricName} Analytics
+        </h3>
+        <p className="text-gray-600 mb-6">
+          Unlock advanced handoff analytics, performance tracking, and team insights with a plan upgrade.
+        </p>
+        <div className="space-y-2 text-sm text-gray-500 mb-6">
+          <p>✓ Queue management analytics</p>
+          <p>✓ Response time tracking</p>
+          <p>✓ Sales team performance</p>
+          <p>✓ Conversion analysis</p>
+        </div>
+        <button 
+          onClick={onClose}
+          className="w-full bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium transition-colors mb-3"
+        >
+          Upgrade to Growth Plan
+        </button>
+        <p className="text-xs text-gray-500">
+          Starting at $397/month
+        </p>
+        <button 
+          onClick={onClose}
+          className="absolute top-4 right-4 p-2 hover:bg-gray-100 rounded-lg transition-colors"
+        >
+          <X className="w-5 h-5 text-gray-500" />
+        </button>
+      </div>
+    </div>
+  </div>
+);
 
 // Shared Modal Wrapper Component
 const ModalWrapper = ({ isOpen, onClose, title, subtitle, children }) => {
@@ -757,7 +803,18 @@ const generateModalMockData = (modalType) => {
 };
 
 const HotLeadHandoffPanel = () => {
-  const { user } = useAuth();
+  const { user, currentPlan } = useAuth();
+  
+  // Get AI Control Room access level from plan
+  const controlRoomAccess = getFeatureValue(currentPlan, 'aiControlRoomAccess');
+  const canAccessDetailedAnalytics = controlRoomAccess === 'full' || controlRoomAccess === 'team_metrics';
+
+  console.log('📊 HotLeadHandoffPanel Access:', {
+    currentPlan,
+    controlRoomAccess,
+    canAccessDetailedAnalytics
+  });
+
   const [hotLeads, setHotLeads] = useState([]);
   const [stats, setStats] = useState({});
   const [loading, setLoading] = useState(true);
@@ -769,9 +826,22 @@ const HotLeadHandoffPanel = () => {
   
   // Modal states
   const [activeModal, setActiveModal] = useState(null);
+  const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
+  const [upgradePromptMetric, setUpgradePromptMetric] = useState('');
   const [selectedPeriod, setSelectedPeriod] = useState('7days');
   const [modalData, setModalData] = useState(null);
   const [loadingModal, setLoadingModal] = useState(false);
+
+  // Handle modal click with plan gating
+  const handleModalClick = (modalType, metricName) => {
+    if (!canAccessDetailedAnalytics) {
+      setUpgradePromptMetric(metricName);
+      setShowUpgradePrompt(true);
+      return;
+    }
+    
+    openModal(modalType);
+  };
 
   useEffect(() => {
     if (user?.tenant_id) {
@@ -1043,10 +1113,14 @@ const handlePeriodChange = async (newPeriod) => {
   return (
     <>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Card 1: Hot Leads Awaiting Action - Now Clickable */}
+        {/* Card 1: Hot Leads Awaiting Action - Now with RBAC */}
         <div 
-          className="bg-white rounded-2xl shadow-md border border-gray-200 p-4 cursor-pointer hover:shadow-lg transition-shadow"
-          onClick={() => openModal('awaitingAction')}
+          className={`bg-white rounded-2xl shadow-md border border-gray-200 p-4 relative transition-all duration-200 ${
+            canAccessDetailedAnalytics 
+              ? 'cursor-pointer hover:shadow-lg' 
+              : 'cursor-pointer hover:shadow-md opacity-90'
+          }`}
+          onClick={() => handleModalClick('awaitingAction', 'Hot Leads Queue')}
         >
           <div className="text-lg font-semibold mb-2">
             🔥 Hot Leads Awaiting Action ({uncalledLeads.length} uncalled)
@@ -1103,14 +1177,28 @@ const handlePeriodChange = async (newPeriod) => {
           )}
           
           <div className="mt-4 text-xs text-gray-400 text-center">
-            Click card for detailed view
+            {canAccessDetailedAnalytics 
+              ? 'Click card for detailed view' 
+              : 'Upgrade for detailed analytics'
+            }
           </div>
+
+          {/* Lock icon for restricted users */}
+          {!canAccessDetailedAnalytics && (
+            <div className="absolute top-4 right-4">
+              <Lock className="w-4 h-4 text-gray-400" />
+            </div>
+          )}
         </div>
 
-        {/* Card 2: AI → Sales Time Lag - Now Clickable */}
+        {/* Card 2: AI → Sales Time Lag - Now with RBAC */}
         <div 
-          className="bg-white rounded-2xl shadow-md border border-gray-200 p-4 cursor-pointer hover:shadow-lg transition-shadow"
-          onClick={() => openModal('timeLag')}
+          className={`bg-white rounded-2xl shadow-md border border-gray-200 p-4 relative transition-all duration-200 ${
+            canAccessDetailedAnalytics 
+              ? 'cursor-pointer hover:shadow-lg' 
+              : 'cursor-pointer hover:shadow-md opacity-90'
+          }`}
+          onClick={() => handleModalClick('timeLag', 'Response Time Analytics')}
         >
           <div className="text-lg font-semibold mb-2">⏱️ AI → Sales Time Lag</div>
           <div className="text-sm text-gray-500 mb-4">
@@ -1129,14 +1217,28 @@ const handlePeriodChange = async (newPeriod) => {
           )}
           
           <div className="mt-4 text-xs text-gray-400 text-center">
-            Click card for detailed analytics
+            {canAccessDetailedAnalytics 
+              ? 'Click card for detailed analytics' 
+              : 'Upgrade for detailed analytics'
+            }
           </div>
+
+          {/* Lock icon for restricted users */}
+          {!canAccessDetailedAnalytics && (
+            <div className="absolute top-4 right-4">
+              <Lock className="w-4 h-4 text-gray-400" />
+            </div>
+          )}
         </div>
 
-        {/* Card 3: Sales Outcomes (Last 7 Days) - Now Clickable */}
+        {/* Card 3: Sales Outcomes - Now with RBAC */}
         <div 
-          className="bg-white rounded-2xl shadow-md border border-gray-200 p-4 cursor-pointer hover:shadow-lg transition-shadow"
-          onClick={() => openModal('salesOutcomes')}
+          className={`bg-white rounded-2xl shadow-md border border-gray-200 p-4 relative transition-all duration-200 ${
+            canAccessDetailedAnalytics 
+              ? 'cursor-pointer hover:shadow-lg' 
+              : 'cursor-pointer hover:shadow-md opacity-90'
+          }`}
+          onClick={() => handleModalClick('salesOutcomes', 'Sales Outcomes Analysis')}
         >
           <div className="text-lg font-semibold mb-2">📊 Sales Outcomes (Last 7 Days)</div>
           <div className="text-sm text-gray-500 mb-4">Results from sales outreach on hot leads</div>
@@ -1155,10 +1257,28 @@ const handlePeriodChange = async (newPeriod) => {
           )}
           
           <div className="mt-4 text-xs text-gray-400 text-center">
-            Click card for conversion analysis
+            {canAccessDetailedAnalytics 
+              ? 'Click card for conversion analysis' 
+              : 'Upgrade for detailed analytics'
+            }
           </div>
+
+          {/* Lock icon for restricted users */}
+          {!canAccessDetailedAnalytics && (
+            <div className="absolute top-4 right-4">
+              <Lock className="w-4 h-4 text-gray-400" />
+            </div>
+          )}
         </div>
       </div>
+
+      {/* Upgrade Prompt Modal for Basic Users */}
+      {showUpgradePrompt && (
+        <UpgradePrompt 
+          metricName={upgradePromptMetric}
+          onClose={() => setShowUpgradePrompt(false)}
+        />
+      )}
 
       {/* Call Outcome Modal */}
 {showOutcomeModal && selectedLead && (
