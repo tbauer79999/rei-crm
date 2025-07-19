@@ -1106,6 +1106,53 @@ const MetricCard = ({ title, value, subtext, trend, onClick, isClickable = false
   );
 };
 
+// Upgrade Prompt Component for when users click on locked cards
+const UpgradePrompt = ({ metricName, onClose }) => (
+  <div className="fixed inset-0 z-50 flex items-center justify-center">
+    {/* Backdrop */}
+    <div 
+      className="absolute inset-0 bg-black bg-opacity-50 backdrop-blur-sm"
+      onClick={onClose}
+    />
+    
+    {/* Modal */}
+    <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md m-4 overflow-hidden">
+      <div className="p-6 text-center">
+        <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <Lock className="w-8 h-8 text-blue-600" />
+        </div>
+        <h3 className="text-xl font-semibold text-gray-900 mb-2">
+          Detailed {metricName} Analytics
+        </h3>
+        <p className="text-gray-600 mb-6">
+          Unlock detailed breakdowns, interactive charts, and drill-down capabilities with a plan upgrade.
+        </p>
+        <div className="space-y-2 text-sm text-gray-500 mb-6">
+          <p>✓ Interactive metric cards</p>
+          <p>✓ Detailed trend analysis</p>
+          <p>✓ Historical comparisons</p>
+          <p>✓ Advanced filtering</p>
+        </div>
+        <button 
+          onClick={onClose}
+          className="w-full bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium transition-colors mb-3"
+        >
+          Upgrade to Growth Plan
+        </button>
+        <p className="text-xs text-gray-500">
+          Starting at $397/month
+        </p>
+        <button 
+          onClick={onClose}
+          className="absolute top-4 right-4 p-2 hover:bg-gray-100 rounded-lg transition-colors"
+        >
+          <X className="w-5 h-5 text-gray-500" />
+        </button>
+      </div>
+    </div>
+  </div>
+);
+
 // Mock data generator
 const generateMockData = (metricType) => {
   const baseData = {
