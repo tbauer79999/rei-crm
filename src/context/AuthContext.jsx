@@ -457,7 +457,6 @@ const getCurrentPlan = () => {
     hasPermission,
     hasFeature,
     currentPlan: getCurrentPlan(),
-    userPlan: getCurrentPlan(), // ADD THIS LINE
     permissions: user?.role ? getRolePermissions(user.role) : []
   };
 

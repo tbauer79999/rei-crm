@@ -121,7 +121,7 @@ const UpgradePrompt = ({ sectionName }) => (
 );
 
 const AIControlRoom = () => {
-  const { userPlan } = useAuth();
+  const { currentPlan } = useAuth();
   const [collapsed, setCollapsed] = useState({});
   const [sectionStatuses, setSectionStatuses] = useState({});
   const [sectionMetrics, setSectionMetrics] = useState({});
@@ -129,11 +129,11 @@ const AIControlRoom = () => {
   const [ready, setReady] = useState(false);
 
   // Get AI Control Room access level from plan
-  const controlRoomAccess = getFeatureValue(userPlan, 'aiControlRoomAccess');
+  const controlRoomAccess = getFeatureValue(currentPlan, 'aiControlRoomAccess');
   const canAccessDetailedAnalytics = controlRoomAccess === 'full' || controlRoomAccess === 'team_metrics';
 
   console.log('🎛️ AI Control Room Access:', {
-    userPlan,
+    currentPlan,
     controlRoomAccess,
     canAccessDetailedAnalytics
   });
@@ -257,49 +257,59 @@ const AIControlRoom = () => {
   };
 
   const renderSectionContent = (sectionLabel) => {
-    // For Basic users, show upgrade prompt instead of detailed components
-    if (!canAccessDetailedAnalytics) {
-      return <UpgradePrompt sectionName={sectionLabel} />;
-    }
-
-    // For Full/Team Metrics users, show the actual components
-    switch (sectionLabel) {
-      case 'Overview & Health':
-        return (
-          <div className="px-6 pb-6 border-t border-gray-100">
-            <div className="pt-6">
-              <OverviewMetrics />
-              <OverviewTrendAndCost />
+    // Always render the section content wrapper
+    return (
+      <div className="px-6 pb-6 border-t border-gray-100">
+        <div className="pt-6">
+          {/* The gating happens INSIDE each section, not at the section level */}
+          {canAccessDetailedAnalytics ? (
+            // Full access users see the actual components
+            <>
+              {sectionLabel === 'Overview & Health' && (
+                <>
+                  <OverviewMetrics />
+                  <OverviewTrendAndCost />
+                </>
+              )}
+              {sectionLabel === 'Lead Journey & Funnel' && (
+                <LeadJourneyFunnel />
+              )}
+              {sectionLabel === 'AI Optimization' && (
+                <AiOptimizationPanel />
+              )}
+              {sectionLabel === 'Hot Lead Handoff' && (
+                <HotLeadHandoffPanel />
+              )}
+            </>
+          ) : (
+            // Basic users see upgrade prompt INSIDE the section
+            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-6 text-center">
+              <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Lock className="w-6 h-6 text-blue-600" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                Detailed {sectionLabel} Analytics
+              </h3>
+              <p className="text-gray-600 mb-4">
+                Unlock detailed breakdowns, interactive charts, and drill-down capabilities with a plan upgrade.
+              </p>
+              <div className="space-y-2 text-sm text-gray-500 mb-6">
+                <p>✓ Interactive metric cards</p>
+                <p>✓ Detailed trend analysis</p>
+                <p>✓ Historical comparisons</p>
+                <p>✓ Advanced filtering</p>
+              </div>
+              <button className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium transition-colors">
+                Upgrade to Growth Plan
+              </button>
+              <p className="text-xs text-gray-500 mt-2">
+                Starting at $397/month
+              </p>
             </div>
-          </div>
-        );
-      case 'Lead Journey & Funnel':
-        return (
-          <div className="px-6 pb-6 border-t border-gray-100">
-            <div className="pt-6">
-              <LeadJourneyFunnel />
-            </div>
-          </div>
-        );
-      case 'AI Optimization':
-        return (
-          <div className="px-6 pb-6 border-t border-gray-100">
-            <div className="pt-6">
-              <AiOptimizationPanel />
-            </div>
-          </div>
-        );
-      case 'Hot Lead Handoff':
-        return (
-          <div className="px-6 pb-6 border-t border-gray-100">
-            <div className="pt-6">
-              <HotLeadHandoffPanel />
-            </div>
-          </div>
-        );
-      default:
-        return null;
-    }
+          )}
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -308,7 +318,7 @@ const AIControlRoom = () => {
       {process.env.NODE_ENV === 'development' && (
         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
           <div className="text-sm">
-            <strong>Debug:</strong> Plan: {userPlan} | AI Control Room Access: {controlRoomAccess} | Can Access Details: {canAccessDetailedAnalytics ? 'Yes' : 'No'}
+            <strong>Debug:</strong> Plan: {currentPlan} | AI Control Room Access: {controlRoomAccess} | Can Access Details: {canAccessDetailedAnalytics ? 'Yes' : 'No'}
           </div>
         </div>
       )}
