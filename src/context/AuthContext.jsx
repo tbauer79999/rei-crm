@@ -32,9 +32,11 @@ const AuthProvider = ({ children }) => {
         
         if (error) {
           console.error('❌ Session error:', error);
-          setUser(null);
-          setSession(null);
-          setLoading(false);
+          if (mounted) {
+            setUser(null);
+            setSession(null);
+            setLoading(false);
+          }
           return;
         }
         
@@ -67,13 +69,13 @@ const AuthProvider = ({ children }) => {
           
         } else {
           console.log('❌ No session found');
-          setUser(null);
-          setSession(null);
+          if (mounted) {
+            setUser(null);
+            setSession(null);
+            setLoading(false);
+          }
         }
         
-        if (mounted) {
-          setLoading(false);
-        }
       } catch (error) {
         console.error('❌ Error initializing auth:', error);
         if (mounted) {
@@ -100,34 +102,37 @@ const AuthProvider = ({ children }) => {
         console.log('🔍 Auth user_metadata - role:', authUser.user_metadata?.role, 'tenant_id:', authUser.user_metadata?.tenant_id);
         console.log('🔍 Final metadata values - role:', role, 'tenant_id:', tenant_id);
         
-// If we have both from metadata, use them but still verify with database
-if (role && tenant_id) {
-  // Get tenant plan even when using metadata
-  let tenantPlan = 'starter'; // default fallback
-  try {
-    const { data: tenant } = await supabase
-      .from('tenants')
-      .select('plan')
-      .eq('id', tenant_id)
-      .single();
-    
-    if (tenant?.plan) {
-      tenantPlan = tenant.plan;
-    }
-  } catch (error) {
-    console.warn('Could not fetch tenant plan:', error);
-  }
+        // If we have both from metadata, use them but still verify with database
+        if (role && tenant_id) {
+          // Get tenant plan even when using metadata
+          let tenantPlan = 'starter'; // default fallback
+          try {
+            const { data: tenant } = await supabase
+              .from('tenants')
+              .select('plan')
+              .eq('id', tenant_id)
+              .single();
+            
+            if (tenant?.plan) {
+              tenantPlan = tenant.plan;
+            }
+          } catch (error) {
+            console.warn('Could not fetch tenant plan:', error);
+          }
 
-  const enrichedUser = {
-    ...authUser,
-    email: authUser.email,
-    role: role,
-    tenant_id: tenant_id,
-    plan: tenantPlan  // ← NOW IT GETS THE REAL PLAN!
-  };
-          
-          console.log('✅ Setting user with metadata:', { email: enrichedUser.email, role: enrichedUser.role, tenant_id: enrichedUser.tenant_id });
-          setUser(enrichedUser);
+          const enrichedUser = {
+            ...authUser,
+            email: authUser.email,
+            role: role,
+            tenant_id: tenant_id,
+            plan: tenantPlan
+          };
+              
+          console.log('✅ Setting user with metadata:', { email: enrichedUser.email, role: enrichedUser.role, tenant_id: enrichedUser.tenant_id, plan: enrichedUser.plan });
+          if (mounted) {
+            setUser(enrichedUser);
+            setLoading(false);
+          }
           
           // Optionally verify in background (don't wait for this)
           verifyUserProfile(authUser.id, role, tenant_id);
@@ -142,19 +147,19 @@ if (role && tenant_id) {
           .eq('id', authUser.id)
           .single();
 
-            // Get tenant plan if we have a tenant_id
-            let tenantPlan = 'starter'; // default fallback
-            if (profile?.tenant_id || tenant_id) {
-              const { data: tenant } = await supabase
-                .from('tenants')
-                .select('plan')
-                .eq('id', profile?.tenant_id || tenant_id)
-                .single();
-              
-              if (tenant?.plan) {
-                tenantPlan = tenant.plan;
-              }
-            }
+        // Get tenant plan if we have a tenant_id
+        let tenantPlan = 'starter'; // default fallback
+        if (profile?.tenant_id || tenant_id) {
+          const { data: tenant } = await supabase
+            .from('tenants')
+            .select('plan')
+            .eq('id', profile?.tenant_id || tenant_id)
+            .single();
+          
+          if (tenant?.plan) {
+            tenantPlan = tenant.plan;
+          }
+        }
 
         if (profileError) {
           console.error('❌ Profile fetch error:', profileError);
@@ -166,11 +171,14 @@ if (role && tenant_id) {
             email: authUser.email,
             role: 'business_admin',
             tenant_id: authUser.id,
-            plan: tenantPlan  // ADD THIS LINE
+            plan: tenantPlan
           };
           
-          console.log('✅ Setting fallback user:', { email: fallbackUser.email, role: fallbackUser.role, tenant_id: fallbackUser.tenant_id });
-          setUser(fallbackUser);
+          console.log('✅ Setting fallback user:', { email: fallbackUser.email, role: fallbackUser.role, tenant_id: fallbackUser.tenant_id, plan: fallbackUser.plan });
+          if (mounted) {
+            setUser(fallbackUser);
+            setLoading(false);
+          }
           return;
         }
 
@@ -181,11 +189,14 @@ if (role && tenant_id) {
             email: authUser.email,
             role: profile.role || 'business_admin',
             tenant_id: profile.tenant_id || authUser.id,
-            plan: tenantPlan  // ADD THIS LINE
+            plan: tenantPlan
           };  
           
-          console.log('✅ Setting user with profile data:', { email: enrichedUser.email, role: enrichedUser.role, tenant_id: enrichedUser.tenant_id });
-          setUser(enrichedUser);
+          console.log('✅ Setting user with profile data:', { email: enrichedUser.email, role: enrichedUser.role, tenant_id: enrichedUser.tenant_id, plan: enrichedUser.plan });
+          if (mounted) {
+            setUser(enrichedUser);
+            setLoading(false);
+          }
           
           // Update auth metadata if it's missing - UPDATE BOTH user_metadata AND app_metadata
           if (!role || !tenant_id) {
@@ -197,16 +208,19 @@ if (role && tenant_id) {
         console.error('❌ Error loading user info:', error);
         
         // Ultimate fallback
-          const ultimateFallbackUser = {
-            ...authUser,
-            email: authUser.email,
-            role: 'business_admin',
-            tenant_id: authUser.id,
-            plan: 'starter'  // ADD THIS LINE
-          };
+        const ultimateFallbackUser = {
+          ...authUser,
+          email: authUser.email,
+          role: 'business_admin',
+          tenant_id: authUser.id,
+          plan: 'starter'
+        };
         
-        console.log('✅ Setting ultimate fallback user:', { email: ultimateFallbackUser.email, role: ultimateFallbackUser.role, tenant_id: ultimateFallbackUser.tenant_id });
-        setUser(ultimateFallbackUser);
+        console.log('✅ Setting ultimate fallback user:', { email: ultimateFallbackUser.email, role: ultimateFallbackUser.role, tenant_id: ultimateFallbackUser.tenant_id, plan: ultimateFallbackUser.plan });
+        if (mounted) {
+          setUser(ultimateFallbackUser);
+          setLoading(false);
+        }
       }
     };
 
@@ -219,16 +233,35 @@ if (role && tenant_id) {
           .eq('id', userId)
           .single();
           
-          // If database differs from metadata, update user state
-          if (profile && (profile.role !== currentRole || profile.tenant_id !== currentTenantId)) {
-            console.log('🔄 Profile changed, updating user...');
+        // If database differs from metadata, update user state
+        if (profile && (profile.role !== currentRole || profile.tenant_id !== currentTenantId)) {
+          console.log('🔄 Profile changed, updating user...');
+          
+          // Get updated tenant plan
+          let tenantPlan = 'starter';
+          try {
+            const { data: tenant } = await supabase
+              .from('tenants')
+              .select('plan')
+              .eq('id', profile.tenant_id)
+              .single();
+            
+            if (tenant?.plan) {
+              tenantPlan = tenant.plan;
+            }
+          } catch (error) {
+            console.warn('Could not fetch updated tenant plan:', error);
+          }
+          
+          if (mounted) {
             setUser(prev => ({
               ...prev,
               role: profile.role,
               tenant_id: profile.tenant_id,
-              plan: prev.plan  // ADD THIS LINE
+              plan: tenantPlan
             }));
           }
+        }
       } catch (error) {
         console.log('⚠️ Background verification failed:', error);
       }
@@ -264,7 +297,7 @@ if (role && tenant_id) {
 
         // 🔄 Force session refresh to apply new metadata to JWT
         const { data: refreshedSession, error: refreshError } = await supabase.auth.refreshSession();
-        if (refreshedSession?.session) {
+        if (refreshedSession?.session && mounted) {
           console.log('🔁 Session refreshed to reflect new metadata');
           setSession(refreshedSession.session);
           localStorage.setItem('auth_token', refreshedSession.session.access_token);
@@ -302,6 +335,7 @@ if (role && tenant_id) {
       if (event === 'SIGNED_OUT') {
         setUser(null);
         setSession(null);
+        setLoading(false);
         localStorage.removeItem('auth_token');
       } else if (event === 'TOKEN_REFRESHED') {
         console.log('🔄 Token refreshed');
@@ -390,15 +424,30 @@ if (role && tenant_id) {
           .eq('id', data.user.id)
           .single();
 
+        // Get tenant plan
+        let tenantPlan = 'starter';
+        if (profile?.tenant_id) {
+          const { data: tenant } = await supabase
+            .from('tenants')
+            .select('plan')
+            .eq('id', profile.tenant_id)
+            .single();
+          
+          if (tenant?.plan) {
+            tenantPlan = tenant.plan;
+          }
+        }
+
         if (profile && !profileError) {
           const refreshedUser = {
             ...data.user,
             email: data.user.email,
             role: profile.role || 'business_admin',
-            tenant_id: profile.tenant_id || data.user.id
+            tenant_id: profile.tenant_id || data.user.id,
+            plan: tenantPlan
           };
           
-          console.log('✅ User refreshed:', { email: refreshedUser.email, role: refreshedUser.role, tenant_id: refreshedUser.tenant_id });
+          console.log('✅ User refreshed:', { email: refreshedUser.email, role: refreshedUser.role, tenant_id: refreshedUser.tenant_id, plan: refreshedUser.plan });
           setUser(refreshedUser);
         } else {
           console.log('⚠️ Profile refresh failed, using fallback');
@@ -406,10 +455,11 @@ if (role && tenant_id) {
             ...data.user,
             email: data.user.email,
             role: 'business_admin',
-            tenant_id: data.user.id
+            tenant_id: data.user.id,
+            plan: tenantPlan
           };
           
-          console.log('✅ Fallback user set:', { email: fallbackRefreshUser.email, role: fallbackRefreshUser.role, tenant_id: fallbackRefreshUser.tenant_id });
+          console.log('✅ Fallback user set:', { email: fallbackRefreshUser.email, role: fallbackRefreshUser.role, tenant_id: fallbackRefreshUser.tenant_id, plan: fallbackRefreshUser.plan });
           setUser(fallbackRefreshUser);
         }
       }
@@ -425,6 +475,7 @@ if (role && tenant_id) {
         email: user.email, 
         role: user.role, 
         tenant_id: user.tenant_id,
+        plan: user.plan,
         hasAllRequiredFields: !!(user.email && user.role && user.tenant_id)
       });
     } else {
@@ -445,17 +496,18 @@ if (role && tenant_id) {
 
   const hasFeature = (feature) => {
     try {
-      // Default to 'starter' plan if we don't have plan data yet
-      return checkFeature('starter', feature);
+      // Use the user's actual plan, fallback to 'starter' if not available
+      const plan = user?.plan || 'starter';
+      return checkFeature(plan, feature);
     } catch (error) {
       console.warn('Feature check failed:', error);
       return false;
     }
   };
 
-const getCurrentPlan = () => {
-  return user?.plan || 'starter';
-};
+  const getCurrentPlan = () => {
+    return user?.plan || 'starter';
+  };
 
   // ONLY EXTEND the existing value object - don't change anything else
   const value = { 
