@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { getFeatureValue } from '../../lib/plans';
 import { callEdgeFunction } from '../../lib/edgeFunctionAuth';
 import { 
   X, TrendingUp, Users, Calendar, Mail, BarChart3, Target, 
   MessageSquare, Activity, Clock, CheckCircle, Send, Inbox,
-  AlertTriangle
+  AlertTriangle, Lock
 } from 'lucide-react';
 
 // Edge Function URL
@@ -1075,12 +1076,12 @@ const MetricModalContent = ({ metricType, data, selectedPeriod, onPeriodChange }
 };
 
 // Updated MetricCard Component
-const MetricCard = ({ title, value, subtext, trend, onClick, isClickable = false }) => {
+const MetricCard = ({ title, value, subtext, trend, onClick, isClickable = false, canAccessDetailed = true }) => {
   return (
     <div 
-      className={`bg-white p-4 rounded-xl shadow border text-center ${
+      className={`bg-white p-4 rounded-xl shadow border text-center relative ${
         isClickable ? 'cursor-pointer hover:shadow-lg transition-shadow' : ''
-      }`}
+      } ${!canAccessDetailed ? 'opacity-90' : ''}`}
       onClick={onClick}
     >
       <h3 className="text-sm text-gray-500 mb-1">{title}</h3>
@@ -1094,6 +1095,12 @@ const MetricCard = ({ title, value, subtext, trend, onClick, isClickable = false
         >
           {trend.startsWith('+') ? '▲' : '▼'} {trend.replace(/^[+-]/, '')}
         </p>
+      )}
+      {/* Show lock icon for restricted users */}
+      {!canAccessDetailed && (
+        <div className="absolute top-2 right-2">
+          <Lock className="w-4 h-4 text-gray-400" />
+        </div>
       )}
     </div>
   );
@@ -1324,13 +1331,25 @@ const generateMockData = (metricType) => {
 
 // Main Component
 export default function OverviewMetrics() {
-  const { user } = useAuth();
+  const { user, currentPlan } = useAuth();
   
-  // Single state for managing all modals
-  const [activeModal, setActiveModal] = useState(null);
-  const [selectedPeriod, setSelectedPeriod] = useState('7days');
-  const [modalData, setModalData] = useState(null);
-  const [loadingModal, setLoadingModal] = useState(false);
+  // Get AI Control Room access level from plan
+  const controlRoomAccess = getFeatureValue(currentPlan, 'aiControlRoomAccess');
+  const canAccessDetailedAnalytics = controlRoomAccess === 'full' || controlRoomAccess === 'team_metrics';
+
+  console.log('📊 OverviewMetrics Access:', {
+    currentPlan,
+    controlRoomAccess,
+    canAccessDetailedAnalytics
+  });
+  
+// Single state for managing all modals
+const [activeModal, setActiveModal] = useState(null);
+const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
+const [upgradePromptMetric, setUpgradePromptMetric] = useState('');
+const [selectedPeriod, setSelectedPeriod] = useState('7days');
+const [modalData, setModalData] = useState(null);
+const [loadingModal, setLoadingModal] = useState(false);
 
   const [metrics, setMetrics] = useState({
     totalLeads: 0,
@@ -1345,6 +1364,19 @@ export default function OverviewMetrics() {
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+// Handle metric card click with plan gating
+const handleMetricClick = (metricType, metricName) => {
+  if (!canAccessDetailedAnalytics) {
+    // Show upgrade prompt for basic users
+    setUpgradePromptMetric(metricName);
+    setShowUpgradePrompt(true);
+    return;
+  }
+  
+  // Open detailed modal for advanced users
+  openModal(metricType);
+};
 
   // Handle modal opening
 const openModal = async (metricType) => {
@@ -1588,29 +1620,33 @@ const handlePeriodChange = async (newPeriod) => {
           <MetricCard 
             title="Total Leads" 
             value={metrics.totalLeads} 
-            onClick={() => openModal('totalLeads')}
+            onClick={() => handleMetricClick('totalLeads', 'Total Leads')}
             isClickable={true}
+            canAccessDetailed={canAccessDetailedAnalytics}
           />
           <MetricCard 
             title="Leads This Week" 
             value={metrics.weeklyLeads} 
             trend={t.weeklyLeads}
-            onClick={() => openModal('weeklyLeads')}
+            onClick={() => handleMetricClick('weeklyLeads', 'Weekly Leads')}
             isClickable={true}
+            canAccessDetailed={canAccessDetailedAnalytics}
           />
           <MetricCard 
             title="Hot Lead Conversion Rate" 
             value={metrics.hotLeadRate} 
             trend={t.hotLeadRate}
-            onClick={() => openModal('hotLeadRate')}
+            onClick={() => handleMetricClick('hotLeadRate', 'Hot Lead Rate')}
             isClickable={true}
+            canAccessDetailed={canAccessDetailedAnalytics}
           />
           <MetricCard 
             title="Reply Rate" 
             value={metrics.replyRate} 
             trend={t.replyRate}
-            onClick={() => openModal('replyRate')}
+            onClick={() => handleMetricClick('replyRate', 'Reply Rate')}
             isClickable={true}
+            canAccessDetailed={canAccessDetailedAnalytics}
           />
         </div>
 
@@ -1619,32 +1655,44 @@ const handlePeriodChange = async (newPeriod) => {
           <MetricCard 
             title="Active Leads" 
             value={metrics.activeLeads}
-            onClick={() => openModal('activeLeads')}
+            onClick={() => handleMetricClick('activeLeads', 'Active Leads')}
             isClickable={true}
+            canAccessDetailed={canAccessDetailedAnalytics}
           />
           <MetricCard 
             title="Completed Leads" 
             value={metrics.completedLeads} 
             trend={t.completedLeads}
-            onClick={() => openModal('completedLeads')}
+            onClick={() => handleMetricClick('completedLeads', 'Completed Leads')}
             isClickable={true}
+            canAccessDetailed={canAccessDetailedAnalytics}
           />
           <MetricCard 
             title="Messages Sent" 
             value={metrics.messagesSent} 
             trend={t.messagesSent}
-            onClick={() => openModal('messagesSent')}
+            onClick={() => handleMetricClick('messagesSent', 'Messages Sent')}
             isClickable={true}
+            canAccessDetailed={canAccessDetailedAnalytics}
           />
           <MetricCard 
             title="Messages Received" 
             value={metrics.messagesReceived} 
             trend={t.messagesReceived}
-            onClick={() => openModal('messagesReceived')}
+            onClick={() => handleMetricClick('messagesReceived', 'Messages Received')}
             isClickable={true}
+            canAccessDetailed={canAccessDetailedAnalytics}
           />
         </div>
       </div>
+
+{/* Upgrade Prompt Modal for Basic Users */}
+      {showUpgradePrompt && (
+        <UpgradePrompt 
+          metricName={upgradePromptMetric}
+          onClose={() => setShowUpgradePrompt(false)}
+        />
+      )}
 
       {/* Single Modal that changes content based on activeModal */}
       <ModalWrapper 
