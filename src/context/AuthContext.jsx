@@ -73,6 +73,7 @@ const AuthProvider = ({ children }) => {
             setUser(null);
             setSession(null);
             setLoading(false);
+            console.log('✅ Loading set to false - no session');
           }
         }
         
@@ -107,17 +108,22 @@ const AuthProvider = ({ children }) => {
           // Get tenant plan even when using metadata
           let tenantPlan = 'starter'; // default fallback
           try {
-            const { data: tenant } = await supabase
+            const { data: tenant, error: tenantError } = await supabase
               .from('tenants')
               .select('plan')
               .eq('id', tenant_id)
               .single();
             
-            if (tenant?.plan) {
+            if (tenantError) {
+              console.warn('Could not fetch tenant plan (error):', tenantError);
+            } else if (tenant?.plan) {
               tenantPlan = tenant.plan;
+              console.log('✅ Got tenant plan:', tenantPlan);
+            } else {
+              console.warn('No tenant plan found, using starter');
             }
           } catch (error) {
-            console.warn('Could not fetch tenant plan:', error);
+            console.warn('Could not fetch tenant plan (catch):', error);
           }
 
           const enrichedUser = {
@@ -132,6 +138,7 @@ const AuthProvider = ({ children }) => {
           if (mounted) {
             setUser(enrichedUser);
             setLoading(false);
+            console.log('✅ Loading set to false after metadata user');
           }
           
           // Optionally verify in background (don't wait for this)
@@ -150,14 +157,21 @@ const AuthProvider = ({ children }) => {
         // Get tenant plan if we have a tenant_id
         let tenantPlan = 'starter'; // default fallback
         if (profile?.tenant_id || tenant_id) {
-          const { data: tenant } = await supabase
-            .from('tenants')
-            .select('plan')
-            .eq('id', profile?.tenant_id || tenant_id)
-            .single();
-          
-          if (tenant?.plan) {
-            tenantPlan = tenant.plan;
+          try {
+            const { data: tenant, error: tenantError } = await supabase
+              .from('tenants')
+              .select('plan')
+              .eq('id', profile?.tenant_id || tenant_id)
+              .single();
+            
+            if (tenantError) {
+              console.warn('Could not fetch tenant plan (profile path):', tenantError);
+            } else if (tenant?.plan) {
+              tenantPlan = tenant.plan;
+              console.log('✅ Got tenant plan (profile path):', tenantPlan);
+            }
+          } catch (error) {
+            console.warn('Could not fetch tenant plan (profile catch):', error);
           }
         }
 
@@ -178,6 +192,7 @@ const AuthProvider = ({ children }) => {
           if (mounted) {
             setUser(fallbackUser);
             setLoading(false);
+            console.log('✅ Loading set to false after fallback user');
           }
           return;
         }
@@ -196,6 +211,7 @@ const AuthProvider = ({ children }) => {
           if (mounted) {
             setUser(enrichedUser);
             setLoading(false);
+            console.log('✅ Loading set to false after profile user');
           }
           
           // Update auth metadata if it's missing - UPDATE BOTH user_metadata AND app_metadata
@@ -220,6 +236,7 @@ const AuthProvider = ({ children }) => {
         if (mounted) {
           setUser(ultimateFallbackUser);
           setLoading(false);
+          console.log('✅ Loading set to false after ultimate fallback user');
         }
       }
     };
