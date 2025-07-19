@@ -105,41 +105,69 @@ const AuthProvider = ({ children }) => {
         
         // If we have both from metadata, use them but still verify with database
         if (role && tenant_id) {
-          // Get tenant plan even when using metadata
-          let tenantPlan = 'starter'; // default fallback
-          try {
-            const { data: tenant, error: tenantError } = await supabase
-              .from('tenants')
-              .select('plan')
-              .eq('id', tenant_id)
-              .single();
-            
-            if (tenantError) {
-              console.warn('Could not fetch tenant plan (error):', tenantError);
-            } else if (tenant?.plan) {
-              tenantPlan = tenant.plan;
-              console.log('✅ Got tenant plan:', tenantPlan);
-            } else {
-              console.warn('No tenant plan found, using starter');
-            }
-          } catch (error) {
-            console.warn('Could not fetch tenant plan (catch):', error);
-          }
-
-          const enrichedUser = {
+          console.log('🔄 Attempting to fetch tenant plan...');
+          
+          // Set user immediately with starter plan, then update with real plan
+          const tempUser = {
             ...authUser,
             email: authUser.email,
             role: role,
             tenant_id: tenant_id,
-            plan: tenantPlan
+            plan: 'starter' // temporary fallback
           };
-              
-          console.log('✅ Setting user with metadata:', { email: enrichedUser.email, role: enrichedUser.role, tenant_id: enrichedUser.tenant_id, plan: enrichedUser.plan });
+          
+          console.log('✅ Setting temp user with metadata (starter plan):', { email: tempUser.email, role: tempUser.role, tenant_id: tempUser.tenant_id, plan: tempUser.plan });
           if (mounted) {
-            setUser(enrichedUser);
+            setUser(tempUser);
             setLoading(false);
-            console.log('✅ Loading set to false after metadata user');
+            console.log('✅ Loading set to false after temp metadata user');
           }
+          
+          // Fetch tenant plan in background with timeout
+          const fetchTenantPlan = async () => {
+            try {
+              console.log('🔄 Background: fetching tenant plan...');
+              
+              // Add timeout to prevent hanging
+              const timeoutPromise = new Promise((_, reject) => 
+                setTimeout(() => reject(new Error('Timeout')), 5000)
+              );
+              
+              const fetchPromise = supabase
+                .from('tenants')
+                .select('plan')
+                .eq('id', tenant_id)
+                .single();
+              
+              const { data: tenant, error: tenantError } = await Promise.race([
+                fetchPromise,
+                timeoutPromise
+              ]);
+              
+              if (tenantError) {
+                console.warn('Background: Could not fetch tenant plan (error):', tenantError);
+              } else if (tenant?.plan) {
+                console.log('✅ Background: Got tenant plan:', tenant.plan);
+                
+                // Update user with real plan
+                if (mounted) {
+                  setUser(prev => ({
+                    ...prev,
+                    plan: tenant.plan
+                  }));
+                  console.log('✅ Background: Updated user with real plan:', tenant.plan);
+                }
+              } else {
+                console.warn('Background: No tenant plan found, keeping starter');
+              }
+            } catch (error) {
+              console.warn('Background: Could not fetch tenant plan (catch):', error.message);
+              // Keep using starter plan
+            }
+          };
+          
+          // Don't await this - let it run in background
+          fetchTenantPlan();
           
           // Optionally verify in background (don't wait for this)
           verifyUserProfile(authUser.id, role, tenant_id);
