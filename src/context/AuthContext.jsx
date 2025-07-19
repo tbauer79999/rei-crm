@@ -100,13 +100,14 @@ const AuthProvider = ({ children }) => {
         console.log('🔍 Auth user_metadata - role:', authUser.user_metadata?.role, 'tenant_id:', authUser.user_metadata?.tenant_id);
         console.log('🔍 Final metadata values - role:', role, 'tenant_id:', tenant_id);
         
-        // If we have both from metadata, use them but still verify with database
+// If we have both from metadata, use them but still verify with database
         if (role && tenant_id) {
           const enrichedUser = {
             ...authUser,
             email: authUser.email,
             role: role,
-            tenant_id: tenant_id
+            tenant_id: tenant_id,
+            plan: 'starter'  // ADD THIS LINE
           };
           
           console.log('✅ Setting user with metadata:', { email: enrichedUser.email, role: enrichedUser.role, tenant_id: enrichedUser.tenant_id });
@@ -125,6 +126,20 @@ const AuthProvider = ({ children }) => {
           .eq('id', authUser.id)
           .single();
 
+            // Get tenant plan if we have a tenant_id
+            let tenantPlan = 'starter'; // default fallback
+            if (profile?.tenant_id || tenant_id) {
+              const { data: tenant } = await supabase
+                .from('tenants')
+                .select('plan')
+                .eq('id', profile?.tenant_id || tenant_id)
+                .single();
+              
+              if (tenant?.plan) {
+                tenantPlan = tenant.plan;
+              }
+            }
+
         if (profileError) {
           console.error('❌ Profile fetch error:', profileError);
           
@@ -134,7 +149,8 @@ const AuthProvider = ({ children }) => {
             ...authUser,
             email: authUser.email,
             role: 'business_admin',
-            tenant_id: authUser.id // Use user ID as tenant ID for new business admins
+            tenant_id: authUser.id,
+            plan: tenantPlan  // ADD THIS LINE
           };
           
           console.log('✅ Setting fallback user:', { email: fallbackUser.email, role: fallbackUser.role, tenant_id: fallbackUser.tenant_id });
@@ -148,8 +164,9 @@ const AuthProvider = ({ children }) => {
             ...authUser,
             email: authUser.email,
             role: profile.role || 'business_admin',
-            tenant_id: profile.tenant_id || authUser.id
-          };
+            tenant_id: profile.tenant_id || authUser.id,
+            plan: tenantPlan  // ADD THIS LINE
+          };  
           
           console.log('✅ Setting user with profile data:', { email: enrichedUser.email, role: enrichedUser.role, tenant_id: enrichedUser.tenant_id });
           setUser(enrichedUser);
@@ -164,12 +181,13 @@ const AuthProvider = ({ children }) => {
         console.error('❌ Error loading user info:', error);
         
         // Ultimate fallback
-        const ultimateFallbackUser = {
-          ...authUser,
-          email: authUser.email,
-          role: 'business_admin',
-          tenant_id: authUser.id
-        };
+          const ultimateFallbackUser = {
+            ...authUser,
+            email: authUser.email,
+            role: 'business_admin',
+            tenant_id: authUser.id,
+            plan: 'starter'  // ADD THIS LINE
+          };
         
         console.log('✅ Setting ultimate fallback user:', { email: ultimateFallbackUser.email, role: ultimateFallbackUser.role, tenant_id: ultimateFallbackUser.tenant_id });
         setUser(ultimateFallbackUser);
@@ -185,15 +203,16 @@ const AuthProvider = ({ children }) => {
           .eq('id', userId)
           .single();
           
-        // If database differs from metadata, update user state
-        if (profile && (profile.role !== currentRole || profile.tenant_id !== currentTenantId)) {
-          console.log('🔄 Profile changed, updating user...');
-          setUser(prev => ({
-            ...prev,
-            role: profile.role,
-            tenant_id: profile.tenant_id
-          }));
-        }
+          // If database differs from metadata, update user state
+          if (profile && (profile.role !== currentRole || profile.tenant_id !== currentTenantId)) {
+            console.log('🔄 Profile changed, updating user...');
+            setUser(prev => ({
+              ...prev,
+              role: profile.role,
+              tenant_id: profile.tenant_id,
+              plan: prev.plan  // ADD THIS LINE
+            }));
+          }
       } catch (error) {
         console.log('⚠️ Background verification failed:', error);
       }
@@ -419,8 +438,7 @@ const AuthProvider = ({ children }) => {
   };
 
 const getCurrentPlan = () => {
-  // TODO: Query tenants table - for now hardcode scale for testing
-  return 'scale';
+  return user?.plan || 'starter';
 };
 
   // ONLY EXTEND the existing value object - don't change anything else
@@ -439,7 +457,6 @@ const getCurrentPlan = () => {
     hasPermission,
     hasFeature,
     currentPlan: getCurrentPlan(),
-    userPlan: getCurrentPlan(), // 👈 ADD THIS LINE HERE
     permissions: user?.role ? getRolePermissions(user.role) : []
   };
 
