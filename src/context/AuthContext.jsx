@@ -101,14 +101,30 @@ const AuthProvider = ({ children }) => {
         console.log('🔍 Final metadata values - role:', role, 'tenant_id:', tenant_id);
         
 // If we have both from metadata, use them but still verify with database
-        if (role && tenant_id) {
-          const enrichedUser = {
-            ...authUser,
-            email: authUser.email,
-            role: role,
-            tenant_id: tenant_id,
-            plan: 'starter'  // ADD THIS LINE
-          };
+if (role && tenant_id) {
+  // Get tenant plan even when using metadata
+  let tenantPlan = 'starter'; // default fallback
+  try {
+    const { data: tenant } = await supabase
+      .from('tenants')
+      .select('plan')
+      .eq('id', tenant_id)
+      .single();
+    
+    if (tenant?.plan) {
+      tenantPlan = tenant.plan;
+    }
+  } catch (error) {
+    console.warn('Could not fetch tenant plan:', error);
+  }
+
+  const enrichedUser = {
+    ...authUser,
+    email: authUser.email,
+    role: role,
+    tenant_id: tenant_id,
+    plan: tenantPlan  // ← NOW IT GETS THE REAL PLAN!
+  };
           
           console.log('✅ Setting user with metadata:', { email: enrichedUser.email, role: enrichedUser.role, tenant_id: enrichedUser.tenant_id });
           setUser(enrichedUser);
