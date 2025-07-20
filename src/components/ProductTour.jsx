@@ -528,27 +528,27 @@ const ProductTour = ({ onComplete }) => {
   return (
     <>
       {/* Debug button - remove in production */}
-      {!isActive && !hasCompletedTour && (
-        <button
-          onClick={startTour}
-          className="fixed bottom-4 right-4 z-[9999] bg-purple-600 hover:bg-purple-700 text-white p-3 rounded-full shadow-lg transition-colors flex items-center space-x-2"
-          title="Start Product Tour (Debug)"
-        >
+{!isActive && !hasCompletedTour && (
+  <button
+    onClick={startTour}
+    className="fixed bottom-4 left-4 z-[9999] bg-purple-600 hover:bg-purple-700 text-white p-3 rounded-full shadow-lg transition-colors flex items-center space-x-2"
+    title="Start Product Tour (Debug)"
+  >
           <Play className="w-5 h-5" />
           <span className="hidden sm:block">Start Tour</span>
         </button>
       )}
 
       {/* Restart tour button for users who completed it */}
-      {!isActive && hasCompletedTour && (
-        <button
-          onClick={() => {
-            console.log('🔄 Restarting tour for returning user');
-            startTour();
-          }}
-          className="fixed bottom-4 right-4 z-[9999] bg-gray-600 hover:bg-gray-700 text-white p-3 rounded-full shadow-lg transition-colors flex items-center space-x-2"
-          title="Restart Product Tour"
-        >
+{!isActive && hasCompletedTour && (
+  <button
+    onClick={() => {
+      console.log('🔄 Restarting tour for returning user');
+      startTour();
+    }}
+    className="fixed bottom-4 left-4 z-[9999] bg-gray-600 hover:bg-gray-700 text-white p-3 rounded-full shadow-lg transition-colors flex items-center space-x-2"
+    title="Restart Product Tour"
+  >
           <Play className="w-5 h-5" />
           <span className="hidden sm:block">Restart Tour</span>
         </button>
