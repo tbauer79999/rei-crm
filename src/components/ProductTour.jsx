@@ -249,7 +249,7 @@ const ProductTour = ({ onComplete }) => {
           // Wait a bit for scroll to complete before positioning tooltip
           setTimeout(() => {
             calculateTooltipPosition();
-          }, 800);
+          }, 400);
         } else {
           calculateTooltipPosition();
         }
@@ -266,7 +266,7 @@ const ProductTour = ({ onComplete }) => {
     }
 
     // For Control Room steps with expansion, wait a bit longer for sections to expand
-    const delay = (location.pathname === '/control-room' && currentStepData.expandSection) ? 1200 : 200;
+    const delay = (location.pathname === '/control-room' && currentStepData.expandSection) ? 800 : 200;
     
     // Start checking after a brief delay to let page render
     const initialDelay = setTimeout(waitForElement, delay);
@@ -479,7 +479,7 @@ const ProductTour = ({ onComplete }) => {
       borderRadius: '8px',
       pointerEvents: 'none',
       zIndex: 9998,
-      boxShadow: '0 0 0 9999px rgba(0, 0, 0, 0.6)',
+      boxShadow: '0 0 0 9999px rgba(0, 0, 0, 0.4)',
     };
   };
 
@@ -533,7 +533,7 @@ const ProductTour = ({ onComplete }) => {
       {isActive && isOnCorrectPage && currentStepData && (
         <>
           {/* Dark overlay */}
-          <div className="fixed inset-0 bg-black/60 z-[9997]" />
+          <div className="fixed inset-0 bg-black/40 z-[9997]" />
 
           {/* Spotlight highlight */}
           <div style={getSpotlightStyle()} />
