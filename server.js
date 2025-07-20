@@ -50,7 +50,7 @@ app.use(cors({
     'https://www.getsurfox.com'        // With www subdomain
   ],
   credentials: true,                   // Allow cookies/auth headers
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
 }));
 
