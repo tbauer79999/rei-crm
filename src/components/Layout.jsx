@@ -257,9 +257,6 @@ export default function Layout({ children }) {
 
   // Mark notification as read
   const markAsRead = async (notificationId) => {
-
-  // Mark notification as read
-  const markAsRead = async (notificationId) => {
     try {
       await supabase
         .from('notifications')
@@ -1059,4 +1056,4 @@ export default function Layout({ children }) {
       </div>
     </div>
   );
-}};
+};
