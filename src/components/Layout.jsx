@@ -219,8 +219,6 @@ export default function Layout({ children }) {
     };
   }, [user?.id, user?.tenant_id, role]);
 
-  }, [user?.id, user?.tenant_id, role]);
-
   // Crisp Chat Widget Integration
   useEffect(() => {
     // Don't initialize if no user
@@ -259,7 +257,7 @@ export default function Layout({ children }) {
 
   // Mark notification as read
   const markAsRead = async (notificationId) => {
-    
+
   // Mark notification as read
   const markAsRead = async (notificationId) => {
     try {
