@@ -1,5 +1,4 @@
 const { supabase } = require('./supabaseService');
-const { getFeatureValue } = require('./plans'); // Import plan utilities
 
 // Helper functions (to be exported)
 const fetchAllRecords = async (table) => {
@@ -159,7 +158,5 @@ module.exports = {
   fetchRecordById,
   fetchSettingValue,
   fetchTenantSetting,
-  callEdgeFunction,
-  getRecommendedToneFromScores,
-  getTenantPlan
+  callEdgeFunction
 };
