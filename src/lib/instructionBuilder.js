@@ -102,7 +102,6 @@ function buildInstructionBundle({
  let finalTone = dynamicTone || tone;
  if (tenantId && !dynamicTone) {
    try {
-     const optimizedTone = await getRecommendedToneFromScores(tenantId);
      finalTone = optimizedTone || tone;
    } catch (error) {
      console.warn('Failed to get optimized tone, using default:', error);
