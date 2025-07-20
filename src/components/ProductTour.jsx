@@ -25,6 +25,8 @@ const ProductTour = ({ onComplete }) => {
       title: 'Welcome to SurFox! 🦊',
       content: 'Your AI-powered lead management platform. Let me show you how to transform your business with intelligent automation.',
       placement: 'center',
+      hasVideo: true,
+      videoUrl: 'https://www.youtube.com/embed/YOUR_VIDEO_ID?autoplay=1&mute=1', // Replace with your YouTube embed URL
     },
     {
       page: '/dashboard',
@@ -601,6 +603,35 @@ const ProductTour = ({ onComplete }) => {
               <h3 className="text-xl font-semibold text-gray-900 mb-2">
                 {currentStepData.title}
               </h3>
+              
+              {/* Video for welcome step */}
+              {currentStepData.hasVideo && (
+                <div className="mb-4">
+                  {currentStepData.videoUrl.includes('youtube.com') || currentStepData.videoUrl.includes('youtu.be') ? (
+                    <iframe 
+                      className="w-full rounded-lg shadow-sm"
+                      height="200"
+                      src={currentStepData.videoUrl}
+                      frameBorder="0"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
+                      title="SurFox Product Tour"
+                    />
+                  ) : (
+                    <video 
+                      className="w-full rounded-lg shadow-sm"
+                      controls
+                      autoPlay
+                      muted
+                      style={{ maxHeight: '200px' }}
+                    >
+                      <source src={currentStepData.videoUrl} type="video/mp4" />
+                      Your browser does not support the video tag.
+                    </video>
+                  )}
+                </div>
+              )}
+              
               <p className="text-gray-600 leading-relaxed">
                 {currentStepData.content}
               </p>
@@ -671,5 +702,5 @@ export const startProductTour = () => {
   sessionStorage.setItem('start_product_tour', 'true');
   window.location.reload();
 };
-console.log("hello")
+
 export default ProductTour;
