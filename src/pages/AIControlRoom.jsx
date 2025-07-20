@@ -207,6 +207,20 @@ const AIControlRoom = () => {
     loadData();
   }, []);
 
+  // Add this new useEffect for tour integration
+  useEffect(() => {
+    const handleStorageChange = (e) => {
+      if (e.key === 'controlroom-collapse') {
+        const newState = JSON.parse(e.newValue || '{}');
+        setCollapsed(newState);
+        console.log('📡 Control Room: Received collapse state update from tour');
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
+
   const toggleSection = (id) => {
     const updated = { ...collapsed, [id]: !collapsed[id] };
     setCollapsed(updated);
@@ -277,9 +291,10 @@ const AIControlRoom = () => {
           <div 
             key={id} 
             className={clsx(
-              "bg-white rounded-2xl shadow-sm border transition-all duration-200 hover:shadow-md",
+              "control-room-section bg-white rounded-2xl shadow-sm border transition-all duration-200 hover:shadow-md",
               statusConfig.borderColor
             )}
+            data-section={id}
           >
             <button
               onClick={() => toggleSection(id)}

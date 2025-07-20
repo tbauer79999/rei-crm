@@ -12,6 +12,7 @@ const ProductTour = ({ onComplete }) => {
   const [currentStep, setCurrentStep] = useState(0);
   const [tooltipPosition, setTooltipPosition] = useState({ top: 0, left: 0 });
   const [hasCompletedTour, setHasCompletedTour] = useState(false);
+  const [savedCollapsedState, setSavedCollapsedState] = useState(null);
   const tooltipRef = useRef(null);
   const checkInterval = useRef(null);
 
@@ -52,29 +53,32 @@ const ProductTour = ({ onComplete }) => {
       page: '/control-room',
       target: 'body',
       title: 'AI Pipeline Control Center',
-      content: 'This is your command center. Monitor your entire lead pipeline and AI performance in real-time.',
+      content: 'This is your command center. Monitor your entire lead pipeline and AI performance in real-time. Let me show you the key sections.',
       placement: 'center',
     },
     {
       page: '/control-room',
-      target: '.tour-pipeline-health',
-      title: 'Pipeline Health',
-      content: 'Monitor the health of your sales pipeline with AI-powered insights and recommendations.',
+      target: '.control-room-section[data-section="overview"]',
+      title: 'Overview & Health Metrics',
+      content: 'Monitor system performance, lead counts, and key health metrics. This gives you a real-time pulse on your business.',
       placement: 'bottom',
+      expandSection: 'overview'
     },
     {
       page: '/control-room',
-      target: '.tour-ai-metrics',
-      title: 'AI Performance Metrics',
-      content: 'Track how your AI is performing - response rates, engagement scores, and conversion metrics.',
-      placement: 'top',
+      target: '.control-room-section[data-section="handoff"]', 
+      title: 'Hot Lead Handoff',
+      content: 'Track sales team notifications and response times. See which hot leads need immediate attention.',
+      placement: 'bottom',
+      expandSection: 'handoff'
     },
     {
       page: '/control-room',
-      target: '.tour-active-campaigns',
-      title: 'Active Monitoring',
-      content: 'See which campaigns are running and get alerts when your AI needs attention.',
-      placement: 'right',
+      target: '.control-room-section[data-section="optimization"]',
+      title: 'AI Optimization Insights',
+      content: 'Analyze message performance, keywords, and conversation insights to continuously improve your AI.',
+      placement: 'bottom',
+      expandSection: 'optimization'
     },
 
     // === CAMPAIGN MANAGEMENT STEPS ===
@@ -134,7 +138,7 @@ const ProductTour = ({ onComplete }) => {
         const { data, error } = await supabase
           .from('users_profile')
           .select('tour_completed')
-          .eq('user_id', user.id)
+          .eq('id', user.id)  // Changed from 'user_id' to 'id'
           .single();
         
         if (error) {
@@ -180,6 +184,43 @@ const ProductTour = ({ onComplete }) => {
   const currentStepData = tourSteps[currentStep];
   const isOnCorrectPage = currentStepData && location.pathname === currentStepData.page;
 
+  // Auto-expand Control Room sections during tour
+  useEffect(() => {
+    if (!isActive || !isOnCorrectPage || !currentStepData) return;
+    
+    // Handle Control Room section expansion
+    if (location.pathname === '/control-room' && currentStepData.expandSection) {
+      const sectionId = currentStepData.expandSection;
+      console.log(`🎯 Tour: Expanding ${sectionId} section`);
+      
+      // Save current state if this is the first Control Room step with expansion
+      if (!savedCollapsedState) {
+        const currentState = localStorage.getItem('controlroom-collapse');
+        if (currentState) {
+          setSavedCollapsedState(currentState);
+          console.log('💾 Tour: Saved current collapsed state');
+        }
+      }
+      
+      // Expand the required section
+      const currentCollapsed = JSON.parse(localStorage.getItem('controlroom-collapse') || '{}');
+      const updatedState = { 
+        ...currentCollapsed, 
+        [sectionId]: false // false means expanded
+      };
+      
+      localStorage.setItem('controlroom-collapse', JSON.stringify(updatedState));
+      
+      // Trigger a storage event to notify the Control Room component
+      window.dispatchEvent(new StorageEvent('storage', {
+        key: 'controlroom-collapse',
+        newValue: JSON.stringify(updatedState)
+      }));
+      
+      console.log(`✅ Tour: ${sectionId} section should now be expanded`);
+    }
+  }, [isActive, currentStep, location.pathname, currentStepData, savedCollapsedState]);
+
   // Wait for target element to exist
   useEffect(() => {
     if (!isActive || !isOnCorrectPage) return;
@@ -209,8 +250,11 @@ const ProductTour = ({ onComplete }) => {
       clearTimeout(checkInterval.current);
     }
 
+    // For Control Room steps with expansion, wait a bit longer for sections to expand
+    const delay = (location.pathname === '/control-room' && currentStepData.expandSection) ? 500 : 200;
+    
     // Start checking after a brief delay to let page render
-    const initialDelay = setTimeout(waitForElement, 200);
+    const initialDelay = setTimeout(waitForElement, delay);
 
     return () => {
       clearTimeout(initialDelay);
@@ -329,23 +373,45 @@ const ProductTour = ({ onComplete }) => {
     setIsActive(false);
     sessionStorage.setItem('tour_completed', 'true');
     
+    // Restore original Control Room collapsed state
+    if (savedCollapsedState) {
+      console.log('🔄 Tour: Restoring original collapsed state');
+      localStorage.setItem('controlroom-collapse', savedCollapsedState);
+      
+      // Trigger storage event to update Control Room
+      window.dispatchEvent(new StorageEvent('storage', {
+        key: 'controlroom-collapse',
+        newValue: savedCollapsedState
+      }));
+      
+      setSavedCollapsedState(null);
+    }
+    
     // Save tour completion to database
+    console.log('💾 Attempting to save tour completion for user:', user?.id);
     if (user?.id) {
       try {
-        const { error } = await supabase
+        console.log('📝 Updating users_profile table...');
+        const { data, error } = await supabase
           .from('users_profile')
           .update({ tour_completed: true })
-          .eq('user_id', user.id);
+          .eq('id', user.id)  // Changed from 'user_id' to 'id'
+          .select(); // Add select to see what was updated
         
         if (error) {
-          console.error('❌ Failed to save tour completion:', error);
+          console.error('❌ Supabase error:', error);
+          console.error('❌ Error details:', JSON.stringify(error, null, 2));
         } else {
-          console.log('✅ Tour completion saved to database');
+          console.log('✅ Tour completion saved successfully');
+          console.log('📊 Updated data:', data);
           setHasCompletedTour(true);
         }
       } catch (error) {
-        console.error('❌ Error saving tour completion:', error);
+        console.error('❌ JavaScript error saving tour completion:', error);
       }
+    } else {
+      console.warn('⚠️ No user.id available for saving tour completion');
+      console.log('👤 Current user object:', user);
     }
     
     if (onComplete) onComplete();
@@ -358,6 +424,19 @@ const ProductTour = ({ onComplete }) => {
 
   const handleSkip = () => {
     if (window.confirm('Are you sure you want to skip the tour? You can restart it anytime from the help menu.')) {
+      // Restore collapsed state before completing
+      if (savedCollapsedState) {
+        console.log('🔄 Tour: Restoring original collapsed state (skip)');
+        localStorage.setItem('controlroom-collapse', savedCollapsedState);
+        
+        window.dispatchEvent(new StorageEvent('storage', {
+          key: 'controlroom-collapse',
+          newValue: savedCollapsedState
+        }));
+        
+        setSavedCollapsedState(null);
+      }
+      
       handleComplete();
     }
   };
