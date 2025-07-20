@@ -671,5 +671,5 @@ export const startProductTour = () => {
   sessionStorage.setItem('start_product_tour', 'true');
   window.location.reload();
 };
-
+console.log("hello")
 export default ProductTour;
