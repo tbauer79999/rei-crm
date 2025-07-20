@@ -237,7 +237,22 @@ const ProductTour = ({ onComplete }) => {
       // Check if target element exists
       const element = document.querySelector(target);
       if (element) {
-        calculateTooltipPosition();
+        // For Control Room sections, scroll them into view
+        if (location.pathname === '/control-room' && target.includes('data-section')) {
+          console.log('🎯 Tour: Scrolling section into view');
+          element.scrollIntoView({ 
+            behavior: 'smooth', 
+            block: 'center',
+            inline: 'nearest'
+          });
+          
+          // Wait a bit for scroll to complete before positioning tooltip
+          setTimeout(() => {
+            calculateTooltipPosition();
+          }, 800);
+        } else {
+          calculateTooltipPosition();
+        }
         return;
       }
 
@@ -251,7 +266,7 @@ const ProductTour = ({ onComplete }) => {
     }
 
     // For Control Room steps with expansion, wait a bit longer for sections to expand
-    const delay = (location.pathname === '/control-room' && currentStepData.expandSection) ? 500 : 200;
+    const delay = (location.pathname === '/control-room' && currentStepData.expandSection) ? 1200 : 200;
     
     // Start checking after a brief delay to let page render
     const initialDelay = setTimeout(waitForElement, delay);
@@ -505,7 +520,11 @@ const ProductTour = ({ onComplete }) => {
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
             </svg>
-            <span className="text-gray-700">Loading tour step...</span>
+            <span className="text-gray-700">
+              {location.pathname === '/control-room' && currentStepData?.expandSection 
+                ? 'Expanding section...' 
+                : 'Loading tour step...'}
+            </span>
           </div>
         </div>
       )}
