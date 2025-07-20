@@ -1,4 +1,4 @@
-const { getRecommendedToneFromScores } = require('./lib/supabaseHelpers');
+const { getRecommendedToneFromScores } = require('./supabaseHelpers');
 
 function getToneDescription(tone) {
  if (tone === 'Friendly & Casual') {
