@@ -219,6 +219,47 @@ export default function Layout({ children }) {
     };
   }, [user?.id, user?.tenant_id, role]);
 
+  }, [user?.id, user?.tenant_id, role]);
+
+  // Crisp Chat Widget Integration
+  useEffect(() => {
+    // Don't initialize if no user
+    if (!user?.email) return;
+
+    // Initialize Crisp
+    window.$crisp = [];
+    window.CRISP_WEBSITE_ID = "850ecb8b-77d9-492e-bfc2-265894dc2402";
+    
+    // Set user context for better support
+    window.$crisp.push(["set", "user:email", user.email]);
+    window.$crisp.push(["set", "user:nickname", user.email.split('@')[0]]);
+    window.$crisp.push(["set", "session:data", {
+      company: companyInfo.name,
+      role: role,
+      tenant_id: user.tenant_id,
+      industry: companyInfo.industry
+    }]);
+    
+    // Load Crisp script
+    const script = document.createElement("script");
+    script.src = "https://client.crisp.chat/l.js";
+    script.async = true;
+    document.head.appendChild(script);
+    
+    console.log('✅ Crisp chat widget initialized for:', user.email);
+    
+    return () => {
+      // Cleanup
+      const existingScript = document.querySelector('script[src="https://client.crisp.chat/l.js"]');
+      if (existingScript) {
+        existingScript.remove();
+      }
+    };
+  }, [user?.email, companyInfo.name, role]);
+
+  // Mark notification as read
+  const markAsRead = async (notificationId) => {
+    
   // Mark notification as read
   const markAsRead = async (notificationId) => {
     try {
