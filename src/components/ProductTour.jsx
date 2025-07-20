@@ -1,230 +1,199 @@
-// src/components/ProductTour.jsx
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, Play } from 'lucide-react';
 
 const ProductTour = ({ onComplete }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const tooltipRef = useRef(null);
-  
-  // Get tour state from localStorage
-  const getTourState = () => {
-    const active = localStorage.getItem('tour_active') === 'true';
-    const step = parseInt(localStorage.getItem('tour_step') || '0', 10);
-    return { active, step };
-  };
-  
-  const { active: initialActive, step: initialStep } = getTourState();
-  const [isActive, setIsActive] = useState(initialActive);
-  const [currentStep, setCurrentStep] = useState(initialStep);
+  const [isActive, setIsActive] = useState(false);
+  const [currentStep, setCurrentStep] = useState(0);
   const [tooltipPosition, setTooltipPosition] = useState({ top: 0, left: 0 });
-  const [isPageReady, setIsPageReady] = useState(false);
-  const pageReadyCheckInterval = useRef(null);
-  const mountTime = useRef(Date.now());
+  const tooltipRef = useRef(null);
+  const checkInterval = useRef(null);
 
-  // Multi-page tour steps
-  const steps = [
-    // Dashboard Steps
+  // Tour steps - organized by page
+  const tourSteps = [
+    // === DASHBOARD STEPS ===
     {
       page: '/dashboard',
-      selector: 'body',
+      target: 'body',
       title: 'Welcome to SurFox! 🦊',
       content: 'Your AI-powered lead management platform. Let me show you how to transform your business with intelligent automation.',
       placement: 'center',
     },
     {
       page: '/dashboard',
-      selector: '.tour-stats',
+      target: '.tour-stats',
       title: 'Your Lead Overview',
-      content: 'Quick stats show your total leads, hot prospects, and monthly performance.',
+      content: 'Quick stats show your total leads, hot prospects, and monthly performance at a glance.',
       placement: 'bottom',
     },
     {
       page: '/dashboard',
-      selector: '.tour-add-lead',
+      target: '.tour-add-lead',
       title: 'Add New Leads',
-      content: 'Add leads one at a time or upload hundreds via CSV.',
+      content: 'Add leads one at a time or upload hundreds via CSV. Your AI will start engaging them immediately.',
       placement: 'left',
     },
     {
+      page: '/dashboard',
+      target: '.tour-recent-activity',
+      title: 'Recent Activity',
+      content: 'See real-time updates on your lead interactions and AI engagement activities.',
+      placement: 'top',
+    },
+
+    // === CONTROL ROOM STEPS ===
+    {
       page: '/control-room',
-      selector: 'body',
+      target: 'body',
       title: 'AI Pipeline Control Center',
-      content: 'This is your command center. Monitor your entire lead pipeline in real-time.',
+      content: 'This is your command center. Monitor your entire lead pipeline and AI performance in real-time.',
       placement: 'center',
-      waitForSelector: '.pipeline-section, .control-room-content, main', // Wait for specific control room elements
     },
     {
       page: '/control-room',
-      selector: 'body',
-      title: 'Pipeline Sections',
-      content: 'Each section here shows different aspects of your AI system - health metrics, lead handoffs, and optimization data.',
-      placement: 'center',
+      target: '.tour-pipeline-health',
+      title: 'Pipeline Health',
+      content: 'Monitor the health of your sales pipeline with AI-powered insights and recommendations.',
+      placement: 'bottom',
     },
+    {
+      page: '/control-room',
+      target: '.tour-ai-metrics',
+      title: 'AI Performance Metrics',
+      content: 'Track how your AI is performing - response rates, engagement scores, and conversion metrics.',
+      placement: 'top',
+    },
+    {
+      page: '/control-room',
+      target: '.tour-active-campaigns',
+      title: 'Active Monitoring',
+      content: 'See which campaigns are running and get alerts when your AI needs attention.',
+      placement: 'right',
+    },
+
+    // === CAMPAIGN MANAGEMENT STEPS ===
     {
       page: '/campaign-management',
-      selector: 'body',
+      target: 'body',
       title: 'Campaign Management',
       content: 'Create and manage your lead generation campaigns. Each campaign can have its own AI personality.',
       placement: 'center',
     },
     {
       page: '/campaign-management',
-      selector: 'button',
-      title: 'Launch AI Campaigns',
-      content: 'Create targeted campaigns for different lead sources.',
+      target: '.tour-create-campaign',
+      title: 'Create Campaigns',
+      content: 'Launch targeted campaigns for different lead sources and customize your AI approach.',
+      placement: 'bottom',
+    },
+    {
+      page: '/campaign-management',
+      target: '.tour-campaign-list',
+      title: 'Manage Active Campaigns',
+      content: 'View all your campaigns, track performance, and make adjustments on the fly.',
+      placement: 'top',
+    },
+
+    // === SETTINGS STEPS ===
+    {
+      page: '/settings',
+      target: 'body',
+      title: 'Settings & Configuration',
+      content: 'Configure your AI, manage your team, and customize your platform preferences.',
+      placement: 'center',
+    },
+    {
+      page: '/settings',
+      target: '.tour-ai-config',
+      title: 'AI Configuration',
+      content: 'Fine-tune your AI personality, response style, and automation preferences.',
       placement: 'bottom',
     },
     {
       page: '/settings',
-      selector: 'body',
-      title: 'Settings & Configuration',
-      content: 'Configure your AI, manage your team, and customize your platform. Your AI is now ready to engage leads 24/7!',
-      placement: 'center',
+      target: '.tour-team-management',
+      title: 'Team Management',
+      content: 'Add team members, set permissions, and manage user access. Your AI is now ready to engage leads 24/7!',
+      placement: 'top',
       isLastStep: true,
     },
   ];
 
-  // Initialize tour from flag
+  // Initialize tour when flag is set
   useEffect(() => {
-    const shouldShow = localStorage.getItem('show_product_tour') === 'true';
-    if (shouldShow && !isActive) {
-      localStorage.removeItem('show_product_tour');
-      localStorage.setItem('tour_active', 'true');
-      localStorage.setItem('tour_step', '0');
-      setIsActive(true);
-      setCurrentStep(0);
+    const shouldStart = sessionStorage.getItem('start_product_tour') === 'true';
+    if (shouldStart) {
+      sessionStorage.removeItem('start_product_tour');
+      startTour();
     }
   }, []);
 
-  // Save state to localStorage whenever it changes
-  useEffect(() => {
-    if (isActive) {
-      localStorage.setItem('tour_active', 'true');
-      localStorage.setItem('tour_step', currentStep.toString());
+  // Start tour function
+  const startTour = () => {
+    setIsActive(true);
+    setCurrentStep(0);
+    // Navigate to first page if not already there
+    const firstStep = tourSteps[0];
+    if (location.pathname !== firstStep.page) {
+      navigate(firstStep.page);
     }
-  }, [isActive, currentStep]);
+  };
 
-  // Check if page is ready when location changes
+  // Get current step data
+  const currentStepData = tourSteps[currentStep];
+  const isOnCorrectPage = currentStepData && location.pathname === currentStepData.page;
+
+  // Wait for target element to exist
   useEffect(() => {
-    mountTime.current = Date.now();
-    setIsPageReady(false);
-    
-    if (!isActive) return;
-    
-    const currentStepData = steps[currentStep];
-    if (!currentStepData || currentStepData.page !== location.pathname) return;
-    
-    console.log('Tour: Checking if page is ready for step', currentStep, 'on', location.pathname);
-    
-    // Clear any existing interval
-    if (pageReadyCheckInterval.current) {
-      clearInterval(pageReadyCheckInterval.current);
-    }
-    
-    let checkCount = 0;
-    const maxChecks = 60; // 30 seconds max wait
-    
-    // Function to check if page is ready
-    const checkPageReady = () => {
-      checkCount++;
-      
-      // Check if we have specific elements to wait for
-      if (currentStepData.waitForSelector) {
-        const element = document.querySelector(currentStepData.waitForSelector);
-        if (element) {
-          console.log('Tour: Page element found:', currentStepData.waitForSelector);
-          setIsPageReady(true);
-          if (pageReadyCheckInterval.current) {
-            clearInterval(pageReadyCheckInterval.current);
-          }
-          return true;
-        }
-      }
-      
-      // For control-room specifically, wait a bit longer and check for data
-      if (location.pathname === '/control-room') {
-        const timeSinceMount = Date.now() - mountTime.current;
-        // Wait at least 2 seconds for control room to load
-        if (timeSinceMount > 2000) {
-          console.log('Tour: Control room timer reached, considering ready');
-          setIsPageReady(true);
-          if (pageReadyCheckInterval.current) {
-            clearInterval(pageReadyCheckInterval.current);
-          }
-          return true;
-        }
-      } else {
-        // For other pages, consider ready after 500ms
-        const timeSinceMount = Date.now() - mountTime.current;
-        if (timeSinceMount > 500) {
-          setIsPageReady(true);
-          if (pageReadyCheckInterval.current) {
-            clearInterval(pageReadyCheckInterval.current);
-          }
-          return true;
-        }
-      }
-      
-      // Timeout after max checks
-      if (checkCount >= maxChecks) {
-        console.log('Tour: Page ready check timeout, proceeding anyway');
-        setIsPageReady(true);
-        if (pageReadyCheckInterval.current) {
-          clearInterval(pageReadyCheckInterval.current);
-        }
-        return true;
-      }
-      
-      return false;
-    };
-    
-    // Check immediately
-    if (!checkPageReady()) {
-      // Then check every 500ms
-      pageReadyCheckInterval.current = setInterval(checkPageReady, 500);
-    }
-    
-    // Cleanup
-    return () => {
-      if (pageReadyCheckInterval.current) {
-        clearInterval(pageReadyCheckInterval.current);
-      }
-    };
-  }, [location.pathname, currentStep, isActive]);
+    if (!isActive || !isOnCorrectPage) return;
 
-  // Check if we should show tour on this page
-  const currentStepData = steps[currentStep];
-  const shouldShowOnPage = isActive && 
-                          currentStepData && 
-                          currentStepData.page === location.pathname && 
-                          isPageReady;
-
-  // Set up tour when page is ready
-  useEffect(() => {
-    if (shouldShowOnPage) {
-      console.log('Tour: Page is ready, setting up step', currentStep);
-      const timer = setTimeout(() => {
+    const waitForElement = () => {
+      const target = currentStepData.target;
+      
+      // If targeting body, consider it always ready
+      if (target === 'body') {
         calculateTooltipPosition();
-      }, 300); // Small delay for final render
-      
-      window.addEventListener('resize', calculateTooltipPosition);
-      window.addEventListener('scroll', calculateTooltipPosition);
-      
-      return () => {
-        clearTimeout(timer);
-        window.removeEventListener('resize', calculateTooltipPosition);
-        window.removeEventListener('scroll', calculateTooltipPosition);
-      };
+        return;
+      }
+
+      // Check if target element exists
+      const element = document.querySelector(target);
+      if (element) {
+        calculateTooltipPosition();
+        return;
+      }
+
+      // If element doesn't exist, keep checking
+      checkInterval.current = setTimeout(waitForElement, 100);
+    };
+
+    // Clear any existing interval
+    if (checkInterval.current) {
+      clearTimeout(checkInterval.current);
     }
-  }, [shouldShowOnPage, currentStep]);
 
+    // Start checking after a brief delay to let page render
+    const initialDelay = setTimeout(waitForElement, 200);
+
+    return () => {
+      clearTimeout(initialDelay);
+      if (checkInterval.current) {
+        clearTimeout(checkInterval.current);
+      }
+    };
+  }, [isActive, currentStep, location.pathname]);
+
+  // Calculate tooltip position
   const calculateTooltipPosition = () => {
-    const step = steps[currentStep];
-    if (!step || !tooltipRef.current || step.page !== location.pathname) return;
+    if (!tooltipRef.current || !currentStepData) return;
 
-    if (step.selector === 'body') {
+    const target = currentStepData.target;
+    const placement = currentStepData.placement || 'bottom';
+
+    // Center placement for body or when element not found
+    if (target === 'body') {
       setTooltipPosition({
         top: window.innerHeight / 2 - 150,
         left: window.innerWidth / 2 - 200,
@@ -232,10 +201,9 @@ const ProductTour = ({ onComplete }) => {
       return;
     }
 
-    const element = document.querySelector(step.selector);
+    const element = document.querySelector(target);
     if (!element) {
-      console.warn('Tour element not found:', step.selector);
-      // Fall back to center placement
+      // Fallback to center if element not found
       setTooltipPosition({
         top: window.innerHeight / 2 - 150,
         left: window.innerWidth / 2 - 200,
@@ -249,13 +217,13 @@ const ProductTour = ({ onComplete }) => {
 
     let top, left;
 
-    switch (step.placement) {
-      case 'bottom':
-        top = rect.bottom + padding;
-        left = rect.left + rect.width / 2 - tooltipRect.width / 2;
-        break;
+    switch (placement) {
       case 'top':
         top = rect.top - tooltipRect.height - padding;
+        left = rect.left + rect.width / 2 - tooltipRect.width / 2;
+        break;
+      case 'bottom':
+        top = rect.bottom + padding;
         left = rect.left + rect.width / 2 - tooltipRect.width / 2;
         break;
       case 'left':
@@ -279,46 +247,52 @@ const ProductTour = ({ onComplete }) => {
     setTooltipPosition({ top, left });
   };
 
+  // Handle window resize
+  useEffect(() => {
+    if (!isActive) return;
+
+    const handleResize = () => {
+      setTimeout(calculateTooltipPosition, 100);
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [isActive, currentStep]);
+
+  // Navigation functions
   const handleNext = () => {
-    console.log('Tour: Next button clicked, current step:', currentStep);
     const nextStep = currentStep + 1;
     
-    if (nextStep < steps.length) {
-      const nextStepData = steps[nextStep];
-      console.log('Tour: Moving to step', nextStep, 'on page', nextStepData.page);
-      setCurrentStep(nextStep);
-      
-      // If next step is on a different page, navigate
-      if (nextStepData.page !== location.pathname) {
-        console.log('Tour: Navigating from', location.pathname, 'to', nextStepData.page);
-        navigate(nextStepData.page);
-      }
-    } else {
+    if (nextStep >= tourSteps.length) {
       handleComplete();
+      return;
+    }
+
+    const nextStepData = tourSteps[nextStep];
+    setCurrentStep(nextStep);
+
+    // Navigate to next page if different
+    if (nextStepData.page !== location.pathname) {
+      navigate(nextStepData.page);
     }
   };
 
   const handlePrevious = () => {
-    console.log('Tour: Previous button clicked, current step:', currentStep);
-    if (currentStep > 0) {
-      const prevStep = currentStep - 1;
-      const prevStepData = steps[prevStep];
-      console.log('Tour: Moving back to step', prevStep, 'on page', prevStepData.page);
-      setCurrentStep(prevStep);
-      
-      // If previous step is on a different page, navigate
-      if (prevStepData.page !== location.pathname) {
-        navigate(prevStepData.page);
-      }
+    if (currentStep === 0) return;
+
+    const prevStep = currentStep - 1;
+    const prevStepData = tourSteps[prevStep];
+    setCurrentStep(prevStep);
+
+    // Navigate to previous page if different
+    if (prevStepData.page !== location.pathname) {
+      navigate(prevStepData.page);
     }
   };
 
   const handleComplete = () => {
-    console.log('Tour: Completing tour');
     setIsActive(false);
-    localStorage.removeItem('tour_active');
-    localStorage.removeItem('tour_step');
-    localStorage.setItem('surfox_tour_completed', 'true');
+    sessionStorage.setItem('tour_completed', 'true');
     if (onComplete) onComplete();
     
     // Return to dashboard
@@ -333,40 +307,19 @@ const ProductTour = ({ onComplete }) => {
     }
   };
 
-  // Don't render anything if tour is not active
-  if (!isActive) return null;
-
-  // Show loading state while waiting for page
-  if (currentStepData && currentStepData.page === location.pathname && !isPageReady) {
-    return (
-      <div className="fixed bottom-8 right-8 z-[9999] bg-white rounded-lg shadow-2xl p-4 max-w-sm">
-        <div className="flex items-center space-x-3">
-          <svg className="animate-spin h-5 w-5 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-          </svg>
-          <span className="text-gray-700">Loading tour step...</span>
-        </div>
-      </div>
-    );
-  }
-
-  if (!shouldShowOnPage) return null;
-
-  const isFirstStep = currentStep === 0;
-  const isLastStep = currentStepData.isLastStep || currentStep === steps.length - 1;
-
-  // Get spotlight dimensions
+  // Get spotlight style for highlighting elements
   const getSpotlightStyle = () => {
-    if (currentStepData.selector === 'body') {
+    const target = currentStepData?.target;
+    
+    if (!target || target === 'body') {
       return { display: 'none' };
     }
 
-    const element = document.querySelector(currentStepData.selector);
+    const element = document.querySelector(target);
     if (!element) return { display: 'none' };
 
     const rect = element.getBoundingClientRect();
-    const padding = 20;
+    const padding = 8;
 
     return {
       position: 'fixed',
@@ -377,113 +330,138 @@ const ProductTour = ({ onComplete }) => {
       borderRadius: '8px',
       pointerEvents: 'none',
       zIndex: 9998,
+      boxShadow: '0 0 0 9999px rgba(0, 0, 0, 0.6)',
     };
   };
 
   return (
     <>
-      {/* Dark overlay */}
-      <div className="fixed inset-0 bg-black/60 z-[9997]" />
-
-      {/* Spotlight */}
-      <div 
-        style={{
-          ...getSpotlightStyle(),
-          boxShadow: '0 0 0 9999px rgba(0, 0, 0, 0.6)',
-        }}
-      />
-
-      {/* Tooltip */}
-      <div
-        ref={tooltipRef}
-        className="fixed z-[9999] bg-white rounded-lg shadow-2xl p-6 max-w-md"
-        style={{
-          top: `${tooltipPosition.top}px`,
-          left: `${tooltipPosition.left}px`,
-          animation: 'fadeIn 0.3s ease-out'
-        }}
-      >
-        {/* Close button */}
+      {/* Debug button - remove in production */}
+      {!isActive && (
         <button
-          onClick={handleSkip}
-          className="absolute top-3 right-3 text-gray-400 hover:text-gray-600 transition-colors"
+          onClick={startTour}
+          className="fixed bottom-4 right-4 z-[9999] bg-purple-600 hover:bg-purple-700 text-white p-3 rounded-full shadow-lg transition-colors flex items-center space-x-2"
+          title="Start Product Tour (Debug)"
         >
-          <X className="w-5 h-5" />
+          <Play className="w-5 h-5" />
+          <span className="hidden sm:block">Start Tour</span>
         </button>
+      )}
 
-        {/* Content */}
-        <div className="pr-8">
-          <h3 className="text-xl font-semibold text-gray-900 mb-2">
-            {currentStepData.title}
-          </h3>
-          <p className="text-gray-600 leading-relaxed">
-            {currentStepData.content}
-          </p>
-        </div>
-
-        {/* Footer */}
-        <div className="mt-6 flex items-center justify-between">
-          {/* Step counter */}
-          <div className="flex items-center space-x-1">
-            {steps.map((_, index) => (
-              <div
-                key={index}
-                className={`h-1.5 transition-all duration-300 rounded-full ${
-                  index === currentStep
-                    ? 'w-8 bg-blue-600'
-                    : index < currentStep
-                    ? 'w-1.5 bg-blue-400'
-                    : 'w-1.5 bg-gray-300'
-                }`}
-              />
-            ))}
+      {/* Loading state when tour is active but waiting for page */}
+      {isActive && (!isOnCorrectPage || !currentStepData) && (
+        <div className="fixed bottom-8 right-8 z-[9999] bg-white rounded-lg shadow-2xl p-4 max-w-sm">
+          <div className="flex items-center space-x-3">
+            <svg className="animate-spin h-5 w-5 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <span className="text-gray-700">Loading tour step...</span>
           </div>
+        </div>
+      )}
 
-          {/* Navigation buttons */}
-          <div className="flex items-center space-x-2">
-            {!isFirstStep && (
-              <button
-                onClick={handlePrevious}
-                className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800 transition-colors"
-              >
-                Back
-              </button>
-            )}
-            
-            {!isLastStep && (
-              <button
-                onClick={handleSkip}
-                className="px-3 py-1.5 text-sm text-gray-500 hover:text-gray-700 transition-colors"
-              >
-                Skip tour
-              </button>
-            )}
-            
+      {/* Tour UI - only render when active and on correct page */}
+      {isActive && isOnCorrectPage && currentStepData && (
+        <>
+          {/* Dark overlay */}
+          <div className="fixed inset-0 bg-black/60 z-[9997]" />
+
+          {/* Spotlight highlight */}
+          <div style={getSpotlightStyle()} />
+
+          {/* Tour tooltip */}
+          <div
+            ref={tooltipRef}
+            className="fixed z-[9999] bg-white rounded-lg shadow-2xl p-6 max-w-md animate-in fade-in duration-300"
+            style={{
+              top: `${tooltipPosition.top}px`,
+              left: `${tooltipPosition.left}px`,
+            }}
+          >
+            {/* Close button */}
             <button
-              onClick={handleNext}
-              className="flex items-center space-x-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              onClick={handleSkip}
+              className="absolute top-3 right-3 text-gray-400 hover:text-gray-600 transition-colors"
+              aria-label="Skip tour"
             >
-              <span>{isLastStep ? 'Finish Tour' : 'Next'}</span>
-              <ChevronRight className="w-4 h-4" />
+              <X className="w-5 h-5" />
             </button>
-          </div>
-        </div>
-      </div>
 
-      <style jsx>{`
-        @keyframes fadeIn {
-          from {
-            opacity: 0;
-            transform: scale(0.95);
-          }
-          to {
-            opacity: 1;
-            transform: scale(1);
-          }
-        }
-      `}</style>
+            {/* Content */}
+            <div className="pr-8">
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                {currentStepData.title}
+              </h3>
+              <p className="text-gray-600 leading-relaxed">
+                {currentStepData.content}
+              </p>
+            </div>
+
+            {/* Footer */}
+            <div className="mt-6 flex items-center justify-between">
+              {/* Progress dots */}
+              <div className="flex items-center space-x-1">
+                {tourSteps.map((_, index) => (
+                  <div
+                    key={index}
+                    className={`h-1.5 transition-all duration-300 rounded-full ${
+                      index === currentStep
+                        ? 'w-8 bg-blue-600'
+                        : index < currentStep
+                        ? 'w-1.5 bg-blue-400'
+                        : 'w-1.5 bg-gray-300'
+                    }`}
+                  />
+                ))}
+              </div>
+
+              {/* Navigation buttons */}
+              <div className="flex items-center space-x-2">
+                {currentStep > 0 && (
+                  <button
+                    onClick={handlePrevious}
+                    className="flex items-center space-x-1 px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800 transition-colors"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                    <span>Back</span>
+                  </button>
+                )}
+                
+                {!currentStepData.isLastStep && currentStep < tourSteps.length - 1 && (
+                  <button
+                    onClick={handleSkip}
+                    className="px-3 py-1.5 text-sm text-gray-500 hover:text-gray-700 transition-colors"
+                  >
+                    Skip tour
+                  </button>
+                )}
+                
+                <button
+                  onClick={handleNext}
+                  className="flex items-center space-x-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  <span>
+                    {currentStepData.isLastStep || currentStep === tourSteps.length - 1 
+                      ? 'Finish Tour' 
+                      : 'Next'
+                    }
+                  </span>
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
     </>
   );
+};
+
+// Export function to start tour from anywhere
+export const startProductTour = () => {
+  sessionStorage.setItem('start_product_tour', 'true');
+  window.location.reload();
 };
 
 export default ProductTour;
