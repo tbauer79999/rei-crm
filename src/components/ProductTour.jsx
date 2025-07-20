@@ -186,12 +186,20 @@ const ProductTour = ({ onComplete }) => {
 
   // Auto-expand Control Room sections during tour
   useEffect(() => {
-    if (!isActive || !isOnCorrectPage || !currentStepData) return;
+    if (!isActive || !currentStepData) return;
     
-    // Handle Control Room section expansion
-    if (location.pathname === '/control-room' && currentStepData.expandSection) {
-      const sectionId = currentStepData.expandSection;
-      console.log(`🎯 Tour: Expanding ${sectionId} section`);
+    // Pre-expand the NEXT section when we're on Control Room  
+    const nextStep = currentStep + 1;
+    const nextStepData = tourSteps[nextStep];
+    
+    // If next step is Control Room with expansion, expand it now
+    if (nextStepData && 
+        nextStepData.page === '/control-room' && 
+        nextStepData.expandSection &&
+        location.pathname === '/control-room') {
+      
+      const sectionId = nextStepData.expandSection;
+      console.log(`🎯 Tour: Pre-expanding ${sectionId} section for next step`);
       
       // Save current state if this is the first Control Room step with expansion
       if (!savedCollapsedState) {
@@ -217,7 +225,39 @@ const ProductTour = ({ onComplete }) => {
         newValue: JSON.stringify(updatedState)
       }));
       
-      console.log(`✅ Tour: ${sectionId} section should now be expanded`);
+      console.log(`✅ Tour: ${sectionId} section pre-expanded for next step`);
+    }
+    
+    // Handle current step expansion (for immediate steps)
+    if (location.pathname === '/control-room' && currentStepData.expandSection) {
+      const sectionId = currentStepData.expandSection;
+      console.log(`🎯 Tour: Expanding ${sectionId} section for current step`);
+      
+      // Save current state if this is the first Control Room step with expansion
+      if (!savedCollapsedState) {
+        const currentState = localStorage.getItem('controlroom-collapse');
+        if (currentState) {
+          setSavedCollapsedState(currentState);
+          console.log('💾 Tour: Saved current collapsed state');
+        }
+      }
+      
+      // Expand the required section
+      const currentCollapsed = JSON.parse(localStorage.getItem('controlroom-collapse') || '{}');
+      const updatedState = { 
+        ...currentCollapsed, 
+        [sectionId]: false // false means expanded
+      };
+      
+      localStorage.setItem('controlroom-collapse', JSON.stringify(updatedState));
+      
+      // Trigger a storage event to notify the Control Room component
+      window.dispatchEvent(new StorageEvent('storage', {
+        key: 'controlroom-collapse',
+        newValue: JSON.stringify(updatedState)
+      }));
+      
+      console.log(`✅ Tour: ${sectionId} section expanded for current step`);
     }
   }, [isActive, currentStep, location.pathname, currentStepData, savedCollapsedState]);
 
@@ -265,8 +305,8 @@ const ProductTour = ({ onComplete }) => {
       clearTimeout(checkInterval.current);
     }
 
-    // For Control Room steps with expansion, wait a bit longer for sections to expand
-    const delay = (location.pathname === '/control-room' && currentStepData.expandSection) ? 800 : 200;
+    // For Control Room steps with expansion, shorter wait since section should already be expanding
+    const delay = (location.pathname === '/control-room' && currentStepData.expandSection) ? 400 : 200;
     
     // Start checking after a brief delay to let page render
     const initialDelay = setTimeout(waitForElement, delay);
@@ -479,7 +519,6 @@ const ProductTour = ({ onComplete }) => {
       borderRadius: '8px',
       pointerEvents: 'none',
       zIndex: 9998,
-      boxShadow: '0 0 0 9999px rgba(0, 0, 0, 0.4)',
     };
   };
 
@@ -532,11 +571,23 @@ const ProductTour = ({ onComplete }) => {
       {/* Tour UI - only render when active and on correct page */}
       {isActive && isOnCorrectPage && currentStepData && (
         <>
-          {/* Dark overlay */}
-          <div className="fixed inset-0 bg-black/40 z-[9997]" />
+          {/* Dark overlay with cutout for highlighted element */}
+          <div 
+            className="fixed inset-0 z-[9997]"
+            style={{
+              background: currentStepData.target === 'body' 
+                ? 'rgba(0, 0, 0, 0.4)'
+                : `radial-gradient(circle at ${tooltipPosition.left + 200}px ${tooltipPosition.top + 150}px, transparent 250px, rgba(0, 0, 0, 0.4) 300px)`
+            }}
+          />
 
-          {/* Spotlight highlight */}
-          <div style={getSpotlightStyle()} />
+          {/* Spotlight highlight - now just a subtle border */}
+          <div style={{
+            ...getSpotlightStyle(),
+            boxShadow: 'none',
+            border: '2px solid #3B82F6',
+            background: 'transparent'
+          }} />
 
           {/* Tour tooltip */}
           <div
