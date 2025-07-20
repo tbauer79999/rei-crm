@@ -1,5 +1,3 @@
-const { getRecommendedToneFromScores } = require('./supabaseHelpers');
-
 function getToneDescription(tone) {
  if (tone === 'Friendly & Casual') {
    return "Use casual contractions (I'm, you'll), emojis where helpful, and sound like someone texting a neighbor. Keep the tone light, helpful, and non-corporate. Avoid hard selling.";
@@ -89,16 +87,15 @@ ALWAYS:
 - Replace vague responses with concrete data`;
 }
 
-async function buildInstructionBundle({
- tone,
- persona,
- industry,
- role,
- leadDetails,
- knowledgeBase,
- campaignMetadata = {},
- dynamicTone = null,
- tenantId = null
+function buildInstructionBundle({
+  tone,
+  persona,
+  industry,
+  role,
+  leadDetails,
+  knowledgeBase,
+  campaignMetadata = {},
+  dynamicTone = null
 }) {
 
  // Get AI-optimized tone based on plan if tenantId provided
