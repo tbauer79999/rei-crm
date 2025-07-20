@@ -1,13 +1,17 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { X, ChevronLeft, ChevronRight, Play } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+import supabase from '../lib/supabaseClient';
 
 const ProductTour = ({ onComplete }) => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { user } = useAuth();
   const [isActive, setIsActive] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
   const [tooltipPosition, setTooltipPosition] = useState({ top: 0, left: 0 });
+  const [hasCompletedTour, setHasCompletedTour] = useState(false);
   const tooltipRef = useRef(null);
   const checkInterval = useRef(null);
 
@@ -121,14 +125,45 @@ const ProductTour = ({ onComplete }) => {
     },
   ];
 
+  // Check if user has completed tour from database
+  useEffect(() => {
+    const checkTourStatus = async () => {
+      if (!user?.id) return;
+      
+      try {
+        const { data, error } = await supabase
+          .from('users_profile')
+          .select('tour_completed')
+          .eq('user_id', user.id)
+          .single();
+        
+        if (error) {
+          console.error('Error checking tour status:', error);
+          return;
+        }
+        
+        setHasCompletedTour(data?.tour_completed || false);
+      } catch (error) {
+        console.error('Error in tour status check:', error);
+      }
+    };
+    
+    checkTourStatus();
+  }, [user?.id]);
+
   // Initialize tour when flag is set
   useEffect(() => {
     const shouldStart = sessionStorage.getItem('start_product_tour') === 'true';
-    if (shouldStart) {
+    
+    if (shouldStart && !hasCompletedTour) {
+      console.log('🎯 Starting tour for new user');
       sessionStorage.removeItem('start_product_tour');
       startTour();
+    } else if (shouldStart && hasCompletedTour) {
+      console.log('👤 User has already completed tour, not starting');
+      sessionStorage.removeItem('start_product_tour');
     }
-  }, []);
+  }, [hasCompletedTour]);
 
   // Start tour function
   const startTour = () => {
@@ -290,9 +325,29 @@ const ProductTour = ({ onComplete }) => {
     }
   };
 
-  const handleComplete = () => {
+  const handleComplete = async () => {
     setIsActive(false);
     sessionStorage.setItem('tour_completed', 'true');
+    
+    // Save tour completion to database
+    if (user?.id) {
+      try {
+        const { error } = await supabase
+          .from('users_profile')
+          .update({ tour_completed: true })
+          .eq('user_id', user.id);
+        
+        if (error) {
+          console.error('❌ Failed to save tour completion:', error);
+        } else {
+          console.log('✅ Tour completion saved to database');
+          setHasCompletedTour(true);
+        }
+      } catch (error) {
+        console.error('❌ Error saving tour completion:', error);
+      }
+    }
+    
     if (onComplete) onComplete();
     
     // Return to dashboard
@@ -337,7 +392,7 @@ const ProductTour = ({ onComplete }) => {
   return (
     <>
       {/* Debug button - remove in production */}
-      {!isActive && (
+      {!isActive && !hasCompletedTour && (
         <button
           onClick={startTour}
           className="fixed bottom-4 right-4 z-[9999] bg-purple-600 hover:bg-purple-700 text-white p-3 rounded-full shadow-lg transition-colors flex items-center space-x-2"
@@ -345,6 +400,21 @@ const ProductTour = ({ onComplete }) => {
         >
           <Play className="w-5 h-5" />
           <span className="hidden sm:block">Start Tour</span>
+        </button>
+      )}
+
+      {/* Restart tour button for users who completed it */}
+      {!isActive && hasCompletedTour && (
+        <button
+          onClick={() => {
+            console.log('🔄 Restarting tour for returning user');
+            startTour();
+          }}
+          className="fixed bottom-4 right-4 z-[9999] bg-gray-600 hover:bg-gray-700 text-white p-3 rounded-full shadow-lg transition-colors flex items-center space-x-2"
+          title="Restart Product Tour"
+        >
+          <Play className="w-5 h-5" />
+          <span className="hidden sm:block">Restart Tour</span>
         </button>
       )}
 
