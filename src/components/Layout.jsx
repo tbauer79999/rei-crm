@@ -5,6 +5,7 @@ import {
   BarChart2, Settings, Home, ChevronLeft, ChevronRight, LogOut, Menu, X, TrendingUp, Brain, Megaphone,
   Bell, Search, HelpCircle, ChevronDown, ChevronUp, User
 } from 'lucide-react';
+import ProductTour from './ProductTour';
 import { useAuth } from '../context/AuthContext';
 import supabase from '../lib/supabaseClient';
 
@@ -994,10 +995,28 @@ export default function Layout({ children }) {
           </div>
         </header>
 
-        {/* Main content area */}
+{/* Main content area */}
         <main className="flex-1 p-4 lg:p-6 bg-gray-50">
           {children}
         </main>
+        
+        {/* Debug Tour Button - Remove in production */}
+        <button
+          onClick={() => {
+            sessionStorage.setItem('start_product_tour', 'true');
+            window.location.reload();
+          }}
+          className="fixed bottom-4 right-4 z-[9999] bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-full shadow-lg transition-colors flex items-center space-x-2"
+          title="Start Product Tour (Debug)"
+        >
+          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
+          </svg>
+          <span className="hidden sm:block">Start Tour</span>
+        </button>
+        
+        {/* Add ProductTour here */}
+        <ProductTour />
       </div>
     </div>
   );
