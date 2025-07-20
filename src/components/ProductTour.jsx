@@ -519,6 +519,7 @@ const ProductTour = ({ onComplete }) => {
       borderRadius: '8px',
       pointerEvents: 'none',
       zIndex: 9998,
+      boxShadow: '0 0 0 9999px rgba(0, 0, 0, 0.25)',
     };
   };
 
@@ -571,23 +572,11 @@ const ProductTour = ({ onComplete }) => {
       {/* Tour UI - only render when active and on correct page */}
       {isActive && isOnCorrectPage && currentStepData && (
         <>
-          {/* Dark overlay with cutout for highlighted element */}
-          <div 
-            className="fixed inset-0 z-[9997]"
-            style={{
-              background: currentStepData.target === 'body' 
-                ? 'rgba(0, 0, 0, 0.4)'
-                : `radial-gradient(circle at ${tooltipPosition.left + 200}px ${tooltipPosition.top + 150}px, transparent 250px, rgba(0, 0, 0, 0.4) 300px)`
-            }}
-          />
+          {/* Dark overlay */}
+          <div className="fixed inset-0 bg-black/25 z-[9997]" />
 
-          {/* Spotlight highlight - now just a subtle border */}
-          <div style={{
-            ...getSpotlightStyle(),
-            boxShadow: 'none',
-            border: '2px solid #3B82F6',
-            background: 'transparent'
-          }} />
+          {/* Spotlight highlight */}
+          <div style={getSpotlightStyle()} />
 
           {/* Tour tooltip */}
           <div
