@@ -1,70 +1,72 @@
+const { getRecommendedToneFromScores } = require('./lib/supabaseHelpers');
+
 function getToneDescription(tone) {
-  if (tone === 'Friendly & Casual') {
-    return "Use casual contractions (I'm, you'll), emojis where helpful, and sound like someone texting a neighbor. Keep the tone light, helpful, and non-corporate. Avoid hard selling.";
-  }
-  return '';
+ if (tone === 'Friendly & Casual') {
+   return "Use casual contractions (I'm, you'll), emojis where helpful, and sound like someone texting a neighbor. Keep the tone light, helpful, and non-corporate. Avoid hard selling.";
+ }
+ return '';
 }
 
 function getPersonaDescription(persona) {
-  if (persona === 'Closer') {
-    return "You are selling. Be firm and clear. Use bold action language like Let's make this happen today or This is your best shot. Eliminate hesitation.";
-  }
-  return '';
+ if (persona === 'Closer') {
+   return "You are selling. Be firm and clear. Use bold action language like Let's make this happen today or This is your best shot. Eliminate hesitation.";
+ }
+ return '';
 }
 
 function getIndustryDescription(industry) {
-  const descriptions = {
-    'Real Estate': "You are a real estate professional communicating with sellers, buyers, or homeowners. Your messaging should balance clarity, confidence, and a sense of local trust.",
-    'Staffing': "You help connect job seekers with opportunities and coordinate the hiring process. Keep communication clear, timely, and professional. When someone mentions a location or role type, immediately provide specific opportunities from your knowledge base.",
-    'Home Services': "You represent a service provider like HVAC, Roofing, or Solar. Be friendly, fast, and clear — and help the lead feel it's easy to move forward.",
-    'Financial Services': "You help clients improve their financial position. That might include credit, taxes, lending, or insurance. Build trust with clarity, not pressure.",
-    'Auto Sales': "You represent a dealership. Messaging should sound helpful, not pushy. Offer to answer questions or help them get started easily."
-  };
-  return descriptions[industry] || '';
+ const descriptions = {
+   'Real Estate': "You are a real estate professional communicating with sellers, buyers, or homeowners. Your messaging should balance clarity, confidence, and a sense of local trust.",
+   'Staffing': "You help connect job seekers with opportunities and coordinate the hiring process. Keep communication clear, timely, and professional. When someone mentions a location or role type, immediately provide specific opportunities from your knowledge base.",
+   'Home Services': "You represent a service provider like HVAC, Roofing, or Solar. Be friendly, fast, and clear — and help the lead feel it's easy to move forward.",
+   'Financial Services': "You help clients improve their financial position. That might include credit, taxes, lending, or insurance. Build trust with clarity, not pressure.",
+   'Auto Sales': "You represent a dealership. Messaging should sound helpful, not pushy. Offer to answer questions or help them get started easily."
+ };
+ return descriptions[industry] || '';
 }
 
 function getRoleDescription(role, industry) {
-  if (industry === 'Real Estate' && role === 'Wholesaler') {
-    return "You are a real estate investor helping sellers avoid the listing process. You specialize in off-market deals and make the experience feel simple and low-pressure. Avoid references to commissions or being an agent.";
-  }
-  if (industry === 'Staffing' && role === 'Recruiter') {
-    return "You are reaching out about job opportunities. Mention role fit, schedule, or interest check. Be concise and approachable. When leads mention locations, specialties, or job types, immediately provide specific opportunities from your knowledge base rather than generic responses.";
-  }
-  return '';
+ if (industry === 'Real Estate' && role === 'Wholesaler') {
+   return "You are a real estate investor helping sellers avoid the listing process. You specialize in off-market deals and make the experience feel simple and low-pressure. Avoid references to commissions or being an agent.";
+ }
+ if (industry === 'Staffing' && role === 'Recruiter') {
+   return "You are reaching out about job opportunities. Mention role fit, schedule, or interest check. Be concise and approachable. When leads mention locations, specialties, or job types, immediately provide specific opportunities from your knowledge base rather than generic responses.";
+ }
+ return '';
 }
 
 function getCampaignStrategy({ industry, service_type, talk_track, vehicle_type }) {
-  if (industry === 'Staffing') {
-    if (talk_track === 'Recruiting Candidates (B2C)') {
-      return "This campaign is focused on recruiting candidates for open roles. Messages should check for interest, qualifications, and timing. Proactively share specific job opportunities when relevant.";
-    }
-    if (talk_track === 'Acquiring Clients (B2B)') {
-      return "This campaign is focused on signing new business clients who need staffing help. Messaging should build credibility and invite a call. When clients ask about capabilities, provide specific examples from your knowledge base.";
-    }
-  }
+ if (industry === 'Staffing') {
+   if (talk_track === 'Recruiting Candidates (B2C)') {
+     return "This campaign is focused on recruiting candidates for open roles. Messages should check for interest, qualifications, and timing. Proactively share specific job opportunities when relevant.";
+   }
+   if (talk_track === 'Acquiring Clients (B2B)') {
+     return "This campaign is focused on signing new business clients who need staffing help. Messaging should build credibility and invite a call. When clients ask about capabilities, provide specific examples from your knowledge base.";
+   }
+ }
 
-  if (industry === 'Home Services' && service_type) {
-    return `This campaign is for ${service_type} services. Help the lead feel it's fast and easy to get a quote or inspection.`;
-  }
+ if (industry === 'Home Services' && service_type) {
+   return `This campaign is for ${service_type} services. Help the lead feel it's fast and easy to get a quote or inspection.`;
+ }
 
-  if (industry === 'Financial Services' && service_type) {
-    return `This campaign is focused on ${service_type}. Messaging should build trust and offer a clear next step without pressure.`;
-  }
+ if (industry === 'Financial Services' && service_type) {
+   return `This campaign is focused on ${service_type}. Messaging should build trust and offer a clear next step without pressure.`;
+ }
 
-  if (industry === 'Auto Sales' && vehicle_type) {
-    return `This campaign targets ${vehicle_type} leads. Messages should be friendly, helpful, and guide them toward the lot or a quote.`;
-  }
+ if (industry === 'Auto Sales' && vehicle_type) {
+   return `This campaign targets ${vehicle_type} leads. Messages should be friendly, helpful, and guide them toward the lot or a quote.`;
+ }
 
-  if (industry === 'Mortgage Lending' && service_type) {
-    return `This campaign is for ${service_type} mortgage leads. Be clear and approachable — help them take the next step easily.`;
-  }
+ if (industry === 'Mortgage Lending' && service_type) {
+   return `This campaign is for ${service_type} mortgage leads. Be clear and approachable — help them take the next step easily.`;
+ }
 
-  return '';
+ return '';
 }
 
 // UNIVERSAL: Knowledge base usage instructions for any industry
 function getKnowledgeBaseInstructions() {
-  return `
+ return `
 === KNOWLEDGE BASE USAGE (CRITICAL) ===
 Your knowledge base contains specific information about your company's offerings. Use it aggressively and proactively:
 
@@ -87,36 +89,47 @@ ALWAYS:
 - Replace vague responses with concrete data`;
 }
 
-function buildInstructionBundle({
-  tone,
-  persona,
-  industry,
-  role,
-  leadDetails,
-  knowledgeBase,
-  campaignMetadata = {},
-  dynamicTone = null
+async function buildInstructionBundle({
+ tone,
+ persona,
+ industry,
+ role,
+ leadDetails,
+ knowledgeBase,
+ campaignMetadata = {},
+ dynamicTone = null,
+ tenantId = null
 }) {
 
-  const finalTone = dynamicTone || tone;
+ // Get AI-optimized tone based on plan if tenantId provided
+ let finalTone = dynamicTone || tone;
+ if (tenantId && !dynamicTone) {
+   try {
+     const optimizedTone = await getRecommendedToneFromScores(tenantId);
+     finalTone = optimizedTone || tone;
+   } catch (error) {
+     console.warn('Failed to get optimized tone, using default:', error);
+     finalTone = tone;
+   }
+ }
 
-  const toneBlock = `TONE: ${finalTone}
+ const toneBlock = `TONE: ${finalTone}
 ${getToneDescription(finalTone)}`;
 
-  const personaBlock = `PERSONA: ${persona}
+ const personaBlock = `PERSONA: ${persona}
 ${getPersonaDescription(persona)}`;
 
-  const industryBlock = `INDUSTRY: ${industry}
+ const industryBlock = `INDUSTRY: ${industry}
 ${getIndustryDescription(industry)}`;
 
-  const roleBlock = `ROLE: ${role}
+ const roleBlock = `ROLE: ${role}
 ${getRoleDescription(role, industry)}`;
 
-  const strategyBlock = getCampaignStrategy({ industry, ...campaignMetadata });
-  
-  const knowledgeInstructions = getKnowledgeBaseInstructions();
+ const strategyBlock = getCampaignStrategy({ industry, ...campaignMetadata });
+ 
+ const knowledgeInstructions = getKnowledgeBaseInstructions();
 
-  const profileBlock = `
+ const profileBlock = `
 ${toneBlock}
 
 ${personaBlock}
@@ -126,7 +139,7 @@ ${industryBlock}
 ${roleBlock}
 `.trim();
 
-  return `=== PRIMARY GOAL ===
+ return `=== PRIMARY GOAL ===
 Your mission is to find out if the lead is interested, qualified, and ready to move forward. Move them toward a decision or disqualify politely.
 
 === CRITICAL BEHAVIOR RULES ===
@@ -173,34 +186,34 @@ ${knowledgeBase}`;
 }
 
 function buildInitialInstruction({
-  tone,
-  persona,
-  industry,
-  role,
-  leadDetails,
-  knowledgeBase,
-  campaignMetadata = {}
+ tone,
+ persona,
+ industry,
+ role,
+ leadDetails,
+ knowledgeBase,
+ campaignMetadata = {}
 }) {
-  console.log('🚨 buildInitialInstruction was called');
-  console.log('🧠 Runtime campaign metadata:', campaignMetadata);
-  
-  const toneBlock = `TONE: ${tone}
+ console.log('🚨 buildInitialInstruction was called');
+ console.log('🧠 Runtime campaign metadata:', campaignMetadata);
+ 
+ const toneBlock = `TONE: ${tone}
 ${getToneDescription(tone)}`;
 
-  const personaBlock = `PERSONA: ${persona}
+ const personaBlock = `PERSONA: ${persona}
 ${getPersonaDescription(persona)}`;
 
-  const industryBlock = `INDUSTRY: ${industry}
+ const industryBlock = `INDUSTRY: ${industry}
 ${getIndustryDescription(industry)}`;
 
-  const roleBlock = `ROLE: ${role}
+ const roleBlock = `ROLE: ${role}
 ${getRoleDescription(role, industry)}`;
 
-  const strategyBlock = getCampaignStrategy({ industry, ...campaignMetadata });
-  
-  const knowledgeInstructions = getKnowledgeBaseInstructions();
+ const strategyBlock = getCampaignStrategy({ industry, ...campaignMetadata });
+ 
+ const knowledgeInstructions = getKnowledgeBaseInstructions();
 
-  const profileBlock = `
+ const profileBlock = `
 ${toneBlock}
 
 ${personaBlock}
@@ -210,7 +223,7 @@ ${industryBlock}
 ${roleBlock}
 `.trim();
 
-  return `You are writing SMS messages on behalf of a business. Your job is to sound like a real human — warm, conversational, and respectful.
+ return `You are writing SMS messages on behalf of a business. Your job is to sound like a real human — warm, conversational, and respectful.
 
 Before writing your first message, understand the context of this lead. Think critically about who they are, what they need, and how to spark engagement.
 
@@ -242,12 +255,12 @@ ${knowledgeBase}`;
 }
 
 export {
-  buildInstructionBundle,
-  buildInitialInstruction,
-  getToneDescription,
-  getPersonaDescription,
-  getIndustryDescription,
-  getRoleDescription,
-  getCampaignStrategy,
-  getKnowledgeBaseInstructions
+ buildInstructionBundle,
+ buildInitialInstruction,
+ getToneDescription,
+ getPersonaDescription,
+ getIndustryDescription,
+ getRoleDescription,
+ getCampaignStrategy,
+ getKnowledgeBaseInstructions
 };

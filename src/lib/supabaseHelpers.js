@@ -1,5 +1,5 @@
 const { supabase } = require('./supabaseService');
-
+const { getFeatureValue } = require('./plans'); // Import plan utilities
 
 // Helper functions (to be exported)
 const fetchAllRecords = async (table) => {
@@ -22,26 +22,61 @@ const fetchRecordById = async (table, id) => {
     .single();
 
   if (error) {
-    // Log the error or handle it as per application's needs
-    // console.error(`Error in fetchRecordById for table ${table}, id ${id}: ${error.message}`);
-    // Rethrow or return null/undefined based on how callers expect to handle it
     throw new Error(`Failed to fetch record from ${table} with id ${id}: ${error.message}`);
   }
 
   return data;
 };
 
+// Add new function to get tenant's plan
+const getTenantPlan = async (tenantId) => {
+  const { data, error } = await supabase
+    .from('tenants')
+    .select('plan')
+    .eq('id', tenantId)
+    .single();
+    
+  if (error || !data) {
+    console.warn('Could not fetch tenant plan, defaulting to starter');
+    return 'starter';
+  }
+  
+  return data.plan || 'starter';
+};
+
+// Updated function with plan-based limits
 const getRecommendedToneFromScores = async (tenantId) => {
-  const { data: recentScores, error } = await supabase
+  // Get tenant's plan
+  const tenantPlan = await getTenantPlan(tenantId);
+  
+  // Get conversation memory limit from plan
+  const conversationLimit = getFeatureValue(tenantPlan, 'conversationMemory');
+  
+  // If starter plan (limit = 0), return default tone
+  if (conversationLimit === 0) {
+    console.log(`🎯 Tenant ${tenantId} on ${tenantPlan} plan - no AI learning, using default tone`);
+    return 'Friendly & Casual';
+  }
+  
+  // Build query with plan-based limit
+  let query = supabase
     .from('lead_scores')
     .select('motivation_score, hesitation_score, urgency_score, interest_level_score')
     .eq('tenant_id', tenantId)
-    .order('updated_at', { ascending: false })
-    .limit(100);
+    .order('updated_at', { ascending: false });
+  
+  // Apply limit based on plan (unless unlimited)
+  if (conversationLimit !== -1) {
+    query = query.limit(conversationLimit);
+  }
+  
+  const { data: recentScores, error } = await query;
+
+  console.log(`🎯 AI Learning: ${tenantPlan} plan analyzing ${recentScores?.length || 0} conversations (limit: ${conversationLimit === -1 ? 'unlimited' : conversationLimit})`);
 
   if (error || !recentScores || recentScores.length === 0) {
     console.warn('No lead_scores data found or error occurred:', error);
-    return 'Friendly & Casual'; // fallback tone
+    return 'Friendly & Casual';
   }
 
   const highPerformers = recentScores.filter(
@@ -61,21 +96,19 @@ const getRecommendedToneFromScores = async (tenantId) => {
   return 'Friendly & Casual';
 };
 
-
-
 const fetchSettingValue = async (key) => {
   const { data, error } = await supabase
     .from('platform_settings')
-    .select('value') // Corrected 'Value' to 'value'
-    .eq('key', key)   // Corrected 'Key' to 'key'
+    .select('value')
+    .eq('key', key)
     .single();
 
   if (error) {
     console.error(`Error fetching setting "${key}":`, error.message);
-    return ''; // Default value or error handling as appropriate
+    return '';
   }
 
-  return data?.value || ''; // Corrected data.Value to data.value
+  return data?.value || '';
 };
 
 const callEdgeFunction = async (functionName, options = {}) => {
@@ -127,5 +160,6 @@ module.exports = {
   fetchSettingValue,
   fetchTenantSetting,
   callEdgeFunction,
-  getRecommendedToneFromScores 
+  getRecommendedToneFromScores,
+  getTenantPlan
 };
