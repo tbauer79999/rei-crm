@@ -2,10 +2,10 @@ import React, { useState } from 'react';
 import { Brain, TrendingUp, Users, MessageSquare, Lock, Zap, Target, Award, BarChart3, ArrowUp, ArrowDown, Info, Crown, Sparkles } from 'lucide-react';
 
 const LearningTab = () => {
-  const [userPlan] = useState('growth'); // growth, scale, enterprise
-  const [learningData] = useState({
+    const { currentPlan } = useAuth(); // growth, scale, enterprise
+    const [learningData] = useState({
     conversationsAnalyzed: 847,
-    planLimit: userPlan === 'growth' ? 1000 : userPlan === 'scale' ? 10000 : 'unlimited',
+    planLimit: currentPlan === 'growth' ? 1000 : currentPlan === 'scale' ? 10000 : 'unlimited',
     improvementRate: 23,
     patternsDiscovered: 47,
     optimizedTone: 'Direct Closer',
@@ -29,8 +29,8 @@ const LearningTab = () => {
   };
 
   const LearningProgress = () => {
-    const progress = userPlan === 'enterprise' ? 100 : 
-                    userPlan === 'scale' ? 8.47 : 
+    const progress = currentPlan  === 'enterprise' ? 100 : 
+                    currentPlan  === 'scale' ? 8.47 : 
                     (learningData.conversationsAnalyzed / learningData.planLimit) * 100;
     
     return (
@@ -40,7 +40,7 @@ const LearningTab = () => {
             <Brain className="w-6 h-6 mr-2 text-purple-600" />
             AI Learning Progress
           </h3>
-          <PlanBadge plan={userPlan} />
+          <PlanBadge plan={currentPlan} />
         </div>
         
         <div className="space-y-4">
@@ -49,20 +49,20 @@ const LearningTab = () => {
               <span className="text-gray-600">Conversations Analyzed</span>
               <span className="font-medium">
                 {learningData.conversationsAnalyzed.toLocaleString()} 
-                {userPlan !== 'enterprise' && ` / ${learningData.planLimit.toLocaleString()}`}
+                {currentPlan !== 'enterprise' && ` / ${learningData.planLimit.toLocaleString()}`}
               </span>
             </div>
             <div className="w-full bg-gray-200 rounded-full h-3">
               <div 
                 className={`h-3 rounded-full transition-all duration-500 ${
-                  userPlan === 'enterprise' ? 'bg-gradient-to-r from-gold-400 to-gold-600' :
+                  currentPlan === 'enterprise' ? 'bg-gradient-to-r from-gold-400 to-gold-600' :
                   progress > 80 ? 'bg-gradient-to-r from-purple-500 to-purple-600' :
                   'bg-gradient-to-r from-blue-500 to-blue-600'
                 }`}
                 style={{ width: `${Math.min(100, progress)}%` }}
               />
             </div>
-            {userPlan !== 'enterprise' && progress > 80 && (
+            {currentPlan !== 'enterprise' && progress > 80 && (
               <p className="text-sm text-orange-600 mt-2 font-medium">
                 ⚡ Approaching learning limit - upgrade for 10x more intelligence
               </p>
@@ -280,10 +280,10 @@ const LearningTab = () => {
   };
 
   const UpgradePrompt = () => {
-    if (userPlan === 'enterprise') return null;
+    if (currentPlan === 'enterprise') return null;
     
-    const nextPlan = userPlan === 'starter' ? 'Growth' : userPlan === 'growth' ? 'Scale' : 'Enterprise';
-    const nextLimit = userPlan === 'starter' ? '100' : userPlan === 'growth' ? '1,000' : 'Unlimited';
+    const nextPlan = currentPlan === 'starter' ? 'Growth' : currentPlan === 'growth' ? 'Scale' : 'Enterprise';
+    const nextLimit = currentPlan === 'starter' ? '100' : currentPlan === 'growth' ? '1,000' : 'Unlimited';
     
     return (
       <div className="bg-gradient-to-r from-indigo-500 to-purple-600 rounded-2xl p-6 text-white">
@@ -305,7 +305,7 @@ const LearningTab = () => {
     );
   };
 
-  if (userPlan === 'starter') {
+  if (currentPlan === 'starter') {
     return (
       <div className="space-y-6">
         <div className="text-center py-12 bg-white rounded-2xl border border-gray-200">
