@@ -704,7 +704,7 @@ export default function BusinessAnalytics() {
 
     const allowedTabs = tabs.filter(tab => {
       const hasPermission = tab.permission;
-      const hasFeatureAccess = !tab.planFeature || hasFeature(userPlan, tab.planFeature);
+      const hasFeatureAccess = !tab.planFeature || hasFeature(tab.planFeature);
       return hasPermission && hasFeatureAccess;
     });
 
@@ -731,7 +731,7 @@ export default function BusinessAnalytics() {
             })}
             
             {/* Show locked tabs for plan upgrades */}
-            {tabs.filter(tab => tab.planFeature && !hasFeature(userPlan, tab.planFeature)).map((tab) => {
+            {tabs.filter(tab => tab.planFeature && !hasFeature(tab.planFeature)).map((tab) => {
               const Icon = tab.icon;
               return (
                 <div
@@ -1509,7 +1509,7 @@ export default function BusinessAnalytics() {
 
   const ABTestingView = () => (
     <FeatureGate 
-      plan={userPlan} 
+      plan={currentPlan}
       feature="messageAbTesting" 
       showUpgrade={true}
       fallback={
@@ -1526,7 +1526,7 @@ export default function BusinessAnalytics() {
 
 const LearningView = () => (
   <FeatureGate 
-    plan={userPlan} 
+    plan={currentPlan}
     feature="aiLearning" 
     showUpgrade={true}
     fallback={
