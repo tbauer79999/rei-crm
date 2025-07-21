@@ -650,106 +650,106 @@ export default function BusinessAnalytics() {
   );
 
   const NavigationTabs = ({ activeView, setActiveView }) => {
-    const tabs = [
-      { 
-        id: 'overview', 
-        name: 'Overview Reports', 
-        icon: BarChart3,
-        permission: canViewFunnelStats,
-        planFeature: null
-      },
-      { 
-        id: 'lead-performance', 
-        name: 'AI Conversion Metrics', 
-        icon: Users,
-        permission: canViewFunnelStats,
-        planFeature: null
-      },
-      { 
-        id: 'performance-analytics', 
-        name: 'Performance Analytics', 
-        icon: Activity,
-        permission: canViewPerformanceAnalytics,
-        planFeature: null
-      },
-      { 
-        id: 'abtesting', 
-        name: 'A/B Testing', 
-        icon: TestTube,
-        permission: canViewPerformanceAnalytics,
-        planFeature: 'messageAbTesting'
-      },
-      { 
-        id: 'learning', 
-        name: 'AI Learning', 
-        icon: Brain,
-        permission: canViewPerformanceAnalytics,
-        planFeature: 'aiLearning'
-      },                       
-      { 
-        id: 'sales-outcomes', 
-        name: 'Team Performance', 
-        icon: Award,
-        permission: canViewEscalationSummaries,
-        planFeature: null
-      },
-      { 
-        id: 'custom-reports', 
-        name: 'Custom Reports', 
-        icon: Settings,
-        permission: canViewPerformanceAnalytics,
-        planFeature: null
-      }
-    ];
+  const tabs = [
+    { 
+      id: 'overview', 
+      name: 'Overview Reports', 
+      icon: BarChart3,
+      permission: canViewFunnelStats,
+      planFeature: null
+    },
+    { 
+      id: 'lead-performance', 
+      name: 'AI Conversion Metrics', 
+      icon: Users,
+      permission: canViewFunnelStats,
+      planFeature: null
+    },
+    { 
+      id: 'performance-analytics', 
+      name: 'Performance Analytics', 
+      icon: Activity,
+      permission: canViewPerformanceAnalytics,
+      planFeature: null
+    },
+    { 
+      id: 'abtesting', 
+      name: 'A/B Testing', 
+      icon: TestTube,
+      permission: canViewPerformanceAnalytics,
+      planFeature: 'messageAbTesting'
+    },
+    { 
+      id: 'learning', 
+      name: 'AI Learning', 
+      icon: Brain,
+      permission: canViewPerformanceAnalytics,
+      planFeature: 'aiLearning'
+    },                       
+    { 
+      id: 'sales-outcomes', 
+      name: 'Team Performance', 
+      icon: Award,
+      permission: canViewEscalationSummaries,
+      planFeature: null
+    },
+    { 
+      id: 'custom-reports', 
+      name: 'Custom Reports', 
+      icon: Settings,
+      permission: canViewPerformanceAnalytics,
+      planFeature: null
+    }
+  ];
 
-    const allowedTabs = tabs.filter(tab => {
-      const hasPermission = tab.permission;
-      const hasFeatureAccess = !tab.planFeature || hasFeature(tab.planFeature);
-      return hasPermission && hasFeatureAccess;
-    });
+  const allowedTabs = tabs.filter(tab => {
+    const hasPermission = tab.permission;
+    const hasFeatureAccess = !tab.planFeature || hasFeature(tab.planFeature);
+    return hasPermission && hasFeatureAccess;
+  });
 
-    return (
-      <div className="bg-white border-b border-gray-200">
-        <div className="px-6">
-          <nav className="flex space-x-8 overflow-x-auto">
-            {allowedTabs.map((tab) => {
-              const Icon = tab.icon;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveView(tab.id)}
-                  className={`flex items-center py-4 px-1 border-b-2 font-medium text-sm transition-colors whitespace-nowrap ${
-                    activeView === tab.id
-                      ? 'border-blue-500 text-blue-600'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                  }`}
-                >
-                  <Icon className="w-4 h-4 mr-2" />
-                  {tab.name}
-                </button>
-              );
-            })}
-            
-            {/* Show locked tabs for plan upgrades */}
-            {tabs.filter(tab => tab.planFeature && !hasFeature(tab.planFeature)).map((tab) => {
-              const Icon = tab.icon;
-              return (
-                <div
-                  key={`locked-${tab.id}`}
-                  className="flex items-center py-4 px-1 border-b-2 border-transparent text-gray-300 cursor-not-allowed"
-                  title={`Requires plan upgrade for ${tab.planFeature}`}
-                >
-                  <Icon className="w-4 h-4 mr-2" />
-                  {tab.name}
-                  <Lock className="w-3 h-3 ml-1" />
-                </div>
-              );
-            })}
-          </nav>
-        </div>
+  return (
+    <div className="bg-white border-b border-gray-200">
+      <div className="px-6">
+        <nav className="flex space-x-8 overflow-x-auto">
+          {allowedTabs.map((tab) => {
+            const Icon = tab.icon;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveView(tab.id)}
+                className={`flex items-center py-4 px-1 border-b-2 font-medium text-sm transition-colors whitespace-nowrap ${
+                  activeView === tab.id
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                <Icon className="w-4 h-4 mr-2" />
+                {tab.name}
+              </button>
+            );
+          })}
+          
+          {/* Show locked tabs for plan upgrades */}
+          {tabs.filter(tab => tab.planFeature && !hasFeature(tab.planFeature) && tab.permission).map((tab) => {
+            const Icon = tab.icon;
+            return (
+              <div
+                key={`locked-${tab.id}`}
+                className="flex items-center py-4 px-1 border-b-2 border-transparent text-gray-300 cursor-not-allowed"
+                title={`Requires plan upgrade for ${tab.planFeature}`}
+              >
+                <Icon className="w-4 h-4 mr-2" />
+                {tab.name}
+                <Lock className="w-3 h-3 ml-1" />
+              </div>
+            );
+          })}
+        </nav>
       </div>
-    );
-  };
+    </div>
+  );
+};
 
   const OverviewReports = () => {
     if (loading) {
