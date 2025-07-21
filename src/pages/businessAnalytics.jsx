@@ -547,13 +547,13 @@ export default function BusinessAnalytics() {
     loadAllData();
   }, [user?.id, hasAnalyticsAccess]); // Only depend on stable values
 
-  // Handle date range changes
-  useEffect(() => {
-    if (!user || !isInitialized.current || loading || !canFilterCampaigns) return;
-    
-    console.log('📅 Date range changed to:', dateRange);
-    loadAllData();
-  }, [dateRange]); // Only depend on dateRange
+// Handle date range changes and plan updates
+useEffect(() => {
+  if (!user || !isInitialized.current || loading || !canFilterCampaigns) return;
+  
+  console.log('📅 Date range changed to:', dateRange);
+  loadAllData();
+}, [dateRange, currentPlan]); // Add currentPlan dependency
 
   // Handle view changes
   const handleViewChange = useCallback((newView) => {
