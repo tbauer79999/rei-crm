@@ -560,15 +560,16 @@ useEffect(() => {
   const handleViewChange = useCallback((newView) => {
     console.log('🔄 Switching view to:', newView);
     
-  const viewPermissions = {
-    'overview': canViewFunnelStats,
-    'lead-performance': canViewFunnelStats,
-    'ai-performance': canViewPerformanceAnalytics,
-    'performance-analytics': canViewPerformanceAnalytics,
-    'abtesting': hasFeature('messageAbTesting') && canViewPerformanceAnalytics,  // ← Use hasFeature function
-    'sales-outcomes': canViewEscalationSummaries,
-    'custom-reports': canViewPerformanceAnalytics
-  };
+const viewPermissions = {
+  'overview': canViewFunnelStats,
+  'lead-performance': canViewFunnelStats,
+  'ai-performance': canViewPerformanceAnalytics,
+  'performance-analytics': canViewPerformanceAnalytics,
+  'abtesting': canViewPerformanceAnalytics,
+  'learning': canViewPerformanceAnalytics,  // Add this line
+  'sales-outcomes': canViewEscalationSummaries,
+  'custom-reports': canViewPerformanceAnalytics
+};
 
     if (!viewPermissions[newView]) {
       setError(`You don't have permission to access the ${newView} view`);
@@ -1512,39 +1513,31 @@ useEffect(() => {
     );
   };
 
-  const ABTestingView = () => (
-    <FeatureGate 
-      plan={currentPlan}
-      feature="messageAbTesting" 
-      showUpgrade={true}
-      fallback={
-        <div className="text-center py-12">
-          <TestTube className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-          <p className="text-gray-600 mb-4">A/B Testing requires a plan upgrade</p>
-          <p className="text-sm text-gray-500">This feature is available on Scale and Enterprise plans</p>
-        </div>
-      }
-    >
-      <ABTestingDashboard />
-    </FeatureGate>
+  const ABTestingView = () => {
+  if (currentPlan && PLAN_FEATURES[currentPlan]?.messageAbTesting) {
+    return <ABTestingDashboard />;
+  }
+  return (
+    <div className="text-center py-12">
+      <TestTube className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+      <p className="text-gray-600 mb-4">A/B Testing requires a plan upgrade</p>
+      <p className="text-sm text-gray-500">This feature is available on Scale and Enterprise plans</p>
+    </div>
   );
+};
 
-const LearningView = () => (
-  <FeatureGate 
-    plan={currentPlan}
-    feature="aiLearning" 
-    showUpgrade={true}
-    fallback={
-      <div className="text-center py-12">
-        <Brain className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-        <p className="text-gray-600 mb-4">AI Learning requires a plan upgrade</p>
-        <p className="text-sm text-gray-500">This feature is available on Growth and higher plans</p>
-      </div>
-    }
-  >
-    <LearningAnalytics />
-  </FeatureGate>
-);
+const LearningView = () => {
+  if (currentPlan && PLAN_FEATURES[currentPlan]?.aiLearning) {
+    return <LearningAnalytics />;
+  }
+  return (
+    <div className="text-center py-12">
+      <Brain className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+      <p className="text-gray-600 mb-4">AI Learning requires a plan upgrade</p>
+      <p className="text-sm text-gray-500">This feature is available on Growth and higher plans</p>
+    </div>
+  );
+};
   
   const CustomReports = () => <CustomReportsBuilder />;
 
