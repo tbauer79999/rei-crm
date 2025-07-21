@@ -175,7 +175,20 @@ export const PLAN_METADATA = {
 
 // Helper functions for plan checking
 export const hasFeature = (plan, feature) => {
-  return PLAN_FEATURES[plan]?.[feature] || false;
+  if (!plan || !feature) {
+    console.warn('hasFeature called with invalid params:', { plan, feature });
+    return false;
+  }
+  
+  const planFeatures = PLAN_FEATURES[plan];
+  if (!planFeatures) {
+    console.warn(`Plan '${plan}' not found in PLAN_FEATURES`);
+    return false;
+  }
+  
+  const result = !!planFeatures[feature];
+  console.log(`🔍 hasFeature check: plan=${plan}, feature=${feature}, result=${result}`);
+  return result;
 };
 
 export const getFeatureValue = (plan, feature) => {
