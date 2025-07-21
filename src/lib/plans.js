@@ -224,6 +224,13 @@ export const FeatureGate = ({ plan, feature, children, fallback = null, showUpgr
   
   if (hasAccess) {
     return children;
+  }// Feature gating for UI components
+export const FeatureGate = ({ plan, feature, children, fallback = null, showUpgrade = false }) => {
+  // Direct check - bypass hasFeature function completely
+  const hasAccess = plan && PLAN_FEATURES[plan]?.[feature];
+  
+  if (hasAccess) {
+    return children;
   }
   
   if (showUpgrade) {
