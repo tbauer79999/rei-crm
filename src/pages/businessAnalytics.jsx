@@ -1516,6 +1516,23 @@ export default function BusinessAnalytics() {
     </FeatureGate>
   );
 
+const LearningView = () => (
+  <FeatureGate 
+    plan={userPlan} 
+    feature="aiLearning" 
+    showUpgrade={true}
+    fallback={
+      <div className="text-center py-12">
+        <Brain className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+        <p className="text-gray-600 mb-4">AI Learning requires a plan upgrade</p>
+        <p className="text-sm text-gray-500">This feature is available on Growth and higher plans</p>
+      </div>
+    }
+  >
+    <LearningAnalytics />
+  </FeatureGate>
+);
+  
   const CustomReports = () => <CustomReportsBuilder />;
 
   const renderActiveView = () => {
@@ -1549,6 +1566,8 @@ export default function BusinessAnalytics() {
         return <PerformanceAnalytics />;
       case 'abtesting':
         return <ABTestingView />;
+      case 'learning':
+        return <LearningView />;
       case 'sales-outcomes':
         return <SalesOutcomes />;
       case 'custom-reports':
