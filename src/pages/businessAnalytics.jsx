@@ -576,7 +576,7 @@ export default function BusinessAnalytics() {
 
     setActiveView(newView);
     setError('');
-  }, [canViewFunnelStats, canViewPerformanceAnalytics, canViewEscalationSummaries, userPlan]);
+  }, [canViewFunnelStats, canViewPerformanceAnalytics, canViewEscalationSummaries, currentPlan]);
 
   // Render access denied screen
   const renderAccessDenied = () => (
