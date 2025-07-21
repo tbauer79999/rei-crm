@@ -217,17 +217,8 @@ export const checkLimit = (plan, feature, currentUsage) => {
 // Feature gating for UI components
 // Feature gating for UI components
 export const FeatureGate = ({ plan, feature, children, fallback = null, showUpgrade = false }) => {
-  // Direct check without using hasFeature function
-  const hasAccess = plan && PLAN_FEATURES[plan]?.[feature];
-  
-  console.log(`🔍 FeatureGate direct check: plan=${plan}, feature=${feature}, hasAccess=${hasAccess}`);
-  
-  if (hasAccess) {
-    return children;
-  }// Feature gating for UI components
-export const FeatureGate = ({ plan, feature, children, fallback = null, showUpgrade = false }) => {
-  // Direct check - bypass hasFeature function completely
-  const hasAccess = plan && PLAN_FEATURES[plan]?.[feature];
+  const planFeatures = PLAN_FEATURES[plan];
+  const hasAccess = planFeatures && planFeatures[feature] === true;
   
   if (hasAccess) {
     return children;
