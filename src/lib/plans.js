@@ -59,6 +59,7 @@ export const PLAN_FEATURES = {
     afterHoursAiOverrideToggle: true,
     aiReplyPacingModeConfig: true,
     chromeExtension: true,
+    aiLearning: true,
     zapierApiIntegration: true,
     
     // Still Disabled
@@ -92,6 +93,7 @@ export const PLAN_FEATURES = {
     afterHoursAiOverrideToggle: true,
     aiReplyPacingModeConfig: true,
     chromeExtension: true,
+    aiLearning: true,
     zapierApiIntegration: true,
     
     // Scale-Only Features
@@ -121,6 +123,7 @@ export const PLAN_FEATURES = {
     afterHoursAiOverrideToggle: true,
     aiReplyPacingModeConfig: true,
     chromeExtension: true,
+    aiLearning: true,
     zapierApiIntegration: true,
     messageAbTesting: true,
     whiteGloveOnboardingCsm: true,

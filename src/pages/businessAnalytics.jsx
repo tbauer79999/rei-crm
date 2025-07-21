@@ -680,6 +680,13 @@ export default function BusinessAnalytics() {
         planFeature: 'messageAbTesting'
       },
       { 
+        id: 'learning', 
+        name: 'AI Learning', 
+        icon: Brain,
+        permission: canViewPerformanceAnalytics,
+        planFeature: 'aiLearning'
+      },                       
+      { 
         id: 'sales-outcomes', 
         name: 'Team Performance', 
         icon: Award,
