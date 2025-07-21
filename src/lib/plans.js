@@ -215,13 +215,18 @@ export const checkLimit = (plan, feature, currentUsage) => {
 };
 
 // Feature gating for UI components
+// Feature gating for UI components
 export const FeatureGate = ({ plan, feature, children, fallback = null, showUpgrade = false }) => {
-  if (hasFeature(plan, feature)) {
+  // Direct check without using hasFeature function
+  const hasAccess = plan && PLAN_FEATURES[plan]?.[feature];
+  
+  console.log(`🔍 FeatureGate direct check: plan=${plan}, feature=${feature}, hasAccess=${hasAccess}`);
+  
+  if (hasAccess) {
     return children;
   }
   
   if (showUpgrade) {
-    // Simple upgrade prompt - you can replace this with your actual UpgradePrompt component later
     return (
       <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg text-center">
         <p className="text-sm text-blue-800 mb-2">
