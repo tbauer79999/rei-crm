@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Brain, TrendingUp, Users, MessageSquare, Lock, Zap, Target, Award, BarChart3, ArrowUp, ArrowDown, Info, Crown, Sparkles } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 
 const LearningTab = () => {
     const { currentPlan } = useAuth(); // growth, scale, enterprise
