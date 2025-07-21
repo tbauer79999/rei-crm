@@ -1593,7 +1593,10 @@ const LearningView = () => (
   return (
     <div className="min-h-screen bg-gray-50">
       <GlobalFilterBar />
-      <NavigationTabs activeView={activeView} setActiveView={handleViewChange} />
+      <NavigationTabs 
+        key={currentPlan} 
+        activeView={activeView} 
+        setActiveView={handleViewChange} />
       <div className="px-6 py-8">
         {renderActiveView()}
       </div>
