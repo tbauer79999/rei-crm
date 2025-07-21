@@ -7,6 +7,7 @@ import { hasFeature, FeatureGate } from '../lib/plans';
 import supabase from '../lib/supabaseClient';
 import ABTestingDashboard from '../components/ABTestingDashboard';
 import CustomReportsBuilder from '../components/CustomReportsBuilder';
+import LearningAnalytics from '../components/LearningAnalytics';
 
 export default function BusinessAnalytics() {
   const { user, hasPermission, userPlan } = useAuth();
