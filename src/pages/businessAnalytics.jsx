@@ -8,6 +8,7 @@ import supabase from '../lib/supabaseClient';
 import ABTestingDashboard from '../components/ABTestingDashboard';
 import CustomReportsBuilder from '../components/CustomReportsBuilder';
 import LearningAnalytics from '../components/LearningAnalytics';
+import { PLAN_FEATURES } from '../lib/plans';
 
 export default function BusinessAnalytics() {
   const { user, hasPermission, currentPlan } = useAuth();
@@ -704,7 +705,11 @@ useEffect(() => {
 
   const allowedTabs = tabs.filter(tab => {
     const hasPermission = tab.permission;
-    const hasFeatureAccess = !tab.planFeature || hasFeature(tab.planFeature);
+    
+    // Use direct plan checking instead of hasFeature() function
+    const hasFeatureAccess = !tab.planFeature || 
+      (currentPlan && PLAN_FEATURES[currentPlan]?.[tab.planFeature]);
+    
     return hasPermission && hasFeatureAccess;
   });
 
@@ -731,7 +736,7 @@ useEffect(() => {
           })}
           
           {/* Show locked tabs for plan upgrades */}
-          {tabs.filter(tab => tab.planFeature && !hasFeature(tab.planFeature) && tab.permission).map((tab) => {
+          {tabs.filter(tab => tab.planFeature && !(currentPlan && PLAN_FEATURES[currentPlan]?.[tab.planFeature]) && tab.permission).map((tab) => {
             const Icon = tab.icon;
             return (
               <div
