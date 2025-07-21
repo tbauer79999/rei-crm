@@ -10,7 +10,7 @@ import CustomReportsBuilder from '../components/CustomReportsBuilder';
 import LearningAnalytics from '../components/LearningAnalytics';
 
 export default function BusinessAnalytics() {
-  const { user, hasPermission, userPlan } = useAuth();
+  const { user, hasPermission, currentPlan } = useAuth();
   const [activeView, setActiveView] = useState('overview');
   const [dateRange, setDateRange] = useState(30);
   const [selectedCampaign, setSelectedCampaign] = useState('all');
@@ -559,15 +559,15 @@ export default function BusinessAnalytics() {
   const handleViewChange = useCallback((newView) => {
     console.log('🔄 Switching view to:', newView);
     
-    const viewPermissions = {
-      'overview': canViewFunnelStats,
-      'lead-performance': canViewFunnelStats,
-      'ai-performance': canViewPerformanceAnalytics,
-      'performance-analytics': canViewPerformanceAnalytics,
-      'abtesting': hasFeature(userPlan, 'messageAbTesting') && canViewPerformanceAnalytics,
-      'sales-outcomes': canViewEscalationSummaries,
-      'custom-reports': canViewPerformanceAnalytics
-    };
+  const viewPermissions = {
+    'overview': canViewFunnelStats,
+    'lead-performance': canViewFunnelStats,
+    'ai-performance': canViewPerformanceAnalytics,
+    'performance-analytics': canViewPerformanceAnalytics,
+    'abtesting': hasFeature('messageAbTesting') && canViewPerformanceAnalytics,  // ← Use hasFeature function
+    'sales-outcomes': canViewEscalationSummaries,
+    'custom-reports': canViewPerformanceAnalytics
+  };
 
     if (!viewPermissions[newView]) {
       setError(`You don't have permission to access the ${newView} view`);
