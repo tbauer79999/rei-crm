@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Users, Phone, Shield } from 'lucide-react';
 import SalesTeamSettings from '../components/settings/SalesTeamSettings';
 import PhoneNumbersSettings from '../components/settings/phonenumbersSettings';
@@ -143,7 +143,7 @@ export default function Settings() {
     useEffect(() => {
     document.title = "Settings – SurFox";
   }, []);
-  
+
   const getStatusIcon = (status) => {
     switch (status) {
       case 'healthy':
