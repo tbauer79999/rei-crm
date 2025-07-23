@@ -17,6 +17,8 @@ import {
   TrendingUp,
   MoreHorizontal,
   ChevronDown,
+  ChevronUp,
+  ArrowUpDown,
   FileText,
   Eye,
   MapPin,
@@ -44,7 +46,7 @@ export default function Dashboard() {
   const [parsedRecords, setParsedRecords] = useState([]);
   const [uploadMessage, setUploadMessage] = useState('');
   const [uploadError, setUploadError] = useState(false);
-  const [sortBy, setSortBy] = useState('hot_score');
+  const [sortBy, setSortBy] = useState('created_at');
   const [sortDirection, setSortDirection] = useState('desc');
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
@@ -52,10 +54,9 @@ export default function Dashboard() {
   const [error, setError] = useState('');
   const navigate = useNavigate();
 
-    useEffect(() => {
+  useEffect(() => {
     document.title = "Pipeline – SurFox";
   }, []);
-
 
   // Get leads that need immediate attention - EXCLUDE already handled leads
   const alertLeads = leads.filter(lead => 
@@ -80,6 +81,28 @@ export default function Dashboard() {
       'ai_status': TrendingUp
     };
     return iconMap[fieldName] || FileText;
+  };
+
+  // Sorting handler function
+  const handleSort = (column) => {
+    if (sortBy === column) {
+      // If clicking the same column, toggle direction
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      // If clicking a new column, set it as sortBy with desc as default
+      setSortBy(column);
+      setSortDirection('desc');
+    }
+  };
+
+  // Get sort icon for column headers
+  const getSortIcon = (column) => {
+    if (sortBy !== column) {
+      return <ArrowUpDown size={14} className="text-gray-400" />;
+    }
+    return sortDirection === 'asc' ? 
+      <ChevronUp size={14} className="text-blue-600" /> : 
+      <ChevronDown size={14} className="text-blue-600" />;
   };
 
   useEffect(() => {
@@ -318,18 +341,30 @@ export default function Dashboard() {
       let bVal = b[sortBy];
       
       // Handle null/undefined values
-      if (aVal === null || aVal === undefined) aVal = 0;
-      if (bVal === null || bVal === undefined) bVal = 0;
+      if (aVal === null || aVal === undefined) aVal = sortBy === 'hot_score' ? 0 : '';
+      if (bVal === null || bVal === undefined) bVal = sortBy === 'hot_score' ? 0 : '';
       
+      // Special handling for different data types
       if (sortBy === 'created_at') {
         aVal = new Date(aVal);
         bVal = new Date(bVal);
+      } else if (sortBy === 'hot_score') {
+        aVal = Number(aVal) || 0;
+        bVal = Number(bVal) || 0;
+      } else if (sortBy === 'requires_immediate_attention') {
+        // Sort boolean values (true first when desc)
+        aVal = aVal ? 1 : 0;
+        bVal = bVal ? 1 : 0;
+      } else {
+        // String sorting (case insensitive)
+        aVal = aVal ? aVal.toString().toLowerCase() : '';
+        bVal = bVal ? bVal.toString().toLowerCase() : '';
       }
       
       if (sortDirection === 'asc') {
-        return aVal > bVal ? 1 : -1;
+        return aVal > bVal ? 1 : aVal < bVal ? -1 : 0;
       } else {
-        return aVal < bVal ? 1 : -1;
+        return aVal < bVal ? 1 : aVal > bVal ? -1 : 0;
       }
     });
     
@@ -956,30 +991,76 @@ export default function Dashboard() {
             <table className="w-full">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Alert
+                  {/* Alert Column */}
+                  <th 
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                    onClick={() => handleSort('requires_immediate_attention')}
+                  >
+                    <div className="flex items-center gap-2">
+                      Alert
+                      {getSortIcon('requires_immediate_attention')}
+                    </div>
                   </th>
+                  
                   {/* Dynamic headers based on configured fields */}
                   {displayFields.map((field) => (
                     <th 
                       key={field.field_name}
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                      onClick={() => handleSort(field.field_name)}
                     >
-                      {field.field_label}
+                      <div className="flex items-center gap-2">
+                        {field.field_label}
+                        {getSortIcon(field.field_name)}
+                      </div>
                     </th>
                   ))}
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Hot Score
+                  
+                  {/* Hot Score Column */}
+                  <th 
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                    onClick={() => handleSort('hot_score')}
+                  >
+                    <div className="flex items-center gap-2">
+                      Hot Score
+                      {getSortIcon('hot_score')}
+                    </div>
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Status
+                  
+                  {/* Status Column */}
+                  <th 
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                    onClick={() => handleSort('status')}
+                  >
+                    <div className="flex items-center gap-2">
+                      Status
+                      {getSortIcon('status')}
+                    </div>
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Campaign
+                  
+                  {/* Campaign Column */}
+                  <th 
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                    onClick={() => handleSort('campaign')}
+                  >
+                    <div className="flex items-center gap-2">
+                      Campaign
+                      {getSortIcon('campaign')}
+                    </div>
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Created
+                  
+                  {/* Created Column */}
+                  <th 
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                    onClick={() => handleSort('created_at')}
+                  >
+                    <div className="flex items-center gap-2">
+                      Created
+                      {getSortIcon('created_at')}
+                    </div>
                   </th>
+                  
+                  {/* Actions Column (No sorting) */}
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Actions
                   </th>
