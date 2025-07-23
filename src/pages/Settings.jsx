@@ -276,9 +276,6 @@ export default function Settings() {
               <div className="text-sm text-gray-600">🕗 Awaiting Changes</div>
             </div>
           </div>
-
-          {/* Debug Access Token Tool */}
-          <DebugTokenButton />
         </div>
       </div>
     </div>
