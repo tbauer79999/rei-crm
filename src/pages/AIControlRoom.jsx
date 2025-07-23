@@ -101,6 +101,10 @@ const AIControlRoom = () => {
   console.log('🎛️ AI Control Room - Plan:', currentPlan);
 
   useEffect(() => {
+  document.title = "Control Room – SurFox";
+}, []);
+
+  useEffect(() => {
     const saved = localStorage.getItem('controlroom-collapse');
     if (saved) {
       setCollapsed(JSON.parse(saved));

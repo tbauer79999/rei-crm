@@ -41,6 +41,10 @@ export default function BusinessAnalytics() {
     salesRepPerformance: []
   });
 
+    useEffect(() => {
+    document.title = "Business Analytics – SurFox";
+  }, []);
+  
   // Check if user has access to analytics at all
   const hasAnalyticsAccess = canViewFunnelStats || canViewPerformanceAnalytics;
 
