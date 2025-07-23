@@ -43,144 +43,75 @@ const SearchBar = ({ searchTerm, onSearchChange, showingResults, onClearSearch }
 
 // Search Results Component
 const SearchResults = ({ searchTerm, searchResults, onViewInTab }) => {
-  // Content snippets for search results
-  const contentSnippets = {
-    'getting-started': [
-      {
-        title: "Platform Overview & Setup",
-        snippet: "Complete platform setup guide covering settings configuration, A2P registration, phone numbers, team setup, and AI configuration. Get started with your first campaign creation.",
-        section: "Initial Setup"
-      },
-      {
-        title: "Settings-First Approach",
-        snippet: "Critical: Complete A2P brand registration first. Without registration, messages won't be delivered. Set up company information, phone numbers, and team configuration.",
-        section: "Configuration Guide"
-      },
-      {
-        title: "Complete Setup Checklist",
-        snippet: "Follow our proven setup sequence: A2P registration → Company info → Phone numbers → Team setup → AI configuration → Knowledge base → Test campaign.",
-        section: "Setup Process"
-      }
-    ],
-    'lead-management': [
-      {
-        title: "Lead Status System",
-        snippet: "Understanding lead statuses: Hot (high engagement), Engaging (active conversations), Responding (initial contact), Cold (low engagement). AI scoring system uses 0-100 scale.",
-        section: "Lead Scoring"
-      },
-      {
-        title: "Bulk Lead Import",
-        snippet: "Import leads via CSV with required format: phone numbers, names, campaign assignment. Supports custom fields for real estate, staffing, and B2B sales industries.",
-        section: "Data Import"
-      },
-      {
-        title: "Conversation Management",
-        snippet: "View real-time conversations with sentiment analysis, engagement metrics, and lead score tracking. Monitor AI performance and manual intervention options.",
-        section: "Conversation Tools"
-      }
-    ],
-    'campaigns': [
-      {
-        title: "Campaign Creation Guide",
-        snippet: "Step-by-step campaign setup: define goals, configure AI personality (professional/friendly/casual), assign phone numbers, set escalation rules, and launch settings.",
-        section: "Campaign Setup"
-      },
-      {
-        title: "AI Personality Configuration",
-        snippet: "Choose AI personality to match your audience: Professional (formal, business-focused), Friendly (warm, approachable), Casual (conversational, relaxed).",
-        section: "AI Configuration"
-      },
-      {
-        title: "Performance Optimization",
-        snippet: "Monitor key metrics: response rate, conversation depth, hot lead conversion. Use A/B testing to optimize messaging and improve campaign performance.",
-        section: "Optimization"
-      }
-    ],
-    'ai-features': [
-      {
-        title: "AI Engine Capabilities",
-        snippet: "Natural language processing, real-time analysis, smart escalation, knowledge integration. AI understands context, intent, and nuance in conversations.",
-        section: "Core AI"
-      },
-      {
-        title: "Conversation Intelligence",
-        snippet: "Every message analyzed for sentiment, urgency, buying signals, and objections. Scores update instantly to identify hot leads the moment they show interest.",
-        section: "Analysis Tools"
-      },
-      {
-        title: "A/B Testing Framework",
-        snippet: "Test opening messages, AI tone variations, follow-up timing, message sequences, and value propositions. Scientific precision for conversation optimization.",
-        section: "Testing Tools"
-      }
-    ],
-    'analytics': [
-      {
-        title: "Real-time Dashboard",
-        snippet: "Monitor system health, hot lead tracking, AI performance metrics, and campaign analytics. Get instant visibility into lead engagement and conversion rates.",
-        section: "Dashboard"
-      },
-      {
-        title: "ROI & Revenue Analytics",
-        snippet: "Track lead source costs, revenue analysis, sales team performance, and conversion metrics. Measure hot leads received, converted, and average deal size.",
-        section: "Revenue Tracking"
-      },
-      {
-        title: "AI Performance Analysis",
-        snippet: "Analyze AI confidence vs outcomes, message effectiveness, optimal timing, and campaign comparison metrics. Optimize AI performance with data-driven insights.",
-        section: "AI Analytics"
-      }
-    ],
-    'settings': [
-      {
-        title: "A2P Brand Registration",
-        snippet: "CRITICAL: Complete A2P brand and campaign registry before sending messages. Business texting requires carrier-approved registration including EIN, business info, and use case.",
-        section: "Compliance"
-      },
-      {
-        title: "Company Information Setup",
-        snippet: "Configure company details, business hours, time zone, industry type. Set messaging communication settings including throttle limits and response delays.",
-        section: "Company Setup"
-      },
-      {
-        title: "Sales Team Configuration",
-        snippet: "Add team members, assign roles (sales user/manager/admin), configure notifications, set availability, and establish hot lead routing rules for optimal distribution.",
-        section: "Team Management"
-      }
-    ],
-    'integrations': [
-      {
-        title: "Current Integration Methods",
-        snippet: "CSV import/export, email notifications, SMS alerts, webhook events. Connect your AI texting platform with existing CRM and sales tools.",
-        section: "Available Integrations"
-      },
-      {
-        title: "CRM Synchronization Workflow",
-        snippet: "Export leads from CRM, import to AI platform, AI engages and qualifies leads, export hot leads back to CRM with updated status and engagement data.",
-        section: "Workflow Setup"
-      },
-      {
-        title: "Future Integration Roadmap",
-        snippet: "Coming 2024: Native CRM integrations (Salesforce, HubSpot), Zapier app, full REST API, webhook support, and bi-directional sync capabilities.",
-        section: "Roadmap"
-      }
-    ],
-    'troubleshooting': [
-      {
-        title: "AI Not Sending Messages",
-        snippet: "Check campaign status (active), AI turned ON, phone number assigned and verified, leads within business hours, message throttle limits not exceeded.",
-        section: "Critical Issues"
-      },
-      {
-        title: "Hot Leads Not Detected",
-        snippet: "Review escalation thresholds (lower to 70% temporarily), check AI personality match with audience, ensure follow-up messages enabled, run A/B tests.",
-        section: "Lead Detection"
-      },
-      {
-        title: "High Unsubscribe Rate",
-        snippet: "If >3% unsubscribe rate: pause campaign, review opening message (too aggressive?), verify lead consent source, reduce follow-up frequency, test friendlier approach.",
-        section: "Performance Issues"
-      }
-    ]
+  // Real content excerpts from actual help content
+  const getContentExcerpts = (tabId, searchTerm) => {
+    const contentSections = {
+      'getting-started': [
+        "Complete A2P brand registration first. Without registration, messages won't be delivered. Set up company information, purchase phone numbers, invite team members, configure AI settings, upload knowledge base, and test everything before launching your first campaign.",
+        "Your first week should focus on: Day 1-2: A2P registration and company setup. Day 3: Purchase phone numbers and add sales team. Day 4-5: Configure AI personality and upload knowledge base. Day 6-7: Create test campaign and monitor results.",
+        "Platform capabilities include: Control Room dashboard for real-time monitoring, Lead Management with AI scoring, Campaign Creation with personality configuration, Analytics for performance insights, and comprehensive Settings for system configuration."
+      ],
+      'lead-management': [
+        "Lead statuses explained: Hot leads show high engagement and buying signals. Engaging leads are actively responding to messages. Responding leads have made initial contact. Cold leads show minimal engagement. The AI scoring system uses a 0-100 scale to rank lead quality.",
+        "Bulk lead import: Prepare your CSV file with required columns: phone numbers (with country codes), names, and campaign assignment. Custom fields can be configured for real estate, staffing, and B2B sales industries. Avoid common import errors by following the template exactly.",
+        "Conversation view features: Real-time message timeline, sentiment indicators, engagement metrics, lead score progression chart, and manual intervention options. Monitor AI performance and identify when human handoff is needed."
+      ],
+      'campaigns': [
+        "Campaign creation fundamentals: The campaign engine drives lead engagement. Process up to 120 leads per hour with unlimited campaigns running 24/7. Each campaign requires a dedicated phone number and clear goal definition.",
+        "Campaign goals and use cases: Qualify potential sellers for real estate, recruit candidates for staffing agencies, book demos for B2B sales, nurture existing leads, create follow-up sequences, and set appointments. Choose the AI approach that matches your success metrics.",
+        "AI personality configuration: Professional personality uses formal, business-focused language. Friendly personality is warm and approachable. Casual personality is conversational and relaxed. Match the personality to your target audience and industry."
+      ],
+      'ai-features': [
+        "AI conversation intelligence: Every message is analyzed for sentiment score, urgency detection, hesitation indicators, qualification signals, and engagement depth. The system measures emotional tone, identifies time-sensitive language, and detects buying signals.",
+        "A/B testing framework: Test opening messages, AI tone variations, follow-up timing, message sequences, and value propositions. Use scientific precision with sufficient sample sizes, run full cycles, and document everything for optimization.",
+        "Knowledge base management: Upload company overview, product/service details, FAQs, case studies, and process documents. Keep content concise with bullet points, update quarterly, and include internal notes for context."
+      ],
+      'analytics': [
+        "Real-time dashboard hierarchy: Pipeline Control Room provides system health overview, AI Strategy Hub offers deep analytics for admins, and Business Analytics shows campaign performance. Enterprise view includes multi-tenant insights.",
+        "Campaign performance metrics: Track total leads, messages sent, response rates, hot leads generated, and conversion rates. Monitor initial response times, conversation depth, hot lead conversion speed, and sales acceptance rates.",
+        "ROI and revenue analytics: Analyze lead source costs, revenue per campaign, sales team performance metrics including hot leads received and converted, average deal size, response times, and win rates."
+      ],
+      'settings': [
+        "CRITICAL: A2P brand and campaign registry must be completed first. Without proper registration, messages will not be delivered. Business texting requires carrier-approved registration including business legal name, EIN, tax ID, business address, phone, website URL, and industry classification.",
+        "Campaign registration process: One campaign registration per use case. Provide campaign information including description, message flow, sample messages, opt-in method, opt-out instructions, and help keywords. Use pre-built templates for real estate lead follow-up, B2B demo booking, staffing recruitment, and customer support.",
+        "Sales team configuration: Add team members by sending invitations. Assign roles (sales user, manager, admin). Configure notifications (email alerts, SMS, in-app, daily summary). Set availability, vacation days, working hours, and capacity limits."
+      ],
+      'integrations': [
+        "Current integration methods: CSV import/export for lead data, email notifications for alerts, SMS alerts for urgent updates, webhook events for real-time data sync. Manual but reliable processes for connecting with existing tech stack.",
+        "CRM synchronization workflow: Export leads from your CRM, map fields to platform template, import to AI texting platform. AI engages and qualifies leads automatically. Export hot leads daily and import back to CRM with updated status and engagement data.",
+        "Future integration roadmap: Coming 2024 includes native integrations with major CRMs (Salesforce, HubSpot, Pipedrive), Zapier app for 1000+ connections, full REST API access, webhook support for real-time sync, and bi-directional synchronization capabilities."
+      ],
+      'troubleshooting': [
+        "AI not sending messages: Check campaign status is active, AI is turned ON, phone number is assigned and verified, leads are assigned to campaign, current time is within business hours, and message throttle limits haven't been exceeded. Toggle campaign off and on to reset.",
+        "Campaign performance issues: Low response rates may indicate aggressive opening messages, poor lead source quality, or wrong audience targeting. High unsubscribe rates (>3%) require immediate attention to prevent delivery issues. Pause campaign and review approach.",
+        "CSV import troubleshooting: Save as CSV (not Excel), use UTF-8 encoding, remove formulas and formatting, check for hidden columns/rows, ensure headers match template exactly (case-sensitive), remove trailing spaces, and include country codes for phone numbers."
+      ]
+    };
+
+    const sections = contentSections[tabId] || [];
+    const term = searchTerm.toLowerCase();
+    
+    // Find sections that contain the search term and extract relevant excerpts
+    return sections
+      .filter(section => section.toLowerCase().includes(term))
+      .map(section => {
+        // Find the sentence containing the search term
+        const sentences = section.split(/[.!?]+/);
+        const relevantSentence = sentences.find(s => s.toLowerCase().includes(term));
+        
+        if (relevantSentence) {
+          // Get some context around the relevant sentence
+          const sentenceIndex = sentences.indexOf(relevantSentence);
+          const start = Math.max(0, sentenceIndex - 1);
+          const end = Math.min(sentences.length, sentenceIndex + 2);
+          const excerpt = sentences.slice(start, end).join('. ').trim();
+          
+          return excerpt.length > 0 ? excerpt + '.' : section.substring(0, 200) + '...';
+        }
+        
+        return section.substring(0, 200) + '...';
+      })
+      .slice(0, 2); // Show top 2 excerpts
   };
 
   const highlightText = (text, searchTerm) => {
@@ -188,11 +119,15 @@ const SearchResults = ({ searchTerm, searchResults, onViewInTab }) => {
     const regex = new RegExp(`(${searchTerm})`, 'gi');
     const parts = text.split(regex);
     
-    return parts.map((part, index) => 
-      regex.test(part) ? 
-        <mark key={index} className="bg-yellow-200 font-medium">{part}</mark> : 
-        part
-    );
+    return parts.map((part, index) => {
+      if (regex.test(part)) {
+        return React.createElement('mark', { 
+          key: index, 
+          style: { backgroundColor: 'yellow', fontWeight: 'bold' }
+        }, part);
+      }
+      return part;
+    });
   };
 
   return (
@@ -227,11 +162,7 @@ const SearchResults = ({ searchTerm, searchResults, onViewInTab }) => {
                 'troubleshooting': 'Troubleshooting'
               };
 
-              const snippets = contentSnippets[tabId] || [];
-              const relevantSnippets = snippets.filter(snippet => 
-                snippet.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                snippet.snippet.toLowerCase().includes(searchTerm.toLowerCase())
-              ).slice(0, 2); // Show top 2 most relevant
+              const excerpts = getContentExcerpts(tabId, searchTerm);
 
               return (
                 <div key={tabId} className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
@@ -253,24 +184,18 @@ const SearchResults = ({ searchTerm, searchResults, onViewInTab }) => {
                       </div>
                     </div>
 
-                    {/* Show relevant snippets */}
-                    <div className="space-y-4">
-                      {relevantSnippets.length > 0 ? (
-                        relevantSnippets.map((snippet, index) => (
-                          <div key={index} className="border-l-4 border-indigo-200 pl-4">
-                            <h4 className="font-medium text-gray-900 mb-1">
-                              {highlightText(snippet.title, searchTerm)}
-                            </h4>
-                            <p className="text-gray-700 text-sm mb-1">
-                              {highlightText(snippet.snippet, searchTerm)}
+                    {/* Show actual content excerpts */}
+                    <div className="space-y-3">
+                      {excerpts.length > 0 ? (
+                        excerpts.map((excerpt, index) => (
+                          <div key={index} className="border-l-4 border-indigo-200 pl-4 py-2">
+                            <p className="text-gray-700 text-sm leading-relaxed">
+                              {highlightText(excerpt, searchTerm)}
                             </p>
-                            <span className="text-xs text-gray-500">
-                              {snippet.section}
-                            </span>
                           </div>
                         ))
                       ) : (
-                        <div className="border-l-4 border-gray-200 pl-4">
+                        <div className="border-l-4 border-gray-200 pl-4 py-2">
                           <p className="text-gray-700 text-sm">
                             Multiple references to "{searchTerm}" found in this section. 
                             Click "View in {tabNames[tabId]}" to see all content.
@@ -371,273 +296,14 @@ const HelpCenter = () => {
     
     // Define comprehensive content for each tab to search through
     const tabContent = {
-      'getting-started': `
-        getting started platform overview complete settings first A2P registration brand campaign registry
-        phone numbers team setup AI configuration knowledge base first week success plan
-        day initial setup configuration company information purchase phone invite team configure AI
-        upload test campaign creation monitor optimize scale operations train sales team reporting
-        platform capabilities control room dashboard lead management AI conversation engine campaign management
-        analytics insights system configuration training videos walkthrough setup guide mistakes avoid
-        best practices week goals setup completion hot lead response rate conversion metrics
-      `,
-      'lead-management': `
-        lead management complete guide pipeline heart platform managing tracking optimizing
-        understanding lead statuses hot engaging responding cold unsubscribed status indicators
-        AI lead scoring system proprietary algorithm 0-100 scale fire hot warm cold scoring
-        factors influence response time frequency message length quality sentiment analysis
-        buying signals urgency indicators engagement depth qualification signals
-        bulk lead import guide preparing CSV file required format column requirements
-        custom fields configuration real estate staffing B2B sales fields industry specific
-        import best practices common errors phone numbers country codes campaign names headers
-        advanced filtering search capabilities global search status filters campaign filters
-        date range score-based filtering bulk actions export selected assign campaign update status
-        understanding conversations conversation view features message timeline real-time scoring
-        sentiment indicators engagement metrics lead score chart manual intervention options
-        lead lifecycle management typical journey import first contact engagement hot lead sales handoff
-        performance metrics response rate conversion qualification time follow-up window
-        optimization daily management weekly tasks monitor review adjust clean data analyze rates
-      `,
-      'campaigns': `
-        campaign management guide engine drives lead engagement master creation optimization
-        campaign fundamentals 120 leads processed hour unlimited campaigns AI works 24/7
-        dedicated phone number per campaign goals use cases qualify sellers recruit candidates
-        book demos lead nurture follow-up sequence appointment setting AI approach success metrics
-        phone number management requirements one number per campaign local area codes
-        number porting compliance built-in warming volume limits dedicated usage best practices
-        AI personality configuration professional friendly casual custom personalities
-        characteristics language terminology value propositions time constraints industry specific
-        campaign creation step-by-step basics description goal color AI configuration
-        personality response speed escalation rules resources assignment phone number
-        sales team routing tags launch settings pro move paused state upload leads
-        campaign control panel states explained active AI on paused archived
-        real-time metrics total leads messages sent response rate hot leads processing limits
-        performance optimization key indicators initial response conversation depth
-        hot lead conversion speed sales acceptance rate benchmarks warning signs
-        average excellent performance optimization checklist A/B tests review conversations
-        advanced strategies scaling vertical horizontal geographic lifecycle management
-        launch growth maturity phases success formula quality leads smart AI setup
-        rapid testing sales alignment troubleshooting common issues low response rates
-        no hot leads high unsubscribe rate quick fixes improve generate reduce
-      `,
-      'ai-features': `
-        AI engine deep dive understanding how AI works optimize performance natural language processing
-        real-time analysis smart escalation knowledge integration continuous learning compliance built-in
-        conversation intelligence analyzes every message sentiment score urgency detection
-        hesitation indicators qualification signals engagement depth measures emotional tone
-        time-sensitive language uncertainty phrases budget mentions timeline discussions
-        AI response strategies lead behavior short minimal responses asking specific questions
-        expressing concerns high interest signals going cold delayed responses
-        A/B testing mastery framework optimize conversations scientific precision
-        opening messages AI tone variations follow-up timing message sequences value propositions
-        testing guidelines one variable time sufficient sample size run full cycle
-        document everything apply learnings understanding test results confidence levels
-        statistically significant winner trending insufficient data
-        AI instructions customization creating custom behaviors industry-specific templates
-        real estate investor staffing recruiting B2B SaaS templates objection handling
-        escalation triggers specific phrases question patterns engagement level information provided
-        advanced AI behaviors train handle common objections too expensive not interested
-        already have solution define when mark leads hot
-        knowledge base management what upload company overview product service details
-        FAQs case studies process documents formatting best practices update quarterly
-        keep concise bullet points include internal notes test after upload
-        AI performance monitoring key indicators message understanding response time
-        accuracy rate escalation rate quality monitoring weekly review checklist
-        optimization triggers response rate drops hot lead rate falls quality issues
-        system tools maintenance data export options conversation export analytics export
-        billing export API access coming soon backup best practices daily weekly monthly quarterly
-        AI future roadmap Q2 Q3 Q4 2024 voice conversation capabilities multi-language support
-        advanced sentiment analysis predictive lead scoring custom model training
-        industry-specific variants objection handling conversation coaching mode
-        AI-generated follow-up sequences cross-platform sync advanced personalization GPT-5 integration
-      `,
-      'analytics': `
-        analytics intelligence platform transform lead engagement data actionable insights
-        real-time visibility AI-powered outreach dashboard hierarchy pipeline control room
-        AI strategy hub business analytics enterprise view multi-tenant overview
-        system health indicators overview health panel hot lead handoff tracking
-        lead journey funnel AI optimization metrics system performance message delivery
-        hot lead response system uptime error rate warning thresholds performance alerts
-        AI strategy hub admin only deep analytics optimizing AI performance
-        overview reports macro conversion funnel historical performance trends
-        AI performance analysis confidence vs outcome message effectiveness optimal timing
-        campaign comparison metrics shows use case persona performance
-        ROI revenue analytics lead source cost analysis revenue analysis
-        sales team performance hot leads received converted average deal size response time win rate
-        A/B testing analytics understanding test results confidence levels what can test
-        best practices success metrics response rate improvement hot lead conversion
-        conversation depth increase unsubscribe rate reduction sales acceptance rate
-        using analytics optimization weekly review checklist Monday morning review process
-        check control room review hot leads analyze funnel campaign performance
-        A/B test results sales feedback action items key performance benchmarks
-        poor average excellent initial response lead to hot hot lead to sale
-        cost per hot lead sales response time analytics pro tip export data
-        business analytics reporting executive dashboard metrics custom reporting options
-        available report types campaign performance sales team lead source analysis
-        AI optimization report scheduling daily weekly monthly custom reports
-        data export integration export options lead export conversation export
-        analytics export billing export current integrations manual CSV email notifications
-        scheduled exports custom date range coming soon REST API webhook notifications
-        native CRM integrations business intelligence connectors data management best practices
-        regular exports analysis tips advanced analytics features predictive analytics
-        cohort analysis attribution modeling analytics limits considerations
-        historical data retention real-time updates custom report generation large data exports
-      `,
-      'settings': `
-        settings complete guide master platform configuration maximize performance smooth operations
-        company information A2P brand campaign registry messaging communication phone numbers
-        sales team AI automation AI instruction hub knowledge base system tools
-        CRITICAL A2P brand campaign registry must complete first without registration messages not delivered
-        business texting requires carrier-approved registration brand registration what you need
-        business legal name EIN tax ID business address phone website URL industry classification
-        registration process go settings A2P registry register new brand complete brand form
-        pay registration fee wait approval common brand registration mistakes
-        campaign registration one campaign per use case campaign information required
-        description message flow sample messages opt-in method opt-out help keywords
-        pre-built campaign templates real estate lead follow-up B2B demo booking
-        staffing recruitment customer support A2P status monitoring registration dashboard
-        approved pending rejected required documentation business license insurance certificate
-        website screenshots sample opt-in forms company information settings basic details
-        required fields company name industry type business hours time zone website
-        optional recommended description unique value proposition target customer company size
-        business hours matter AI never texts outside configured hours
-        messaging communication settings critical controls message throttle response delay
-        conversation limit follow-up attempts timing defaults impact recommendations
-        messaging best practices start conservative throttles random delays longer delays
-        test settings monitor unsubscribe rates phone number management strategy
-        local vs toll-free number rotation dedicated vs shared number warming
-        compliance requirements only text consented numbers honor opt-outs immediately
-        include business identification respect quiet hours maintain consent records
-        sales team configuration team setup process adding team members send invitation
-        assign role sales user manager admin configure notifications email alerts SMS
-        in-app daily summary set availability vacation days working hours capacity limits
-        hot lead routing rules round robin performance-based skill-based geographic campaign-specific
-        routing priority campaign assignment skill tag matching availability status
-        current workload performance score AI automation settings escalation thresholds
-        configure when leads marked hot handed sales lead score threshold sentiment threshold
-        message count keyword triggers escalation rules auto-assignment re-engagement automation
-        workflow triggers smart scheduling AI configuration tips start default thresholds
-        review false positives different campaigns document changes sales team feedback
-        AI instruction hub creating effective instructions instruction components base personality
-        goals objectives conversation flow industry-specific templates real estate staffing
-        B2B SaaS custom personalities how create tone style vocabulary example conversations
-        dos don'ts test sample leads knowledge base management what upload essential documents
-        company overview product service details FAQs case studies process documents
-        best practices update quarterly keep concise bullet points internal notes test upload
-        knowledge base formatting example company FAQ frequently asked questions
-        about company how quickly close need repairs determine offer fees
-        internal only typical offer minimum deal size avoid properties
-        system tools maintenance data export options lead export conversation export
-        analytics export billing export includes format use case API access coming soon
-        backup best practices recommended schedule daily hot leads weekly all leads
-        monthly complete system quarterly archive old conversations
-        settings setup checklist complete these order A2P brand registration campaign registration
-        company information purchase phone numbers add sales team configure AI settings
-        upload knowledge base test everything ready launch once checkboxes complete
-        ready import leads start first campaign
-      `,
-      'integrations': `
-        integrations workflows connect AI texting platform existing tech stack seamless operations
-        current integration methods CSV import export email notifications SMS alerts
-        webhook events coming API access native integrations planned manual reliable
-        real-time alerts instant text notifications urgent hot leads full programmatic access
-        direct connections popular CRMs Salesforce HubSpot Pipedrive coming soon
-        common integration workflows CRM synchronization workflow current manual process
-        export leads from CRM map fields platform template import AI texting platform
-        AI engages qualifies leads export hot leads daily import back CRM updated status
-        automation tips scheduled exports spreadsheet tools field mapping import templates
-        daily sync routines marketing automation integration lead flow architecture
-        email campaign form submission AI texting hot lead CRM deal integration points
-        form submissions auto-add web form integration email responders trigger SMS outreach
-        lead scoring combine email SMS engagement suppression lists sync opt-outs all channels
-        sales tool stack integration common sales stack connections calendar Calendly
-        share booking links AI conversations dialer PowerDialer export hot lead phone numbers
-        email sequences trigger based AI outcome proposal tools generate qualified lead data
-        future integration roadmap coming 2024 native integrations major CRMs webhook support
-        Zapier app full REST API planned integrations Salesforce bi-directional sync
-        custom objects workflow triggers HubSpot contact sync deal creation timeline events
-        Zapier 1000+ app connections custom workflows Slack hot lead alerts team notifications
-        conversation summaries integration benefits current capabilities manual CSV import export
-        email SMS notifications bulk data transfers lead source tracking team notification systems
-        coming soon real-time CRM synchronization webhook event triggers API-driven integrations
-        Zapier marketplace app native platform connections getting started integrations
-        recommended first steps audit current tech stack map lead journey start CSV imports
-        set up notifications plan API access current manual process automation tips
-        integration points CRM synchronization marketing automation sales tool stack
-        common sales stack connections tool type integration method data flow
-        calendar dialer email sequences proposal tools business intelligence connectors
-        data management best practices regular exports analysis tips
-      `,
-      'troubleshooting': `
-        troubleshooting guide quick solutions common issues most problems resolved minutes
-        critical issues immediate action required AI not sending any messages impact
-        no lead engagement potential revenue loss diagnostic steps check campaign status
-        active AI turned ON verify phone number assigned active verified review lead status
-        assigned campaign check time settings within business hours message throttle
-        hit daily hourly limits system health check control room red indicators
-        quick fixes toggle campaign off on reset verify phone number texting yourself
-        check settings messaging throttle limits ensure leads valid phone numbers country code
-        hot leads not being detected common causes escalation threshold set too high
-        AI personality mismatch audience campaign goal doesn't match lead intent
-        conversations ending too early solutions review recent conversations leads showing interest
-        lower threshold 70 temporarily monitor check AI asking qualifying questions
-        ensure follow-up messages enabled run A/B test different approach
-        high unsubscribe rate greater than 3% risk high unsubscribes damage sender reputation
-        address immediately prevent delivery issues diagnostic questions opening message too aggressive
-        texting outside business hours lead source quality poor frequency too high
-        message content spammy misleading immediate actions pause campaign temporarily
-        review soften opening message verify lead consent source quality reduce follow-up frequency
-        A/B test friendlier approach common issues solutions CSV import failing
-        error invalid file format save CSV not Excel UTF-8 encoding remove formulas formatting
-        check hidden columns rows headers don't match download fresh template case-sensitive
-        remove trailing spaces don't add remove columns invalid phone numbers
-        include country code remove special characters format no extensions letters
-        sales team not getting notifications check these settings team member status
-        active available campaign assignment assigned specific member notification settings
-        email SMS enabled profile email delivery check spam folder phone number
-        correct number country code test notification system create test lead manually mark hot
-        AI giving incorrect information root causes outdated knowledge base documents
-        conflicting information multiple docs AI instructions too vague no relevant info
-        fix process review conversation identify incorrect info update knowledge base correct details
-        add specific instructions prevent recurrence test asking AI same question monitor future
-        poor AI conversation quality symptoms repetitive responses not answering questions directly
-        too pushy passive losing conversation context optimization steps review AI personality
-        match audience update instructions add examples good responses knowledge base
-        comprehensive FAQ coverage A/B test different conversation styles human review
-        sales team review provide feedback performance issues slow message delivery
-        normal vs abnormal delays 5-30 second AI response delay configured
-        1-2 minute delay high volume abnormal greater than 5 minute delays consistently
-        messages arriving hours later troubleshooting check system metrics control room
-        verify message throttle settings reduce active campaign count temporarily
-        contact support delays persist dashboard loading slowly quick fixes
-        clear browser cache cookies try different browser Chrome recommended
-        reduce date range analytics views close unnecessary browser tabs
-        check internet connection speed system performance benchmarks expected performance ranges
-        poor average excellent initial response rate lead to hot hot lead to sale
-        cost per hot lead sales response time system health indicators
-        message delivery hot lead response system uptime error rate threshold
-        diagnostic tools self-help self-diagnostic checklist all campaigns show active status
-        phone numbers verified assigned A2P brand campaigns approved business hours configured
-        sales team notifications enabled AI knowledge base uploaded test messages sent successfully
-        health check tools control room dashboard message delivery logs AI performance metrics
-        campaign analytics getting help support contact methods live chat support
-        available Monday-Friday 9AM-6PM EST average response time 2 minutes
-        email support response within 24 hours knowledge base search online help center
-        training sessions weekly group training book 1-on-1 onboarding enterprise accounts
-        emergency support critical issues business operations available 24/7 enterprise customers
-        user community join Slack community connect other users share tips peer support
-        pro tip contacting support include campaign ID example lead ID screenshot issue
-        steps reproduce speeds resolution 80% emergency procedures critical system down
-        compliance issue phone number suspended immediate actions assess scope impact
-        stop pause affected systems notify stakeholders document timeline
-        resolution process gather diagnostic information contact appropriate support
-        implement workarounds monitor resolution incident response checklist
-        prevention maintenance weekly maintenance checklist system health review error logs
-        check message delivery rates monitor AI conversation quality verify phone number status
-        data management backup lead database clean duplicate entries update knowledge base
-        archive old conversations common prevention mistakes not monitoring unsubscribe rates
-        ignoring carrier compliance updates skipping knowledge base updates
-        not testing phone numbers regularly failing train new team members properly
-      `
+      'getting-started': 'getting started platform overview complete settings first A2P registration brand campaign registry phone numbers team setup AI configuration knowledge base first week success plan day initial setup configuration company information purchase phone invite team configure AI upload test campaign creation monitor optimize scale operations train sales team reporting platform capabilities control room dashboard lead management AI conversation engine campaign management analytics insights system configuration training videos walkthrough setup guide mistakes avoid best practices week goals setup completion hot lead response rate conversion metrics',
+      'lead-management': 'lead management complete guide pipeline heart platform managing tracking optimizing understanding lead statuses hot engaging responding cold unsubscribed status indicators AI lead scoring system proprietary algorithm 0-100 scale fire hot warm cold scoring factors influence response time frequency message length quality sentiment analysis buying signals urgency indicators engagement depth qualification signals bulk lead import guide preparing CSV file required format column requirements custom fields configuration real estate staffing B2B sales fields industry specific import best practices common errors phone numbers country codes campaign names headers advanced filtering search capabilities global search status filters campaign filters date range score-based filtering bulk actions export selected assign campaign update status understanding conversations conversation view features message timeline real-time scoring sentiment indicators engagement metrics lead score chart manual intervention options lead lifecycle management typical journey import first contact engagement hot lead sales handoff performance metrics response rate conversion qualification time follow-up window optimization daily management weekly tasks monitor review adjust clean data analyze rates',
+      'campaigns': 'campaign management guide engine drives lead engagement master creation optimization campaign fundamentals 120 leads processed hour unlimited campaigns AI works 24/7 dedicated phone number per campaign goals use cases qualify sellers recruit candidates book demos lead nurture follow-up sequence appointment setting AI approach success metrics phone number management requirements one number per campaign local area codes number porting compliance built-in warming volume limits dedicated usage best practices AI personality configuration professional friendly casual custom personalities characteristics language terminology value propositions time constraints industry specific campaign creation step-by-step basics description goal color AI configuration personality response speed escalation rules resources assignment phone number sales team routing tags launch settings pro move paused state upload leads campaign control panel states explained active AI on paused archived real-time metrics total leads messages sent response rate hot leads processing limits performance optimization key indicators initial response conversation depth hot lead conversion speed sales acceptance rate benchmarks warning signs average excellent performance optimization checklist A/B tests review conversations advanced strategies scaling vertical horizontal geographic lifecycle management launch growth maturity phases success formula quality leads smart AI setup rapid testing sales alignment troubleshooting common issues low response rates no hot leads high unsubscribe rate quick fixes improve generate reduce',
+      'ai-features': 'AI engine deep dive understanding how AI works optimize performance natural language processing real-time analysis smart escalation knowledge integration continuous learning compliance built-in conversation intelligence analyzes every message sentiment score urgency detection hesitation indicators qualification signals engagement depth measures emotional tone time-sensitive language uncertainty phrases budget mentions timeline discussions AI response strategies lead behavior short minimal responses asking specific questions expressing concerns high interest signals going cold delayed responses A/B testing mastery framework optimize conversations scientific precision opening messages AI tone variations follow-up timing message sequences value propositions testing guidelines one variable time sufficient sample size run full cycle document everything apply learnings understanding test results confidence levels statistically significant winner trending insufficient data AI instructions customization creating custom behaviors industry-specific templates real estate investor staffing recruiting B2B SaaS templates objection handling escalation triggers specific phrases question patterns engagement level information provided advanced AI behaviors train handle common objections too expensive not interested already have solution define when mark leads hot knowledge base management what upload company overview product service details FAQs case studies process documents formatting best practices update quarterly keep concise bullet points include internal notes test after upload AI performance monitoring key indicators message understanding response time accuracy rate escalation rate quality monitoring weekly review checklist optimization triggers response rate drops hot lead rate falls quality issues system tools maintenance data export options conversation export analytics export billing export API access coming soon backup best practices daily weekly monthly quarterly AI future roadmap Q2 Q3 Q4 2024 voice conversation capabilities multi-language support advanced sentiment analysis predictive lead scoring custom model training industry-specific variants objection handling conversation coaching mode AI-generated follow-up sequences cross-platform sync advanced personalization GPT-5 integration',
+      'analytics': 'analytics intelligence platform transform lead engagement data actionable insights real-time visibility AI-powered outreach dashboard hierarchy pipeline control room AI strategy hub business analytics enterprise view multi-tenant overview system health indicators overview health panel hot lead handoff tracking lead journey funnel AI optimization metrics system performance message delivery hot lead response system uptime error rate warning thresholds performance alerts AI strategy hub admin only deep analytics optimizing AI performance overview reports macro conversion funnel historical performance trends AI performance analysis confidence vs outcome message effectiveness optimal timing campaign comparison metrics shows use case persona performance ROI revenue analytics lead source cost analysis revenue analysis sales team performance hot leads received converted average deal size response time win rate A/B testing analytics understanding test results confidence levels what can test best practices success metrics response rate improvement hot lead conversion conversation depth increase unsubscribe rate reduction sales acceptance rate using analytics optimization weekly review checklist Monday morning review process check control room review hot leads analyze funnel campaign performance A/B test results sales feedback action items key performance benchmarks poor average excellent initial response lead to hot hot lead to sale cost per hot lead sales response time analytics pro tip export data business analytics reporting executive dashboard metrics custom reporting options available report types campaign performance sales team lead source analysis AI optimization report scheduling daily weekly monthly custom reports data export integration export options lead export conversation export analytics export billing export current integrations manual CSV email notifications scheduled exports custom date range coming soon REST API webhook notifications native CRM integrations business intelligence connectors data management best practices regular exports analysis tips advanced analytics features predictive analytics cohort analysis attribution modeling analytics limits considerations historical data retention real-time updates custom report generation large data exports',
+      'settings': 'settings complete guide master platform configuration maximize performance smooth operations company information A2P brand campaign registry messaging communication phone numbers sales team AI automation AI instruction hub knowledge base system tools CRITICAL A2P brand campaign registry must complete first without registration messages not delivered business texting requires carrier-approved registration brand registration what you need business legal name EIN tax ID business address phone website URL industry classification registration process go settings A2P registry register new brand complete brand form pay registration fee wait approval common brand registration mistakes campaign registration one campaign per use case campaign information required description message flow sample messages opt-in method opt-out help keywords pre-built campaign templates real estate lead follow-up B2B demo booking staffing recruitment customer support A2P status monitoring registration dashboard approved pending rejected required documentation business license insurance certificate website screenshots sample opt-in forms company information settings basic details required fields company name industry type business hours time zone website optional recommended description unique value proposition target customer company size business hours matter AI never texts outside configured hours messaging communication settings critical controls message throttle response delay conversation limit follow-up attempts timing defaults impact recommendations messaging best practices start conservative throttles random delays longer delays test settings monitor unsubscribe rates phone number management strategy local vs toll-free number rotation dedicated vs shared number warming compliance requirements only text consented numbers honor opt-outs immediately include business identification respect quiet hours maintain consent records sales team configuration team setup process adding team members send invitation assign role sales user manager admin configure notifications email alerts SMS in-app daily summary set availability vacation days working hours capacity limits hot lead routing rules round robin performance-based skill-based geographic campaign-specific routing priority campaign assignment skill tag matching availability status current workload performance score AI automation settings escalation thresholds configure when leads marked hot handed sales lead score threshold sentiment threshold message count keyword triggers escalation rules auto-assignment re-engagement automation workflow triggers smart scheduling AI configuration tips start default thresholds review false positives different campaigns document changes sales team feedback AI instruction hub creating effective instructions instruction components base personality goals objectives conversation flow industry-specific templates real estate staffing B2B SaaS custom personalities how create tone style vocabulary example conversations dos don\'ts test sample leads knowledge base management what upload essential documents company overview product service details FAQs case studies process documents best practices update quarterly keep concise bullet points internal notes test upload knowledge base formatting example company FAQ frequently asked questions about company how quickly close need repairs determine offer fees internal only typical offer minimum deal size avoid properties system tools maintenance data export options lead export conversation export analytics export billing export includes format use case API access coming soon backup best practices recommended schedule daily hot leads weekly all leads monthly complete system quarterly archive old conversations settings setup checklist complete these order A2P brand registration campaign registration company information purchase phone numbers add sales team configure AI settings upload knowledge base test everything ready launch once checkboxes complete ready import leads start first campaign',
+      'integrations': 'integrations workflows connect AI texting platform existing tech stack seamless operations current integration methods CSV import export email notifications SMS alerts webhook events coming API access native integrations planned manual reliable real-time alerts instant text notifications urgent hot leads full programmatic access direct connections popular CRMs Salesforce HubSpot Pipedrive coming soon common integration workflows CRM synchronization workflow current manual process export leads from CRM map fields platform template import AI texting platform AI engages qualifies leads export hot leads daily import back CRM updated status automation tips scheduled exports spreadsheet tools field mapping import templates daily sync routines marketing automation integration lead flow architecture email campaign form submission AI texting hot lead CRM deal integration points form submissions auto-add web form integration email responders trigger SMS outreach lead scoring combine email SMS engagement suppression lists sync opt-outs all channels sales tool stack integration common sales stack connections calendar Calendly share booking links AI conversations dialer PowerDialer export hot lead phone numbers email sequences trigger based AI outcome proposal tools generate qualified lead data future integration roadmap coming 2024 native integrations major CRMs webhook support Zapier app full REST API planned integrations Salesforce bi-directional sync custom objects workflow triggers HubSpot contact sync deal creation timeline events Zapier 1000+ app connections custom workflows Slack hot lead alerts team notifications conversation summaries integration benefits current capabilities manual CSV import export email SMS notifications bulk data transfers lead source tracking team notification systems coming soon real-time CRM synchronization webhook event triggers API-driven integrations Zapier marketplace app native platform connections getting started integrations recommended first steps audit current tech stack map lead journey start CSV imports set up notifications plan API access current manual process automation tips integration points CRM synchronization marketing automation sales tool stack common sales stack connections tool type integration method data flow calendar dialer email sequences proposal tools business intelligence connectors data management best practices regular exports analysis tips',
+      'troubleshooting': 'troubleshooting guide quick solutions common issues most problems resolved minutes critical issues immediate action required AI not sending any messages impact no lead engagement potential revenue loss diagnostic steps check campaign status active AI turned ON verify phone number assigned active verified review lead status assigned campaign check time settings within business hours message throttle hit daily hourly limits system health check control room red indicators quick fixes toggle campaign off on reset verify phone number texting yourself check settings messaging throttle limits ensure leads valid phone numbers country code hot leads not being detected common causes escalation threshold set too high AI personality mismatch audience campaign goal doesn\'t match lead intent conversations ending too early solutions review recent conversations leads showing interest lower threshold 70 temporarily monitor check AI asking qualifying questions ensure follow-up messages enabled run A/B test different approach high unsubscribe rate greater than 3% risk high unsubscribes damage sender reputation address immediately prevent delivery issues diagnostic questions opening message too aggressive texting outside business hours lead source quality poor frequency too high message content spammy misleading immediate actions pause campaign temporarily review soften opening message verify lead consent source quality reduce follow-up frequency A/B test friendlier approach common issues solutions CSV import failing error invalid file format save CSV not Excel UTF-8 encoding remove formulas formatting check hidden columns rows headers don\'t match download fresh template case-sensitive remove trailing spaces don\'t add remove columns invalid phone numbers include country code remove special characters format no extensions letters sales team not getting notifications check these settings team member status active available campaign assignment assigned specific member notification settings email SMS enabled profile email delivery check spam folder phone number correct number country code test notification system create test lead manually mark hot AI giving incorrect information root causes outdated knowledge base documents conflicting information multiple docs AI instructions too vague no relevant info fix process review conversation identify incorrect info update knowledge base correct details add specific instructions prevent recurrence test asking AI same question monitor future poor AI conversation quality symptoms repetitive responses not answering questions directly too pushy passive losing conversation context optimization steps review AI personality match audience update instructions add examples good responses knowledge base comprehensive FAQ coverage A/B test different conversation styles human review sales team review provide feedback performance issues slow message delivery normal vs abnormal delays 5-30 second AI response delay configured 1-2 minute delay high volume abnormal greater than 5 minute delays consistently messages arriving hours later troubleshooting check system metrics control room verify message throttle settings reduce active campaign count temporarily contact support delays persist dashboard loading slowly quick fixes clear browser cache cookies try different browser Chrome recommended reduce date range analytics views close unnecessary browser tabs check internet connection speed system performance benchmarks expected performance ranges poor average excellent initial response rate lead to hot hot lead to sale cost per hot lead sales response time system health indicators message delivery hot lead response system uptime error rate threshold diagnostic tools self-help self-diagnostic checklist all campaigns show active status phone numbers verified assigned A2P brand campaigns approved business hours configured sales team notifications enabled AI knowledge base uploaded test messages sent successfully health check tools control room dashboard message delivery logs AI performance metrics campaign analytics getting help support contact methods live chat support available Monday-Friday 9AM-6PM EST average response time 2 minutes email support response within 24 hours knowledge base search online help center training sessions weekly group training book 1-on-1 onboarding enterprise accounts emergency support critical issues business operations available 24/7 enterprise customers user community join Slack community connect other users share tips peer support pro tip contacting support include campaign ID example lead ID screenshot issue steps reproduce speeds resolution 80% emergency procedures critical system down compliance issue phone number suspended immediate actions assess scope impact stop pause affected systems notify stakeholders document timeline resolution process gather diagnostic information contact appropriate support implement workarounds monitor resolution incident response checklist prevention maintenance weekly maintenance checklist system health review error logs check message delivery rates monitor AI conversation quality verify phone number status data management backup lead database clean duplicate entries update knowledge base archive old conversations common prevention mistakes not monitoring unsubscribe rates ignoring carrier compliance updates skipping knowledge base updates not testing phone numbers regularly failing train new team members properly'
     };
     
     // Search through each tab's content and count matches
@@ -647,7 +313,7 @@ const HelpCenter = () => {
       
       let matches = 0;
       searchWords.forEach(searchWord => {
-        if (searchWord.length >= 2) {
+        if (searchWord.length >= 2) { // Only count words with 2+ characters
           const wordMatches = contentWords.filter(word => 
             word.includes(searchWord) || searchWord.includes(word)
           ).length;
