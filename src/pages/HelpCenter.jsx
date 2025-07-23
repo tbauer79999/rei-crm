@@ -390,7 +390,7 @@ const HelpCenter = () => {
         setActiveTab(topResult);
       }
     }
-  }, [searchResults, searchTerm, activeTab]);
+}, [searchResults, searchTerm]);
 
   const renderTabContent = () => {
     switch (activeTab) {
