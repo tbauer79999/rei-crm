@@ -108,6 +108,7 @@ const CampaignProgress = ({ campaignId }) => {
   const [progress, setProgress] = useState({ 
     processed: 0, 
     total: 0,
+    sent: 0,        // ✅ NEW: Separate sent vs delivered
     delivered: 0,
     failed: 0,
     retries: 0,
@@ -139,16 +140,18 @@ const CampaignProgress = ({ campaignId }) => {
             const total = leads.length;
             const processed = leads.filter(l => l.ai_sent).length;
             
-            // Count delivery statuses
-            const delivered = messages.filter(m => m.status === 'sent' || m.status === 'delivered').length;
-            const failed = messages.filter(m => m.status === 'failed').length;
+            // ✅ UPDATED: Count delivery statuses properly
+            const sent = messages.filter(m => m.status === 'sent').length;
+            const delivered = messages.filter(m => m.status === 'delivered').length;
+            const failed = messages.filter(m => m.status === 'failed' || m.status === 'undelivered').length;
             const retries = messages.filter(m => m.original_message_id !== null).length;
-            const queued = messages.filter(m => m.status === 'queued').length;
+            const queued = messages.filter(m => m.status === 'queued' || m.status === 'pending').length;
             
             setProgress({ 
               processed, 
               total,
-              delivered,
+              sent,        // ✅ NEW
+              delivered,   // ✅ NOW ACCURATE
               failed,
               retries,
               queued

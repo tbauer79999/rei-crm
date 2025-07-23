@@ -19,7 +19,7 @@ import EnterpriseRoute from './components/EnterpriseRoute';
 import OnboardingGuard from './components/OnboardingGuard';
 import InvitationSignupPage from './pages/InvitationSignupPage';
 import supabase from './lib/supabaseClient';
-import HelpCenter from './components/HelpCenter';
+import HelpCenter from './pages/HelpCenter';
 
 // Component to handle root redirect with email confirmation check
 function RootRedirect() {

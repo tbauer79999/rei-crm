@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo  } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { PERMISSIONS } from '../lib/permissions';
@@ -757,9 +757,9 @@ export default function LeadDetail() {
   };
 
   // Calculate AI insights and retry stats
-  const aiInsights = calculateAIInsights();
-  const retryStats = calculateRetryStats();
-  const groupedMessages = groupMessagesWithRetries(messages);
+    const aiInsights = useMemo(() => calculateAIInsights(), [messages]);
+    const retryStats = useMemo(() => calculateRetryStats(), [messages]);
+    const groupedMessages = useMemo(() => groupMessagesWithRetries(messages), [messages]);
 
   // Permission check - show access denied if user can't view leads
   if (!canViewLeads) {
@@ -1170,13 +1170,13 @@ export default function LeadDetail() {
                               />
                             )}
                             {original.status === 'sent' && (
-                              <StatusPill type="success" label="Delivered" />
+                              <StatusPill type="warning" label="Sent" tooltip="Delivered to carrier" />
                             )}
                             {original.status === 'queued' && (
                               <StatusPill type="warning" label="Queued" />
                             )}
                             {original.status === 'delivered' && (
-                              <StatusPill type="success" label="Delivered" />
+                              <StatusPill type="success" label="Delivered" tooltip="Delivered to recipient" />
                             )}
                           </div>
                         )}
@@ -1233,13 +1233,13 @@ export default function LeadDetail() {
                                           />
                                         )}
                                         {retry.status === 'sent' && (
-                                          <StatusPill type="success" label="Delivered" />
+                                          <StatusPill type="warning" label="Sent" tooltip="Delivered to carrier" />
                                         )}
                                         {retry.status === 'queued' && (
                                           <StatusPill type="warning" label="Queued" />
                                         )}
                                         {retry.status === 'delivered' && (
-                                          <StatusPill type="success" label="Delivered" />
+                                          <StatusPill type="success" label="Delivered" tooltip="Delivered to recipient" />
                                         )}
                                       </div>
                                     </div>
