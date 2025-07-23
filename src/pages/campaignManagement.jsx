@@ -272,6 +272,11 @@ export default function CampaignManagement() {
 
   const isGlobalAdmin = user?.role === 'global_admin';
   const [isFetching, setIsFetching] = useState(false);
+  
+  useEffect(() => {
+    document.title = "Campaign Manager – SurFox";
+  }, []);
+
 
   // Fetch tenant industry
   const fetchTenantIndustry = async () => {
