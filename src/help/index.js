@@ -1,11 +1,11 @@
 // 📁 index.js (Export all shared components)
-export { default as CollapsibleSection } from './CollapsibleSection';
-export { default as FeatureCard } from './FeatureCard';
-export { default as MetricCard } from './MetricCard';
-export { default as StatusPill } from './StatusPill';
-export { default as AlertBox } from './AlertBox';
-export { default as ProcessFlow } from './ProcessFlow';
-export { default as BestPracticeBox } from './BestPracticeBox';
-export { default as WarningBox } from './WarningBox';
-export { default as DataTable } from './DataTable';
-export { default as FeatureList } from './FeatureList';
+export { default as CollapsibleSection } from './shared/CollapsibleSection';
+export { default as FeatureCard } from './shared/FeatureCard';
+export { default as MetricCard } from './shared/MetricCard';
+export { default as StatusPill } from './shared/StatusPill';
+export { default as AlertBox } from './shared/AlertBox';
+export { default as ProcessFlow } from './shared/ProcessFlow';
+export { default as BestPracticeBox } from './shared/BestPracticeBox';
+export { default as WarningBox } from './shared/WarningBox';
+export { default as DataTable } from './shared/DataTable';
+export { default as FeatureList } from './shared/FeatureList';
