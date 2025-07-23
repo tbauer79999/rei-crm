@@ -11,7 +11,7 @@ import Integrations from '../help/tabs/Integrations';
 import Troubleshooting from '../help/tabs/Troubleshooting';
 
 // Search Bar Component
-const SearchBar = ({ searchTerm, onSearchChange }) => {
+const SearchBar = ({ searchTerm, onSearchChange, showingResults, onClearSearch }) => {
   return (
     <section className="bg-white py-8 shadow-sm sticky top-0 z-50">
       <div className="container mx-auto max-w-4xl px-5">
@@ -26,28 +26,314 @@ const SearchBar = ({ searchTerm, onSearchChange }) => {
           <span className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 text-xl">
             🔍
           </span>
+          {showingResults && (
+            <button
+              onClick={onClearSearch}
+              className="absolute right-12 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+              title="Clear search"
+            >
+              ✕
+            </button>
+          )}
         </div>
       </div>
     </section>
   );
 };
 
-// Tab Navigation Component
-const TabNavigation = ({ activeTab, onTabChange, searchResults }) => {
+// Search Results Component
+const SearchResults = ({ searchTerm, searchResults, onViewInTab }) => {
+  // Content snippets for search results
+  const contentSnippets = {
+    'getting-started': [
+      {
+        title: "Platform Overview & Setup",
+        snippet: "Complete platform setup guide covering settings configuration, A2P registration, phone numbers, team setup, and AI configuration. Get started with your first campaign creation.",
+        section: "Initial Setup"
+      },
+      {
+        title: "Settings-First Approach",
+        snippet: "Critical: Complete A2P brand registration first. Without registration, messages won't be delivered. Set up company information, phone numbers, and team configuration.",
+        section: "Configuration Guide"
+      },
+      {
+        title: "Complete Setup Checklist",
+        snippet: "Follow our proven setup sequence: A2P registration → Company info → Phone numbers → Team setup → AI configuration → Knowledge base → Test campaign.",
+        section: "Setup Process"
+      }
+    ],
+    'lead-management': [
+      {
+        title: "Lead Status System",
+        snippet: "Understanding lead statuses: Hot (high engagement), Engaging (active conversations), Responding (initial contact), Cold (low engagement). AI scoring system uses 0-100 scale.",
+        section: "Lead Scoring"
+      },
+      {
+        title: "Bulk Lead Import",
+        snippet: "Import leads via CSV with required format: phone numbers, names, campaign assignment. Supports custom fields for real estate, staffing, and B2B sales industries.",
+        section: "Data Import"
+      },
+      {
+        title: "Conversation Management",
+        snippet: "View real-time conversations with sentiment analysis, engagement metrics, and lead score tracking. Monitor AI performance and manual intervention options.",
+        section: "Conversation Tools"
+      }
+    ],
+    'campaigns': [
+      {
+        title: "Campaign Creation Guide",
+        snippet: "Step-by-step campaign setup: define goals, configure AI personality (professional/friendly/casual), assign phone numbers, set escalation rules, and launch settings.",
+        section: "Campaign Setup"
+      },
+      {
+        title: "AI Personality Configuration",
+        snippet: "Choose AI personality to match your audience: Professional (formal, business-focused), Friendly (warm, approachable), Casual (conversational, relaxed).",
+        section: "AI Configuration"
+      },
+      {
+        title: "Performance Optimization",
+        snippet: "Monitor key metrics: response rate, conversation depth, hot lead conversion. Use A/B testing to optimize messaging and improve campaign performance.",
+        section: "Optimization"
+      }
+    ],
+    'ai-features': [
+      {
+        title: "AI Engine Capabilities",
+        snippet: "Natural language processing, real-time analysis, smart escalation, knowledge integration. AI understands context, intent, and nuance in conversations.",
+        section: "Core AI"
+      },
+      {
+        title: "Conversation Intelligence",
+        snippet: "Every message analyzed for sentiment, urgency, buying signals, and objections. Scores update instantly to identify hot leads the moment they show interest.",
+        section: "Analysis Tools"
+      },
+      {
+        title: "A/B Testing Framework",
+        snippet: "Test opening messages, AI tone variations, follow-up timing, message sequences, and value propositions. Scientific precision for conversation optimization.",
+        section: "Testing Tools"
+      }
+    ],
+    'analytics': [
+      {
+        title: "Real-time Dashboard",
+        snippet: "Monitor system health, hot lead tracking, AI performance metrics, and campaign analytics. Get instant visibility into lead engagement and conversion rates.",
+        section: "Dashboard"
+      },
+      {
+        title: "ROI & Revenue Analytics",
+        snippet: "Track lead source costs, revenue analysis, sales team performance, and conversion metrics. Measure hot leads received, converted, and average deal size.",
+        section: "Revenue Tracking"
+      },
+      {
+        title: "AI Performance Analysis",
+        snippet: "Analyze AI confidence vs outcomes, message effectiveness, optimal timing, and campaign comparison metrics. Optimize AI performance with data-driven insights.",
+        section: "AI Analytics"
+      }
+    ],
+    'settings': [
+      {
+        title: "A2P Brand Registration",
+        snippet: "CRITICAL: Complete A2P brand and campaign registry before sending messages. Business texting requires carrier-approved registration including EIN, business info, and use case.",
+        section: "Compliance"
+      },
+      {
+        title: "Company Information Setup",
+        snippet: "Configure company details, business hours, time zone, industry type. Set messaging communication settings including throttle limits and response delays.",
+        section: "Company Setup"
+      },
+      {
+        title: "Sales Team Configuration",
+        snippet: "Add team members, assign roles (sales user/manager/admin), configure notifications, set availability, and establish hot lead routing rules for optimal distribution.",
+        section: "Team Management"
+      }
+    ],
+    'integrations': [
+      {
+        title: "Current Integration Methods",
+        snippet: "CSV import/export, email notifications, SMS alerts, webhook events. Connect your AI texting platform with existing CRM and sales tools.",
+        section: "Available Integrations"
+      },
+      {
+        title: "CRM Synchronization Workflow",
+        snippet: "Export leads from CRM, import to AI platform, AI engages and qualifies leads, export hot leads back to CRM with updated status and engagement data.",
+        section: "Workflow Setup"
+      },
+      {
+        title: "Future Integration Roadmap",
+        snippet: "Coming 2024: Native CRM integrations (Salesforce, HubSpot), Zapier app, full REST API, webhook support, and bi-directional sync capabilities.",
+        section: "Roadmap"
+      }
+    ],
+    'troubleshooting': [
+      {
+        title: "AI Not Sending Messages",
+        snippet: "Check campaign status (active), AI turned ON, phone number assigned and verified, leads within business hours, message throttle limits not exceeded.",
+        section: "Critical Issues"
+      },
+      {
+        title: "Hot Leads Not Detected",
+        snippet: "Review escalation thresholds (lower to 70% temporarily), check AI personality match with audience, ensure follow-up messages enabled, run A/B tests.",
+        section: "Lead Detection"
+      },
+      {
+        title: "High Unsubscribe Rate",
+        snippet: "If >3% unsubscribe rate: pause campaign, review opening message (too aggressive?), verify lead consent source, reduce follow-up frequency, test friendlier approach.",
+        section: "Performance Issues"
+      }
+    ]
+  };
+
+  const highlightText = (text, searchTerm) => {
+    if (!searchTerm) return text;
+    const regex = new RegExp(`(${searchTerm})`, 'gi');
+    const parts = text.split(regex);
+    
+    return parts.map((part, index) => 
+      regex.test(part) ? 
+        <mark key={index} className="bg-yellow-200 font-medium">{part}</mark> : 
+        part
+    );
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* Search Results Header */}
+      <div className="bg-white border-b border-gray-200 py-6">
+        <div className="container mx-auto max-w-4xl px-5">
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">
+            Search Results for "{searchTerm}"
+          </h2>
+          <p className="text-gray-600">
+            Found {Object.values(searchResults).reduce((a, b) => a + b, 0)} matches across{' '}
+            {Object.keys(searchResults).length} sections
+          </p>
+        </div>
+      </div>
+
+      {/* Search Results List */}
+      <div className="container mx-auto max-w-4xl px-5 py-8">
+        <div className="space-y-6">
+          {Object.entries(searchResults)
+            .sort(([,a], [,b]) => b - a) // Sort by relevance (match count)
+            .map(([tabId, matchCount]) => {
+              const tabNames = {
+                'getting-started': 'Getting Started',
+                'lead-management': 'Lead Management',
+                'campaigns': 'Campaigns',
+                'ai-features': 'AI Features',
+                'analytics': 'Analytics',
+                'settings': 'Settings',
+                'integrations': 'Integrations',
+                'troubleshooting': 'Troubleshooting'
+              };
+
+              const snippets = contentSnippets[tabId] || [];
+              const relevantSnippets = snippets.filter(snippet => 
+                snippet.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                snippet.snippet.toLowerCase().includes(searchTerm.toLowerCase())
+              ).slice(0, 2); // Show top 2 most relevant
+
+              return (
+                <div key={tabId} className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+                  <div className="p-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-xl font-semibold text-gray-900">
+                        {tabNames[tabId]}
+                      </h3>
+                      <div className="flex items-center space-x-3">
+                        <span className="bg-indigo-100 text-indigo-800 px-3 py-1 rounded-full text-sm font-medium">
+                          {matchCount} matches
+                        </span>
+                        <button
+                          onClick={() => onViewInTab(tabId)}
+                          className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors font-medium"
+                        >
+                          View in {tabNames[tabId]}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Show relevant snippets */}
+                    <div className="space-y-4">
+                      {relevantSnippets.length > 0 ? (
+                        relevantSnippets.map((snippet, index) => (
+                          <div key={index} className="border-l-4 border-indigo-200 pl-4">
+                            <h4 className="font-medium text-gray-900 mb-1">
+                              {highlightText(snippet.title, searchTerm)}
+                            </h4>
+                            <p className="text-gray-700 text-sm mb-1">
+                              {highlightText(snippet.snippet, searchTerm)}
+                            </p>
+                            <span className="text-xs text-gray-500">
+                              {snippet.section}
+                            </span>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="border-l-4 border-gray-200 pl-4">
+                          <p className="text-gray-700 text-sm">
+                            Multiple references to "{searchTerm}" found in this section. 
+                            Click "View in {tabNames[tabId]}" to see all content.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+        </div>
+
+        {/* No Results */}
+        {Object.keys(searchResults).length === 0 && (
+          <div className="text-center py-12">
+            <div className="text-gray-400 mb-4">
+              <svg className="w-16 h-16 mx-auto" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">No results found</h3>
+            <p className="text-gray-600">
+              Try searching with different keywords or check your spelling.
+            </p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// Tab Navigation Component (Updated)
+const TabNavigation = ({ activeTab, onTabChange, isSearchMode, onBackToSearch }) => {
   const tabs = [
-    { id: 'getting-started', label: 'Getting Started', count: searchResults['getting-started'] || 0 },
-    { id: 'lead-management', label: 'Lead Management', count: searchResults['lead-management'] || 0 },
-    { id: 'campaigns', label: 'Campaigns', count: searchResults['campaigns'] || 0 },
-    { id: 'ai-features', label: 'AI Features', count: searchResults['ai-features'] || 0 },
-    { id: 'analytics', label: 'Analytics', count: searchResults['analytics'] || 0 },
-    { id: 'settings', label: 'Settings', count: searchResults['settings'] || 0 },
-    { id: 'integrations', label: 'Integrations', count: searchResults['integrations'] || 0 },
-    { id: 'troubleshooting', label: 'Troubleshooting', count: searchResults['troubleshooting'] || 0 }
+    { id: 'getting-started', label: 'Getting Started' },
+    { id: 'lead-management', label: 'Lead Management' },
+    { id: 'campaigns', label: 'Campaigns' },
+    { id: 'ai-features', label: 'AI Features' },
+    { id: 'analytics', label: 'Analytics' },
+    { id: 'settings', label: 'Settings' },
+    { id: 'integrations', label: 'Integrations' },
+    { id: 'troubleshooting', label: 'Troubleshooting' }
   ];
 
   return (
     <nav className="bg-white py-4 border-b border-gray-200 mb-12">
       <div className="container mx-auto max-w-4xl px-5">
+        {/* Back to Search Button */}
+        {isSearchMode && (
+          <div className="mb-4">
+            <button
+              onClick={onBackToSearch}
+              className="flex items-center text-indigo-600 hover:text-indigo-700 font-medium transition-colors"
+            >
+              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+              Back to search results
+            </button>
+          </div>
+        )}
+
         <div className="flex gap-8 overflow-x-auto pb-2">
           {tabs.map((tab) => (
             <button
@@ -61,11 +347,6 @@ const TabNavigation = ({ activeTab, onTabChange, searchResults }) => {
               `}
             >
               {tab.label}
-              {tab.count > 0 && (
-                <span className="ml-2 bg-indigo-100 text-indigo-600 px-2 py-1 rounded-full text-xs">
-                  {tab.count}
-                </span>
-              )}
             </button>
           ))}
         </div>
@@ -78,8 +359,10 @@ const TabNavigation = ({ activeTab, onTabChange, searchResults }) => {
 const HelpCenter = () => {
   const [activeTab, setActiveTab] = useState('getting-started');
   const [searchTerm, setSearchTerm] = useState('');
+  const [showSearchResults, setShowSearchResults] = useState(false);
+  const [searchFromTab, setSearchFromTab] = useState(null);
 
-  // REAL SEARCH FUNCTIONALITY - searches through actual content
+  // REAL SEARCH FUNCTIONALITY
   const searchResults = useMemo(() => {
     if (!searchTerm || searchTerm.length < 2) return {};
     
@@ -364,7 +647,7 @@ const HelpCenter = () => {
       
       let matches = 0;
       searchWords.forEach(searchWord => {
-        if (searchWord.length >= 2) { // Only count words with 2+ characters
+        if (searchWord.length >= 2) {
           const wordMatches = contentWords.filter(word => 
             word.includes(searchWord) || searchWord.includes(word)
           ).length;
@@ -380,17 +663,36 @@ const HelpCenter = () => {
     return results;
   }, [searchTerm]);
 
-  // Auto-switch to most relevant tab when searching
-  React.useEffect(() => {
-    if (searchTerm && Object.keys(searchResults).length > 0) {
-      const topResult = Object.entries(searchResults).reduce((a, b) => 
-        searchResults[a[0]] > searchResults[b[0]] ? a : b
-      )[0];
-      if (topResult !== activeTab) {
-        setActiveTab(topResult);
-      }
+  const handleSearchChange = (term) => {
+    setSearchTerm(term);
+    if (term.length >= 2) {
+      setShowSearchResults(true);
+    } else {
+      setShowSearchResults(false);
     }
-}, [searchResults, searchTerm]);
+  };
+
+  const handleViewInTab = (tabId) => {
+    setActiveTab(tabId);
+    setShowSearchResults(false);
+    setSearchFromTab(searchTerm); // Remember we came from search
+  };
+
+  const handleBackToSearch = () => {
+    setShowSearchResults(true);
+  };
+
+  const handleClearSearch = () => {
+    setSearchTerm('');
+    setShowSearchResults(false);
+    setSearchFromTab(null);
+  };
+
+  const handleTabChange = (tabId) => {
+    setActiveTab(tabId);
+    setShowSearchResults(false);
+    setSearchFromTab(null); // Clear search context when manually switching tabs
+  };
 
   const renderTabContent = () => {
     switch (activeTab) {
@@ -432,36 +734,59 @@ const HelpCenter = () => {
       {/* Search Bar */}
       <SearchBar 
         searchTerm={searchTerm} 
-        onSearchChange={setSearchTerm} 
+        onSearchChange={handleSearchChange}
+        showingResults={showSearchResults || searchFromTab}
+        onClearSearch={handleClearSearch}
       />
 
-      {/* Navigation */}
-      <TabNavigation 
-        activeTab={activeTab} 
-        onTabChange={setActiveTab}
-        searchResults={searchResults}
-      />
+      {/* Show Search Results OR Tab Content */}
+      {showSearchResults ? (
+        <SearchResults 
+          searchTerm={searchTerm}
+          searchResults={searchResults}
+          onViewInTab={handleViewInTab}
+        />
+      ) : (
+        <>
+          {/* Navigation */}
+          <TabNavigation 
+            activeTab={activeTab} 
+            onTabChange={handleTabChange}
+            isSearchMode={!!searchFromTab}
+            onBackToSearch={handleBackToSearch}
+          />
 
-      {/* Main Content */}
-      <main className="container mx-auto max-w-4xl px-5 pb-20">
-        {/* Search Results Summary */}
-        {searchTerm && (
-          <div className="mb-8 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-            <h3 className="font-semibold text-blue-800 mb-2">
-              Search Results for "{searchTerm}"
-            </h3>
-            <div className="text-blue-700 text-sm">
-              Found {Object.values(searchResults).reduce((a, b) => a + b, 0)} matches across{' '}
-              {Object.keys(searchResults).length} sections
+          {/* Main Content */}
+          <main className="container mx-auto max-w-4xl px-5 pb-20">
+            {/* Search Context Banner */}
+            {searchFromTab && (
+              <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="font-medium text-blue-900">
+                      Viewing results for "{searchFromTab}"
+                    </h3>
+                    <p className="text-blue-700 text-sm">
+                      You're viewing this section based on your search. Use the button above to return to all search results.
+                    </p>
+                  </div>
+                  <button
+                    onClick={handleClearSearch}
+                    className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                  >
+                    Clear search
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Tab Content */}
+            <div className="content-section active animate-fadeIn">
+              {renderTabContent()}
             </div>
-          </div>
-        )}
-
-        {/* Tab Content */}
-        <div className="content-section active animate-fadeIn">
-          {renderTabContent()}
-        </div>
-      </main>
+          </main>
+        </>
+      )}
 
       {/* Add the CSS for animations and styling */}
       <style jsx>{`
