@@ -140,6 +140,10 @@ const settingsCategories = [
 export default function Settings() {
   const [activeCategory, setActiveCategory] = useState(null);
 
+    useEffect(() => {
+    document.title = "Settings – SurFox";
+  }, []);
+  
   const getStatusIcon = (status) => {
     switch (status) {
       case 'healthy':

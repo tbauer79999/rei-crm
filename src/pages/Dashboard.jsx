@@ -52,6 +52,11 @@ export default function Dashboard() {
   const [error, setError] = useState('');
   const navigate = useNavigate();
 
+    useEffect(() => {
+    document.title = "Pipeline – SurFox";
+  }, []);
+
+
   // Get leads that need immediate attention - EXCLUDE already handled leads
   const alertLeads = leads.filter(lead => 
     lead.requires_immediate_attention && 
