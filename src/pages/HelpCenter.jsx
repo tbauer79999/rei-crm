@@ -33,46 +33,38 @@ const SearchBar = ({ searchTerm, onSearchChange }) => {
 };
 
 // Tab Navigation Component
-const TabNavigation = ({ activeTab, onTabChange, searchResults }) => {
-  const tabs = [
-    { id: 'getting-started', label: 'Getting Started', count: searchResults['getting-started'] || 0 },
-    { id: 'lead-management', label: 'Lead Management', count: searchResults['lead-management'] || 0 },
-    { id: 'campaigns', label: 'Campaigns', count: searchResults['campaigns'] || 0 },
-    { id: 'ai-features', label: 'AI Features', count: searchResults['ai-features'] || 0 },
-    { id: 'analytics', label: 'Analytics', count: searchResults['analytics'] || 0 },
-    { id: 'settings', label: 'Settings', count: searchResults['settings'] || 0 },
-    { id: 'integrations', label: 'Integrations', count: searchResults['integrations'] || 0 },
-    { id: 'troubleshooting', label: 'Troubleshooting', count: searchResults['troubleshooting'] || 0 }
-  ];
-
-  return (
-    <nav className="bg-white py-4 border-b border-gray-200 mb-12">
-      <div className="container mx-auto max-w-4xl px-5">
-        <div className="flex gap-8 overflow-x-auto pb-2">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => onTabChange(tab.id)}
-              className={`
-                text-gray-600 no-underline py-2 px-4 border-b-2 border-transparent 
-                whitespace-nowrap transition-all duration-300 font-medium
-                hover:text-indigo-600 hover:border-indigo-600
-                ${activeTab === tab.id ? 'text-indigo-600 border-indigo-600' : ''}
-              `}
-            >
-              {tab.label}
-              {tab.count > 0 && (
-                <span className="ml-2 bg-indigo-100 text-indigo-600 px-2 py-1 rounded-full text-xs">
-                  {tab.count}
-                </span>
-              )}
-            </button>
-          ))}
-        </div>
-      </div>
-    </nav>
-  );
-};
+// Real search functionality
+const searchResults = useMemo(() => {
+  if (!searchTerm || searchTerm.length < 2) return {};
+  
+  const term = searchTerm.toLowerCase();
+  const results = {};
+  
+  // Define content for each tab to search through
+  const tabContent = {
+    'getting-started': 'getting started platform overview settings first A2P registration phone numbers team setup AI configuration knowledge base complete setup checklist',
+    'lead-management': 'lead management status hot cold engaging responding AI scoring import CSV bulk upload conversation view filtering search',
+    'campaigns': 'campaign management creation phone numbers AI personality professional friendly casual goals qualify sellers recruit candidates book demos',
+    'ai-features': 'AI features engine conversation intelligence A/B testing custom instructions knowledge base templates real estate staffing B2B',
+    'analytics': 'analytics dashboard pipeline control room AI strategy hub performance metrics ROI revenue analysis export data',
+    'settings': 'settings company information A2P brand registration campaign registry phone numbers sales team AI automation messaging',
+    'integrations': 'integrations workflows CSV import export email notifications webhooks API CRM synchronization',
+    'troubleshooting': 'troubleshooting common issues AI not sending hot leads not detected CSV import failing notifications performance'
+  };
+  
+  // Search through each tab's content
+  Object.entries(tabContent).forEach(([tabId, content]) => {
+    const matches = content.toLowerCase().split(' ').filter(word => 
+      word.includes(term) || term.includes(word)
+    ).length;
+    
+    if (matches > 0) {
+      results[tabId] = matches;
+    }
+  });
+  
+  return results;
+}, [searchTerm]);
 
 // Main Help Center Component
 const HelpCenter = () => {
