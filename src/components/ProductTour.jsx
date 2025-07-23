@@ -12,6 +12,7 @@ const ProductTour = ({ onComplete }) => {
   const [currentStep, setCurrentStep] = useState(0);
   const [tooltipPosition, setTooltipPosition] = useState({ top: 0, left: 0 });
   const [hasCompletedTour, setHasCompletedTour] = useState(false);
+  const [tourStatusLoading, setTourStatusLoading] = useState(true); // Add loading state
   const [savedCollapsedState, setSavedCollapsedState] = useState(null);
   const tooltipRef = useRef(null);
   const checkInterval = useRef(null);
@@ -134,23 +135,31 @@ const ProductTour = ({ onComplete }) => {
   // Check if user has completed tour from database
   useEffect(() => {
     const checkTourStatus = async () => {
-      if (!user?.id) return;
+      if (!user?.id) {
+        setTourStatusLoading(false);
+        return;
+      }
       
       try {
+        console.log('🔍 Checking tour status for user:', user.id);
         const { data, error } = await supabase
           .from('users_profile')
           .select('tour_completed')
-          .eq('id', user.id)  // Changed from 'user_id' to 'id'
+          .eq('id', user.id)
           .single();
         
         if (error) {
           console.error('Error checking tour status:', error);
-          return;
+          setHasCompletedTour(false); // Default to false if error
+        } else {
+          console.log('📊 Tour status data:', data);
+          setHasCompletedTour(data?.tour_completed || false);
         }
-        
-        setHasCompletedTour(data?.tour_completed || false);
       } catch (error) {
         console.error('Error in tour status check:', error);
+        setHasCompletedTour(false); // Default to false if error
+      } finally {
+        setTourStatusLoading(false);
       }
     };
     
@@ -161,18 +170,22 @@ const ProductTour = ({ onComplete }) => {
   useEffect(() => {
     const shouldStart = sessionStorage.getItem('start_product_tour') === 'true';
     
-    if (shouldStart && !hasCompletedTour) {
-      console.log('🎯 Starting tour for new user');
+    if (shouldStart && !tourStatusLoading) {
+      console.log('🎯 Tour start requested, hasCompletedTour:', hasCompletedTour);
       sessionStorage.removeItem('start_product_tour');
-      startTour();
-    } else if (shouldStart && hasCompletedTour) {
-      console.log('👤 User has already completed tour, not starting');
-      sessionStorage.removeItem('start_product_tour');
+      
+      if (!hasCompletedTour) {
+        console.log('🎯 Starting tour for new user');
+        startTour();
+      } else {
+        console.log('👤 User has already completed tour, not auto-starting');
+      }
     }
-  }, [hasCompletedTour]);
+  }, [hasCompletedTour, tourStatusLoading]);
 
   // Start tour function
   const startTour = () => {
+    console.log('🚀 Starting tour, current step will be 0');
     setIsActive(true);
     setCurrentStep(0);
     // Navigate to first page if not already there
@@ -452,8 +465,8 @@ const ProductTour = ({ onComplete }) => {
         const { data, error } = await supabase
           .from('users_profile')
           .update({ tour_completed: true })
-          .eq('id', user.id)  // Changed from 'user_id' to 'id'
-          .select(); // Add select to see what was updated
+          .eq('id', user.id)
+          .select();
         
         if (error) {
           console.error('❌ Supabase error:', error);
@@ -525,33 +538,52 @@ const ProductTour = ({ onComplete }) => {
     };
   };
 
+  // Debug logging for button visibility
+  console.log('🔍 Button state debug:', {
+    isActive,
+    hasCompletedTour,
+    tourStatusLoading,
+    userId: user?.id,
+    shouldShowStartButton: !isActive && !hasCompletedTour && !tourStatusLoading,
+    shouldShowRestartButton: !isActive && hasCompletedTour && !tourStatusLoading
+  });
+
   return (
     <>
-      {/* Debug button - remove in production */}
-{!isActive && !hasCompletedTour && (
-  <button
-    onClick={startTour}
-    className="fixed bottom-4 left-4 z-[9999] bg-purple-600 hover:bg-purple-700 text-white p-3 rounded-full shadow-lg transition-colors flex items-center space-x-2"
-    title="Start Product Tour (Debug)"
-  >
+      {/* Single Tour Button - Start or Restart based on completion status */}
+      {!isActive && !tourStatusLoading && (
+        <button
+          onClick={() => {
+            if (hasCompletedTour) {
+              console.log('🔄 Restarting tour for returning user');
+            } else {
+              console.log('🎯 Starting tour for new user');
+            }
+            startTour();
+          }}
+          className={`fixed bottom-4 left-4 z-[9999] ${
+            hasCompletedTour 
+              ? 'bg-gray-600 hover:bg-gray-700' 
+              : 'bg-purple-600 hover:bg-purple-700'
+          } text-white p-3 rounded-full shadow-lg transition-colors flex items-center space-x-2`}
+          title={hasCompletedTour ? "Restart Product Tour" : "Start Product Tour"}
+        >
           <Play className="w-5 h-5" />
-          <span className="hidden sm:block">Start Tour</span>
+          <span className="hidden sm:block">
+            {hasCompletedTour ? 'Restart Tour' : 'Start Tour'}
+          </span>
         </button>
       )}
 
-      {/* Restart tour button for users who completed it */}
-{!isActive && hasCompletedTour && (
-  <button
-    onClick={() => {
-      console.log('🔄 Restarting tour for returning user');
-      startTour();
-    }}
-    className="fixed bottom-4 left-4 z-[9999] bg-gray-600 hover:bg-gray-700 text-white p-3 rounded-full shadow-lg transition-colors flex items-center space-x-2"
-    title="Restart Product Tour"
-  >
-          <Play className="w-5 h-5" />
-          <span className="hidden sm:block">Restart Tour</span>
-        </button>
+      {/* Loading state when checking tour status */}
+      {tourStatusLoading && (
+        <div className="fixed bottom-4 left-4 z-[9999] bg-gray-500 text-white p-3 rounded-full shadow-lg flex items-center space-x-2">
+          <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          <span className="hidden sm:block text-sm">Loading...</span>
+        </div>
       )}
 
       {/* Loading state when tour is active but waiting for page */}
