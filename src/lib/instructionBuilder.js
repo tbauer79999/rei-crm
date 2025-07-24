@@ -172,6 +172,74 @@ ${leadDetails}
 ${knowledgeBase}`;
 }
 
+function buildFollowupInstruction({
+  tone,
+  persona,
+  industry,
+  role,
+  leadDetails,
+  knowledgeBase,
+  campaignMetadata = {},
+  followupStage,
+  dynamicTone = null
+}) {
+
+  const finalTone = dynamicTone || tone;
+
+  const toneBlock = `TONE: ${finalTone}
+${getToneDescription(finalTone)}`;
+
+  const personaBlock = `PERSONA: ${persona}
+${getPersonaDescription(persona)}`;
+
+  const industryBlock = `INDUSTRY: ${industry}
+${getIndustryDescription(industry)}`;
+
+  const roleBlock = `ROLE: ${role}
+${getRoleDescription(role, industry)}`;
+
+  const strategyBlock = getCampaignStrategy({ industry, ...campaignMetadata });
+  
+  const knowledgeInstructions = getKnowledgeBaseInstructions();
+
+  const profileBlock = `
+${toneBlock}
+
+${personaBlock}
+
+${industryBlock}
+
+${roleBlock}
+`.trim();
+
+  return `=== PRIMARY GOAL ===
+Your mission is to re-engage this lead and move them toward a conversation. This is follow-up #${followupStage}.
+
+=== CRITICAL BEHAVIOR RULES ===
+- Never reintroduce yourself during an ongoing conversation
+- Avoid formal greetings like "Hello [Full Name]"
+- Keep it warm, natural, and conversational — never salesy or robotic
+- Reference previous conversation context when appropriate
+- ALWAYS provide specific information from your knowledge base when relevant triggers are mentioned
+- Never give generic responses when you have specific data to share
+
+${knowledgeInstructions}
+
+=== OUTPUT FORMAT ===
+Generate only the follow-up message text that should be sent to the lead. Do not include any scoring, analysis, labels, or structured data. Return just the message.
+
+=== CAMPAIGN STRATEGY ===
+${strategyBlock}
+
+=== PROFILE ===
+${profileBlock}
+
+${leadDetails}
+
+=== KNOWLEDGE BASE ===
+${knowledgeBase}`;
+}
+
 function buildInitialInstruction({
   tone,
   persona,
@@ -244,6 +312,7 @@ ${knowledgeBase}`;
 export {
   buildInstructionBundle,
   buildInitialInstruction,
+  buildFollowupInstruction,
   getToneDescription,
   getPersonaDescription,
   getIndustryDescription,

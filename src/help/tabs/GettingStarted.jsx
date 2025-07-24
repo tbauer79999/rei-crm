@@ -33,17 +33,17 @@ const GettingStarted = () => {
   const platformComponents = [
     {
       icon: '📊',
-      title: 'Pipeline Control Room',
+      title: 'Intelligence Center',
       description: 'Executive dashboard showing real-time system health, lead flow metrics, AI performance indicators, and conversion funnels. Monitor hot lead handoffs, response times, and system-wide KPIs from a single command center.'
     },
     {
       icon: '👥',
-      title: 'Lead Dashboard',
+      title: 'Pipeline',
       description: 'Comprehensive lead management interface with advanced filtering, bulk actions, custom field configuration, and real-time status updates. Track leads through their entire journey from cold to closed.'
     },
     {
       icon: '🤖',
-      title: 'AI Conversation Engine',
+      title: 'Lead Detail',
       description: 'View detailed AI-lead conversations with sentiment analysis, lead scoring, urgency detection, and engagement metrics. Every message is analyzed for buying signals and qualification criteria.'
     },
     {
@@ -53,12 +53,12 @@ const GettingStarted = () => {
     },
     {
       icon: '📈',
-      title: 'Analytics & Insights',
+      title: 'AI Strategy Hub',
       description: 'Deep analytics including conversion funnels, ROI analysis, AI performance metrics, and sales outcomes. Export custom reports and track performance across time periods.'
     },
     {
       icon: '⚙️',
-      title: 'System Configuration',
+      title: 'Settings',
       description: 'Configure company info, messaging rules, AI behavior, team access, phone numbers, and knowledge base. Full control over system behavior and user permissions.'
     }
   ];

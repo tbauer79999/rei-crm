@@ -629,13 +629,14 @@ const EnterpriseAIStrategyHub = () => {
         });
 
         // Build follow-up bundles
-        const followupBundles = strategyConfig.followups.map(followup => 
-          buildInstructionBundle({
-            tone: followup.tone || strategyConfig.engagementTone,
-            persona: followup.persona,
-            industry: strategyConfig.industry,
-            role: strategyConfig.role,
-            businessName: strategyConfig.businessName
+          const followupBundles = strategyConfig.followups.map((followup, index) => 
+            buildFollowupInstruction({  // ← Use the new function
+              tone: followup.tone || strategyConfig.engagementTone,
+              persona: followup.persona,
+              industry: strategyConfig.industry,
+              role: strategyConfig.role,
+              businessName: strategyConfig.businessName,
+              followupStage: index + 1  // Add stage number
           })
         );
 

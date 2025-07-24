@@ -153,7 +153,7 @@ const SearchResults = ({ searchTerm, searchResults, onViewInTab }) => {
             .map(([tabId, matchCount]) => {
               const tabNames = {
                 'getting-started': 'Getting Started',
-                'lead-management': 'Lead Management',
+                'lead-management': 'Pipeline',
                 'campaigns': 'Campaigns',
                 'ai-features': 'AI Features',
                 'analytics': 'Analytics',
