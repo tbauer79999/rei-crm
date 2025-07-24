@@ -747,10 +747,10 @@ const handleSendMessage = async () => {
 
   // 🚫 PRIMARY GUARD RAIL: Check if AI is still managing this lead
   if (lead.ai_conversation_enabled) {
-    const proceed = confirm(
-      "This lead is currently being managed by AI. Sending a manual message will take over the conversation. " +
-      "Continue?"
-    );
+const proceed = window.confirm(
+  "This lead is currently being managed by AI. Sending a manual message will take over the conversation. " +
+  "Continue?"
+);
     if (!proceed) return;
   }
 
