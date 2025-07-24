@@ -737,13 +737,28 @@ export default function LeadDetail() {
     return null;
   };
 
-  const const handleSendMessage = async () => {
+const handleSendMessage = async () => {
   if (!canSendMessages) {
     alert("You don't have permission to send messages.");
     return;
   }
 
   if (!newMessage.trim()) return;
+
+  // 🚫 PRIMARY GUARD RAIL: Check if AI is still managing this lead
+  if (lead.ai_conversation_enabled) {
+    const proceed = confirm(
+      "This lead is currently being managed by AI. Sending a manual message will take over the conversation. " +
+      "Continue?"
+    );
+    if (!proceed) return;
+  }
+
+  // 🚫 BASIC SAFETY: Don't message unsubscribed leads
+  if (lead.status === 'Unsubscribed' || lead.status === 'Do Not Contact') {
+    alert("Cannot send messages to unsubscribed leads.");
+    return;
+  }
 
   setSendingMessage(true);
   try {
@@ -782,7 +797,7 @@ export default function LeadDetail() {
         sender: 'Manual', // Mark as manual send
         channel: 'sms',
         message_id: `manual-${Date.now()}`,
-        status: 'queued' // Start with queued status
+        status: 'queued'
       })
       .select('id')
       .single();
@@ -818,14 +833,28 @@ export default function LeadDetail() {
         })
         .eq('id', insertedMessage.id);
 
+      // 🆕 KEY: Disable AI conversation since human took over
+      if (lead.ai_conversation_enabled) {
+        await supabase
+          .from('leads')
+          .update({ 
+            ai_conversation_enabled: false,
+            last_manual_contact: new Date().toISOString()
+          })
+          .eq('id', lead.id);
+        
+        console.log('✅ AI conversation disabled - human took over');
+        
+        // Update local state so UI reflects the change
+        setLead(prev => ({ 
+          ...prev, 
+          ai_conversation_enabled: false,
+          last_manual_contact: new Date().toISOString()
+        }));
+      }
+
       // Clear the input
       setNewMessage('');
-      
-      // Refresh messages to show the new one
-      // (your existing auto-refresh will pick it up, but we can force refresh)
-      setTimeout(() => {
-        window.location.reload(); // Simple refresh - you could make this more elegant
-      }, 1000);
       
     } else {
       throw new Error(twilioResult.error || 'Failed to send message');
@@ -834,9 +863,6 @@ export default function LeadDetail() {
   } catch (error) {
     console.error('Error sending manual message:', error);
     alert('Failed to send message: ' + error.message);
-    
-    // Update message status to failed if we created it
-    // (You might want to store the insertedMessage.id for this)
   } finally {
     setSendingMessage(false);
   }
