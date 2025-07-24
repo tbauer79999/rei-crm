@@ -1256,7 +1256,7 @@ const proceed = window.confirm(
                               <span>•</span>
                               <div className="flex items-center gap-1">
                                 <Sparkles size={12} />
-                                <span>AI</span>
+                                <span>{original.sender === 'Manual' ? 'Manual' : 'AI'}</span>
                               </div>
                             </>
                           )}
