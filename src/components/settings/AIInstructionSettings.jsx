@@ -37,7 +37,8 @@ import {
 } from 'lucide-react';
 import {
   buildInstructionBundle,
-  buildInitialInstruction
+  buildInitialInstruction,
+  buildFollowupInstruction  
 } from '../../lib/instructionBuilder.js';
 
 const EnterpriseAIStrategyHub = () => {
