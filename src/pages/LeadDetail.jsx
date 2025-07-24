@@ -737,24 +737,110 @@ export default function LeadDetail() {
     return null;
   };
 
-  const handleSendMessage = async () => {
-    if (!canSendMessages) {
-      alert("You don't have permission to send messages.");
-      return;
+  const const handleSendMessage = async () => {
+  if (!canSendMessages) {
+    alert("You don't have permission to send messages.");
+    return;
+  }
+
+  if (!newMessage.trim()) return;
+
+  setSendingMessage(true);
+  try {
+    console.log('Sending manual message:', newMessage);
+    
+    // Get the lead's campaign to find the correct phone number
+    const { data: campaignData, error: campaignError } = await supabase
+      .from("campaigns")
+      .select(`
+        phone_number_id,
+        phone_numbers (
+          phone_number,
+          twilio_sid
+        )
+      `)
+      .eq("id", lead.campaign_id)
+      .eq("tenant_id", user.tenant_id)
+      .single();
+
+    if (campaignError || !campaignData?.phone_numbers) {
+      throw new Error('Campaign phone number not found');
     }
 
-    if (!newMessage.trim()) return;
+    const phoneNumber = campaignData.phone_numbers;
 
-    setSendingMessage(true);
-    try {
-      console.log('Sending message:', newMessage);
+    // Insert the message into the database first
+    const { data: insertedMessage, error: insertError } = await supabase
+      .from('messages')
+      .insert({
+        direction: 'outbound',
+        message_body: newMessage.trim(),
+        timestamp: new Date().toISOString(),
+        phone: lead.phone,
+        tenant_id: user.tenant_id,
+        lead_id: lead.id,
+        sender: 'Manual', // Mark as manual send
+        channel: 'sms',
+        message_id: `manual-${Date.now()}`,
+        status: 'queued' // Start with queued status
+      })
+      .select('id')
+      .single();
+
+    if (insertError) {
+      throw new Error('Failed to save message: ' + insertError.message);
+    }
+
+    // Send via Twilio using your edge function
+    const { data: twilioResult, error: twilioError } = await supabase.functions.invoke('send-manual-sms', {
+      body: {
+        to: lead.phone,
+        from: phoneNumber.phone_number,
+        body: newMessage.trim(),
+        message_id: insertedMessage.id,
+        tenant_id: user.tenant_id
+      }
+    });
+
+    if (twilioError) {
+      throw new Error('Failed to send SMS: ' + twilioError.message);
+    }
+
+    if (twilioResult.success) {
+      console.log('✅ Manual message sent successfully');
+      
+      // Update the message with Twilio SID
+      await supabase
+        .from('messages')
+        .update({ 
+          message_id: twilioResult.twilio_sid,
+          status: 'sent'
+        })
+        .eq('id', insertedMessage.id);
+
+      // Clear the input
       setNewMessage('');
-    } catch (error) {
-      console.error('Error sending message:', error);
-    } finally {
-      setSendingMessage(false);
+      
+      // Refresh messages to show the new one
+      // (your existing auto-refresh will pick it up, but we can force refresh)
+      setTimeout(() => {
+        window.location.reload(); // Simple refresh - you could make this more elegant
+      }, 1000);
+      
+    } else {
+      throw new Error(twilioResult.error || 'Failed to send message');
     }
-  };
+
+  } catch (error) {
+    console.error('Error sending manual message:', error);
+    alert('Failed to send message: ' + error.message);
+    
+    // Update message status to failed if we created it
+    // (You might want to store the insertedMessage.id for this)
+  } finally {
+    setSendingMessage(false);
+  }
+};
 
   // Calculate AI insights and retry stats
     const aiInsights = useMemo(() => calculateAIInsights(), [messages]);
