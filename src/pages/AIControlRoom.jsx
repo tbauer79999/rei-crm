@@ -188,9 +188,9 @@ const MobileSectionCard = ({
             <div className="mb-3 p-2.5 bg-gray-50 rounded-lg w-full min-w-0">
               <h4 className="font-medium text-gray-900 text-sm mb-1 break-words">{section.label}</h4>
               <p className="text-xs text-gray-600 break-words">{section.description}</p>
-              {statusReason && (
-                <p className="text-xs text-gray-500 mt-2 font-mono break-all overflow-wrap-anywhere">{statusReason}</p>
-              )}
+                {statusReason && (
+                  <p className="text-xs text-gray-500 mt-2 font-mono break-all overflow-wrap-anywhere max-w-full overflow-hidden">{statusReason}</p>
+                )}
             </div>
             
             {/* Component Content */}
@@ -297,7 +297,7 @@ const MobileStatusBar = ({ sections, sectionStatuses, sectionMetrics }) => {
         </div>
       </div>
       
-      <div className="grid grid-cols-3 gap-2 w-full">
+      <div className="grid grid-cols-3 gap-2 w-full min-w-0 overflow-x-hidden max-w-full">
         <div className="text-center min-w-0">
           <div className="w-6 h-6 bg-green-50 rounded-lg flex items-center justify-center mx-auto mb-1">
             <CheckCircle className="w-3 h-3 text-green-500" />
@@ -332,7 +332,7 @@ const MobileQuickActions = ({ onExpandAll, onCollapseAll, allExpanded }) => {
     <div className="bg-white rounded-xl border border-gray-200 p-3 mb-3 w-full min-w-0">
       <div className="flex items-center justify-between">
         <h3 className="font-medium text-gray-900 text-sm truncate flex-1">Quick Actions</h3>
-        <div className="flex items-center space-x-2 flex-shrink-0 ml-2">
+        <div className="flex items-center space-x-2 flex-shrink-0 ml-2 max-w-full overflow-hidden">
           <button
             onClick={onExpandAll}
             disabled={allExpanded}
@@ -553,35 +553,41 @@ const AIControlRoom = () => {
   const renderSectionContent = (sectionLabel) => {
     // Always show the actual components - no feature gating at section level
     switch (sectionLabel) {
-      case 'Overview & Health':
-        return (
-          <div className="space-y-3 w-full min-w-0">
-            <div className="w-full min-w-0">
-              <OverviewMetrics />
+        case 'Overview & Health':
+          return (
+            <div className="space-y-3 w-full min-w-0 overflow-x-hidden max-w-full">
+              <div className="w-full min-w-0 overflow-hidden">
+                <OverviewMetrics />
+              </div>
+              <div className="w-full min-w-0 overflow-hidden">
+                <OverviewTrendAndCost />
+              </div>
             </div>
-            <div className="w-full min-w-0">
-              <OverviewTrendAndCost />
-            </div>
-          </div>
-        );
-      case 'Lead Journey & Funnel':
-        return (
-          <div className="w-full min-w-0">
-            <LeadJourneyFunnel />
-          </div>
-        );
-      case 'AI Optimization':
-        return (
-          <div className="w-full min-w-0">
-            <AiOptimizationPanel />
-          </div>
-        );
-      case 'Hot Lead Handoff':
-        return (
-          <div className="w-full min-w-0">
-            <HotLeadHandoffPanel />
-          </div>
-        );
+          );
+case 'Lead Journey & Funnel':
+  return (
+    <div className="w-full min-w-0 overflow-x-hidden max-w-full">
+      <div className="w-full min-w-0 overflow-hidden">
+        <LeadJourneyFunnel />
+      </div>
+    </div>
+  );
+case 'AI Optimization':
+  return (
+    <div className="w-full min-w-0 overflow-x-hidden max-w-full">
+      <div className="w-full min-w-0 overflow-hidden">
+        <AiOptimizationPanel />
+      </div>
+    </div>
+  );
+case 'Hot Lead Handoff':
+  return (
+    <div className="w-full min-w-0 overflow-x-hidden max-w-full">
+      <div className="w-full min-w-0 overflow-hidden">
+        <HotLeadHandoffPanel />
+      </div>
+    </div>
+  );
       default:
         return null;
     }
@@ -624,7 +630,7 @@ const AIControlRoom = () => {
           </div>
           
           <div className="flex items-center space-x-3">
-            <div className="flex items-center bg-gray-100 rounded-lg p-1">
+            <div className="flex items-center bg-gray-100 rounded-lg p-1 max-w-full overflow-hidden">
               <button
                 onClick={() => setViewMode('desktop')}
                 className={clsx(

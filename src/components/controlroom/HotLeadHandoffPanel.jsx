@@ -108,11 +108,11 @@ const ModalWrapper = ({ isOpen, onClose, title, subtitle, children }) => {
       <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-6xl max-h-[90vh] m-2 lg:m-4 overflow-hidden">
         {/* Header */}
         <div className="border-b border-gray-200 px-4 lg:px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="min-w-0 flex-1">
-              <h2 className="text-lg lg:text-2xl font-bold text-gray-900 truncate">{title}</h2>
-              <p className="text-sm text-gray-500 mt-1 truncate">{subtitle}</p>
-            </div>
+<div className="flex items-center justify-between w-full min-w-0">
+  <div className="min-w-0 flex-1 max-w-full overflow-hidden">
+    <h2 className="text-lg lg:text-2xl font-bold text-gray-900 truncate max-w-full">{title}</h2>
+    <p className="text-sm text-gray-500 mt-1 truncate max-w-full">{subtitle}</p>
+  </div>
             <button
               onClick={onClose}
               className="p-2 hover:bg-gray-100 rounded-lg transition-colors flex-shrink-0 ml-2"
@@ -143,7 +143,7 @@ const TimePeriodSelector = ({ selectedPeriod, onPeriodChange }) => {
 
   return (
     <div className="border-b border-gray-200 px-4 lg:px-6 py-3 bg-gray-50">
-      <div className="flex flex-col lg:flex-row lg:items-center space-y-2 lg:space-y-0 lg:space-x-4">
+      <div className="flex flex-col lg:flex-row lg:items-center space-y-2 lg:space-y-0 lg:space-x-4 w-full max-w-full overflow-hidden">
         <span className="text-sm font-medium text-gray-700">Time Period:</span>
         <div className="flex flex-wrap gap-2">
           {periods.map(period => (
@@ -238,8 +238,9 @@ const AwaitingActionList = ({ data }) => {
         <Users className="w-4 lg:w-5 h-4 lg:h-5 mr-2 text-orange-600" />
         <span className="truncate">Leads Awaiting Action</span>
       </h3>
-      <div className="overflow-x-auto">
-        <table className="w-full">
+        <div className="overflow-x-auto w-full min-w-0">
+          <div className="min-w-max">
+            <table className="w-full">
           <thead>
             <tr className="border-b border-gray-200">
               <th className="text-left py-3 px-2 lg:px-4 text-sm font-medium text-gray-700">Lead Name</th>
@@ -279,6 +280,7 @@ const AwaitingActionList = ({ data }) => {
             ))}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );
@@ -306,8 +308,8 @@ const QueueDistribution = ({ data }) => {
               />
               <span className="text-sm font-medium text-gray-700 truncate">{item.type}</span>
             </div>
-            <div className="flex items-center space-x-2 flex-shrink-0">
-              <div className="w-20 lg:w-32 bg-gray-200 rounded-full h-2">
+<div className="flex items-center space-x-2 flex-shrink-0 max-w-full overflow-hidden">
+  <div className="w-20 lg:w-32 bg-gray-200 rounded-full h-2 flex-shrink-0">
                 <div
                   className="h-2 rounded-full transition-all duration-500"
                   style={{
@@ -423,8 +425,9 @@ const PerformanceByRep = ({ data, metricType = 'responseTime' }) => {
       <h3 className="text-base lg:text-lg font-semibold text-gray-900 mb-4 truncate">
         {metricType === 'responseTime' ? 'Response Time by Sales Rep' : 'Outcomes by Sales Rep'}
       </h3>
-      <div className="overflow-x-auto">
-        <table className="w-full">
+<div className="overflow-x-auto w-full min-w-0">
+  <div className="min-w-max">
+    <table className="w-full">
           <thead>
             <tr className="border-b border-gray-200">
               <th className="text-left py-3 px-2 lg:px-4 text-sm font-medium text-gray-700">Sales Rep</th>
@@ -486,6 +489,7 @@ const PerformanceByRep = ({ data, metricType = 'responseTime' }) => {
             ))}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );
@@ -498,7 +502,7 @@ const SLACompliance = ({ data }) => {
   return (
     <div className="bg-white border border-gray-200 rounded-xl p-4 lg:p-6 w-full min-w-0">
       <h3 className="text-base lg:text-lg font-semibold text-gray-900 mb-4 truncate">SLA Compliance Metrics</h3>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6 w-full max-w-full overflow-hidden">
         <div className="text-center p-3 lg:p-4 bg-blue-50 rounded-lg">
           <p className="text-sm text-gray-600">Compliance Rate</p>
           <p className={`text-3xl lg:text-4xl font-bold ${
@@ -514,7 +518,7 @@ const SLACompliance = ({ data }) => {
           <p className="text-3xl lg:text-4xl font-bold text-gray-700">{data.totalHandoffs}</p>
         </div>
       </div>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 w-full max-w-full overflow-hidden">
         <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
           <span className="text-sm text-green-700">SLA Met</span>
           <span className="text-lg font-bold text-green-800">{data.slaSatisfied}</span>
@@ -556,7 +560,7 @@ const OutcomesTrend = ({ data }) => {
         <TrendingUp className="w-4 lg:w-5 h-4 lg:h-5 mr-2 text-green-600" />
         <span className="truncate">Sales Outcomes Trend</span>
       </h3>
-      <div className="h-48 lg:h-64 relative">
+      <div className="h-48 lg:h-64 relative w-full max-w-full overflow-hidden">
         {/* Simple stacked bar visualization */}
         <div className="flex items-end justify-around h-full pb-8">
           {data.map((day, i) => {
@@ -1108,7 +1112,7 @@ const handlePeriodChange = async (newPeriod) => {
         
         {/* Desktop Loading */}
         <div className="hidden lg:block">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-full overflow-hidden">
             <div className="bg-white rounded-2xl shadow-md border border-gray-200 p-4">
               <div className="text-center text-gray-500">
                 Please log in to view hot leads
@@ -1198,9 +1202,9 @@ const handlePeriodChange = async (newPeriod) => {
                   <div className="text-sm">No hot leads awaiting calls!</div>
                 </div>
               ) : (
-                <div className="space-y-3">
-                  {previewLeads.map((lead) => (
-                    <div key={lead.id} className="border-t pt-3">
+<div className="space-y-3 w-full max-w-full overflow-hidden">
+  {previewLeads.map((lead) => (
+    <div key={lead.id} className="border-t pt-3 w-full min-w-0">
                       <div className="font-medium text-sm truncate">
                         {lead.name} - Marked Hot: {lead.marked_hot_time_ago}
                       </div>
@@ -1521,12 +1525,12 @@ const handlePeriodChange = async (newPeriod) => {
       </div>
 
       {/* Modal Body */}
-      <div className="p-4 lg:p-6 max-h-[80vh] overflow-y-auto">
+      <div className="p-4 lg:p-6 max-h-[80vh] overflow-y-auto w-full max-w-full overflow-x-hidden">
         <p className="text-sm font-medium text-gray-700 mb-4">
           Select call outcome <span className="text-red-500">*</span>
         </p>
         
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 w-full max-w-full overflow-hidden">
           {/* Voicemail */}
           <button 
             onClick={() => handleOutcomeSelection('voicemail')}
@@ -1584,7 +1588,7 @@ const handlePeriodChange = async (newPeriod) => {
 
         {/* Pipeline Value Input - Shows when Qualified is selected */}
         {selectedOutcome === 'qualified' && (
-          <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg w-full max-w-full overflow-hidden">
             <div className="mb-3">
               <p className="text-sm font-medium text-gray-900 mb-1">
                 💰 What's this lead worth to you if closed? <span className="text-red-500">*</span>

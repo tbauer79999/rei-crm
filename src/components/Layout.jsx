@@ -583,7 +583,7 @@ export default function Layout({ children }) {
   const companyInitials = getCompanyInitials();
 
   return (
-    <div className="flex min-h-screen bg-gray-50">
+    <div className="flex min-h-screen bg-gray-50 overflow-x-hidden max-w-full">
       {/* Mobile backdrop */}
       {(mobileOpen || showMobileSearch) && (
         <div 
@@ -604,9 +604,10 @@ export default function Layout({ children }) {
         bg-white border-r border-gray-200/80 
         transition-all duration-300 ease-out
         shadow-xl lg:shadow-none
+        max-w-full overflow-x-hidden
       `}>
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-4 h-16 border-b border-gray-100">
+        <div className="flex items-center justify-between px-4 py-4 h-16 border-b border-gray-100 w-full min-w-0">
           {!collapsed && (
             <div className="flex items-center space-x-2 min-w-0 flex-1">
               <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center flex-shrink-0">
@@ -648,7 +649,7 @@ export default function Layout({ children }) {
         </div>
 
         {/* Navigation */}
-        <nav className="p-3 space-y-1">
+        <nav className="p-3 space-y-1 w-full min-w-0 overflow-x-hidden">
           {navItems.map(({ path, label, icon: Icon, tourClass }) => {
             const isActive = location.pathname === path;
             return (
@@ -659,7 +660,7 @@ export default function Layout({ children }) {
                 className={`
                   ${tourClass || ''}
                   group flex items-center ${collapsed ? 'justify-center px-3' : 'px-3'} py-2.5 
-                  text-sm font-medium rounded-xl transition-all duration-200
+                  text-sm font-medium rounded-xl transition-all duration-200 w-full min-w-0
                   ${isActive 
                     ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-lg shadow-indigo-500/25' 
                     : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900'
@@ -678,10 +679,10 @@ export default function Layout({ children }) {
       </aside>
 
       {/* Main content */}
-      <div className="flex flex-col flex-1 min-h-screen lg:ml-0">
+      <div className="flex flex-col flex-1 min-h-screen lg:ml-0 w-full min-w-0 overflow-x-hidden max-w-full">
         {/* Top header */}
-        <header className="bg-white border-b border-gray-200 px-4 lg:px-6 py-3 h-16">
-          <div className="flex justify-between items-center h-full">
+        <header className="bg-white border-b border-gray-200 px-4 lg:px-6 py-3 h-16 w-full overflow-x-hidden">
+          <div className="flex justify-between items-center h-full w-full min-w-0">
             <div className="flex items-center space-x-4 min-w-0 flex-1">
               <button
                 onClick={() => setMobileOpen(true)}
@@ -702,9 +703,9 @@ export default function Layout({ children }) {
               </div>
             </div>
             
-            <div className="flex items-center space-x-2 lg:space-x-3 flex-shrink-0">
+            <div className="flex items-center space-x-2 lg:space-x-3 flex-shrink-0 min-w-0">
               {/* Desktop Search Box */}
-              <div className="tour-global-search hidden md:flex items-center relative search-container">
+              <div className="tour-global-search hidden md:flex items-center relative search-container min-w-0 max-w-xs lg:max-w-none">
                 <Search className="absolute left-3 w-4 h-4 text-gray-400" />
                 <input
                   type="text"
@@ -712,12 +713,12 @@ export default function Layout({ children }) {
                   onChange={(e) => setSearchQuery(e.target.value)}
                   onFocus={() => searchQuery.length >= 2 && setShowSearchResults(true)}
                   placeholder="Search leads, campaigns..."
-                  className="pl-10 pr-4 py-2 w-64 lg:w-80 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200 placeholder-gray-400"
+                  className="pl-10 pr-4 py-2 w-full max-w-48 lg:w-80 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200 placeholder-gray-400"
                 />
                 
                 {/* Desktop Search Results Dropdown */}
                 {showSearchResults && (searchResults || isSearching) && (
-                  <div className="absolute top-full mt-2 left-0 right-0 bg-white rounded-lg border border-gray-200 shadow-lg z-50 max-h-96 overflow-y-auto">
+                  <div className="absolute top-full mt-2 left-0 right-0 bg-white rounded-lg border border-gray-200 shadow-lg z-50 max-h-96 overflow-y-auto max-w-[calc(100vw-2rem)] lg:max-w-none">
                     {isSearching ? (
                       <div className="p-4 text-center text-sm text-gray-500">
                         <div className="inline-flex items-center">
@@ -729,7 +730,7 @@ export default function Layout({ children }) {
                         </div>
                       </div>
                     ) : searchResults && (searchResults.leads.length > 0 || searchResults.campaigns.length > 0) ? (
-                      <div>
+                      <div className="w-full min-w-0">
                         {/* Leads Section */}
                         {searchResults.leads.length > 0 && (
                           <div>
@@ -740,7 +741,7 @@ export default function Layout({ children }) {
                               <button
                                 key={`lead-${lead.id}`}
                                 onClick={() => handleSearchResultClick('lead', lead)}
-                                className="w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors flex items-center justify-between group"
+                                className="w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors flex items-center justify-between group min-w-0"
                               >
                                 <div className="min-w-0 flex-1">
                                   <div className="text-sm font-medium text-gray-900 truncate">
@@ -781,7 +782,7 @@ export default function Layout({ children }) {
                               <button
                                 key={`campaign-${campaign.id}`}
                                 onClick={() => handleSearchResultClick('campaign', campaign)}
-                                className="w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors flex items-center justify-between group"
+                                className="w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors flex items-center justify-between group min-w-0"
                               >
                                 <div className="flex-1 min-w-0">
                                   <div className="text-sm font-medium text-gray-900 truncate">
@@ -851,7 +852,7 @@ export default function Layout({ children }) {
                 
                 {/* Notifications Dropdown */}
                 {showNotifications && (
-                  <div className="absolute right-0 mt-2 w-80 sm:w-96 max-h-[600px] bg-white rounded-lg border border-gray-200 shadow-xl z-50 flex flex-col max-w-[calc(100vw-2rem)] sm:max-w-none">
+                  <div className="absolute right-0 mt-2 w-80 sm:w-96 max-h-[600px] bg-white rounded-lg border border-gray-200 shadow-xl z-50 flex flex-col max-w-[calc(100vw-2rem)] sm:max-w-none overflow-hidden">
                     {/* Header */}
                     <div className="p-4 border-b border-gray-100 flex items-center justify-between">
                       <h3 className="font-semibold text-gray-900">Notifications</h3>
@@ -866,7 +867,7 @@ export default function Layout({ children }) {
                     </div>
                     
                     {/* Notifications List */}
-                    <div className="flex-1 overflow-y-auto">
+                    <div className="flex-1 overflow-y-auto min-w-0">
                       {notificationsLoading ? (
                         <div className="p-8 text-center">
                           <div className="inline-flex items-center text-sm text-gray-500">
@@ -900,11 +901,11 @@ export default function Layout({ children }) {
                             <button
                               key={notification.id}
                               onClick={() => handleNotificationClick(notification)}
-                              className={`w-full p-4 text-left hover:bg-gray-50 transition-colors border-b border-gray-100 ${
+                              className={`w-full p-4 text-left hover:bg-gray-50 transition-colors border-b border-gray-100 min-w-0 ${
                                 !notification.read ? 'bg-blue-50/30' : ''
                               }`}
                             >
-                              <div className="flex items-start space-x-3">
+                              <div className="flex items-start space-x-3 min-w-0">
                                 {/* Priority indicator */}
                                 <div className={`mt-0.5 px-2 py-1 rounded-full text-xs font-medium flex-shrink-0 ${
                                   priorityColors[notification.priority] || priorityColors.low
@@ -914,7 +915,7 @@ export default function Layout({ children }) {
                                 
                                 {/* Content */}
                                 <div className="flex-1 min-w-0">
-                                  <div className="flex items-center justify-between">
+                                  <div className="flex items-center justify-between min-w-0">
                                     <p className={`text-sm ${!notification.read ? 'font-semibold' : 'font-medium'} text-gray-900 truncate`}>
                                       {notification.title}
                                     </p>
@@ -981,7 +982,7 @@ export default function Layout({ children }) {
               <div className="relative user-menu-container">
                 <button
                   onClick={() => setShowTopUserMenu(!showTopUserMenu)}
-                  className="flex items-center space-x-2 px-2 sm:px-3 py-1.5 rounded-lg hover:bg-gray-100 transition-all duration-200"
+                  className="flex items-center space-x-2 px-2 sm:px-3 py-1.5 rounded-lg hover:bg-gray-100 transition-all duration-200 min-w-0"
                 >
                   <div className="w-8 h-8 bg-gradient-to-br from-indigo-400 via-purple-400 to-pink-400 rounded-full flex items-center justify-center flex-shrink-0">
                     <span className="text-white text-xs font-semibold">
@@ -1039,16 +1040,16 @@ export default function Layout({ children }) {
         {/* Mobile Search Overlay */}
         {showMobileSearch && (
           <div className="fixed inset-0 z-50 md:hidden">
-            <div className="bg-white h-full flex flex-col">
+            <div className="bg-white h-full flex flex-col w-full max-w-full overflow-hidden">
               {/* Search Header */}
-              <div className="flex items-center p-4 border-b border-gray-200">
+              <div className="flex items-center p-4 border-b border-gray-200 w-full min-w-0">
                 <button
                   onClick={() => setShowMobileSearch(false)}
-                  className="p-2 -ml-2 rounded-lg hover:bg-gray-100 transition-colors text-gray-600 mr-3"
+                  className="p-2 -ml-2 rounded-lg hover:bg-gray-100 transition-colors text-gray-600 mr-3 flex-shrink-0"
                 >
                   <X size={20} />
                 </button>
-                <div className="flex-1 relative">
+                <div className="flex-1 relative min-w-0">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
                   <input
                     type="text"
@@ -1062,7 +1063,7 @@ export default function Layout({ children }) {
               </div>
               
               {/* Mobile Search Results */}
-              <div className="flex-1 overflow-y-auto">
+              <div className="flex-1 overflow-y-auto w-full min-w-0">
                 {isSearching ? (
                   <div className="p-8 text-center text-sm text-gray-500">
                     <div className="inline-flex items-center">
@@ -1074,7 +1075,7 @@ export default function Layout({ children }) {
                     </div>
                   </div>
                 ) : searchResults && (searchResults.leads.length > 0 || searchResults.campaigns.length > 0) ? (
-                  <div>
+                  <div className="w-full min-w-0">
                     {/* Mobile Leads Section */}
                     {searchResults.leads.length > 0 && (
                       <div>
@@ -1085,9 +1086,9 @@ export default function Layout({ children }) {
                           <button
                             key={`mobile-lead-${lead.id}`}
                             onClick={() => handleSearchResultClick('lead', lead)}
-                            className="w-full px-4 py-4 text-left hover:bg-gray-50 transition-colors border-b border-gray-100"
+                            className="w-full px-4 py-4 text-left hover:bg-gray-50 transition-colors border-b border-gray-100 min-w-0"
                           >
-                            <div className="flex items-center justify-between">
+                            <div className="flex items-center justify-between min-w-0">
                               <div className="min-w-0 flex-1">
                                 <div className="text-base font-medium text-gray-900 truncate">
                                   {lead.name || 'Unnamed Lead'}
@@ -1128,9 +1129,9 @@ export default function Layout({ children }) {
                           <button
                             key={`mobile-campaign-${campaign.id}`}
                             onClick={() => handleSearchResultClick('campaign', campaign)}
-                            className="w-full px-4 py-4 text-left hover:bg-gray-50 transition-colors border-b border-gray-100"
+                            className="w-full px-4 py-4 text-left hover:bg-gray-50 transition-colors border-b border-gray-100 min-w-0"
                           >
-                            <div className="flex items-center justify-between">
+                            <div className="flex items-center justify-between min-w-0">
                               <div className="min-w-0 flex-1">
                                 <div className="text-base font-medium text-gray-900 truncate">
                                   {campaign.name}
@@ -1180,7 +1181,7 @@ export default function Layout({ children }) {
         )}
 
         {/* Main content area */}
-        <main className="flex-1 p-4 lg:p-6 bg-gray-50">
+        <main className="flex-1 p-4 lg:p-6 bg-gray-50 w-full min-w-0 overflow-x-hidden max-w-full">
           {children}
         </main>
         
