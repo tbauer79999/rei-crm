@@ -2359,4 +2359,5 @@ const viewPermissions = {
       </div>
     </div>
   );
-}}
+}
+console.log("hello")
