@@ -97,7 +97,7 @@ router.post('/', async (req, res) => {
     console.log('🔍 DEBUG - Creating campaign with data:', { name, startDate, endDate, tenant_id });
 
     // Check if user has admin access for creating campaigns
-    if (!['global_admin', 'enterprise_admin', 'business_admin'].includes(userRole)) {
+    if (!['global_admin', 'enterprise_admin', 'business_admin', 'user'].includes(userRole)) {
       return res.status(403).json({ error: 'Admin access required to create campaigns' });
     }
 
@@ -366,7 +366,7 @@ router.put('/:id', async (req, res) => {
     console.log('🔍 DEBUG - Updating campaign:', id, 'with updates:', updates);
 
     // Check if user has admin access
-    if (!['global_admin', 'enterprise_admin', 'business_admin'].includes(userRole)) {
+    if (!['global_admin', 'enterprise_admin', 'business_admin', 'user'].includes(userRole)) {
       return res.status(403).json({ error: 'Admin access required to update campaigns' });
     }
 
@@ -439,7 +439,7 @@ router.patch('/:id/archive', async (req, res) => {
     console.log('🔍 DEBUG - Archiving campaign:', id);
 
     // Check if user has admin access
-    if (!['global_admin', 'enterprise_admin', 'business_admin'].includes(userRole)) {
+    if (!['global_admin', 'enterprise_admin', 'business_admin', 'user'].includes(userRole)) {
       return res.status(403).json({ error: 'Admin access required to archive campaigns' });
     }
 
@@ -491,7 +491,7 @@ router.patch('/:id/unarchive', async (req, res) => {
     console.log('🔍 DEBUG - Unarchiving campaign:', id);
 
     // Check if user has admin access
-    if (!['global_admin', 'enterprise_admin', 'business_admin'].includes(userRole)) {
+    if (!['global_admin', 'enterprise_admin', 'business_admin', 'user'].includes(userRole)) {
       return res.status(403).json({ error: 'Admin access required to unarchive campaigns' });
     }
 
@@ -630,7 +630,6 @@ router.patch('/:id/toggle-active', async (req, res) => {
 });
 
 // Toggle AI setting for campaign - restricted to admins
-// Toggle AI setting for campaign - restricted to admins
 router.patch('/:id/ai-toggle', async (req, res) => {
   try {
     const { id } = req.params;
@@ -641,9 +640,9 @@ router.patch('/:id/ai-toggle', async (req, res) => {
     console.log('🔍 DEBUG - Toggling AI for campaign:', id, 'to:', ai_on);
 
     // Check if user has admin access
-    if (!['global_admin', 'enterprise_admin', 'business_admin'].includes(userRole)) {
-      return res.status(403).json({ error: 'Admin access required to toggle AI settings' });
-    }
+if (!['global_admin', 'enterprise_admin', 'business_admin', 'user'].includes(userRole)) {
+  return res.status(403).json({ error: 'Insufficient permissions to toggle AI settings' });
+}
 
     if (typeof ai_on !== 'boolean') {
       return res.status(400).json({ error: 'ai_on must be a boolean' });
