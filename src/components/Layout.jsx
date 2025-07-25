@@ -360,10 +360,6 @@ useEffect(() => {
   return () => document.removeEventListener('mousedown', handleClickOutside);
 }, [showTopUserMenu, showUserMenu, showSearchResults, showNotifications]);
 
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showTopUserMenu, showUserMenu, showSearchResults, showNotifications]);
-
   // Get page-specific messaging based on current route
   const getPageMessages = () => {
     const companyName = companyInfo.name;
