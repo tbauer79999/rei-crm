@@ -689,16 +689,16 @@ export default function Layout({ children }) {
                 <Menu size={20} />
               </button>
               
-              {/* Breadcrumb style navigation */}
-              <div className="flex items-center space-x-2">
-                <Link to="/dashboard" className="text-sm text-gray-500 hover:text-gray-700">
-                  {companyInfo.name}
-                </Link>
-                <ChevronRight className="w-4 h-4 text-gray-400" />
-                <h1 className="text-sm font-semibold text-gray-900">
-                  {messages.title}
-                </h1>
-              </div>
+{/* Breadcrumb style navigation */}
+<div className="flex items-center space-x-2 min-w-0 flex-1">
+  <Link to="/dashboard" className="hidden sm:block text-sm text-gray-500 hover:text-gray-700 truncate">
+    {companyInfo.name}
+  </Link>
+  <ChevronRight className="hidden sm:block w-4 h-4 text-gray-400 flex-shrink-0" />
+  <h1 className="text-sm font-semibold text-gray-900 truncate">
+    {messages.title}
+  </h1>
+</div>
             </div>
             
             <div className="flex items-center space-x-2 lg:space-x-3 flex-shrink-0 ml-2">
@@ -716,7 +716,7 @@ export default function Layout({ children }) {
                 
                 {/* Search Results Dropdown */}
                 {showSearchResults && (searchResults || isSearching) && (
-                  <div className="absolute top-full mt-2 left-0 right-0 bg-white rounded-lg border border-gray-200 shadow-lg z-50 max-h-96 overflow-y-auto">
+                  <div className="absolute top-full mt-2 left-0 right-0 bg-white rounded-lg border border-gray-200 shadow-lg z-50 max-h-96 overflow-y-auto min-w-max">
                     {isSearching ? (
                       <div className="p-4 text-center text-sm text-gray-500">
                         <div className="inline-flex items-center">
@@ -847,7 +847,7 @@ export default function Layout({ children }) {
                 
                 {/* Notifications Dropdown */}
                 {showNotifications && (
-                  <div className="absolute right-0 mt-2 w-80 sm:w-96 max-h-[600px] bg-white rounded-lg border border-gray-200 shadow-xl z-50 flex flex-col max-w-[calc(100vw-2rem)] sm:max-w-none">
+                  <div className="absolute right-0 mt-2 w-80 sm:w-96 max-h-[600px] bg-white rounded-lg border border-gray-200 shadow-xl z-50 flex flex-col origin-top-right">
                     {/* Header */}
                     <div className="p-4 border-b border-gray-100 flex items-center justify-between">
                       <h3 className="font-semibold text-gray-900">Notifications</h3>
