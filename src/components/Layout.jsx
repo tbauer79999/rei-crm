@@ -847,7 +847,7 @@ export default function Layout({ children }) {
                 
                 {/* Notifications Dropdown */}
                 {showNotifications && (
-                  <div className="absolute right-0 mt-2 w-80 sm:w-96 max-h-[600px] bg-white rounded-lg border border-gray-200 shadow-xl z-50 flex flex-col max-w-[calc(100vw-2rem)]">
+                  <div className="absolute right-0 mt-2 w-80 sm:w-96 max-h-[600px] bg-white rounded-lg border border-gray-200 shadow-xl z-50 flex flex-col max-w-[calc(100vw-2rem)] sm:max-w-none">
                     {/* Header */}
                     <div className="p-4 border-b border-gray-100 flex items-center justify-between">
                       <h3 className="font-semibold text-gray-900">Notifications</h3>
@@ -997,7 +997,7 @@ export default function Layout({ children }) {
                 
                 {/* Dropdown */}
                 {showTopUserMenu && (
-                  <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg border border-gray-200 shadow-lg z-50">
+                  <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg border border-gray-200 shadow-lg z-50 max-w-[calc(100vw-2rem)] sm:max-w-none">
                     <div className="p-3 border-b border-gray-100">
                       <p className="text-sm font-medium text-gray-900">{user?.email}</p>
                       <p className="text-xs text-gray-500 mt-0.5">{companyInfo.name}</p>
