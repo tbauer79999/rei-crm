@@ -31,11 +31,11 @@ const AIKnowledgeBase = () => {
   const [processingWebsites, setProcessingWebsites] = useState(new Set());
 
   useEffect(() => {
-      // ADD THESE DEBUG LOGS:
-  console.log('🔍 Current user:', user);
-  console.log('🔍 User tenant_id:', user?.tenant_id);
-  console.log('🔍 User role:', user?.role);
-  console.log('🔍 canViewKnowledgeBase:', canViewKnowledgeBase);
+    // ADD THESE DEBUG LOGS:
+    console.log('🔍 Current user:', user);
+    console.log('🔍 User tenant_id:', user?.tenant_id);
+    console.log('🔍 User role:', user?.role);
+    console.log('🔍 canViewKnowledgeBase:', canViewKnowledgeBase);
     if (canViewKnowledgeBase) {
       fetchKnowledgeBase();
       if (activeTab === 'websites') {
@@ -64,11 +64,11 @@ const AIKnowledgeBase = () => {
       
       // Filter out websites - only show actual documents
       const documentsOnly = docsData.filter(doc => 
-      doc.source_type !== 'website' && 
-      !doc.website_url && 
-      doc.file_url && 
-      !doc.title?.startsWith('http')
-    );
+        doc.source_type !== 'website' && 
+        !doc.website_url && 
+        doc.file_url && 
+        !doc.title?.startsWith('http')
+      );
 
       setDocuments(documentsOnly);
 
@@ -190,17 +190,9 @@ const AIKnowledgeBase = () => {
       const docId = uploadResponse.data?.record?.id;
       if (!docId) throw new Error('Upload succeeded but document ID missing');
 
-      // 🔥 Trigger Supabase Edge Function to chunk/embed
-      await fetch('https://wuuqrdlfgkasnwydyvgk.supabase.co/functions/v1/chunk-and-embed', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ document_id: docId })
-      });
+      // ✅ REMOVED EDGE FUNCTION CALL - Database trigger will handle processing automatically
 
-      setSuccess('File uploaded and processed successfully!');
+      setSuccess('File uploaded successfully! Processing will begin automatically.');
       setSelectedFile(null);
       const fileInput = document.querySelector('input[type="file"]');
       if (fileInput) fileInput.value = '';
@@ -664,17 +656,6 @@ const AIKnowledgeBase = () => {
                   </li>
                 ))}
               </ul>
-            </div>
-          ) : (
-            <div className="pt-4 text-center py-8">
-              <Globe className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-500 text-sm mb-1">No websites added yet.</p>
-              <p className="text-gray-400 text-xs">
-                {canUploadDocs 
-                  ? 'Add websites to index their content for AI context.'
-                  : 'Contact an admin to add websites for AI context.'
-                }
-              </p>
             </div>
           )}
         </Card>
