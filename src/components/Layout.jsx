@@ -324,24 +324,24 @@ export default function Layout({ children }) {
   };
 
   // Add click outside handler to close menus
-useEffect(() => {
-  const handleClickOutside = (event) => {
-    if (showTopUserMenu && !event.target.closest('.user-menu-container')) {
-      setShowTopUserMenu(false);
-    }
+// useEffect(() => {
+//   const handleClickOutside = (event) => {
+//     if (showTopUserMenu && !event.target.closest('.user-menu-container')) {
+//       setShowTopUserMenu(false);
+//     }
     
-    if (showSearchResults && !event.target.closest('.search-container')) {
-      setShowSearchResults(false);
-    }
+//     if (showSearchResults && !event.target.closest('.search-container')) {
+//       setShowSearchResults(false);
+//     }
 
-    if (showNotifications && !event.target.closest('.notifications-container')) {
-      setShowNotifications(false);
-    }
-  };
+//     if (showNotifications && !event.target.closest('.notifications-container')) {
+//       setShowNotifications(false);
+//     }
+//   };
 
-  document.addEventListener('click', handleClickOutside);
-  return () => document.removeEventListener('click', handleClickOutside);
-}, [showTopUserMenu, showSearchResults, showNotifications]);
+//   document.addEventListener('click', handleClickOutside);
+//   return () => document.removeEventListener('click', handleClickOutside);
+// }, [showTopUserMenu, showSearchResults, showNotifications]);
 
   // Get page-specific messaging based on current route
   const getPageMessages = () => {
