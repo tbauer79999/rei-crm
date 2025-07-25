@@ -28,10 +28,282 @@ import {
   AlertCircle,
   Flame,
   Activity,
-  Zap
+  Zap,
+  X,
+  Menu
 } from 'lucide-react';
 import Papa from 'papaparse';
 import supabase from '../lib/supabaseClient';
+
+// Mobile Components
+const MobileMetricCard = ({ title, value, subtitle, icon: Icon, color = 'blue', alert = false, onClick }) => {
+  const colors = {
+    blue: 'from-blue-50 to-blue-100 text-blue-600 border-blue-200',
+    green: 'from-green-50 to-green-100 text-green-600 border-green-200',
+    purple: 'from-purple-50 to-purple-100 text-purple-600 border-purple-200',
+    orange: 'from-orange-50 to-orange-100 text-orange-600 border-orange-200',
+    red: 'from-red-50 to-red-100 text-red-600 border-red-200'
+  };
+
+  return (
+    <div 
+      className={`bg-gradient-to-r ${colors[color]} rounded-xl p-4 border cursor-pointer hover:shadow-md transition-all ${alert ? 'ring-2 ring-red-300 animate-pulse' : ''}`}
+      onClick={onClick}
+    >
+      <div className="flex items-center justify-between mb-2">
+        <Icon className="w-6 h-6 flex-shrink-0" />
+        {alert && (
+          <div className="flex h-2 w-2">
+            <div className="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-red-400 opacity-75"></div>
+            <div className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></div>
+          </div>
+        )}
+      </div>
+      <div className="space-y-1">
+        <p className="text-xs font-medium opacity-80">{title}</p>
+        <p className="text-lg font-bold">{value}</p>
+        {subtitle && <p className="text-xs opacity-70">{subtitle}</p>}
+      </div>
+    </div>
+  );
+};
+
+const MobileLeadCard = ({ lead, onClick, onCall }) => {
+  const displayStatus = lead.funnel_stage || lead.status;
+  const getStatusConfig = (status) => {
+    const configs = {
+      'Hot Lead': { color: 'bg-red-500', icon: '🔥' },
+      'Hot': { color: 'bg-red-500', icon: '🔥' },
+      'Engaged': { color: 'bg-orange-500', icon: '💬' },
+      'Warm': { color: 'bg-yellow-500', icon: '☀️' },
+      'Engaging': { color: 'bg-orange-500', icon: '💬' },
+      'Responding': { color: 'bg-green-500', icon: '↩️' },
+      'Cold Lead': { color: 'bg-blue-500', icon: '❄️' },
+      'Cold': { color: 'bg-blue-500', icon: '❄️' },
+      'Unsubscribed': { color: 'bg-gray-500', icon: '🚫' }
+    };
+    return configs[status] || configs['Cold Lead'];
+  };
+
+  const statusConfig = getStatusConfig(displayStatus);
+
+  return (
+    <div 
+      className={`bg-white rounded-xl border-l-4 p-4 shadow-sm hover:shadow-md transition-all cursor-pointer ${
+        lead.hot_score >= 80 ? 'border-l-orange-400' :
+        lead.hot_score >= 60 ? 'border-l-green-400' : 'border-l-blue-400'
+      }`}
+      onClick={onClick}
+    >
+      {/* Header */}
+      <div className="flex items-start justify-between mb-3">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-1">
+            {lead.requires_immediate_attention && !(lead.status === 'Hot Lead' && lead.assigned_to_sales_team_id) && (
+              <div className="flex h-2 w-2">
+                <div className="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-red-400 opacity-75"></div>
+                <div className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></div>
+              </div>
+            )}
+            <h3 className="text-lg font-semibold text-gray-900 truncate">
+              {lead.name || 'Unknown Lead'}
+            </h3>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium text-white`} style={{ backgroundColor: statusConfig.color }}>
+              <span>{statusConfig.icon}</span>
+              {displayStatus}
+            </span>
+            <span className="text-sm text-gray-500">Score: {lead.hot_score || 0}</span>
+          </div>
+        </div>
+        
+        {/* Actions */}
+        <div className="flex items-center gap-2 ml-2">
+          {lead.requires_immediate_attention && !(lead.status === 'Hot Lead' && lead.assigned_to_sales_team_id) && lead.phone && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onCall(lead.phone);
+              }}
+              className="p-2 bg-green-100 text-green-600 rounded-lg hover:bg-green-200 transition-colors"
+              title="Call Now"
+            >
+              <Phone size={16} />
+            </button>
+          )}
+          <button 
+            onClick={(e) => {
+              e.stopPropagation();
+              onClick();
+            }}
+            className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
+          >
+            <Eye size={16} />
+          </button>
+        </div>
+      </div>
+
+      {/* Contact Info */}
+      <div className="space-y-2 mb-3">
+        {lead.phone && (
+          <div className="flex items-center text-sm text-gray-600">
+            <Phone size={14} className="mr-2 text-gray-400" />
+            <span>{lead.phone}</span>
+          </div>
+        )}
+        {lead.email && (
+          <div className="flex items-center text-sm text-gray-600">
+            <Mail size={14} className="mr-2 text-gray-400" />
+            <span className="truncate">{lead.email}</span>
+          </div>
+        )}
+        {(lead.notes || lead.summary) && (
+          <div className="flex items-start text-sm text-gray-600">
+            <FileText size={14} className="mr-2 text-gray-400 mt-0.5" />
+            <span className="line-clamp-2">{lead.notes || lead.summary}</span>
+          </div>
+        )}
+      </div>
+
+      {/* Footer */}
+      <div className="flex items-center justify-between text-xs text-gray-500">
+        <span>{lead.campaign || 'No Campaign'}</span>
+        <span>{lead.created_at ? new Date(lead.created_at).toLocaleDateString() : '—'}</span>
+      </div>
+
+      {/* Hot Score Bar */}
+      <div className="mt-3">
+        <div className="w-full bg-gray-200 rounded-full h-1.5">
+          <div 
+            className={`h-1.5 rounded-full transition-all ${
+              lead.hot_score >= 80 ? 'bg-red-500' :
+              lead.hot_score >= 60 ? 'bg-orange-500' :
+              lead.hot_score >= 40 ? 'bg-yellow-500' : 'bg-blue-500'
+            }`}
+            style={{ width: `${Math.min(lead.hot_score || 0, 100)}%` }}
+          />
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const MobileFilterPanel = ({ 
+  search, 
+  setSearch, 
+  filterStatus, 
+  setFilterStatus, 
+  actualStatuses, 
+  getStatusCount, 
+  getStatusConfig,
+  downloadSampleCSV,
+  onAddLead 
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <>
+      {/* Mobile Filter Button */}
+      <div className="lg:hidden bg-white border-b border-gray-200 px-4 py-3">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-lg font-semibold text-gray-900">Pipeline</h2>
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={downloadSampleCSV}
+              className="p-2 text-gray-500 hover:text-gray-700"
+              title="Export"
+            >
+              <Download className="w-5 h-5" />
+            </button>
+            <button
+              onClick={onAddLead}
+              className="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              title="Add Lead"
+            >
+              <Plus className="w-5 h-5" />
+            </button>
+            <button
+              onClick={() => setIsOpen(true)}
+              className="flex items-center px-3 py-2 bg-gray-100 rounded-lg text-sm font-medium text-gray-700"
+            >
+              <Filter className="w-4 h-4 mr-2" />
+              Filters
+            </button>
+          </div>
+        </div>
+        
+        {/* Search */}
+        <div className="relative">
+          <Search size={20} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Search leads..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          />
+        </div>
+      </div>
+
+      {/* Mobile Filter Overlay */}
+      {isOpen && (
+        <>
+          <div 
+            className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
+            onClick={() => setIsOpen(false)}
+          />
+          <div className="fixed inset-x-0 bottom-0 bg-white rounded-t-xl z-50 lg:hidden max-h-96 overflow-y-auto">
+            <div className="p-4">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-gray-900">Filter Leads</h3>
+                <button
+                  onClick={() => setIsOpen(false)}
+                  className="p-2 text-gray-500 hover:text-gray-700"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              
+              <div className="space-y-3">
+                {actualStatuses.map((status) => {
+                  const count = getStatusCount(status);
+                  const isActive = (filterStatus === status || (status === 'All' && filterStatus === null));
+                  const config = getStatusConfig(status);
+                  
+                  return (
+                    <button
+                      key={status}
+                      onClick={() => {
+                        setFilterStatus(status === 'All' ? null : status);
+                        setIsOpen(false);
+                      }}
+                      className={`w-full flex items-center justify-between p-3 rounded-lg text-left transition-colors ${
+                        isActive
+                          ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                          : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        {status !== 'All' && <span className="text-lg">{config.icon}</span>}
+                        <span className="font-medium">{status}</span>
+                      </div>
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                        isActive ? 'bg-blue-100 text-blue-700' : 'bg-white text-gray-600'
+                      }`}>
+                        {count}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+    </>
+  );
+};
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -744,8 +1016,8 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-6 py-4">
+      {/* Desktop Header */}
+      <div className="hidden lg:block bg-white border-b border-gray-200 px-6 py-4">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-semibold text-gray-800 flex items-center gap-3">
@@ -784,9 +1056,22 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {/* Mobile Filter Panel */}
+      <MobileFilterPanel
+        search={search}
+        setSearch={setSearch}
+        filterStatus={filterStatus}
+        setFilterStatus={setFilterStatus}
+        actualStatuses={actualStatuses}
+        getStatusCount={getStatusCount}
+        getStatusConfig={getStatusConfig}
+        downloadSampleCSV={downloadSampleCSV}
+        onAddLead={() => setShowForm(!showForm)}
+      />
+
       {/* Add Lead Form */}
       {showForm && (
-        <div className="bg-white border-b border-gray-200 px-6 py-6">
+        <div className="bg-white border-b border-gray-200 px-4 lg:px-6 py-6">
           <div className="max-w-4xl">
             <AddLead 
               onSuccess={() => {
@@ -800,9 +1085,42 @@ export default function Dashboard() {
       )}
 
       {/* Main Content */}
-      <div className="p-6">
-        {/* Stats Cards */}
-        <div className="tour-stats grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+      <div className="p-4 lg:p-6">
+        {/* Mobile Stats Cards */}
+        <div className="lg:hidden grid grid-cols-2 gap-3 mb-6">
+          <MobileMetricCard
+            title="Critical Alerts"
+            value={criticalAlerts.length}
+            subtitle="Need immediate action"
+            icon={AlertCircle}
+            color="red"
+            alert={criticalAlerts.length > 0}
+          />
+          <MobileMetricCard
+            title="Hot Leads"
+            value={leads.filter(l => l.hot_score >= 80).length}
+            subtitle="Quality prospects"
+            icon={Flame}
+            color="orange"
+          />
+          <MobileMetricCard
+            title="Active"
+            value={leads.filter(l => l.hot_score >= 60).length}
+            subtitle="Engaged & responding"
+            icon={Activity}
+            color="green"
+          />
+          <MobileMetricCard
+            title="Total Leads"
+            value={leads.length}
+            subtitle="All conversations"
+            icon={Users}
+            color="blue"
+          />
+        </div>
+
+        {/* Desktop Stats Cards */}
+        <div className="hidden lg:block tour-stats grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
           {/* Critical Alerts */}
           <div className="bg-red-50 border border-red-200 rounded-xl p-6 relative group">
             <div className="flex items-center justify-between">
@@ -916,8 +1234,8 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Filters and Search */}
-        <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
+        {/* Desktop Filters and Search */}
+        <div className="hidden lg:block bg-white rounded-xl border border-gray-200 p-6 mb-6">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
             {/* Search */}
             <div className="tour-search relative flex-1 max-w-md">
@@ -962,8 +1280,62 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Leads Table */}
-        <div className="tour-leads-table bg-white rounded-xl border border-gray-200 overflow-hidden">
+        {/* Mobile Leads List */}
+        <div className="lg:hidden space-y-4">
+          {currentLeads.length === 0 ? (
+            <div className="bg-white rounded-xl border border-gray-200 p-8 text-center">
+              <Users size={48} className="text-gray-300 mx-auto mb-4" />
+              <p className="text-lg font-medium text-gray-900">No leads found</p>
+              <p className="text-gray-500">
+                {leads.length === 0 
+                  ? 'Get started by adding your first lead' 
+                  : 'Try adjusting your filters or search term'
+                }
+              </p>
+            </div>
+          ) : (
+            <>
+              {currentLeads.map((lead) => (
+                <MobileLeadCard
+                  key={lead.id}
+                  lead={lead}
+                  onClick={() => handleRowClick(lead.id)}
+                  onCall={(phone) => window.location.href = `tel:${phone}`}
+                />
+              ))}
+              
+              {/* Mobile Pagination */}
+              {totalPages > 1 && (
+                <div className="bg-white rounded-xl border border-gray-200 p-4">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-gray-700">
+                      Page {currentPage} of {totalPages}
+                    </span>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                        disabled={currentPage === 1}
+                        className="px-3 py-1 border border-gray-300 rounded-lg hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Previous
+                      </button>
+                      <button
+                        onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                        disabled={currentPage === totalPages}
+                        className="px-3 py-1 border border-gray-300 rounded-lg hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Next
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        {/* Desktop Leads Table */}
+        <div className="hidden lg:block tour-leads-table bg-white rounded-xl border border-gray-200 overflow-hidden">
           {/* Table Header */}
           <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
             <div className="flex items-center justify-between">
@@ -1190,7 +1562,7 @@ export default function Dashboard() {
             </table>
           </div>
 
-          {/* Pagination */}
+          {/* Desktop Pagination */}
           {totalPages > 1 && (
             <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
               <div className="flex items-center justify-between">
