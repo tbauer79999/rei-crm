@@ -94,18 +94,18 @@ const ModalWrapper = ({ isOpen, onClose, title, subtitle, children }) => {
         onClick={onClose}
       />
       
-      {/* Modal */}
-      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-6xl max-h-[90vh] m-4 overflow-hidden">
+      {/* Modal - Mobile Optimized */}
+      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-6xl max-h-[90vh] m-2 lg:m-4 overflow-hidden">
         {/* Header */}
-        <div className="border-b border-gray-200 px-6 py-4">
+        <div className="border-b border-gray-200 px-4 lg:px-6 py-4">
           <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-2xl font-bold text-gray-900">{title}</h2>
-              <p className="text-sm text-gray-500 mt-1">{subtitle}</p>
+            <div className="min-w-0 flex-1">
+              <h2 className="text-lg lg:text-2xl font-bold text-gray-900 truncate">{title}</h2>
+              <p className="text-sm text-gray-500 mt-1 truncate">{subtitle}</p>
             </div>
             <button
               onClick={onClose}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              className="p-2 hover:bg-gray-100 rounded-lg transition-colors flex-shrink-0 ml-2"
               aria-label="Close modal"
             >
               <X className="w-5 h-5 text-gray-500" />
@@ -134,15 +134,15 @@ const TimePeriodSelector = ({ selectedPeriod, onPeriodChange, periods }) => {
   const periodsToShow = periods || defaultPeriods;
 
   return (
-    <div className="border-b border-gray-200 px-6 py-3 bg-gray-50">
-      <div className="flex items-center space-x-4">
+    <div className="border-b border-gray-200 px-4 lg:px-6 py-3 bg-gray-50">
+      <div className="flex flex-col lg:flex-row lg:items-center space-y-2 lg:space-y-0 lg:space-x-4">
         <span className="text-sm font-medium text-gray-700">Time Period:</span>
-        <div className="flex space-x-2">
+        <div className="flex flex-wrap gap-2">
           {periodsToShow.map(period => (
             <button
               key={period.value}
               onClick={() => onPeriodChange(period.value)}
-              className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+              className={`px-3 lg:px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
                 selectedPeriod === period.value
                   ? 'bg-blue-600 text-white'
                   : 'bg-white text-gray-700 hover:bg-gray-100'
@@ -162,12 +162,12 @@ const TrendChart = ({ data, title, icon: Icon, iconColor }) => {
   const maxValue = Math.max(...data.map(d => d.count));
   
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-6">
-      <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-        <Icon className={`w-5 h-5 mr-2 ${iconColor}`} />
-        {title}
+    <div className="bg-white border border-gray-200 rounded-xl p-4 lg:p-6 w-full min-w-0">
+      <h3 className="text-base lg:text-lg font-semibold text-gray-900 mb-4 flex items-center">
+        <Icon className={`w-4 lg:w-5 h-4 lg:h-5 mr-2 ${iconColor}`} />
+        <span className="truncate">{title}</span>
       </h3>
-      <div className="h-64 relative">
+      <div className="h-48 lg:h-64 relative w-full min-w-0">
         <svg className="w-full h-full" viewBox="0 0 800 200">
           {/* Grid lines */}
           {[0, 1, 2, 3, 4].map(i => (
@@ -214,20 +214,20 @@ const SourceDistribution = ({ data, title = "Lead Sources" }) => {
   const total = data.reduce((sum, item) => sum + item.count, 0);
   
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-6">
-      <h3 className="text-lg font-semibold text-gray-900 mb-4">{title}</h3>
+    <div className="bg-white border border-gray-200 rounded-xl p-4 lg:p-6 w-full min-w-0">
+      <h3 className="text-base lg:text-lg font-semibold text-gray-900 mb-4 truncate">{title}</h3>
       <div className="space-y-3">
         {data.map((source, i) => (
-          <div key={i} className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
+          <div key={i} className="flex items-center justify-between min-w-0">
+            <div className="flex items-center space-x-2 lg:space-x-3 min-w-0 flex-1">
               <div 
-                className="w-3 h-3 rounded-full"
+                className="w-3 h-3 rounded-full flex-shrink-0"
                 style={{ backgroundColor: source.color }}
               />
-              <span className="text-sm font-medium text-gray-700">{source.source || source.name}</span>
+              <span className="text-sm font-medium text-gray-700 truncate">{source.source || source.name}</span>
             </div>
-            <div className="flex items-center space-x-2">
-              <div className="w-32 bg-gray-200 rounded-full h-2">
+            <div className="flex items-center space-x-2 flex-shrink-0">
+              <div className="w-20 lg:w-32 bg-gray-200 rounded-full h-2">
                 <div
                   className="h-2 rounded-full transition-all duration-500"
                   style={{
@@ -236,7 +236,7 @@ const SourceDistribution = ({ data, title = "Lead Sources" }) => {
                   }}
                 />
               </div>
-              <span className="text-sm text-gray-600 w-12 text-right">{source.count}</span>
+              <span className="text-sm text-gray-600 w-8 lg:w-12 text-right">{source.count}</span>
             </div>
           </div>
         ))}
@@ -252,23 +252,23 @@ const SourceDistribution = ({ data, title = "Lead Sources" }) => {
 };
 
 const TopSalespersons = ({ data }) => (
-  <div className="bg-white border border-gray-200 rounded-xl p-6">
-    <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-      <Users className="w-5 h-5 mr-2 text-green-600" />
-      Top 5 Salespersons
+  <div className="bg-white border border-gray-200 rounded-xl p-4 lg:p-6 w-full min-w-0">
+    <h3 className="text-base lg:text-lg font-semibold text-gray-900 mb-4 flex items-center">
+      <Users className="w-4 lg:w-5 h-4 lg:h-5 mr-2 text-green-600" />
+      <span className="truncate">Top 5 Salespersons</span>
     </h3>
     <div className="space-y-3">
       {data.map((person, i) => (
-        <div key={person.id} className="flex items-center justify-between p-3 hover:bg-gray-50 rounded-lg transition-colors">
-          <div className="flex items-center space-x-3">
-            <span className="text-2xl">{person.avatar}</span>
-            <div>
-              <p className="text-sm font-medium text-gray-900">{person.name}</p>
+        <div key={person.id} className="flex items-center justify-between p-3 hover:bg-gray-50 rounded-lg transition-colors min-w-0">
+          <div className="flex items-center space-x-3 min-w-0 flex-1">
+            <span className="text-xl lg:text-2xl flex-shrink-0">{person.avatar}</span>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium text-gray-900 truncate">{person.name}</p>
               <p className="text-xs text-gray-500">Rank #{i + 1}</p>
             </div>
           </div>
-          <div className="text-right">
-            <p className="text-lg font-bold text-gray-900">{person.totalLeads}</p>
+          <div className="text-right flex-shrink-0">
+            <p className="text-base lg:text-lg font-bold text-gray-900">{person.totalLeads}</p>
             <p className="text-xs text-gray-500">leads</p>
           </div>
         </div>
@@ -284,12 +284,12 @@ const WeeklyTrendChart = ({ data }) => {
   );
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-6">
-      <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-        <TrendingUp className="w-5 h-5 mr-2 text-green-600" />
-        Weekly Lead Performance
+    <div className="bg-white border border-gray-200 rounded-xl p-4 lg:p-6 w-full min-w-0">
+      <h3 className="text-base lg:text-lg font-semibold text-gray-900 mb-4 flex items-center">
+        <TrendingUp className="w-4 lg:w-5 h-4 lg:h-5 mr-2 text-green-600" />
+        <span className="truncate">Weekly Lead Performance</span>
       </h3>
-      <div className="h-64 relative">
+      <div className="h-48 lg:h-64 relative w-full min-w-0">
         <svg className="w-full h-full" viewBox="0 0 800 200">
           {/* Grid lines */}
           {[0, 1, 2, 3, 4].map(i => (
@@ -373,15 +373,15 @@ const WeeklySourceBreakdown = ({ data }) => {
   };
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-6">
-      <h3 className="text-lg font-semibold text-gray-900 mb-4">Lead Sources by Week</h3>
+    <div className="bg-white border border-gray-200 rounded-xl p-4 lg:p-6 w-full min-w-0">
+      <h3 className="text-base lg:text-lg font-semibold text-gray-900 mb-4 truncate">Lead Sources by Week</h3>
       <div className="overflow-x-auto">
-        <table className="w-full">
+        <table className="w-full min-w-0">
           <thead>
             <tr className="border-b border-gray-200">
-              <th className="text-left py-2 px-3 text-sm font-medium text-gray-700">Source</th>
+              <th className="text-left py-2 px-2 lg:px-3 text-sm font-medium text-gray-700">Source</th>
               {data.map((week, i) => (
-                <th key={i} className="text-center py-2 px-3 text-sm font-medium text-gray-700">
+                <th key={i} className="text-center py-2 px-1 lg:px-3 text-sm font-medium text-gray-700">
                   W{i + 1}
                 </th>
               ))}
@@ -390,17 +390,17 @@ const WeeklySourceBreakdown = ({ data }) => {
           <tbody>
             {Object.keys(sourceColors).map(source => (
               <tr key={source} className="border-b border-gray-100">
-                <td className="py-2 px-3 text-sm text-gray-900 flex items-center">
+                <td className="py-2 px-2 lg:px-3 text-sm text-gray-900 flex items-center min-w-0">
                   <div 
-                    className="w-3 h-3 rounded-full mr-2"
+                    className="w-3 h-3 rounded-full mr-2 flex-shrink-0"
                     style={{ backgroundColor: sourceColors[source] }}
                   />
-                  {source}
+                  <span className="truncate">{source}</span>
                 </td>
                 {data.map((week, i) => {
                   const sourceData = week.sources.find(s => s.name === source);
                   return (
-                    <td key={i} className="text-center py-2 px-3 text-sm text-gray-600">
+                    <td key={i} className="text-center py-2 px-1 lg:px-3 text-sm text-gray-600">
                       {sourceData?.count || 0}
                     </td>
                   );
@@ -419,12 +419,12 @@ const HotRateTrendChart = ({ data, targetRate = 15 }) => {
   const maxValue = Math.max(...data.map(d => d.hotRate), targetRate) * 1.1;
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-6">
-      <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-        <Target className="w-5 h-5 mr-2 text-orange-600" />
-        Hot Lead Rate Trend
+    <div className="bg-white border border-gray-200 rounded-xl p-4 lg:p-6 w-full min-w-0">
+      <h3 className="text-base lg:text-lg font-semibold text-gray-900 mb-4 flex items-center">
+        <Target className="w-4 lg:w-5 h-4 lg:h-5 mr-2 text-orange-600" />
+        <span className="truncate">Hot Lead Rate Trend</span>
       </h3>
-      <div className="h-64 relative">
+      <div className="h-48 lg:h-64 relative w-full min-w-0">
         <svg className="w-full h-full" viewBox="0 0 800 200">
           {/* Grid lines */}
           {[0, 1, 2, 3, 4].map(i => (
@@ -489,14 +489,14 @@ const HotRateTrendChart = ({ data, targetRate = 15 }) => {
 // Hot Rate by Channel
 const HotRateByChannel = ({ data }) => {
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-6">
-      <h3 className="text-lg font-semibold text-gray-900 mb-4">Hot Rate by Channel</h3>
+    <div className="bg-white border border-gray-200 rounded-xl p-4 lg:p-6 w-full min-w-0">
+      <h3 className="text-base lg:text-lg font-semibold text-gray-900 mb-4 truncate">Hot Rate by Channel</h3>
       <div className="space-y-3">
         {data.map((channel, i) => (
-          <div key={i} className="flex items-center justify-between">
-            <span className="text-sm font-medium text-gray-700">{channel.channel}</span>
-            <div className="flex items-center space-x-2">
-              <div className="w-32 bg-gray-200 rounded-full h-2">
+          <div key={i} className="flex items-center justify-between min-w-0">
+            <span className="text-sm font-medium text-gray-700 truncate flex-1">{channel.channel}</span>
+            <div className="flex items-center space-x-2 flex-shrink-0">
+              <div className="w-20 lg:w-32 bg-gray-200 rounded-full h-2">
                 <div
                   className="h-2 rounded-full transition-all duration-500 bg-orange-500"
                   style={{ width: `${channel.hotRate * 100}%` }}
@@ -516,35 +516,35 @@ const HotRateByChannel = ({ data }) => {
 // Time to Hot Distribution
 const TimeToHotMetrics = ({ data }) => {
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-6">
-      <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-        <Clock className="w-5 h-5 mr-2 text-purple-600" />
-        Time to Hot Lead Conversion
+    <div className="bg-white border border-gray-200 rounded-xl p-4 lg:p-6 w-full min-w-0">
+      <h3 className="text-base lg:text-lg font-semibold text-gray-900 mb-4 flex items-center">
+        <Clock className="w-4 lg:w-5 h-4 lg:h-5 mr-2 text-purple-600" />
+        <span className="truncate">Time to Hot Lead Conversion</span>
       </h3>
       
       <div className="grid grid-cols-2 gap-4 mb-6">
-        <div className="text-center p-4 bg-purple-50 rounded-lg">
+        <div className="text-center p-3 lg:p-4 bg-purple-50 rounded-lg">
           <p className="text-sm text-gray-600">Average Time</p>
-          <p className="text-2xl font-bold text-purple-700">{data.avgMinutes} min</p>
+          <p className="text-xl lg:text-2xl font-bold text-purple-700">{data.avgMinutes} min</p>
         </div>
-        <div className="text-center p-4 bg-purple-50 rounded-lg">
+        <div className="text-center p-3 lg:p-4 bg-purple-50 rounded-lg">
           <p className="text-sm text-gray-600">Median Time</p>
-          <p className="text-2xl font-bold text-purple-700">{data.medianMinutes} min</p>
+          <p className="text-xl lg:text-2xl font-bold text-purple-700">{data.medianMinutes} min</p>
         </div>
       </div>
       
       <div className="space-y-2">
         <p className="text-sm font-medium text-gray-700 mb-2">Distribution</p>
         {data.distribution.map((item, i) => (
-          <div key={i} className="flex items-center space-x-2">
-            <span className="text-sm text-gray-600 w-20">{item.range}</span>
-            <div className="flex-1 bg-gray-200 rounded-full h-4">
+          <div key={i} className="flex items-center space-x-2 min-w-0">
+            <span className="text-sm text-gray-600 w-16 lg:w-20 flex-shrink-0">{item.range}</span>
+            <div className="flex-1 bg-gray-200 rounded-full h-3 lg:h-4 min-w-0">
               <div
-                className="bg-purple-500 h-4 rounded-full"
+                className="bg-purple-500 h-3 lg:h-4 rounded-full"
                 style={{ width: `${item.percentage}%` }}
               />
             </div>
-            <span className="text-sm text-gray-600 w-12 text-right">{item.percentage}%</span>
+            <span className="text-sm text-gray-600 w-8 lg:w-12 text-right flex-shrink-0">{item.percentage}%</span>
           </div>
         ))}
       </div>
@@ -557,20 +557,20 @@ const HotLeadFunnel = ({ data }) => {
   const maxCount = Math.max(...data.map(d => d.count));
   
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-6">
-      <h3 className="text-lg font-semibold text-gray-900 mb-4">Hot Lead Conversion Funnel</h3>
+    <div className="bg-white border border-gray-200 rounded-xl p-4 lg:p-6 w-full min-w-0">
+      <h3 className="text-base lg:text-lg font-semibold text-gray-900 mb-4 truncate">Hot Lead Conversion Funnel</h3>
       <div className="space-y-3">
         {data.map((stage, i) => (
           <div key={i} className="relative">
             <div 
-              className="bg-gradient-to-r from-orange-500 to-orange-400 text-white p-3 rounded-lg"
-              style={{ width: `${(stage.count / maxCount) * 100}%`, minWidth: '150px' }}
+              className="bg-gradient-to-r from-orange-500 to-orange-400 text-white p-3 rounded-lg min-w-0"
+              style={{ width: `${(stage.count / maxCount) * 100}%`, minWidth: '120px' }}
             >
-              <p className="font-medium">{stage.stage}</p>
+              <p className="font-medium text-sm lg:text-base truncate">{stage.stage}</p>
               <p className="text-sm opacity-90">{stage.count} leads</p>
             </div>
             {i < data.length - 1 && (
-              <div className="absolute -bottom-2 left-8 text-xs text-gray-500">
+              <div className="absolute -bottom-2 left-4 lg:left-8 text-xs text-gray-500">
                 ↓ {stage.conversionToNext}% conversion
               </div>
             )}
@@ -581,34 +581,32 @@ const HotLeadFunnel = ({ data }) => {
   );
 };
 
-// NEW COMPONENTS FOR REMAINING 4 CARDS
-
 // Stagnant Leads Table
 const StagnantLeadsTable = ({ data }) => (
-  <div className="bg-white border border-gray-200 rounded-xl p-6">
-    <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-      <AlertTriangle className="w-5 h-5 mr-2 text-yellow-600" />
-      Stagnant Leads Report
+  <div className="bg-white border border-gray-200 rounded-xl p-4 lg:p-6 w-full min-w-0">
+    <h3 className="text-base lg:text-lg font-semibold text-gray-900 mb-4 flex items-center">
+      <AlertTriangle className="w-4 lg:w-5 h-4 lg:h-5 mr-2 text-yellow-600" />
+      <span className="truncate">Stagnant Leads Report</span>
     </h3>
     <div className="overflow-x-auto">
       <table className="w-full">
         <thead>
           <tr className="border-b border-gray-200">
-            <th className="text-left py-3 px-4 text-sm font-medium text-gray-700">Lead Name</th>
-            <th className="text-left py-3 px-4 text-sm font-medium text-gray-700">Current Status</th>
-            <th className="text-left py-3 px-4 text-sm font-medium text-gray-700">Assigned To</th>
-            <th className="text-left py-3 px-4 text-sm font-medium text-gray-700">Last Interaction</th>
-            <th className="text-left py-3 px-4 text-sm font-medium text-gray-700">Days Stagnant</th>
+            <th className="text-left py-3 px-2 lg:px-4 text-sm font-medium text-gray-700">Lead Name</th>
+            <th className="text-left py-3 px-2 lg:px-4 text-sm font-medium text-gray-700">Current Status</th>
+            <th className="text-left py-3 px-2 lg:px-4 text-sm font-medium text-gray-700">Assigned To</th>
+            <th className="text-left py-3 px-2 lg:px-4 text-sm font-medium text-gray-700">Last Interaction</th>
+            <th className="text-left py-3 px-2 lg:px-4 text-sm font-medium text-gray-700">Days Stagnant</th>
           </tr>
         </thead>
         <tbody>
           {data.map((lead) => (
             <tr key={lead.leadId} className="border-b border-gray-100 hover:bg-gray-50">
-              <td className="py-3 px-4 text-sm font-medium text-gray-900">{lead.name}</td>
-              <td className="py-3 px-4 text-sm text-gray-600">{lead.currentStatus}</td>
-              <td className="py-3 px-4 text-sm text-gray-600">{lead.assignedTo || 'AI'}</td>
-              <td className="py-3 px-4 text-sm text-gray-600">{lead.lastInteraction}</td>
-              <td className="py-3 px-4">
+              <td className="py-3 px-2 lg:px-4 text-sm font-medium text-gray-900">{lead.name}</td>
+              <td className="py-3 px-2 lg:px-4 text-sm text-gray-600">{lead.currentStatus}</td>
+              <td className="py-3 px-2 lg:px-4 text-sm text-gray-600">{lead.assignedTo || 'AI'}</td>
+              <td className="py-3 px-2 lg:px-4 text-sm text-gray-600">{lead.lastInteraction}</td>
+              <td className="py-3 px-2 lg:px-4">
                 <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                   lead.daysStagnant > 7 ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'
                 }`}>
@@ -637,20 +635,20 @@ const OutcomeDistribution = ({ data }) => {
   };
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-6">
-      <h3 className="text-lg font-semibold text-gray-900 mb-4">Completion Status Distribution</h3>
+    <div className="bg-white border border-gray-200 rounded-xl p-4 lg:p-6 w-full min-w-0">
+      <h3 className="text-base lg:text-lg font-semibold text-gray-900 mb-4 truncate">Completion Status Distribution</h3>
       <div className="space-y-3">
         {data.map((outcome, i) => (
-          <div key={i} className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
+          <div key={i} className="flex items-center justify-between min-w-0">
+            <div className="flex items-center space-x-2 lg:space-x-3 min-w-0 flex-1">
               <div 
-                className="w-3 h-3 rounded-full"
+                className="w-3 h-3 rounded-full flex-shrink-0"
                 style={{ backgroundColor: getOutcomeColor(outcome.status) }}
               />
-              <span className="text-sm font-medium text-gray-700">{outcome.status}</span>
+              <span className="text-sm font-medium text-gray-700 truncate">{outcome.status}</span>
             </div>
-            <div className="flex items-center space-x-2">
-              <div className="w-32 bg-gray-200 rounded-full h-2">
+            <div className="flex items-center space-x-2 flex-shrink-0">
+              <div className="w-20 lg:w-32 bg-gray-200 rounded-full h-2">
                 <div
                   className="h-2 rounded-full transition-all duration-500"
                   style={{
@@ -659,7 +657,7 @@ const OutcomeDistribution = ({ data }) => {
                   }}
                 />
               </div>
-              <span className="text-sm text-gray-600 w-16 text-right">
+              <span className="text-sm text-gray-600 w-12 lg:w-16 text-right">
                 {outcome.count} ({((outcome.count / total) * 100).toFixed(1)}%)
               </span>
             </div>
@@ -672,13 +670,13 @@ const OutcomeDistribution = ({ data }) => {
 
 // Delivery Stats Component
 const DeliveryStats = ({ data }) => (
-  <div className="bg-white border border-gray-200 rounded-xl p-6">
-    <h3 className="text-lg font-semibold text-gray-900 mb-4">Delivery & Open Rate Summary</h3>
-    <div className="grid grid-cols-4 gap-4">
+  <div className="bg-white border border-gray-200 rounded-xl p-4 lg:p-6 w-full min-w-0">
+    <h3 className="text-base lg:text-lg font-semibold text-gray-900 mb-4 truncate">Delivery & Open Rate Summary</h3>
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 lg:gap-4">
       {data.map((stat, i) => (
-        <div key={i} className="text-center p-3 bg-gray-50 rounded-lg">
-          <p className="text-2xl font-bold text-gray-800">{stat.value}</p>
-          <p className="text-xs text-gray-600 mt-1">{stat.label}</p>
+        <div key={i} className="text-center p-2 lg:p-3 bg-gray-50 rounded-lg">
+          <p className="text-lg lg:text-2xl font-bold text-gray-800 truncate">{stat.value}</p>
+          <p className="text-xs text-gray-600 mt-1 truncate">{stat.label}</p>
           {stat.percentage && (
             <p className="text-xs text-gray-500 mt-1">({stat.percentage}%)</p>
           )}
@@ -701,23 +699,23 @@ const SentimentAnalysis = ({ data }) => {
   };
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-6">
-      <h3 className="text-lg font-semibold text-gray-900 mb-4">Message Sentiment Distribution</h3>
+    <div className="bg-white border border-gray-200 rounded-xl p-4 lg:p-6 w-full min-w-0">
+      <h3 className="text-base lg:text-lg font-semibold text-gray-900 mb-4 truncate">Message Sentiment Distribution</h3>
       <div className="flex justify-around items-center">
         {data.map((item, i) => (
           <div key={i} className="text-center">
             <div 
-              className="w-24 h-24 rounded-full flex items-center justify-center mb-2"
+              className="w-16 h-16 lg:w-24 lg:h-24 rounded-full flex items-center justify-center mb-2"
               style={{ backgroundColor: `${getSentimentColor(item.sentiment)}20` }}
             >
               <span 
-                className="text-3xl font-bold"
+                className="text-xl lg:text-3xl font-bold"
                 style={{ color: getSentimentColor(item.sentiment) }}
               >
                 {((item.count / total) * 100).toFixed(0)}%
               </span>
             </div>
-            <p className="text-sm font-medium text-gray-700">{item.sentiment}</p>
+            <p className="text-sm font-medium text-gray-700 truncate">{item.sentiment}</p>
             <p className="text-xs text-gray-500">{item.count} messages</p>
           </div>
         ))}
@@ -728,23 +726,23 @@ const SentimentAnalysis = ({ data }) => {
 
 // Top Intents Component
 const TopIntents = ({ data }) => (
-  <div className="bg-white border border-gray-200 rounded-xl p-6">
-    <h3 className="text-lg font-semibold text-gray-900 mb-4">Top Inbound Intents/Topics</h3>
+  <div className="bg-white border border-gray-200 rounded-xl p-4 lg:p-6 w-full min-w-0">
+    <h3 className="text-base lg:text-lg font-semibold text-gray-900 mb-4 truncate">Top Inbound Intents/Topics</h3>
     <div className="space-y-2">
       {data.map((intent, i) => (
-        <div key={i} className="flex items-center justify-between p-3 hover:bg-gray-50 rounded-lg">
-          <div className="flex items-center space-x-3">
-            <span className="text-sm font-medium text-gray-800">#{i + 1}</span>
-            <span className="text-sm text-gray-700">{intent.intent}</span>
+        <div key={i} className="flex items-center justify-between p-2 lg:p-3 hover:bg-gray-50 rounded-lg min-w-0">
+          <div className="flex items-center space-x-2 lg:space-x-3 min-w-0 flex-1">
+            <span className="text-sm font-medium text-gray-800 flex-shrink-0">#{i + 1}</span>
+            <span className="text-sm text-gray-700 truncate">{intent.intent}</span>
           </div>
-          <div className="flex items-center space-x-2">
-            <div className="w-24 bg-gray-200 rounded-full h-2">
+          <div className="flex items-center space-x-2 flex-shrink-0">
+            <div className="w-16 lg:w-24 bg-gray-200 rounded-full h-2">
               <div
                 className="h-2 rounded-full bg-purple-500"
                 style={{ width: `${(intent.count / data[0].count) * 100}%` }}
               />
             </div>
-            <span className="text-sm text-gray-600 w-12 text-right">{intent.count}</span>
+            <span className="text-sm text-gray-600 w-8 lg:w-12 text-right">{intent.count}</span>
           </div>
         </div>
       ))}
@@ -779,7 +777,7 @@ const MetricModalContent = ({ metricType, data, selectedPeriod, onPeriodChange }
         periods={periodOptions}
       />
       
-      <div className="p-6 space-y-6">
+      <div className="p-4 lg:p-6 space-y-4 lg:space-y-6 w-full min-w-0">
         {/* Existing features */}
         {features.includes('trend') && (
           <TrendChart 
@@ -800,19 +798,19 @@ const MetricModalContent = ({ metricType, data, selectedPeriod, onPeriodChange }
         )}
         
         {features.includes('hotLeadCorrelation') && (
-          <div className="bg-white border border-gray-200 rounded-xl p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Weekly Lead Quality Correlation</h3>
-            <div className="grid grid-cols-3 gap-4 text-center">
-              <div className="p-4 bg-gray-50 rounded-lg">
-                <p className="text-2xl font-bold text-gray-800">{data.avgHotRate}%</p>
+          <div className="bg-white border border-gray-200 rounded-xl p-4 lg:p-6 w-full min-w-0">
+            <h3 className="text-base lg:text-lg font-semibold text-gray-900 mb-4 truncate">Weekly Lead Quality Correlation</h3>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 text-center">
+              <div className="p-3 lg:p-4 bg-gray-50 rounded-lg">
+                <p className="text-xl lg:text-2xl font-bold text-gray-800">{data.avgHotRate}%</p>
                 <p className="text-sm text-gray-600">Avg Hot Rate</p>
               </div>
-              <div className="p-4 bg-gray-50 rounded-lg">
-                <p className="text-2xl font-bold text-gray-800">{data.totalHotLeads}</p>
+              <div className="p-3 lg:p-4 bg-gray-50 rounded-lg">
+                <p className="text-xl lg:text-2xl font-bold text-gray-800">{data.totalHotLeads}</p>
                 <p className="text-sm text-gray-600">Total Hot Leads</p>
               </div>
-              <div className="p-4 bg-gray-50 rounded-lg">
-                <p className="text-2xl font-bold text-gray-800">{data.bestWeek}</p>
+              <div className="p-3 lg:p-4 bg-gray-50 rounded-lg">
+                <p className="text-xl lg:text-2xl font-bold text-gray-800">{data.bestWeek}</p>
                 <p className="text-sm text-gray-600">Best Week</p>
               </div>
             </div>
@@ -820,9 +818,9 @@ const MetricModalContent = ({ metricType, data, selectedPeriod, onPeriodChange }
         )}
         
         {features.includes('weeklyInsights') && data.weeklyInsights && (
-          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 w-full min-w-0">
             <h4 className="font-medium text-blue-900 mb-2">Key Insights</h4>
-            <p className="text-sm text-blue-800">{data.weeklyInsights}</p>
+            <p className="text-sm text-blue-800 break-words">{data.weeklyInsights}</p>
           </div>
         )}
 
@@ -842,7 +840,7 @@ const MetricModalContent = ({ metricType, data, selectedPeriod, onPeriodChange }
         )}
         
         {features.includes('stageDistribution') && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
             <SourceDistribution data={data.stageData} title="Active Leads by Stage" />
             
             {features.includes('ownerDistribution') && (
@@ -870,13 +868,13 @@ const MetricModalContent = ({ metricType, data, selectedPeriod, onPeriodChange }
         )}
         
         {features.includes('disqualificationReasons') && data.disqualificationReasons && (
-          <div className="bg-white border border-gray-200 rounded-xl p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Top Disqualification Reasons</h3>
+          <div className="bg-white border border-gray-200 rounded-xl p-4 lg:p-6 w-full min-w-0">
+            <h3 className="text-base lg:text-lg font-semibold text-gray-900 mb-4 truncate">Top Disqualification Reasons</h3>
             <div className="space-y-2">
               {data.disqualificationReasons.map((reason, i) => (
-                <div key={i} className="flex items-center justify-between p-2 hover:bg-gray-50 rounded">
-                  <span className="text-sm text-gray-700">{reason.reason}</span>
-                  <span className="text-sm font-medium text-red-600">{reason.count} leads</span>
+                <div key={i} className="flex items-center justify-between p-2 hover:bg-gray-50 rounded min-w-0">
+                  <span className="text-sm text-gray-700 truncate flex-1">{reason.reason}</span>
+                  <span className="text-sm font-medium text-red-600 flex-shrink-0">{reason.count} leads</span>
                 </div>
               ))}
             </div>
@@ -884,9 +882,9 @@ const MetricModalContent = ({ metricType, data, selectedPeriod, onPeriodChange }
         )}
         
         {features.includes('avgCompletionTime') && (
-          <div className="bg-green-50 border border-green-200 rounded-xl p-6 text-center">
-            <h3 className="text-lg font-semibold text-green-900 mb-2">Average Time to Completion</h3>
-            <p className="text-4xl font-bold text-green-700">{data.avgCompletionTime} days</p>
+          <div className="bg-green-50 border border-green-200 rounded-xl p-4 lg:p-6 text-center w-full min-w-0">
+            <h3 className="text-base lg:text-lg font-semibold text-green-900 mb-2 truncate">Average Time to Completion</h3>
+            <p className="text-3xl lg:text-4xl font-bold text-green-700">{data.avgCompletionTime} days</p>
             <p className="text-sm text-green-600 mt-2">From initial contact to completion</p>
           </div>
         )}
@@ -910,14 +908,14 @@ const MetricModalContent = ({ metricType, data, selectedPeriod, onPeriodChange }
         )}
         
         {features.includes('engagementByType') && (
-          <div className="bg-white border border-gray-200 rounded-xl p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Engagement Rate by Message Type</h3>
+          <div className="bg-white border border-gray-200 rounded-xl p-4 lg:p-6 w-full min-w-0">
+            <h3 className="text-base lg:text-lg font-semibold text-gray-900 mb-4 truncate">Engagement Rate by Message Type</h3>
             <div className="space-y-3">
               {data.engagementData.map((item, i) => (
-                <div key={i} className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-gray-700">{item.type}</span>
-                  <div className="flex items-center space-x-2">
-                    <div className="w-32 bg-gray-200 rounded-full h-2">
+                <div key={i} className="flex items-center justify-between min-w-0">
+                  <span className="text-sm font-medium text-gray-700 truncate flex-1">{item.type}</span>
+                  <div className="flex items-center space-x-2 flex-shrink-0">
+                    <div className="w-20 lg:w-32 bg-gray-200 rounded-full h-2">
                       <div
                         className="h-2 rounded-full bg-blue-500"
                         style={{ width: `${item.rate * 100}%` }}
@@ -947,28 +945,28 @@ const MetricModalContent = ({ metricType, data, selectedPeriod, onPeriodChange }
         )}
         
         {features.includes('unhandledMessages') && (
-          <div className="bg-white border border-gray-200 rounded-xl p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-              <AlertTriangle className="w-5 h-5 mr-2 text-yellow-600" />
-              AI Unhandled Messages
+          <div className="bg-white border border-gray-200 rounded-xl p-4 lg:p-6 w-full min-w-0">
+            <h3 className="text-base lg:text-lg font-semibold text-gray-900 mb-4 flex items-center">
+              <AlertTriangle className="w-4 lg:w-5 h-4 lg:h-5 mr-2 text-yellow-600" />
+              <span className="truncate">AI Unhandled Messages</span>
             </h3>
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-gray-200">
-                    <th className="text-left py-3 px-4 text-sm font-medium text-gray-700">Message ID</th>
-                    <th className="text-left py-3 px-4 text-sm font-medium text-gray-700">Content Excerpt</th>
-                    <th className="text-left py-3 px-4 text-sm font-medium text-gray-700">Date</th>
-                    <th className="text-left py-3 px-4 text-sm font-medium text-gray-700">Confidence</th>
+                    <th className="text-left py-3 px-2 lg:px-4 text-sm font-medium text-gray-700">Message ID</th>
+                    <th className="text-left py-3 px-2 lg:px-4 text-sm font-medium text-gray-700">Content Excerpt</th>
+                    <th className="text-left py-3 px-2 lg:px-4 text-sm font-medium text-gray-700">Date</th>
+                    <th className="text-left py-3 px-2 lg:px-4 text-sm font-medium text-gray-700">Confidence</th>
                   </tr>
                 </thead>
                 <tbody>
                   {data.unhandledMessages.map((msg) => (
                     <tr key={msg.messageId} className="border-b border-gray-100 hover:bg-gray-50">
-                      <td className="py-3 px-4 text-sm text-gray-900">{msg.messageId.slice(0, 8)}...</td>
-                      <td className="py-3 px-4 text-sm text-gray-600">{msg.content.slice(0, 50)}...</td>
-                      <td className="py-3 px-4 text-sm text-gray-600">{msg.date}</td>
-                      <td className="py-3 px-4">
+                      <td className="py-3 px-2 lg:px-4 text-sm text-gray-900">{msg.messageId.slice(0, 8)}...</td>
+                      <td className="py-3 px-2 lg:px-4 text-sm text-gray-600">{msg.content.slice(0, 50)}...</td>
+                      <td className="py-3 px-2 lg:px-4 text-sm text-gray-600">{msg.date}</td>
+                      <td className="py-3 px-2 lg:px-4">
                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                           msg.confidence < 0.5 ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'
                         }`}>
@@ -983,14 +981,14 @@ const MetricModalContent = ({ metricType, data, selectedPeriod, onPeriodChange }
           </div>
         )}
         
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
           {features.includes('sources') && data.sourceData && (
-  <SourceDistribution data={data.sourceData} />
-)}
+            <SourceDistribution data={data.sourceData} />
+          )}
           
           {features.includes('topSales') && data.topSalespersons && (
-  <TopSalespersons data={data.topSalespersons} />
-)}
+            <TopSalespersons data={data.topSalespersons} />
+          )}
           
           {features.includes('hotRateByChannel') && (
             <HotRateByChannel data={data.hotRateByChannelData} />
@@ -1002,13 +1000,13 @@ const MetricModalContent = ({ metricType, data, selectedPeriod, onPeriodChange }
         </div>
         
         {features.includes('hotRateByTopic') && data.hotRateByTopicData && (
-          <div className="bg-white border border-gray-200 rounded-xl p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Hot Rate by AI-Identified Topics</h3>
+          <div className="bg-white border border-gray-200 rounded-xl p-4 lg:p-6 w-full min-w-0">
+            <h3 className="text-base lg:text-lg font-semibold text-gray-900 mb-4 truncate">Hot Rate by AI-Identified Topics</h3>
             <div className="space-y-2">
               {data.hotRateByTopicData.map((topic, i) => (
-                <div key={i} className="flex items-center justify-between p-2 hover:bg-gray-50 rounded">
-                  <span className="text-sm text-gray-700">{topic.topic}</span>
-                  <span className="text-sm font-medium text-orange-600">{topic.hotRate}%</span>
+                <div key={i} className="flex items-center justify-between p-2 hover:bg-gray-50 rounded min-w-0">
+                  <span className="text-sm text-gray-700 truncate flex-1">{topic.topic}</span>
+                  <span className="text-sm font-medium text-orange-600 flex-shrink-0">{topic.hotRate}%</span>
                 </div>
               ))}
             </div>
@@ -1020,13 +1018,13 @@ const MetricModalContent = ({ metricType, data, selectedPeriod, onPeriodChange }
         )}
         
         {features.includes('optimizationTips') && data.optimizationTips && (
-          <div className="bg-orange-50 border border-orange-200 rounded-xl p-4">
+          <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 w-full min-w-0">
             <h4 className="font-medium text-orange-900 mb-2">Optimization Recommendations</h4>
             <ul className="space-y-1">
               {data.optimizationTips.map((tip, i) => (
                 <li key={i} className="text-sm text-orange-800 flex items-start">
-                  <span className="mr-2">•</span>
-                  <span>{tip}</span>
+                  <span className="mr-2 flex-shrink-0">•</span>
+                  <span className="break-words">{tip}</span>
                 </li>
               ))}
             </ul>
@@ -1034,31 +1032,31 @@ const MetricModalContent = ({ metricType, data, selectedPeriod, onPeriodChange }
         )}
 
         {features.includes('recentSignups') && (
-          <div className="bg-white border border-gray-200 rounded-xl p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-              <Calendar className="w-5 h-5 mr-2 text-purple-600" />
-              Recent Lead Sign-ups
+          <div className="bg-white border border-gray-200 rounded-xl p-4 lg:p-6 w-full min-w-0">
+            <h3 className="text-base lg:text-lg font-semibold text-gray-900 mb-4 flex items-center">
+              <Calendar className="w-4 lg:w-5 h-4 lg:h-5 mr-2 text-purple-600" />
+              <span className="truncate">Recent Lead Sign-ups</span>
             </h3>
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-gray-200">
-                    <th className="text-left py-3 px-4 text-sm font-medium text-gray-700">Lead Name</th>
-                    <th className="text-left py-3 px-4 text-sm font-medium text-gray-700">Email</th>
-                    <th className="text-left py-3 px-4 text-sm font-medium text-gray-700">Signup Date</th>
-                    <th className="text-left py-3 px-4 text-sm font-medium text-gray-700">Source</th>
+                    <th className="text-left py-3 px-2 lg:px-4 text-sm font-medium text-gray-700">Lead Name</th>
+                    <th className="text-left py-3 px-2 lg:px-4 text-sm font-medium text-gray-700">Email</th>
+                    <th className="text-left py-3 px-2 lg:px-4 text-sm font-medium text-gray-700">Signup Date</th>
+                    <th className="text-left py-3 px-2 lg:px-4 text-sm font-medium text-gray-700">Source</th>
                   </tr>
                 </thead>
                 <tbody>
                   {data.recentSignups.map((signup) => (
                     <tr key={signup.id} className="border-b border-gray-100 hover:bg-gray-50">
-                      <td className="py-3 px-4 text-sm text-gray-900">{signup.name}</td>
-                      <td className="py-3 px-4 text-sm text-gray-600 flex items-center">
-                        <Mail className="w-3 h-3 mr-2 text-gray-400" />
-                        {signup.email}
+                      <td className="py-3 px-2 lg:px-4 text-sm text-gray-900">{signup.name}</td>
+                      <td className="py-3 px-2 lg:px-4 text-sm text-gray-600 flex items-center min-w-0">
+                        <Mail className="w-3 h-3 mr-2 text-gray-400 flex-shrink-0" />
+                        <span className="truncate">{signup.email}</span>
                       </td>
-                      <td className="py-3 px-4 text-sm text-gray-600">{signup.signupDate}</td>
-                      <td className="py-3 px-4">
+                      <td className="py-3 px-2 lg:px-4 text-sm text-gray-600">{signup.signupDate}</td>
+                      <td className="py-3 px-2 lg:px-4">
                         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                           {signup.source}
                         </span>
@@ -1075,18 +1073,18 @@ const MetricModalContent = ({ metricType, data, selectedPeriod, onPeriodChange }
   );
 };
 
-// Updated MetricCard Component
+// Updated MetricCard Component with mobile optimization
 const MetricCard = ({ title, value, subtext, trend, onClick, isClickable = false, canAccessDetailed = true }) => {
   return (
     <div 
-      className={`bg-white p-4 rounded-xl shadow border text-center relative ${
+      className={`bg-white p-3 lg:p-4 rounded-xl shadow border text-center relative w-full min-w-0 ${
         isClickable ? 'cursor-pointer hover:shadow-lg transition-shadow' : ''
       } ${!canAccessDetailed ? 'opacity-90' : ''}`}
       onClick={onClick}
     >
-      <h3 className="text-sm text-gray-500 mb-1">{title}</h3>
-      <p className="text-2xl font-bold text-gray-800">{value}</p>
-      {subtext && <p className="text-xs text-gray-400 mt-1">{subtext}</p>}
+      <h3 className="text-xs lg:text-sm text-gray-500 mb-1 truncate">{title}</h3>
+      <p className="text-lg lg:text-2xl font-bold text-gray-800 truncate">{value}</p>
+      {subtext && <p className="text-xs text-gray-400 mt-1 truncate">{subtext}</p>}
       {trend && (
         <p
           className={`text-xs mt-1 font-medium ${
@@ -1100,6 +1098,45 @@ const MetricCard = ({ title, value, subtext, trend, onClick, isClickable = false
       {!canAccessDetailed && (
         <div className="absolute top-2 right-2">
           <Lock className="w-4 h-4 text-gray-400" />
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Mobile Metric Card Component
+const MobileMetricCard = ({ title, value, subtext, trend, onClick, isClickable = false, canAccessDetailed = true, icon: Icon }) => {
+  return (
+    <div 
+      className={`bg-white p-3 rounded-xl shadow border relative w-full min-w-0 ${
+        isClickable ? 'cursor-pointer hover:shadow-lg transition-shadow' : ''
+      } ${!canAccessDetailed ? 'opacity-90' : ''}`}
+      onClick={onClick}
+    >
+      <div className="flex items-center justify-between mb-2">
+        {Icon && <Icon className="w-4 h-4 text-blue-600 flex-shrink-0" />}
+        {trend && (
+          <div className={`flex items-center text-xs ${
+            trend.startsWith('+') ? 'text-green-600' : 'text-red-500'
+          }`}>
+            <span className="mr-1">
+              {trend.startsWith('+') ? '▲' : '▼'}
+            </span>
+            <span className="truncate">{trend.replace(/^[+-]/, '')}</span>
+          </div>
+        )}
+      </div>
+      
+      <div className="space-y-1">
+        <h3 className="text-xs text-gray-500 font-medium truncate">{title}</h3>
+        <p className="text-lg font-bold text-gray-800 truncate">{value}</p>
+        {subtext && <p className="text-xs text-gray-400 truncate">{subtext}</p>}
+      </div>
+      
+      {/* Show lock icon for restricted users */}
+      {!canAccessDetailed && (
+        <div className="absolute top-2 right-2">
+          <Lock className="w-3 h-3 text-gray-400" />
         </div>
       )}
     </div>
@@ -1390,13 +1427,13 @@ export default function OverviewMetrics() {
     canAccessDetailedAnalytics
   });
   
-// Single state for managing all modals
-const [activeModal, setActiveModal] = useState(null);
-const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
-const [upgradePromptMetric, setUpgradePromptMetric] = useState('');
-const [selectedPeriod, setSelectedPeriod] = useState('7days');
-const [modalData, setModalData] = useState(null);
-const [loadingModal, setLoadingModal] = useState(false);
+  // Single state for managing all modals
+  const [activeModal, setActiveModal] = useState(null);
+  const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
+  const [upgradePromptMetric, setUpgradePromptMetric] = useState('');
+  const [selectedPeriod, setSelectedPeriod] = useState('7days');
+  const [modalData, setModalData] = useState(null);
+  const [loadingModal, setLoadingModal] = useState(false);
 
   const [metrics, setMetrics] = useState({
     totalLeads: 0,
@@ -1412,154 +1449,154 @@ const [loadingModal, setLoadingModal] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-// Handle metric card click with plan gating
-const handleMetricClick = (metricType, metricName) => {
-  if (!canAccessDetailedAnalytics) {
-    // Show upgrade prompt for basic users
-    setUpgradePromptMetric(metricName);
-    setShowUpgradePrompt(true);
-    return;
-  }
-  
-  // Open detailed modal for advanced users
-  openModal(metricType);
-};
-
-  // Handle modal opening
-const openModal = async (metricType) => {
-  setActiveModal(metricType);
-  setLoadingModal(true);
-  setModalData(null);
-  
-  try {
-    let endpoint = '';
-    let params = '';
-    
-    // Map metric types to their respective endpoints
-    switch (metricType) {
-      case 'totalLeads':
-        endpoint = '/details/total-leads';
-        params = `?period=${selectedPeriod === '7days' ? '7' : selectedPeriod === '30days' ? '30' : '90'}`;
-        break;
-        
-      case 'weeklyLeads':
-        endpoint = '/details/weekly-leads';
-        params = `?weeks=${selectedPeriod === '4weeks' ? '4' : selectedPeriod === '8weeks' ? '8' : '12'}`;
-        break;
-        
-      case 'hotLeadRate':
-        endpoint = '/details/hot-lead-rate';
-        params = `?period=${selectedPeriod === '7days' ? '7' : selectedPeriod === '30days' ? '30' : '90'}`;
-        break;
-        
-      case 'activeLeads':
-        endpoint = '/details/active-leads';
-        break;
-        
-      case 'completedLeads':
-        endpoint = '/details/completed-leads';
-        params = `?period=${selectedPeriod === '7days' ? '7' : selectedPeriod === '30days' ? '30' : '90'}`;
-        break;
-        
-      case 'messagesSent':
-        endpoint = '/details/messages';
-        params = `?type=sent&period=${selectedPeriod === '7days' ? '7' : selectedPeriod === '30days' ? '30' : '90'}`;
-        break;
-        
-      case 'messagesReceived':
-        endpoint = '/details/messages';
-        params = `?type=received&period=${selectedPeriod === '7days' ? '7' : selectedPeriod === '30days' ? '30' : '90'}`;
-        break;
-        
-      case 'replyRate':
-        // For reply rate, we'll use mock data for now as it doesn't have a dedicated endpoint
-        setTimeout(() => {
-          setModalData(generateMockData(metricType));
-          setLoadingModal(false);
-        }, 500);
-        return;
-        
-      default:
-        console.error('Unknown metric type:', metricType);
-        setLoadingModal(false);
-        return;
+  // Handle metric card click with plan gating
+  const handleMetricClick = (metricType, metricName) => {
+    if (!canAccessDetailedAnalytics) {
+      // Show upgrade prompt for basic users
+      setUpgradePromptMetric(metricName);
+      setShowUpgradePrompt(true);
+      return;
     }
     
-    // Call the edge function with the appropriate endpoint
-    const data = await callEdgeFunction(`${EDGE_FUNCTION_URL}${endpoint}${params}`);
-    console.log(`Data returned for ${metricType}:`, data);  // <-- ADD THIS LINE
-    // Transform the data to match the expected format if needed
-    setModalData(data);
-    
-  } catch (error) {
-    console.error('Error fetching modal data:', error);
-    // Fall back to mock data on error
-    setModalData(generateMockData(metricType));
-  } finally {
-    setLoadingModal(false);
-  }
-};
+    // Open detailed modal for advanced users
+    openModal(metricType);
+  };
 
-// Handle period change in modal
-const handlePeriodChange = async (newPeriod) => {
-  setSelectedPeriod(newPeriod);
-  
-  // If modal is open, refetch data with new period
-  if (activeModal && activeModal !== 'replyRate') {
+  // Handle modal opening
+  const openModal = async (metricType) => {
+    setActiveModal(metricType);
     setLoadingModal(true);
+    setModalData(null);
     
     try {
       let endpoint = '';
       let params = '';
       
       // Map metric types to their respective endpoints
-      switch (activeModal) {
+      switch (metricType) {
         case 'totalLeads':
           endpoint = '/details/total-leads';
-          params = `?period=${newPeriod === '7days' ? '7' : newPeriod === '30days' ? '30' : '90'}`;
+          params = `?period=${selectedPeriod === '7days' ? '7' : selectedPeriod === '30days' ? '30' : '90'}`;
           break;
           
         case 'weeklyLeads':
           endpoint = '/details/weekly-leads';
-          params = `?weeks=${newPeriod === '4weeks' ? '4' : newPeriod === '8weeks' ? '8' : '12'}`;
+          params = `?weeks=${selectedPeriod === '4weeks' ? '4' : selectedPeriod === '8weeks' ? '8' : '12'}`;
           break;
           
         case 'hotLeadRate':
           endpoint = '/details/hot-lead-rate';
-          params = `?period=${newPeriod === '7days' ? '7' : newPeriod === '30days' ? '30' : '90'}`;
+          params = `?period=${selectedPeriod === '7days' ? '7' : selectedPeriod === '30days' ? '30' : '90'}`;
+          break;
+          
+        case 'activeLeads':
+          endpoint = '/details/active-leads';
           break;
           
         case 'completedLeads':
           endpoint = '/details/completed-leads';
-          params = `?period=${newPeriod === '7days' ? '7' : newPeriod === '30days' ? '30' : '90'}`;
+          params = `?period=${selectedPeriod === '7days' ? '7' : selectedPeriod === '30days' ? '30' : '90'}`;
           break;
           
         case 'messagesSent':
           endpoint = '/details/messages';
-          params = `?type=sent&period=${newPeriod === '7days' ? '7' : newPeriod === '30days' ? '30' : '90'}`;
+          params = `?type=sent&period=${selectedPeriod === '7days' ? '7' : selectedPeriod === '30days' ? '30' : '90'}`;
           break;
           
         case 'messagesReceived':
           endpoint = '/details/messages';
-          params = `?type=received&period=${newPeriod === '7days' ? '7' : newPeriod === '30days' ? '30' : '90'}`;
+          params = `?type=received&period=${selectedPeriod === '7days' ? '7' : selectedPeriod === '30days' ? '30' : '90'}`;
           break;
           
+        case 'replyRate':
+          // For reply rate, we'll use mock data for now as it doesn't have a dedicated endpoint
+          setTimeout(() => {
+            setModalData(generateMockData(metricType));
+            setLoadingModal(false);
+          }, 500);
+          return;
+          
         default:
+          console.error('Unknown metric type:', metricType);
           setLoadingModal(false);
           return;
       }
       
+      // Call the edge function with the appropriate endpoint
       const data = await callEdgeFunction(`${EDGE_FUNCTION_URL}${endpoint}${params}`);
+      console.log(`Data returned for ${metricType}:`, data);
+      // Transform the data to match the expected format if needed
       setModalData(data);
       
     } catch (error) {
       console.error('Error fetching modal data:', error);
-      setModalData(generateMockData(activeModal));
+      // Fall back to mock data on error
+      setModalData(generateMockData(metricType));
     } finally {
       setLoadingModal(false);
     }
-  }
-};
+  };
+
+  // Handle period change in modal
+  const handlePeriodChange = async (newPeriod) => {
+    setSelectedPeriod(newPeriod);
+    
+    // If modal is open, refetch data with new period
+    if (activeModal && activeModal !== 'replyRate') {
+      setLoadingModal(true);
+      
+      try {
+        let endpoint = '';
+        let params = '';
+        
+        // Map metric types to their respective endpoints
+        switch (activeModal) {
+          case 'totalLeads':
+            endpoint = '/details/total-leads';
+            params = `?period=${newPeriod === '7days' ? '7' : newPeriod === '30days' ? '30' : '90'}`;
+            break;
+            
+          case 'weeklyLeads':
+            endpoint = '/details/weekly-leads';
+            params = `?weeks=${newPeriod === '4weeks' ? '4' : newPeriod === '8weeks' ? '8' : '12'}`;
+            break;
+            
+          case 'hotLeadRate':
+            endpoint = '/details/hot-lead-rate';
+            params = `?period=${newPeriod === '7days' ? '7' : newPeriod === '30days' ? '30' : '90'}`;
+            break;
+            
+          case 'completedLeads':
+            endpoint = '/details/completed-leads';
+            params = `?period=${newPeriod === '7days' ? '7' : newPeriod === '30days' ? '30' : '90'}`;
+            break;
+            
+          case 'messagesSent':
+            endpoint = '/details/messages';
+            params = `?type=sent&period=${newPeriod === '7days' ? '7' : newPeriod === '30days' ? '30' : '90'}`;
+            break;
+            
+          case 'messagesReceived':
+            endpoint = '/details/messages';
+            params = `?type=received&period=${newPeriod === '7days' ? '7' : newPeriod === '30days' ? '30' : '90'}`;
+            break;
+            
+          default:
+            setLoadingModal(false);
+            return;
+        }
+        
+        const data = await callEdgeFunction(`${EDGE_FUNCTION_URL}${endpoint}${params}`);
+        setModalData(data);
+        
+      } catch (error) {
+        console.error('Error fetching modal data:', error);
+        setModalData(generateMockData(activeModal));
+      } finally {
+        setLoadingModal(false);
+      }
+    }
+  };
 
   useEffect(() => {
     if (!user || !user.tenant_id) { 
@@ -1626,17 +1663,33 @@ const handlePeriodChange = async (newPeriod) => {
 
   if (loading) {
     return (
-      <div className="space-y-6">
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="w-full min-w-0 space-y-4">
+        {/* Mobile Loading */}
+        <div className="lg:hidden grid grid-cols-2 gap-2">
           {[1, 2, 3, 4, 5, 6, 7, 8].map(i => (
-            <div key={i} className="bg-white p-4 rounded-xl shadow border">
+            <div key={i} className="bg-white p-3 rounded-xl shadow border min-w-0">
               <div className="animate-pulse">
-                <div className="h-4 bg-gray-200 rounded w-1/2 mb-2"></div>
-                <div className="h-8 bg-gray-200 rounded w-3/4 mb-2"></div>
-                <div className="h-3 bg-gray-200 rounded w-2/3"></div>
+                <div className="h-3 bg-gray-200 rounded w-1/2 mb-2"></div>
+                <div className="h-6 bg-gray-200 rounded w-3/4 mb-1"></div>
+                <div className="h-2 bg-gray-200 rounded w-2/3"></div>
               </div>
             </div>
           ))}
+        </div>
+        
+        {/* Desktop Loading */}
+        <div className="hidden lg:block space-y-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+            {[1, 2, 3, 4, 5, 6, 7, 8].map(i => (
+              <div key={i} className="bg-white p-4 rounded-xl shadow border">
+                <div className="animate-pulse">
+                  <div className="h-4 bg-gray-200 rounded w-1/2 mb-2"></div>
+                  <div className="h-8 bg-gray-200 rounded w-3/4 mb-2"></div>
+                  <div className="h-3 bg-gray-200 rounded w-2/3"></div>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     );
@@ -1644,9 +1697,9 @@ const handlePeriodChange = async (newPeriod) => {
 
   if (error) {
     return (
-      <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-center">
+      <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-center w-full min-w-0">
         <p className="text-red-600 font-medium">Failed to load metrics</p>
-        <p className="text-red-500 text-sm mt-1">{error}</p>
+        <p className="text-red-500 text-sm mt-1 break-words">{error}</p>
         <button 
           onClick={() => window.location.reload()} 
           className="mt-2 text-sm text-red-600 underline hover:text-red-700"
@@ -1659,81 +1712,162 @@ const handlePeriodChange = async (newPeriod) => {
 
   const t = metrics.trends;
 
-  return (
-    <>
-      <div className="space-y-6">
-        {/* Row 1 */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-          <MetricCard 
-            title="Total Leads" 
-            value={metrics.totalLeads} 
-            onClick={() => handleMetricClick('totalLeads', 'Total Leads')}
-            isClickable={true}
-            canAccessDetailed={canAccessDetailedAnalytics}
-          />
-          <MetricCard 
-            title="Leads This Week" 
-            value={metrics.weeklyLeads} 
-            trend={t.weeklyLeads}
-            onClick={() => handleMetricClick('weeklyLeads', 'Weekly Leads')}
-            isClickable={true}
-            canAccessDetailed={canAccessDetailedAnalytics}
-          />
-          <MetricCard 
-            title="Hot Lead Conversion Rate" 
-            value={metrics.hotLeadRate} 
-            trend={t.hotLeadRate}
-            onClick={() => handleMetricClick('hotLeadRate', 'Hot Lead Rate')}
-            isClickable={true}
-            canAccessDetailed={canAccessDetailedAnalytics}
-          />
-          <MetricCard 
-            title="Reply Rate" 
-            value={metrics.replyRate} 
-            trend={t.replyRate}
-            onClick={() => handleMetricClick('replyRate', 'Reply Rate')}
-            isClickable={true}
-            canAccessDetailed={canAccessDetailedAnalytics}
-          />
-        </div>
+  // Define metric data with icons for mobile
+  const metricData = [
+    {
+      key: 'totalLeads',
+      title: 'Total Leads',
+      value: metrics.totalLeads,
+      icon: BarChart3,
+      trend: null
+    },
+    {
+      key: 'weeklyLeads',
+      title: 'Leads This Week',
+      value: metrics.weeklyLeads,
+      icon: TrendingUp,
+      trend: t.weeklyLeads
+    },
+    {
+      key: 'hotLeadRate',
+      title: 'Hot Lead Rate',
+      value: metrics.hotLeadRate,
+      icon: Target,
+      trend: t.hotLeadRate
+    },
+    {
+      key: 'replyRate',
+      title: 'Reply Rate',
+      value: metrics.replyRate,
+      icon: MessageSquare,
+      trend: t.replyRate
+    },
+    {
+      key: 'activeLeads',
+      title: 'Active Leads',
+      value: metrics.activeLeads,
+      icon: Activity,
+      trend: null
+    },
+    {
+      key: 'completedLeads',
+      title: 'Completed Leads',
+      value: metrics.completedLeads,
+      icon: CheckCircle,
+      trend: t.completedLeads
+    },
+    {
+      key: 'messagesSent',
+      title: 'Messages Sent',
+      value: metrics.messagesSent,
+      icon: Send,
+      trend: t.messagesSent
+    },
+    {
+      key: 'messagesReceived',
+      title: 'Messages Received',
+      value: metrics.messagesReceived,
+      icon: Inbox,
+      trend: t.messagesReceived
+    }
+  ];
 
-        {/* Row 2 */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-          <MetricCard 
-            title="Active Leads" 
-            value={metrics.activeLeads}
-            onClick={() => handleMetricClick('activeLeads', 'Active Leads')}
-            isClickable={true}
-            canAccessDetailed={canAccessDetailedAnalytics}
-          />
-          <MetricCard 
-            title="Completed Leads" 
-            value={metrics.completedLeads} 
-            trend={t.completedLeads}
-            onClick={() => handleMetricClick('completedLeads', 'Completed Leads')}
-            isClickable={true}
-            canAccessDetailed={canAccessDetailedAnalytics}
-          />
-          <MetricCard 
-            title="Messages Sent" 
-            value={metrics.messagesSent} 
-            trend={t.messagesSent}
-            onClick={() => handleMetricClick('messagesSent', 'Messages Sent')}
-            isClickable={true}
-            canAccessDetailed={canAccessDetailedAnalytics}
-          />
-          <MetricCard 
-            title="Messages Received" 
-            value={metrics.messagesReceived} 
-            trend={t.messagesReceived}
-            onClick={() => handleMetricClick('messagesReceived', 'Messages Received')}
-            isClickable={true}
-            canAccessDetailed={canAccessDetailedAnalytics}
-          />
+  return (
+    <div className="w-full min-w-0">
+      {/* Mobile Layout */}
+      <div className="lg:hidden w-full min-w-0">
+        <div className="grid grid-cols-2 gap-2 w-full">
+          {metricData.map((metric) => (
+            <MobileMetricCard
+              key={metric.key}
+              title={metric.title}
+              value={metric.value}
+              trend={metric.trend}
+              icon={metric.icon}
+              onClick={() => handleMetricClick(metric.key, metric.title)}
+              isClickable={true}
+              canAccessDetailed={canAccessDetailedAnalytics}
+            />
+          ))}
         </div>
       </div>
 
-{/* Upgrade Prompt Modal for Basic Users */}
+      {/* Desktop Layout */}
+      <div className="hidden lg:block w-full">
+        <div className="space-y-6">
+          {/* Row 1 */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+            <MetricCard 
+              title="Total Leads" 
+              value={metrics.totalLeads} 
+              onClick={() => handleMetricClick('totalLeads', 'Total Leads')}
+              isClickable={true}
+              canAccessDetailed={canAccessDetailedAnalytics}
+            />
+            <MetricCard 
+              title="Leads This Week" 
+              value={metrics.weeklyLeads} 
+              trend={t.weeklyLeads}
+              onClick={() => handleMetricClick('weeklyLeads', 'Weekly Leads')}
+              isClickable={true}
+              canAccessDetailed={canAccessDetailedAnalytics}
+            />
+            <MetricCard 
+              title="Hot Lead Conversion Rate" 
+              value={metrics.hotLeadRate} 
+              trend={t.hotLeadRate}
+              onClick={() => handleMetricClick('hotLeadRate', 'Hot Lead Rate')}
+              isClickable={true}
+              canAccessDetailed={canAccessDetailedAnalytics}
+            />
+            <MetricCard 
+              title="Reply Rate" 
+              value={metrics.replyRate} 
+              trend={t.replyRate}
+              onClick={() => handleMetricClick('replyRate', 'Reply Rate')}
+              isClickable={true}
+              canAccessDetailed={canAccessDetailedAnalytics}
+            />
+          </div>
+
+          {/* Row 2 */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+            <MetricCard 
+              title="Active Leads" 
+              value={metrics.activeLeads}
+              onClick={() => handleMetricClick('activeLeads', 'Active Leads')}
+              isClickable={true}
+              canAccessDetailed={canAccessDetailedAnalytics}
+            />
+            <MetricCard 
+              title="Completed Leads" 
+              value={metrics.completedLeads} 
+              trend={t.completedLeads}
+              onClick={() => handleMetricClick('completedLeads', 'Completed Leads')}
+              isClickable={true}
+              canAccessDetailed={canAccessDetailedAnalytics}
+            />
+            <MetricCard 
+              title="Messages Sent" 
+              value={metrics.messagesSent} 
+              trend={t.messagesSent}
+              onClick={() => handleMetricClick('messagesSent', 'Messages Sent')}
+              isClickable={true}
+              canAccessDetailed={canAccessDetailedAnalytics}
+            />
+            <MetricCard 
+              title="Messages Received" 
+              value={metrics.messagesReceived} 
+              trend={t.messagesReceived}
+              onClick={() => handleMetricClick('messagesReceived', 'Messages Received')}
+              isClickable={true}
+              canAccessDetailed={canAccessDetailedAnalytics}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Upgrade Prompt Modal for Basic Users */}
       {showUpgradePrompt && (
         <UpgradePrompt 
           metricName={upgradePromptMetric}
@@ -1764,6 +1898,6 @@ const handlePeriodChange = async (newPeriod) => {
           />
         ) : null}
       </ModalWrapper>
-    </>
+    </div>
   );
 }
