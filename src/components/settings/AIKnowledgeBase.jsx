@@ -64,9 +64,12 @@ const AIKnowledgeBase = () => {
       
       // Filter out websites - only show actual documents
       const documentsOnly = docsData.filter(doc => 
-        !doc.website_url && doc.source_type !== 'website' && !doc.title?.includes('http')
-      );
-      
+      doc.source_type !== 'website' && 
+      !doc.website_url && 
+      doc.file_url && 
+      !doc.title?.startsWith('http')
+    );
+
       setDocuments(documentsOnly);
 
     } catch (err) {
