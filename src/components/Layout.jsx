@@ -28,7 +28,7 @@ export default function Layout({ children }) {
     industry: 'real estate',
     loading: true
   });
-console.log()
+
   // Notification state
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -591,16 +591,16 @@ console.log()
       )}
 
       {/* Sidebar */}
-<aside className={`
-  tour-sidebar
-  ${collapsed ? 'w-16' : 'w-64'} 
-  ${mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
-  fixed lg:static inset-y-0 left-0 z-50
-  bg-white border-r border-gray-200/80 
-  transition-all duration-300 ease-out
-  shadow-xl lg:shadow-none
-  max-w-full
-`}>
+      <aside className={`
+        tour-sidebar
+        ${collapsed ? 'w-16' : 'w-64'} 
+        ${mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+        fixed lg:static inset-y-0 left-0 z-50
+        bg-white border-r border-gray-200/80 
+        transition-all duration-300 ease-out
+        shadow-xl lg:shadow-none
+        max-w-full
+      `}>
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-4 h-16 border-b border-gray-100">
           {!collapsed && (
@@ -673,15 +673,14 @@ console.log()
         </nav>
 
         {/* Bottom spacing */}
-  
       </aside>
 
       {/* Main content */}
       <div className="flex flex-col flex-1 min-h-screen lg:ml-0 w-full max-w-full overflow-x-hidden">
         {/* Top header */}
         <header className="bg-white border-b border-gray-200 px-4 lg:px-6 py-3 h-16">
-<div className="flex justify-between items-center h-full w-full min-w-0">
-  <div className="flex items-center space-x-4 min-w-0 flex-1">
+          <div className="flex justify-between items-center h-full w-full min-w-0">
+            <div className="flex items-center space-x-4 min-w-0 flex-1">
               <button
                 onClick={() => setMobileOpen(true)}
                 className="lg:hidden p-2 rounded-lg hover:bg-gray-100 transition-colors text-gray-600"
@@ -689,16 +688,16 @@ console.log()
                 <Menu size={20} />
               </button>
               
-{/* Breadcrumb style navigation */}
-<div className="flex items-center space-x-2 min-w-0 flex-1">
-  <Link to="/dashboard" className="hidden sm:block text-sm text-gray-500 hover:text-gray-700 truncate">
-    {companyInfo.name}
-  </Link>
-  <ChevronRight className="hidden sm:block w-4 h-4 text-gray-400 flex-shrink-0" />
-  <h1 className="text-sm font-semibold text-gray-900 truncate">
-    {messages.title}
-  </h1>
-</div>
+              {/* Breadcrumb style navigation */}
+              <div className="flex items-center space-x-2 min-w-0 flex-1">
+                <Link to="/dashboard" className="hidden sm:block text-sm text-gray-500 hover:text-gray-700 truncate">
+                  {companyInfo.name}
+                </Link>
+                <ChevronRight className="hidden sm:block w-4 h-4 text-gray-400 flex-shrink-0" />
+                <h1 className="text-sm font-semibold text-gray-900 truncate">
+                  {messages.title}
+                </h1>
+              </div>
             </div>
             
             <div className="flex items-center space-x-2 lg:space-x-3 flex-shrink-0 ml-2">
@@ -710,17 +709,18 @@ console.log()
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   onFocus={() => {
-  if (searchQuery.length >= 2) {
-    setShowSearchResults(true);
-  }
-}}
+                    if (searchQuery.length >= 2) {
+                      setShowSearchResults(true);
+                    }
+                  }}
                   placeholder="Search leads, campaigns..."
                   className="pl-10 pr-4 py-2 w-64 lg:w-80 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200 placeholder-gray-400"
                 />
                 
                 {/* Search Results Dropdown */}
-{showSearchResults && (searchResults || isSearching) && (
-  <div className="fixed top-16 left-1/2 transform -translate-x-1/2 w-80 lg:w-96 bg-white rounded-lg border border-gray-200 shadow-lg z-50 max-h-96 overflow-y-auto">                    {isSearching ? (
+                {showSearchResults && (searchResults || isSearching) && (
+                  <div className="fixed top-16 left-1/2 transform -translate-x-1/2 w-80 lg:w-96 bg-white rounded-lg border border-gray-200 shadow-lg z-50 max-h-96 overflow-y-auto">
+                    {isSearching ? (
                       <div className="p-4 text-center text-sm text-gray-500">
                         <div className="inline-flex items-center">
                           <svg className="animate-spin -ml-1 mr-3 h-4 w-4 text-indigo-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -829,13 +829,13 @@ console.log()
                 )}
               </div>
               
-{/* Mobile Search Button */}
-<button 
-  onClick={() => setShowMobileSearch(true)}
-  className="md:hidden p-2 rounded-lg hover:bg-gray-100 transition-colors text-gray-600"
->
-  <Search size={18} />
-</button>
+              {/* Mobile Search Button */}
+              <button 
+                onClick={() => setShowMobileSearch(true)}
+                className="md:hidden p-2 rounded-lg hover:bg-gray-100 transition-colors text-gray-600"
+              >
+                <Search size={18} />
+              </button>
               
               {/* Notifications - UPDATED */}
               <div className="relative notifications-container">
@@ -851,9 +851,10 @@ console.log()
                   )}
                 </button>
                 
-{/* Notifications Dropdown */}
-{showNotifications && (
-  <div className="fixed top-16 right-4 w-80 sm:w-96 max-h-[600px] bg-white rounded-lg border border-gray-200 shadow-xl z-50 flex flex-col">                    {/* Header */}
+                {/* Notifications Dropdown */}
+                {showNotifications && (
+                  <div className="fixed top-16 right-4 w-80 sm:w-96 max-h-[600px] bg-white rounded-lg border border-gray-200 shadow-xl z-50 flex flex-col">
+                    {/* Header */}
                     <div className="p-4 border-b border-gray-100 flex items-center justify-between">
                       <h3 className="font-semibold text-gray-900">Notifications</h3>
                       {unreadCount > 0 && (
@@ -1036,158 +1037,157 @@ console.log()
             </div>
           </div>
         </header>
-</header>
 
-{/* Mobile Search Overlay */}
-{showMobileSearch && (
-  <div className="fixed inset-0 z-50 md:hidden">
-    <div className="bg-white h-full flex flex-col">
-      {/* Search Header */}
-      <div className="flex items-center p-4 border-b border-gray-200">
-        <button
-          onClick={() => setShowMobileSearch(false)}
-          className="p-2 -ml-2 rounded-lg hover:bg-gray-100 transition-colors text-gray-600 mr-3"
-        >
-          <X size={20} />
-        </button>
-        <div className="flex-1 relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search leads, campaigns..."
-            className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-            autoFocus
-          />
-        </div>
-      </div>
-     </div>
-      {/* Mobile Search Results */}
-<div className="flex-1 overflow-y-auto">
-  {isSearching ? (
-    <div className="p-8 text-center text-sm text-gray-500">
-      <div className="inline-flex items-center">
-        <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-indigo-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-        </svg>
-        Searching...
-      </div>
-    </div>
-  ) : searchResults && (searchResults.leads.length > 0 || searchResults.campaigns.length > 0) ? (
-    <div>
-      {/* Mobile Leads Section */}
-      {searchResults.leads.length > 0 && (
-        <div>
-          <div className="px-4 py-3 text-xs font-semibold text-gray-500 bg-gray-50 border-b border-gray-100">
-            LEADS
-          </div>
-          {searchResults.leads.map((lead) => (
-            <button
-              key={`mobile-lead-${lead.id}`}
-              onClick={() => {
-                handleSearchResultClick('lead', lead);
-                setShowMobileSearch(false);
-              }}
-              className="w-full px-4 py-4 text-left hover:bg-gray-50 transition-colors border-b border-gray-100"
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex-1 min-w-0">
-                  <div className="text-base font-medium text-gray-900 truncate">
-                    {lead.name || 'Unnamed Lead'}
-                  </div>
-                  <div className="text-sm text-gray-500 mt-1 truncate">
-                    {lead.email || lead.phone || 'No contact info'}
-                  </div>
-                  {lead.ai_score && (
-                    <div className="text-xs text-gray-600 mt-1">
-                      Score: {lead.ai_score}
+        {/* Mobile Search Overlay */}
+        {showMobileSearch && (
+          <div className="fixed inset-0 z-50 md:hidden">
+            <div className="bg-white h-full flex flex-col">
+              {/* Search Header */}
+              <div className="flex items-center p-4 border-b border-gray-200">
+                <button
+                  onClick={() => setShowMobileSearch(false)}
+                  className="p-2 -ml-2 rounded-lg hover:bg-gray-100 transition-colors text-gray-600 mr-3"
+                >
+                  <X size={20} />
+                </button>
+                <div className="flex-1 relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search leads, campaigns..."
+                    className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    autoFocus
+                  />
+                </div>
+              </div>
+            
+              {/* Mobile Search Results */}
+              <div className="flex-1 overflow-y-auto">
+                {isSearching ? (
+                  <div className="p-8 text-center text-sm text-gray-500">
+                    <div className="inline-flex items-center">
+                      <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-indigo-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Searching...
                     </div>
-                  )}
-                </div>
-                <div className="ml-3 flex-shrink-0">
-                  <span className={`text-xs px-2 py-1 rounded-full ${
-                    lead.status === 'active' ? 'bg-green-100 text-green-700' :
-                    lead.status === 'qualified' ? 'bg-blue-100 text-blue-700' :
-                    lead.status === 'disqualified' ? 'bg-red-100 text-red-700' :
-                    lead.status === 'contacted' ? 'bg-yellow-100 text-yellow-700' :
-                    'bg-gray-100 text-gray-700'
-                  }`}>
-                    {lead.status || 'Unknown'}
-                  </span>
-                </div>
+                  </div>
+                ) : searchResults && (searchResults.leads.length > 0 || searchResults.campaigns.length > 0) ? (
+                  <div>
+                    {/* Mobile Leads Section */}
+                    {searchResults.leads.length > 0 && (
+                      <div>
+                        <div className="px-4 py-3 text-xs font-semibold text-gray-500 bg-gray-50 border-b border-gray-100">
+                          LEADS
+                        </div>
+                        {searchResults.leads.map((lead) => (
+                          <button
+                            key={`mobile-lead-${lead.id}`}
+                            onClick={() => {
+                              handleSearchResultClick('lead', lead);
+                              setShowMobileSearch(false);
+                            }}
+                            className="w-full px-4 py-4 text-left hover:bg-gray-50 transition-colors border-b border-gray-100"
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex-1 min-w-0">
+                                <div className="text-base font-medium text-gray-900 truncate">
+                                  {lead.name || 'Unnamed Lead'}
+                                </div>
+                                <div className="text-sm text-gray-500 mt-1 truncate">
+                                  {lead.email || lead.phone || 'No contact info'}
+                                </div>
+                                {lead.ai_score && (
+                                  <div className="text-xs text-gray-600 mt-1">
+                                    Score: {lead.ai_score}
+                                  </div>
+                                )}
+                              </div>
+                              <div className="ml-3 flex-shrink-0">
+                                <span className={`text-xs px-2 py-1 rounded-full ${
+                                  lead.status === 'active' ? 'bg-green-100 text-green-700' :
+                                  lead.status === 'qualified' ? 'bg-blue-100 text-blue-700' :
+                                  lead.status === 'disqualified' ? 'bg-red-100 text-red-700' :
+                                  lead.status === 'contacted' ? 'bg-yellow-100 text-yellow-700' :
+                                  'bg-gray-100 text-gray-700'
+                                }`}>
+                                  {lead.status || 'Unknown'}
+                                </span>
+                              </div>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    
+                    {/* Mobile Campaigns Section */}
+                    {searchResults.campaigns.length > 0 && (
+                      <div>
+                        <div className="px-4 py-3 text-xs font-semibold text-gray-500 bg-gray-50 border-b border-gray-100">
+                          CAMPAIGNS
+                        </div>
+                        {searchResults.campaigns.map((campaign) => (
+                          <button
+                            key={`mobile-campaign-${campaign.id}`}
+                            onClick={() => {
+                              handleSearchResultClick('campaign', campaign);
+                              setShowMobileSearch(false);
+                            }}
+                            className="w-full px-4 py-4 text-left hover:bg-gray-50 transition-colors border-b border-gray-100"
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex-1 min-w-0">
+                                <div className="text-base font-medium text-gray-900 truncate">
+                                  {campaign.name}
+                                </div>
+                                <div className="text-sm text-gray-500 mt-1 line-clamp-2">
+                                  {campaign.description || `Started: ${campaign.start_date ? new Date(campaign.start_date).toLocaleDateString() : 'No start date'}`}
+                                </div>
+                              </div>
+                              <div className="ml-3 flex-shrink-0 flex flex-col items-end space-y-1">
+                                {campaign.ai_on && (
+                                  <span className="text-xs px-2 py-1 rounded-full bg-purple-100 text-purple-700">
+                                    AI
+                                  </span>
+                                )}
+                                <span className={`text-xs px-2 py-1 rounded-full ${
+                                  campaign.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'
+                                }`}>
+                                  {campaign.is_active ? 'Active' : 'Inactive'}
+                                </span>
+                              </div>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ) : searchQuery.length >= 2 ? (
+                  <div className="p-8 text-center">
+                    <div className="text-gray-400 mb-3">
+                      <Search size={48} className="mx-auto" />
+                    </div>
+                    <p className="text-base text-gray-500 mb-1">No results found for "{searchQuery}"</p>
+                    <p className="text-sm text-gray-400">Try searching with different keywords</p>
+                  </div>
+                ) : (
+                  <div className="p-8 text-center">
+                    <div className="text-gray-400 mb-3">
+                      <Search size={48} className="mx-auto" />
+                    </div>
+                    <p className="text-base text-gray-500 mb-1">Search your leads and campaigns</p>
+                    <p className="text-sm text-gray-400">Type at least 2 characters to start searching</p>
+                  </div>
+                )}
               </div>
-            </button>
-          ))}
-        </div>
-      )}
-      
-      {/* Mobile Campaigns Section */}
-      {searchResults.campaigns.length > 0 && (
-        <div>
-          <div className="px-4 py-3 text-xs font-semibold text-gray-500 bg-gray-50 border-b border-gray-100">
-            CAMPAIGNS
+            </div>
           </div>
-          {searchResults.campaigns.map((campaign) => (
-            <button
-              key={`mobile-campaign-${campaign.id}`}
-              onClick={() => {
-                handleSearchResultClick('campaign', campaign);
-                setShowMobileSearch(false);
-              }}
-              className="w-full px-4 py-4 text-left hover:bg-gray-50 transition-colors border-b border-gray-100"
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex-1 min-w-0">
-                  <div className="text-base font-medium text-gray-900 truncate">
-                    {campaign.name}
-                  </div>
-                  <div className="text-sm text-gray-500 mt-1 line-clamp-2">
-                    {campaign.description || `Started: ${campaign.start_date ? new Date(campaign.start_date).toLocaleDateString() : 'No start date'}`}
-                  </div>
-                </div>
-                <div className="ml-3 flex-shrink-0 flex flex-col items-end space-y-1">
-                  {campaign.ai_on && (
-                    <span className="text-xs px-2 py-1 rounded-full bg-purple-100 text-purple-700">
-                      AI
-                    </span>
-                  )}
-                  <span className={`text-xs px-2 py-1 rounded-full ${
-                    campaign.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'
-                  }`}>
-                    {campaign.is_active ? 'Active' : 'Inactive'}
-                  </span>
-                </div>
-              </div>
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  ) : searchQuery.length >= 2 ? (
-    <div className="p-8 text-center">
-      <div className="text-gray-400 mb-3">
-        <Search size={48} className="mx-auto" />
-      </div>
-      <p className="text-base text-gray-500 mb-1">No results found for "{searchQuery}"</p>
-      <p className="text-sm text-gray-400">Try searching with different keywords</p>
-    </div>
-  ) : (
-    <div className="p-8 text-center">
-      <div className="text-gray-400 mb-3">
-        <Search size={48} className="mx-auto" />
-      </div>
-      <p className="text-base text-gray-500 mb-1">Search your leads and campaigns</p>
-      <p className="text-sm text-gray-400">Type at least 2 characters to start searching</p>
-    </div>
-  )}
-</div>
-    </div>
-  </div>
-)}
+        )}
 
-{/* Main content area */}
+        {/* Main content area */}
         <main className="flex-1 p-4 lg:p-6 bg-gray-50 w-full max-w-full overflow-x-hidden">
           {children}
         </main>
