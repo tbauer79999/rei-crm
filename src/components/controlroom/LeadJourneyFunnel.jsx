@@ -69,16 +69,18 @@ const ModalWrapper = ({ isOpen, onClose, title, subtitle, children }) => {
         onClick={onClose}
       />
       
-      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-6xl max-h-[90vh] m-4 overflow-hidden">
-        <div className="border-b border-gray-200 px-6 py-4">
+      {/* Modal - Mobile Optimized */}
+      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-6xl max-h-[90vh] m-2 lg:m-4 overflow-hidden">
+        {/* Header */}
+        <div className="border-b border-gray-200 px-4 lg:px-6 py-4">
           <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-2xl font-bold text-gray-900">{title}</h2>
-              <p className="text-sm text-gray-500 mt-1">{subtitle}</p>
+            <div className="min-w-0 flex-1">
+              <h2 className="text-lg lg:text-2xl font-bold text-gray-900 truncate">{title}</h2>
+              <p className="text-sm text-gray-500 mt-1 truncate">{subtitle}</p>
             </div>
             <button
               onClick={onClose}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              className="p-2 hover:bg-gray-100 rounded-lg transition-colors flex-shrink-0 ml-2"
               aria-label="Close modal"
             >
               <X className="w-5 h-5 text-gray-500" />
@@ -86,6 +88,7 @@ const ModalWrapper = ({ isOpen, onClose, title, subtitle, children }) => {
           </div>
         </div>
 
+        {/* Content */}
         <div className="overflow-y-auto max-h-[calc(90vh-80px)]">
           {children}
         </div>
@@ -106,15 +109,15 @@ const TimePeriodSelector = ({ selectedPeriod, onPeriodChange, customPeriods }) =
   const periods = customPeriods || defaultPeriods;
 
   return (
-    <div className="border-b border-gray-200 px-6 py-3 bg-gray-50">
-      <div className="flex items-center space-x-4">
+    <div className="border-b border-gray-200 px-4 lg:px-6 py-3 bg-gray-50">
+      <div className="flex flex-col lg:flex-row lg:items-center space-y-2 lg:space-y-0 lg:space-x-4">
         <span className="text-sm font-medium text-gray-700">Time Period:</span>
-        <div className="flex space-x-2">
+        <div className="flex flex-wrap gap-2">
           {periods.map(period => (
             <button
               key={period.value}
               onClick={() => onPeriodChange(period.value)}
-              className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+              className={`px-3 lg:px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
                 selectedPeriod === period.value
                   ? 'bg-blue-600 text-white'
                   : 'bg-white text-gray-700 hover:bg-gray-100'
@@ -132,18 +135,18 @@ const TimePeriodSelector = ({ selectedPeriod, onPeriodChange, customPeriods }) =
 // Enhanced Status Chart with Drill-down
 const StatusChart = ({ data, onStatusClick }) => {
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-6">
-      <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-        <BarChart3 className="w-5 h-5 mr-2 text-blue-600" />
-        Lead Status Distribution
+    <div className="bg-white border border-gray-200 rounded-xl p-4 lg:p-6 w-full min-w-0">
+      <h3 className="text-base lg:text-lg font-semibold text-gray-900 mb-4 flex items-center">
+        <BarChart3 className="w-4 lg:w-5 h-4 lg:h-5 mr-2 text-blue-600" />
+        <span className="truncate">Lead Status Distribution</span>
       </h3>
-      <ResponsiveContainer width="100%" height={300}>
+      <ResponsiveContainer width="100%" height={250}>
         <PieChart>
           <Pie 
             data={data} 
             dataKey="value" 
             nameKey="name" 
-            outerRadius={100}
+            outerRadius={80}
             label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
             labelLine={false}
             onClick={(data) => onStatusClick(data.name)}
@@ -163,18 +166,19 @@ const StatusChart = ({ data, onStatusClick }) => {
 // Status Trend Chart
 const StatusTrendChart = ({ data, selectedStatus }) => {
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-6">
-      <h3 className="text-lg font-semibold text-gray-900 mb-4">
+    <div className="bg-white border border-gray-200 rounded-xl p-4 lg:p-6 w-full min-w-0">
+      <h3 className="text-base lg:text-lg font-semibold text-gray-900 mb-4 truncate">
         {selectedStatus ? `${selectedStatus} Status Trend` : 'Select a Status to View Trend'}
       </h3>
       {selectedStatus && data.length > 0 ? (
-        <ResponsiveContainer width="100%" height={250}>
+        <ResponsiveContainer width="100%" height={200}>
           <LineChart data={data}>
             <XAxis 
               dataKey="date" 
               tickFormatter={(date) => new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+              fontSize={10}
             />
-            <YAxis />
+            <YAxis fontSize={10} />
             <Tooltip 
               labelFormatter={(date) => new Date(date).toLocaleDateString()}
               formatter={(value) => [`${value} leads`, 'Count']}
@@ -189,8 +193,8 @@ const StatusTrendChart = ({ data, selectedStatus }) => {
           </LineChart>
         </ResponsiveContainer>
       ) : (
-        <div className="h-64 flex items-center justify-center text-gray-500">
-          <p>Click on a status in the pie chart to view its trend</p>
+        <div className="h-48 flex items-center justify-center text-gray-500">
+          <p className="text-sm text-center break-words">Click on a status in the pie chart to view its trend</p>
         </div>
       )}
     </div>
@@ -200,36 +204,36 @@ const StatusTrendChart = ({ data, selectedStatus }) => {
 // Stuck Leads Table
 const StuckLeadsTable = ({ data }) => {
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-6">
-      <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-        <AlertTriangle className="w-5 h-5 mr-2 text-yellow-600" />
-        Leads Stuck in Status
+    <div className="bg-white border border-gray-200 rounded-xl p-4 lg:p-6 w-full min-w-0">
+      <h3 className="text-base lg:text-lg font-semibold text-gray-900 mb-4 flex items-center">
+        <AlertTriangle className="w-4 lg:w-5 h-4 lg:h-5 mr-2 text-yellow-600" />
+        <span className="truncate">Leads Stuck in Status</span>
       </h3>
       <div className="overflow-x-auto">
         <table className="w-full">
           <thead>
             <tr className="border-b border-gray-200">
-              <th className="text-left py-3 px-4 text-sm font-medium text-gray-700">Lead Name</th>
-              <th className="text-left py-3 px-4 text-sm font-medium text-gray-700">Current Status</th>
-              <th className="text-left py-3 px-4 text-sm font-medium text-gray-700">Days in Status</th>
-              <th className="text-left py-3 px-4 text-sm font-medium text-gray-700">Last Activity</th>
+              <th className="text-left py-3 px-2 lg:px-4 text-sm font-medium text-gray-700">Lead Name</th>
+              <th className="text-left py-3 px-2 lg:px-4 text-sm font-medium text-gray-700">Current Status</th>
+              <th className="text-left py-3 px-2 lg:px-4 text-sm font-medium text-gray-700">Days in Status</th>
+              <th className="text-left py-3 px-2 lg:px-4 text-sm font-medium text-gray-700">Last Activity</th>
             </tr>
           </thead>
           <tbody>
             {data.map((lead) => (
               <tr key={lead.leadId} className="border-b border-gray-100 hover:bg-gray-50">
-                <td className="py-3 px-4 text-sm font-medium text-gray-900">{lead.name}</td>
-                <td className="py-3 px-4">
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                <td className="py-3 px-2 lg:px-4 text-sm font-medium text-gray-900">{lead.name}</td>
+                <td className="py-3 px-2 lg:px-4">
+                  <span className="inline-flex items-center px-2 lg:px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
                     {lead.currentStatus}
                   </span>
                 </td>
-                <td className="py-3 px-4 text-sm text-gray-600">
+                <td className="py-3 px-2 lg:px-4 text-sm text-gray-600">
                   <span className={lead.daysInStatus > 30 ? 'text-red-600 font-medium' : ''}>
                     {lead.daysInStatus} days
                   </span>
                 </td>
-                <td className="py-3 px-4 text-sm text-gray-600">{lead.lastActivity}</td>
+                <td className="py-3 px-2 lg:px-4 text-sm text-gray-600">{lead.lastActivity}</td>
               </tr>
             ))}
           </tbody>
@@ -244,10 +248,10 @@ const VisualFunnel = ({ data }) => {
   const maxValue = Math.max(...data.map(d => d.countEntered));
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-6">
-      <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-        <Target className="w-5 h-5 mr-2 text-green-600" />
-        Lead Conversion Funnel
+    <div className="bg-white border border-gray-200 rounded-xl p-4 lg:p-6 w-full min-w-0">
+      <h3 className="text-base lg:text-lg font-semibold text-gray-900 mb-4 flex items-center">
+        <Target className="w-4 lg:w-5 h-4 lg:h-5 mr-2 text-green-600" />
+        <span className="truncate">Lead Conversion Funnel</span>
       </h3>
       <div className="space-y-4">
         {data.map((stage, index) => {
@@ -258,11 +262,11 @@ const VisualFunnel = ({ data }) => {
           return (
             <div key={stage.fromStage} className="relative">
               <div className="flex items-center mb-2">
-                <span className="text-sm font-medium text-gray-700 w-24">{stage.fromStage}</span>
-                <div className="flex-1 relative">
-                  <div className="bg-gray-200 rounded-full h-8">
+                <span className="text-sm font-medium text-gray-700 w-20 lg:w-24 truncate">{stage.fromStage}</span>
+                <div className="flex-1 relative min-w-0">
+                  <div className="bg-gray-200 rounded-full h-6 lg:h-8">
                     <div
-                      className="bg-gradient-to-r from-green-500 to-green-400 h-8 rounded-full flex items-center justify-end pr-3"
+                      className="bg-gradient-to-r from-green-500 to-green-400 h-6 lg:h-8 rounded-full flex items-center justify-end pr-2 lg:pr-3"
                       style={{ width: `${width}%` }}
                     >
                       <span className="text-white text-xs font-bold">{stage.countEntered}</span>
@@ -271,8 +275,8 @@ const VisualFunnel = ({ data }) => {
                   {index < data.length - 1 && (
                     <div className="absolute -bottom-1 left-0 flex items-center text-xs text-gray-500">
                       <ArrowRight className="w-3 h-3 mr-1" />
-                      <span>{stage.conversionRate}% to next</span>
-                      <span className="ml-2 text-red-500">({dropOffPercent}% drop-off)</span>
+                      <span className="truncate">{stage.conversionRate}% to next</span>
+                      <span className="ml-2 text-red-500 truncate">({dropOffPercent}% drop-off)</span>
                     </div>
                   )}
                 </div>
@@ -288,15 +292,15 @@ const VisualFunnel = ({ data }) => {
 // Time in Stage Chart
 const TimeInStageChart = ({ data }) => {
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-6">
-      <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-        <Clock className="w-5 h-5 mr-2 text-purple-600" />
-        Average Time in Stage
+    <div className="bg-white border border-gray-200 rounded-xl p-4 lg:p-6 w-full min-w-0">
+      <h3 className="text-base lg:text-lg font-semibold text-gray-900 mb-4 flex items-center">
+        <Clock className="w-4 lg:w-5 h-4 lg:h-5 mr-2 text-purple-600" />
+        <span className="truncate">Average Time in Stage</span>
       </h3>
-      <ResponsiveContainer width="100%" height={250}>
+      <ResponsiveContainer width="100%" height={200}>
         <BarChart data={data}>
-          <XAxis dataKey="stage" />
-          <YAxis />
+          <XAxis dataKey="stage" fontSize={10} />
+          <YAxis fontSize={10} />
           <Tooltip formatter={(value) => `${value} days`} />
           <Bar dataKey="avgDays" fill="#8b5cf6">
             {data.map((entry, index) => (
@@ -312,18 +316,19 @@ const TimeInStageChart = ({ data }) => {
 // Volume Trend with Comparison
 const VolumeTrendChart = ({ data, showComparison }) => {
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-6">
-      <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-        <TrendingUp className="w-5 h-5 mr-2 text-purple-600" />
-        New Lead Volume Trend
+    <div className="bg-white border border-gray-200 rounded-xl p-4 lg:p-6 w-full min-w-0">
+      <h3 className="text-base lg:text-lg font-semibold text-gray-900 mb-4 flex items-center">
+        <TrendingUp className="w-4 lg:w-5 h-4 lg:h-5 mr-2 text-purple-600" />
+        <span className="truncate">New Lead Volume Trend</span>
       </h3>
-      <ResponsiveContainer width="100%" height={300}>
+      <ResponsiveContainer width="100%" height={250}>
         <ComposedChart data={data}>
           <XAxis 
             dataKey="date" 
             tickFormatter={(date) => new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+            fontSize={10}
           />
-          <YAxis />
+          <YAxis fontSize={10} />
           <Tooltip 
             labelFormatter={(date) => new Date(date).toLocaleDateString()}
             formatter={(value, name) => [`${value} leads`, name]}
@@ -359,35 +364,35 @@ const VolumeTrendChart = ({ data, showComparison }) => {
 // Source Quality Table
 const SourceQualityTable = ({ data }) => {
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-6">
-      <h3 className="text-lg font-semibold text-gray-900 mb-4">Lead Quality by Source</h3>
+    <div className="bg-white border border-gray-200 rounded-xl p-4 lg:p-6 w-full min-w-0">
+      <h3 className="text-base lg:text-lg font-semibold text-gray-900 mb-4 truncate">Lead Quality by Source</h3>
       <div className="overflow-x-auto">
         <table className="w-full">
           <thead>
             <tr className="border-b border-gray-200">
-              <th className="text-left py-3 px-4 text-sm font-medium text-gray-700">Source</th>
-              <th className="text-left py-3 px-4 text-sm font-medium text-gray-700">Volume</th>
-              <th className="text-left py-3 px-4 text-sm font-medium text-gray-700">Avg Score</th>
-              <th className="text-left py-3 px-4 text-sm font-medium text-gray-700">Hot Rate</th>
-              <th className="text-left py-3 px-4 text-sm font-medium text-gray-700">Quality Index</th>
+              <th className="text-left py-3 px-2 lg:px-4 text-sm font-medium text-gray-700">Source</th>
+              <th className="text-left py-3 px-2 lg:px-4 text-sm font-medium text-gray-700">Volume</th>
+              <th className="text-left py-3 px-2 lg:px-4 text-sm font-medium text-gray-700">Avg Score</th>
+              <th className="text-left py-3 px-2 lg:px-4 text-sm font-medium text-gray-700">Hot Rate</th>
+              <th className="text-left py-3 px-2 lg:px-4 text-sm font-medium text-gray-700">Quality Index</th>
             </tr>
           </thead>
           <tbody>
             {data.map((source, i) => (
               <tr key={i} className="border-b border-gray-100 hover:bg-gray-50">
-                <td className="py-3 px-4 text-sm font-medium text-gray-900">{source.source}</td>
-                <td className="py-3 px-4 text-sm text-gray-600">{source.volume}</td>
-                <td className="py-3 px-4 text-sm text-gray-600">{source.avgScore.toFixed(2)}</td>
-                <td className="py-3 px-4">
-                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                <td className="py-3 px-2 lg:px-4 text-sm font-medium text-gray-900">{source.source}</td>
+                <td className="py-3 px-2 lg:px-4 text-sm text-gray-600">{source.volume}</td>
+                <td className="py-3 px-2 lg:px-4 text-sm text-gray-600">{source.avgScore.toFixed(2)}</td>
+                <td className="py-3 px-2 lg:px-4">
+                  <span className={`inline-flex items-center px-2 lg:px-2.5 py-0.5 rounded-full text-xs font-medium ${
                     source.hotRate >= 0.2 ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
                   }`}>
                     {(source.hotRate * 100).toFixed(1)}%
                   </span>
                 </td>
-                <td className="py-3 px-4">
+                <td className="py-3 px-2 lg:px-4">
                   <div className="flex items-center">
-                    <div className="w-24 bg-gray-200 rounded-full h-2 mr-2">
+                    <div className="w-16 lg:w-24 bg-gray-200 rounded-full h-2 mr-2">
                       <div
                         className="h-2 rounded-full bg-blue-500"
                         style={{ width: `${source.qualityIndex * 100}%` }}
@@ -408,10 +413,10 @@ const SourceQualityTable = ({ data }) => {
 // Transition Flow Visualization (simplified Sankey alternative)
 const TransitionFlow = ({ data }) => {
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-6">
-      <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-        <Shuffle className="w-5 h-5 mr-2 text-orange-600" />
-        Lead Status Transitions
+    <div className="bg-white border border-gray-200 rounded-xl p-4 lg:p-6 w-full min-w-0">
+      <h3 className="text-base lg:text-lg font-semibold text-gray-900 mb-4 flex items-center">
+        <Shuffle className="w-4 lg:w-5 h-4 lg:h-5 mr-2 text-orange-600" />
+        <span className="truncate">Lead Status Transitions</span>
       </h3>
       <div className="space-y-4">
         {data.map((transition, i) => {
@@ -419,9 +424,9 @@ const TransitionFlow = ({ data }) => {
           const width = (transition.count / maxCount) * 100;
           
           return (
-            <div key={i} className="flex items-center space-x-4">
-              <div className="w-24 text-sm font-medium text-gray-700 text-right">{transition.from}</div>
-              <div className="flex-1 relative">
+            <div key={i} className="flex items-center space-x-2 lg:space-x-4 min-w-0">
+              <div className="w-20 lg:w-24 text-sm font-medium text-gray-700 text-right truncate">{transition.from}</div>
+              <div className="flex-1 relative min-w-0">
                 <div className="bg-gray-200 rounded h-6">
                   <div
                     className="bg-gradient-to-r from-orange-400 to-orange-500 h-6 rounded flex items-center justify-center"
@@ -431,7 +436,7 @@ const TransitionFlow = ({ data }) => {
                   </div>
                 </div>
               </div>
-              <div className="w-24 text-sm font-medium text-gray-700">{transition.to}</div>
+              <div className="w-20 lg:w-24 text-sm font-medium text-gray-700 truncate">{transition.to}</div>
             </div>
           );
         })}
@@ -470,10 +475,10 @@ const JourneyModalContent = ({ modalType, data, selectedPeriod, onPeriodChange }
         customPeriods={customPeriods}
       />
       
-      <div className="p-6 space-y-6">
+      <div className="p-4 lg:p-6 space-y-4 lg:space-y-6 w-full min-w-0">
         {/* Status Distribution features */}
         {features.includes('statusChart') && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
             <StatusChart 
               data={data.statusDistribution} 
               onStatusClick={setSelectedStatus}
@@ -488,21 +493,21 @@ const JourneyModalContent = ({ modalType, data, selectedPeriod, onPeriodChange }
         )}
         
         {features.includes('statusMetrics') && (
-          <div className="grid grid-cols-4 gap-4">
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-center">
-              <p className="text-2xl font-bold text-blue-700">{data.metrics.totalLeads}</p>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 lg:gap-4">
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 lg:p-4 text-center">
+              <p className="text-xl lg:text-2xl font-bold text-blue-700">{data.metrics.totalLeads}</p>
               <p className="text-sm text-blue-600">Total Leads</p>
             </div>
-            <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-center">
-              <p className="text-2xl font-bold text-green-700">{data.metrics.hotLeads}</p>
+            <div className="bg-green-50 border border-green-200 rounded-lg p-3 lg:p-4 text-center">
+              <p className="text-xl lg:text-2xl font-bold text-green-700">{data.metrics.hotLeads}</p>
               <p className="text-sm text-green-600">Hot Leads</p>
             </div>
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-center">
-              <p className="text-2xl font-bold text-yellow-700">{data.metrics.avgAge} days</p>
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 lg:p-4 text-center">
+              <p className="text-xl lg:text-2xl font-bold text-yellow-700">{data.metrics.avgAge} days</p>
               <p className="text-sm text-yellow-600">Avg Lead Age</p>
             </div>
-            <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 text-center">
-              <p className="text-2xl font-bold text-purple-700">{data.metrics.conversionRate}%</p>
+            <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 lg:p-4 text-center">
+              <p className="text-xl lg:text-2xl font-bold text-purple-700">{data.metrics.conversionRate}%</p>
               <p className="text-sm text-purple-600">Conversion Rate</p>
             </div>
           </div>
@@ -518,31 +523,31 @@ const JourneyModalContent = ({ modalType, data, selectedPeriod, onPeriodChange }
         )}
         
         {features.includes('conversionTable') && (
-          <div className="bg-white border border-gray-200 rounded-xl p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Stage-by-Stage Conversion</h3>
+          <div className="bg-white border border-gray-200 rounded-xl p-4 lg:p-6 w-full min-w-0">
+            <h3 className="text-base lg:text-lg font-semibold text-gray-900 mb-4 truncate">Stage-by-Stage Conversion</h3>
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-gray-200">
-                    <th className="text-left py-3 px-4 text-sm font-medium text-gray-700">From Stage</th>
-                    <th className="text-left py-3 px-4 text-sm font-medium text-gray-700">To Stage</th>
-                    <th className="text-right py-3 px-4 text-sm font-medium text-gray-700">Entered</th>
-                    <th className="text-right py-3 px-4 text-sm font-medium text-gray-700">Exited</th>
-                    <th className="text-right py-3 px-4 text-sm font-medium text-gray-700">Conversion</th>
-                    <th className="text-right py-3 px-4 text-sm font-medium text-gray-700">Drop-off</th>
+                    <th className="text-left py-3 px-2 lg:px-4 text-sm font-medium text-gray-700">From Stage</th>
+                    <th className="text-left py-3 px-2 lg:px-4 text-sm font-medium text-gray-700">To Stage</th>
+                    <th className="text-right py-3 px-2 lg:px-4 text-sm font-medium text-gray-700">Entered</th>
+                    <th className="text-right py-3 px-2 lg:px-4 text-sm font-medium text-gray-700">Exited</th>
+                    <th className="text-right py-3 px-2 lg:px-4 text-sm font-medium text-gray-700">Conversion</th>
+                    <th className="text-right py-3 px-2 lg:px-4 text-sm font-medium text-gray-700">Drop-off</th>
                   </tr>
                 </thead>
                 <tbody>
                   {data.funnelData.map((stage, i) => (
                     <tr key={i} className="border-b border-gray-100 hover:bg-gray-50">
-                      <td className="py-3 px-4 text-sm text-gray-900">{stage.fromStage}</td>
-                      <td className="py-3 px-4 text-sm text-gray-900">{stage.toStage}</td>
-                      <td className="py-3 px-4 text-sm text-gray-600 text-right">{stage.countEntered}</td>
-                      <td className="py-3 px-4 text-sm text-gray-600 text-right">{stage.countExited}</td>
-                      <td className="py-3 px-4 text-right">
+                      <td className="py-3 px-2 lg:px-4 text-sm text-gray-900">{stage.fromStage}</td>
+                      <td className="py-3 px-2 lg:px-4 text-sm text-gray-900">{stage.toStage}</td>
+                      <td className="py-3 px-2 lg:px-4 text-sm text-gray-600 text-right">{stage.countEntered}</td>
+                      <td className="py-3 px-2 lg:px-4 text-sm text-gray-600 text-right">{stage.countExited}</td>
+                      <td className="py-3 px-2 lg:px-4 text-right">
                         <span className="text-sm font-medium text-green-600">{stage.conversionRate}%</span>
                       </td>
-                      <td className="py-3 px-4 text-right">
+                      <td className="py-3 px-2 lg:px-4 text-right">
                         <span className="text-sm font-medium text-red-600">{stage.dropOffRate}%</span>
                       </td>
                     </tr>
@@ -558,20 +563,20 @@ const JourneyModalContent = ({ modalType, data, selectedPeriod, onPeriodChange }
         )}
         
         {features.includes('dropoffReasons') && (
-          <div className="bg-white border border-gray-200 rounded-xl p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Top Drop-off Reasons</h3>
+          <div className="bg-white border border-gray-200 rounded-xl p-4 lg:p-6 w-full min-w-0">
+            <h3 className="text-base lg:text-lg font-semibold text-gray-900 mb-4 truncate">Top Drop-off Reasons</h3>
             <div className="space-y-2">
               {data.dropoffReasons.map((reason, i) => (
-                <div key={i} className="flex items-center justify-between p-3 hover:bg-gray-50 rounded">
-                  <span className="text-sm text-gray-700">{reason.reason}</span>
-                  <div className="flex items-center space-x-2">
-                    <div className="w-32 bg-gray-200 rounded-full h-2">
+                <div key={i} className="flex items-center justify-between p-2 lg:p-3 hover:bg-gray-50 rounded min-w-0">
+                  <span className="text-sm text-gray-700 truncate flex-1">{reason.reason}</span>
+                  <div className="flex items-center space-x-2 flex-shrink-0">
+                    <div className="w-20 lg:w-32 bg-gray-200 rounded-full h-2">
                       <div
                         className="h-2 rounded-full bg-red-500"
                         style={{ width: `${(reason.count / data.totalDropoffs) * 100}%` }}
                       />
                     </div>
-                    <span className="text-sm text-gray-600 w-12 text-right">{reason.count}</span>
+                    <span className="text-sm text-gray-600 w-8 lg:w-12 text-right">{reason.count}</span>
                   </div>
                 </div>
               ))}
@@ -583,7 +588,7 @@ const JourneyModalContent = ({ modalType, data, selectedPeriod, onPeriodChange }
         {features.includes('volumeTrend') && (
           <div>
             <div className="flex items-center justify-between mb-2">
-              <h3 className="text-lg font-semibold text-gray-900">Volume Analysis</h3>
+              <h3 className="text-base lg:text-lg font-semibold text-gray-900 truncate">Volume Analysis</h3>
               <label className="flex items-center space-x-2">
                 <input
                   type="checkbox"
@@ -599,12 +604,12 @@ const JourneyModalContent = ({ modalType, data, selectedPeriod, onPeriodChange }
         )}
         
         {features.includes('sourceBreakdown') && (
-          <div className="bg-white border border-gray-200 rounded-xl p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Leads by Source</h3>
-            <ResponsiveContainer width="100%" height={300}>
+          <div className="bg-white border border-gray-200 rounded-xl p-4 lg:p-6 w-full min-w-0">
+            <h3 className="text-base lg:text-lg font-semibold text-gray-900 mb-4 truncate">Leads by Source</h3>
+            <ResponsiveContainer width="100%" height={250}>
               <BarChart data={data.sourceBreakdown}>
-                <XAxis dataKey="source" />
-                <YAxis />
+                <XAxis dataKey="source" fontSize={10} />
+                <YAxis fontSize={10} />
                 <Tooltip />
                 <Bar dataKey="count" fill="#8b5cf6" />
               </BarChart>
@@ -617,26 +622,26 @@ const JourneyModalContent = ({ modalType, data, selectedPeriod, onPeriodChange }
         )}
         
         {features.includes('recentUploads') && (
-          <div className="bg-white border border-gray-200 rounded-xl p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Recent Lead Uploads</h3>
+          <div className="bg-white border border-gray-200 rounded-xl p-4 lg:p-6 w-full min-w-0">
+            <h3 className="text-base lg:text-lg font-semibold text-gray-900 mb-4 truncate">Recent Lead Uploads</h3>
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-gray-200">
-                    <th className="text-left py-3 px-4 text-sm font-medium text-gray-700">Lead Name</th>
-                    <th className="text-left py-3 px-4 text-sm font-medium text-gray-700">Source</th>
-                    <th className="text-left py-3 px-4 text-sm font-medium text-gray-700">Upload Date</th>
-                    <th className="text-left py-3 px-4 text-sm font-medium text-gray-700">Initial Status</th>
+                    <th className="text-left py-3 px-2 lg:px-4 text-sm font-medium text-gray-700">Lead Name</th>
+                    <th className="text-left py-3 px-2 lg:px-4 text-sm font-medium text-gray-700">Source</th>
+                    <th className="text-left py-3 px-2 lg:px-4 text-sm font-medium text-gray-700">Upload Date</th>
+                    <th className="text-left py-3 px-2 lg:px-4 text-sm font-medium text-gray-700">Initial Status</th>
                   </tr>
                 </thead>
                 <tbody>
                   {data.recentUploads.map((lead, i) => (
                     <tr key={i} className="border-b border-gray-100 hover:bg-gray-50">
-                      <td className="py-3 px-4 text-sm font-medium text-gray-900">{lead.name}</td>
-                      <td className="py-3 px-4 text-sm text-gray-600">{lead.source}</td>
-                      <td className="py-3 px-4 text-sm text-gray-600">{lead.uploadDate}</td>
-                      <td className="py-3 px-4">
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                      <td className="py-3 px-2 lg:px-4 text-sm font-medium text-gray-900">{lead.name}</td>
+                      <td className="py-3 px-2 lg:px-4 text-sm text-gray-600">{lead.source}</td>
+                      <td className="py-3 px-2 lg:px-4 text-sm text-gray-600">{lead.uploadDate}</td>
+                      <td className="py-3 px-2 lg:px-4">
+                        <span className="inline-flex items-center px-2 lg:px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                           {lead.initialStatus}
                         </span>
                       </td>
@@ -649,16 +654,16 @@ const JourneyModalContent = ({ modalType, data, selectedPeriod, onPeriodChange }
         )}
         
         {features.includes('integrationStatus') && (
-          <div className="bg-white border border-gray-200 rounded-xl p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Integration Status</h3>
+          <div className="bg-white border border-gray-200 rounded-xl p-4 lg:p-6 w-full min-w-0">
+            <h3 className="text-base lg:text-lg font-semibold text-gray-900 mb-4 truncate">Integration Status</h3>
             <div className="space-y-3">
               {data.integrationStatus.map((integration, i) => (
                 <div key={i} className="flex items-center justify-between p-3 border rounded-lg">
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">{integration.name}</p>
-                    <p className="text-xs text-gray-500">Last sync: {integration.lastSync}</p>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-gray-900 truncate">{integration.name}</p>
+                    <p className="text-xs text-gray-500 truncate">Last sync: {integration.lastSync}</p>
                   </div>
-                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                  <span className={`inline-flex items-center px-2 lg:px-2.5 py-0.5 rounded-full text-xs font-medium flex-shrink-0 ${
                     integration.status === 'Healthy' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
                   }`}>
                     {integration.status}
@@ -675,8 +680,8 @@ const JourneyModalContent = ({ modalType, data, selectedPeriod, onPeriodChange }
         )}
         
         {features.includes('transitionMatrix') && (
-          <div className="bg-white border border-gray-200 rounded-xl p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Transition Matrix</h3>
+          <div className="bg-white border border-gray-200 rounded-xl p-4 lg:p-6 w-full min-w-0">
+            <h3 className="text-base lg:text-lg font-semibold text-gray-900 mb-4 truncate">Transition Matrix</h3>
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
                 <thead>
@@ -716,16 +721,16 @@ const JourneyModalContent = ({ modalType, data, selectedPeriod, onPeriodChange }
         )}
         
         {features.includes('commonPaths') && (
-          <div className="bg-white border border-gray-200 rounded-xl p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Common Lead Paths</h3>
+          <div className="bg-white border border-gray-200 rounded-xl p-4 lg:p-6 w-full min-w-0">
+            <h3 className="text-base lg:text-lg font-semibold text-gray-900 mb-4 truncate">Common Lead Paths</h3>
             <div className="space-y-2">
               {data.commonPaths.map((path, i) => (
-                <div key={i} className="flex items-center justify-between p-3 hover:bg-gray-50 rounded">
-                  <div className="flex items-center space-x-2">
-                    <span className="text-sm font-medium text-gray-700">#{i + 1}</span>
-                    <span className="text-sm text-gray-600">{path.path}</span>
+                <div key={i} className="flex items-center justify-between p-2 lg:p-3 hover:bg-gray-50 rounded min-w-0">
+                  <div className="flex items-center space-x-2 min-w-0 flex-1">
+                    <span className="text-sm font-medium text-gray-700 flex-shrink-0">#{i + 1}</span>
+                    <span className="text-sm text-gray-600 truncate">{path.path}</span>
                   </div>
-                  <span className="text-sm font-medium text-blue-600">{path.count} leads</span>
+                  <span className="text-sm font-medium text-blue-600 flex-shrink-0">{path.count} leads</span>
                 </div>
               ))}
             </div>
@@ -733,28 +738,28 @@ const JourneyModalContent = ({ modalType, data, selectedPeriod, onPeriodChange }
         )}
         
         {features.includes('stuckTransitions') && (
-          <div className="bg-white border border-gray-200 rounded-xl p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-              <AlertTriangle className="w-5 h-5 mr-2 text-yellow-600" />
-              Stuck Transitions
+          <div className="bg-white border border-gray-200 rounded-xl p-4 lg:p-6 w-full min-w-0">
+            <h3 className="text-base lg:text-lg font-semibold text-gray-900 mb-4 flex items-center">
+              <AlertTriangle className="w-4 lg:w-5 h-4 lg:h-5 mr-2 text-yellow-600" />
+              <span className="truncate">Stuck Transitions</span>
             </h3>
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-gray-200">
-                    <th className="text-left py-3 px-4 text-sm font-medium text-gray-700">Lead Name</th>
-                    <th className="text-left py-3 px-4 text-sm font-medium text-gray-700">Current Status</th>
-                    <th className="text-left py-3 px-4 text-sm font-medium text-gray-700">Expected Next</th>
-                    <th className="text-left py-3 px-4 text-sm font-medium text-gray-700">Time Since Last</th>
+                    <th className="text-left py-3 px-2 lg:px-4 text-sm font-medium text-gray-700">Lead Name</th>
+                    <th className="text-left py-3 px-2 lg:px-4 text-sm font-medium text-gray-700">Current Status</th>
+                    <th className="text-left py-3 px-2 lg:px-4 text-sm font-medium text-gray-700">Expected Next</th>
+                    <th className="text-left py-3 px-2 lg:px-4 text-sm font-medium text-gray-700">Time Since Last</th>
                   </tr>
                 </thead>
                 <tbody>
                   {data.stuckTransitions.map((lead, i) => (
                     <tr key={i} className="border-b border-gray-100 hover:bg-gray-50">
-                      <td className="py-3 px-4 text-sm font-medium text-gray-900">{lead.name}</td>
-                      <td className="py-3 px-4 text-sm text-gray-600">{lead.currentStatus}</td>
-                      <td className="py-3 px-4 text-sm text-gray-600">{lead.expectedNext}</td>
-                      <td className="py-3 px-4">
+                      <td className="py-3 px-2 lg:px-4 text-sm font-medium text-gray-900">{lead.name}</td>
+                      <td className="py-3 px-2 lg:px-4 text-sm text-gray-600">{lead.currentStatus}</td>
+                      <td className="py-3 px-2 lg:px-4 text-sm text-gray-600">{lead.expectedNext}</td>
+                      <td className="py-3 px-2 lg:px-4">
                         <span className="text-sm font-medium text-red-600">{lead.timeSinceLast}</span>
                       </td>
                     </tr>
@@ -766,6 +771,22 @@ const JourneyModalContent = ({ modalType, data, selectedPeriod, onPeriodChange }
         )}
       </div>
     </>
+  );
+};
+
+// Mobile Card Component
+const MobileCard = ({ title, children, onClick, subtitle }) => {
+  return (
+    <div 
+      className="bg-white p-3 rounded-xl shadow border cursor-pointer hover:shadow-lg transition-shadow w-full min-w-0"
+      onClick={onClick}
+    >
+      <h3 className="text-sm font-semibold mb-2 truncate">{title}</h3>
+      <div className="w-full min-w-0">
+        {children}
+      </div>
+      <p className="text-xs text-gray-400 text-center mt-2 truncate">{subtitle}</p>
+    </div>
   );
 };
 
@@ -1014,24 +1035,41 @@ const openModal = async (modalType) => {
 
   if (loading) {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        {[1, 2, 3, 4].map(i => (
-          <div key={i} className="bg-white p-4 rounded shadow">
-            <div className="animate-pulse">
-              <div className="h-4 bg-gray-200 rounded w-3/4 mb-4"></div>
-              <div className="h-64 bg-gray-200 rounded"></div>
+      <div className="w-full min-w-0 space-y-4">
+        {/* Mobile Loading */}
+        <div className="lg:hidden space-y-2">
+          {[1, 2, 3, 4].map(i => (
+            <div key={i} className="bg-white p-3 rounded-xl shadow border min-w-0">
+              <div className="animate-pulse">
+                <div className="h-3 bg-gray-200 rounded w-1/2 mb-2"></div>
+                <div className="h-24 bg-gray-200 rounded"></div>
+              </div>
             </div>
+          ))}
+        </div>
+        
+        {/* Desktop Loading */}
+        <div className="hidden lg:block">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            {[1, 2, 3, 4].map(i => (
+              <div key={i} className="bg-white p-4 rounded shadow">
+                <div className="animate-pulse">
+                  <div className="h-4 bg-gray-200 rounded w-3/4 mb-4"></div>
+                  <div className="h-64 bg-gray-200 rounded"></div>
+                </div>
+              </div>
+            ))}
           </div>
-        ))}
+        </div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-center">
+      <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-center w-full min-w-0">
         <p className="text-red-600 font-medium">Failed to load lead journey data</p>
-        <p className="text-red-500 text-sm mt-1">{error}</p>
+        <p className="text-red-500 text-sm mt-1 break-words">{error}</p>
         <button 
           onClick={fetchData} 
           className="mt-2 text-sm text-red-600 underline hover:text-red-700"
@@ -1046,205 +1084,360 @@ const openModal = async (modalType) => {
 
   return (
     <>
-      <div className="space-y-6">
-        {/* Date Range Selector */}
-        <div className="bg-white p-4 rounded shadow">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold">Lead Journey Analytics</h2>
-            <div className="flex gap-2">
-              {[7, 14, 30, 90].map(days => (
-                <button
-                  key={days}
-                  onClick={() => setDateRange(days)}
-                  className={`px-3 py-1 rounded text-sm transition-colors ${
-                    dateRange === days 
-                      ? 'bg-blue-600 text-white' 
-                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                  }`}
-                >
-                  {days}d
-                </button>
-              ))}
+      <div className="w-full min-w-0">
+        {/* Mobile Layout */}
+        <div className="lg:hidden w-full min-w-0">
+          <div className="space-y-4">
+            {/* Date Range Selector */}
+            <div className="bg-white p-3 rounded-xl shadow border">
+              <div className="flex flex-col space-y-3">
+                <h2 className="text-lg font-semibold truncate">Lead Journey Analytics</h2>
+                <div className="flex gap-2 overflow-x-auto">
+                  {[7, 14, 30, 90].map(days => (
+                    <button
+                      key={days}
+                      onClick={() => setDateRange(days)}
+                      className={`px-3 py-2 rounded text-sm transition-colors flex-shrink-0 ${
+                        dateRange === days 
+                          ? 'bg-blue-600 text-white' 
+                          : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                      }`}
+                    >
+                      {days}d
+                    </button>
+                  ))}
+                </div>
+                <p className="text-sm text-gray-600 truncate">
+                  Analyzing {journeyData.totalLeads || 0} leads over the last {dateRange} days
+                </p>
+              </div>
             </div>
+
+            {/* Lead Status Distribution */}
+            <MobileCard
+              title="Lead Status Distribution"
+              subtitle="Click for detailed breakdown"
+              onClick={() => openModal('statusDistribution')}
+            >
+              {statusDistribution.length > 0 ? (
+                <ResponsiveContainer width="100%" height={180}>
+                  <PieChart>
+                    <Pie 
+                      data={statusDistribution} 
+                      dataKey="value" 
+                      nameKey="name" 
+                      outerRadius={60}
+                      label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                      labelLine={false}
+                    >
+                      {statusDistribution.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(value, name) => [value, name]} />
+                  </PieChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-32 flex items-center justify-center text-gray-500">
+                  <div className="text-center">
+                    <div className="text-2xl mb-2">📈</div>
+                    <div className="text-sm">No funnel data available</div>
+                    <div className="text-xs mt-1">Lead progression will appear here</div>
+                  </div>
+                </div>
+              )}
+            </MobileCard>
+
+            {/* Upload Trend */}
+            <MobileCard
+              title="Lead Upload Trend"
+              subtitle="Click for acquisition analysis"
+              onClick={() => openModal('uploadTrend')}
+            >
+              {trendData.length > 0 ? (
+                <ResponsiveContainer width="100%" height={120}>
+                  <LineChart data={trendData}>
+                    <XAxis 
+                      dataKey="date" 
+                      tickFormatter={(date) => {
+                        const d = new Date(date);
+                        return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                      }}
+                      fontSize={8}
+                    />
+                    <YAxis fontSize={8} />
+                    <Tooltip 
+                      labelFormatter={(date) => new Date(date).toLocaleDateString()}
+                      formatter={(value) => [value, 'Leads']}
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="leads" 
+                      stroke="#3b82f6" 
+                      strokeWidth={2}
+                      dot={{ r: 3, fill: '#3b82f6' }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-32 flex items-center justify-center text-gray-500">
+                  <div className="text-center">
+                    <div className="text-2xl mb-2">📊</div>
+                    <div className="text-sm">No trend data available</div>
+                    <div className="text-xs mt-1">Upload history will appear here</div>
+                  </div>
+                </div>
+              )}
+            </MobileCard>
+
+            {/* Status Transitions */}
+            <MobileCard
+              title="Lead Status Transitions"
+              subtitle="Click for flow analysis"
+              onClick={() => openModal('statusTransitions')}
+            >
+              {transitionData.length > 0 ? (
+                <div className="max-h-32 overflow-y-auto">
+                  <table className="min-w-full text-sm">
+                    <thead className="bg-gray-50 sticky top-0">
+                      <tr>
+                        <th className="px-2 py-2 text-left font-medium text-gray-700 text-xs">Transition</th>
+                        <th className="px-2 py-2 text-right font-medium text-gray-700 text-xs">Count</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
+                      {transitionData.slice(0, 4).map((item, idx) => (
+                        <tr key={idx} className="hover:bg-gray-50">
+                          <td className="px-2 py-2 text-xs">
+                            <div className="font-medium text-gray-900 truncate">{item.transition}</div>
+                          </td>
+                          <td className="px-2 py-2 text-right">
+                            <div className="flex flex-col items-end">
+                              <span className="font-bold text-sm text-blue-600">{item.count}</span>
+                              <span className="text-xs text-gray-500">{item.percent}</span>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="h-32 flex items-center justify-center text-gray-500">
+                  <div className="text-center">
+                    <div className="text-2xl mb-2">🔄</div>
+                    <div className="text-sm">No transition data available</div>
+                    <div className="text-xs mt-1">Status changes will appear here</div>
+                  </div>
+                </div>
+              )}
+            </MobileCard>
           </div>
-          <p className="text-sm text-gray-600 mt-2">
-            Analyzing {journeyData.totalLeads || 0} leads over the last {dateRange} days
-          </p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-6">
-          {/* Lead Status Distribution - Now Clickable */}
-          <div 
-            className="bg-white p-4 rounded shadow lg:col-span-1 cursor-pointer hover:shadow-lg transition-shadow"
-            onClick={() => openModal('statusDistribution')}
-          >
-            <h3 className="text-lg font-semibold mb-2">Lead Status Distribution</h3>
-            {statusDistribution.length > 0 ? (
-              <ResponsiveContainer width="100%" height={280}>
-                <PieChart>
-                  <Pie 
-                    data={statusDistribution} 
-                    dataKey="value" 
-                    nameKey="name" 
-                    outerRadius={80}
-                    label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                    labelLine={false}
-                  >
-                    {statusDistribution.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip formatter={(value, name) => [value, name]} />
-                </PieChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="h-64 flex items-center justify-center text-gray-500">
-                <div className="text-center">
-                  <div className="text-2xl mb-2">📊</div>
-                  <div>No lead data available</div>
-                  <div className="text-xs mt-1">Add some leads to see analytics</div>
+        {/* Desktop Layout */}
+        <div className="hidden lg:block w-full">
+          <div className="space-y-6">
+            {/* Date Range Selector */}
+            <div className="bg-white p-4 rounded shadow">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-semibold">Lead Journey Analytics</h2>
+                <div className="flex gap-2">
+                  {[7, 14, 30, 90].map(days => (
+                    <button
+                      key={days}
+                      onClick={() => setDateRange(days)}
+                      className={`px-3 py-1 rounded text-sm transition-colors ${
+                        dateRange === days 
+                          ? 'bg-blue-600 text-white' 
+                          : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                      }`}
+                    >
+                      {days}d
+                    </button>
+                  ))}
                 </div>
               </div>
-            )}
-            <p className="text-xs text-gray-400 text-center mt-2">Click for detailed breakdown</p>
-          </div>
+              <p className="text-sm text-gray-600 mt-2">
+                Analyzing {journeyData.totalLeads || 0} leads over the last {dateRange} days
+              </p>
+            </div>
 
-          {/* Funnel - Now Clickable */}
-          <div 
-            className="bg-white p-4 rounded shadow lg:col-span-1 cursor-pointer hover:shadow-lg transition-shadow"
-            onClick={() => openModal('progressionFunnel')}
-          >
-            <h3 className="text-lg font-semibold mb-4">Lead Progression Funnel</h3>
-            {funnelData.length > 0 ? (
-              <div className="space-y-4">
-                {funnelData.map((item) => {
-                  const max = Math.max(...funnelData.map(i => i.count), 1);
-                  const conversionRate = funnelData[0]?.count > 0 
-                    ? Math.round((item.count / funnelData[0].count) * 100) 
-                    : 0;
-                  
-                  return (
-                    <div key={item.stage}>
-                      <div className="flex justify-between text-sm mb-2">
-                        <span className="font-medium">{item.stage}</span>
-                        <span className="font-semibold text-blue-600">
-                          {item.count} ({conversionRate}%)
-                        </span>
-                      </div>
-                      <div className="w-full bg-gray-200 rounded-full h-4">
-                        <div
-                          className="bg-gradient-to-r from-blue-500 to-indigo-600 h-4 rounded-full transition-all duration-700 flex items-center justify-end pr-2"
-                          style={{ width: `${(item.count / max) * 100}%` }}
-                        >
-                          {item.count > 0 && (
-                            <span className="text-white text-xs font-bold">{item.count}</span>
-                          )}
-                        </div>
-                      </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-6">
+              {/* Lead Status Distribution - Now Clickable */}
+              <div 
+                className="bg-white p-4 rounded shadow lg:col-span-1 cursor-pointer hover:shadow-lg transition-shadow"
+                onClick={() => openModal('statusDistribution')}
+              >
+                <h3 className="text-lg font-semibold mb-2">Lead Status Distribution</h3>
+                {statusDistribution.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={280}>
+                    <PieChart>
+                      <Pie 
+                        data={statusDistribution} 
+                        dataKey="value" 
+                        nameKey="name" 
+                        outerRadius={80}
+                        label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                        labelLine={false}
+                      >
+                        {statusDistribution.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip formatter={(value, name) => [value, name]} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="h-64 flex items-center justify-center text-gray-500">
+                    <div className="text-center">
+                      <div className="text-2xl mb-2">📊</div>
+                      <div>No lead data available</div>
+                      <div className="text-xs mt-1">Add some leads to see analytics</div>
                     </div>
-                  );
-                })}
+                  </div>
+                )}
+                <p className="text-xs text-gray-400 text-center mt-2">Click for detailed breakdown</p>
               </div>
-            ) : (
-              <div className="h-64 flex items-center justify-center text-gray-500">
-                <div className="text-center">
-                  <div className="text-2xl mb-2">📈</div>
-                  <div>No funnel data available</div>
-                  <div className="text-xs mt-1">Lead progression will appear here</div>
-                </div>
-              </div>
-            )}
-            <p className="text-xs text-gray-400 text-center mt-4">Click for conversion analytics</p>
-          </div>
 
-          {/* Upload Trend - Now Clickable */}
-          <div 
-            className="bg-white p-4 rounded shadow lg:col-span-2 xl:col-span-1 cursor-pointer hover:shadow-lg transition-shadow"
-            onClick={() => openModal('uploadTrend')}
-          >
-            <h3 className="text-lg font-semibold mb-2">Lead Upload Trend</h3>
-            {trendData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={280}>
-                <LineChart data={trendData} margin={{ top: 5, right: 30, left: 20, bottom: 60 }}>
-                  <XAxis 
-                    dataKey="date" 
-                    tickFormatter={(date) => {
-                      const d = new Date(date);
-                      return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-                    }}
-                    angle={-45}
-                    textAnchor="end"
-                    height={60}
-                  />
-                  <YAxis />
-                  <Tooltip 
-                    labelFormatter={(date) => new Date(date).toLocaleDateString()}
-                    formatter={(value) => [value, 'Leads']}
-                  />
-                  <Line 
-                    type="monotone" 
-                    dataKey="leads" 
-                    stroke="#3b82f6" 
-                    strokeWidth={3}
-                    dot={{ r: 5, fill: '#3b82f6' }}
-                    activeDot={{ r: 7, fill: '#1d4ed8' }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="h-64 flex items-center justify-center text-gray-500">
-                <div className="text-center">
-                  <div className="text-2xl mb-2">📊</div>
-                  <div>No trend data available</div>
-                  <div className="text-xs mt-1">Upload history will appear here</div>
-                </div>
-              </div>
-            )}
-            <p className="text-xs text-gray-400 text-center mt-2">Click for acquisition analysis</p>
-          </div>
-
-          {/* Status Transitions - Now Clickable */}
-          <div 
-            className="bg-white p-4 rounded shadow lg:col-span-2 xl:col-span-1 cursor-pointer hover:shadow-lg transition-shadow"
-            onClick={() => openModal('statusTransitions')}
-          >
-            <h3 className="text-lg font-semibold mb-4">Lead Status Transitions</h3>
-            {transitionData.length > 0 ? (
-              <div className="max-h-64 overflow-y-auto">
-                <table className="min-w-full text-sm">
-                  <thead className="bg-gray-50 sticky top-0">
-                    <tr>
-                      <th className="px-3 py-2 text-left font-medium text-gray-700">Transition</th>
-                      <th className="px-3 py-2 text-right font-medium text-gray-700">Count</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200">
-                    {transitionData.map((item, idx) => (
-                      <tr key={idx} className="hover:bg-gray-50">
-                        <td className="px-3 py-3 text-xs">
-                          <div className="font-medium text-gray-900">{item.transition}</div>
-                        </td>
-                        <td className="px-3 py-3 text-right">
-                          <div className="flex flex-col items-end">
-                            <span className="font-bold text-lg text-blue-600">{item.count}</span>
-                            <span className="text-xs text-gray-500">{item.percent}</span>
+              {/* Funnel - Now Clickable */}
+              <div 
+                className="bg-white p-4 rounded shadow lg:col-span-1 cursor-pointer hover:shadow-lg transition-shadow"
+                onClick={() => openModal('progressionFunnel')}
+              >
+                <h3 className="text-lg font-semibold mb-4">Lead Progression Funnel</h3>
+                {funnelData.length > 0 ? (
+                  <div className="space-y-4">
+                    {funnelData.map((item) => {
+                      const max = Math.max(...funnelData.map(i => i.count), 1);
+                      const conversionRate = funnelData[0]?.count > 0 
+                        ? Math.round((item.count / funnelData[0].count) * 100) 
+                        : 0;
+                      
+                      return (
+                        <div key={item.stage}>
+                          <div className="flex justify-between text-sm mb-2">
+                            <span className="font-medium">{item.stage}</span>
+                            <span className="font-semibold text-blue-600">
+                              {item.count} ({conversionRate}%)
+                            </span>
                           </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                          <div className="w-full bg-gray-200 rounded-full h-4">
+                            <div
+                              className="bg-gradient-to-r from-blue-500 to-indigo-600 h-4 rounded-full transition-all duration-700 flex items-center justify-end pr-2"
+                              style={{ width: `${(item.count / max) * 100}%` }}
+                            >
+                              {item.count > 0 && (
+                                <span className="text-white text-xs font-bold">{item.count}</span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="h-64 flex items-center justify-center text-gray-500">
+                    <div className="text-center">
+                      <div className="text-2xl mb-2">📈</div>
+                      <div>No funnel data available</div>
+                      <div className="text-xs mt-1">Lead progression will appear here</div>
+                    </div>
+                  </div>
+                )}
+                <p className="text-xs text-gray-400 text-center mt-4">Click for conversion analytics</p>
               </div>
-            ) : (
-              <div className="h-64 flex items-center justify-center text-gray-500">
-                <div className="text-center">
-                  <div className="text-2xl mb-2">🔄</div>
-                  <div>No transition data available</div>
-                  <div className="text-xs mt-1">Status changes will appear here</div>
-                </div>
+
+              {/* Upload Trend - Now Clickable */}
+              <div 
+                className="bg-white p-4 rounded shadow lg:col-span-2 xl:col-span-1 cursor-pointer hover:shadow-lg transition-shadow"
+                onClick={() => openModal('uploadTrend')}
+              >
+                <h3 className="text-lg font-semibold mb-2">Lead Upload Trend</h3>
+                {trendData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={280}>
+                    <LineChart data={trendData} margin={{ top: 5, right: 30, left: 20, bottom: 60 }}>
+                      <XAxis 
+                        dataKey="date" 
+                        tickFormatter={(date) => {
+                          const d = new Date(date);
+                          return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                        }}
+                        angle={-45}
+                        textAnchor="end"
+                        height={60}
+                      />
+                      <YAxis />
+                      <Tooltip 
+                        labelFormatter={(date) => new Date(date).toLocaleDateString()}
+                        formatter={(value) => [value, 'Leads']}
+                      />
+                      <Line 
+                        type="monotone" 
+                        dataKey="leads" 
+                        stroke="#3b82f6" 
+                        strokeWidth={3}
+                        dot={{ r: 5, fill: '#3b82f6' }}
+                        activeDot={{ r: 7, fill: '#1d4ed8' }}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="h-64 flex items-center justify-center text-gray-500">
+                    <div className="text-center">
+                      <div className="text-2xl mb-2">📊</div>
+                      <div>No trend data available</div>
+                      <div className="text-xs mt-1">Upload history will appear here</div>
+                    </div>
+                  </div>
+                )}
+                <p className="text-xs text-gray-400 text-center mt-2">Click for acquisition analysis</p>
               </div>
-            )}
-            <p className="text-xs text-gray-400 text-center mt-4">Click for flow analysis</p>
+
+              {/* Status Transitions - Now Clickable */}
+              <div 
+                className="bg-white p-4 rounded shadow lg:col-span-2 xl:col-span-1 cursor-pointer hover:shadow-lg transition-shadow"
+                onClick={() => openModal('statusTransitions')}
+              >
+                <h3 className="text-lg font-semibold mb-4">Lead Status Transitions</h3>
+                {transitionData.length > 0 ? (
+                  <div className="max-h-64 overflow-y-auto">
+                    <table className="min-w-full text-sm">
+                      <thead className="bg-gray-50 sticky top-0">
+                        <tr>
+                          <th className="px-3 py-2 text-left font-medium text-gray-700">Transition</th>
+                          <th className="px-3 py-2 text-right font-medium text-gray-700">Count</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200">
+                        {transitionData.map((item, idx) => (
+                          <tr key={idx} className="hover:bg-gray-50">
+                            <td className="px-3 py-3 text-xs">
+                              <div className="font-medium text-gray-900">{item.transition}</div>
+                            </td>
+                            <td className="px-3 py-3 text-right">
+                              <div className="flex flex-col items-end">
+                                <span className="font-bold text-lg text-blue-600">{item.count}</span>
+                                <span className="text-xs text-gray-500">{item.percent}</span>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="h-64 flex items-center justify-center text-gray-500">
+                    <div className="text-center">
+                      <div className="text-2xl mb-2">🔄</div>
+                      <div>No transition data available</div>
+                      <div className="text-xs mt-1">Status changes will appear here</div>
+                    </div>
+                  </div>
+                )}
+                <p className="text-xs text-gray-400 text-center mt-4">Click for flow analysis</p>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -1275,3 +1468,50 @@ const openModal = async (modalType) => {
     </>
   );
 }
+                  <div className="text-center">
+                    <div className="text-2xl mb-2">📊</div>
+                    <div className="text-sm">No lead data available</div>
+                    <div className="text-xs mt-1">Add some leads to see analytics</div>
+                  </div>
+                </div>
+              )}
+            </MobileCard>
+
+            {/* Funnel */}
+            <MobileCard
+              title="Lead Progression Funnel"
+              subtitle="Click for conversion analytics"
+              onClick={() => openModal('progressionFunnel')}
+            >
+              {funnelData.length > 0 ? (
+                <div className="space-y-3">
+                  {funnelData.map((item) => {
+                    const max = Math.max(...funnelData.map(i => i.count), 1);
+                    const conversionRate = funnelData[0]?.count > 0 
+                      ? Math.round((item.count / funnelData[0].count) * 100) 
+                      : 0;
+                    
+                    return (
+                      <div key={item.stage}>
+                        <div className="flex justify-between text-sm mb-1">
+                          <span className="font-medium truncate">{item.stage}</span>
+                          <span className="font-semibold text-blue-600 flex-shrink-0">
+                            {item.count} ({conversionRate}%)
+                          </span>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-3">
+                          <div
+                            className="bg-gradient-to-r from-blue-500 to-indigo-600 h-3 rounded-full transition-all duration-700 flex items-center justify-end pr-2"
+                            style={{ width: `${(item.count / max) * 100}%` }}
+                          >
+                            {item.count > 0 && (
+                              <span className="text-white text-xs font-bold">{item.count}</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="h-32 flex items-center justify-center text-gray-500">
