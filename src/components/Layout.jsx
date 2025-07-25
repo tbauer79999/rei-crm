@@ -682,7 +682,7 @@ export default function Layout({ children }) {
       <div className="flex flex-col flex-1 min-h-screen lg:ml-0 w-full min-w-0 overflow-x-hidden max-w-full">
         {/* Top header */}
         <header className="bg-white border-b border-gray-200 px-4 lg:px-6 py-3 h-16 w-full overflow-x-hidden">
-          <div className="flex justify-between items-center h-full w-full min-w-0">
+          <div className="flex justify-between items-center h-full w-full min-w-0 overflow-hidden">
             <div className="flex items-center space-x-4 min-w-0 flex-1">
               <button
                 onClick={() => setMobileOpen(true)}
@@ -703,9 +703,9 @@ export default function Layout({ children }) {
               </div>
             </div>
             
-            <div className="flex items-center space-x-2 lg:space-x-3 flex-shrink-0 min-w-0">
+            <div className="flex items-center space-x-2 lg:space-x-3 flex-shrink-0 ml-2">
               {/* Desktop Search Box */}
-              <div className="tour-global-search hidden md:flex items-center relative search-container min-w-0 max-w-xs lg:max-w-none">
+              <div className="tour-global-search hidden md:flex items-center relative search-container min-w-0 w-full max-w-xs">
                 <Search className="absolute left-3 w-4 h-4 text-gray-400" />
                 <input
                   type="text"
@@ -713,7 +713,7 @@ export default function Layout({ children }) {
                   onChange={(e) => setSearchQuery(e.target.value)}
                   onFocus={() => searchQuery.length >= 2 && setShowSearchResults(true)}
                   placeholder="Search leads, campaigns..."
-                  className="pl-10 pr-4 py-2 w-full max-w-48 lg:w-80 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200 placeholder-gray-400"
+                  className="pl-10 pr-4 py-2 w-full bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200 placeholder-gray-400"
                 />
                 
                 {/* Desktop Search Results Dropdown */}
@@ -1002,7 +1002,7 @@ export default function Layout({ children }) {
                 
                 {/* Dropdown */}
                 {showTopUserMenu && (
-                  <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg border border-gray-200 shadow-lg z-50">
+                  <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg border border-gray-200 shadow-lg z-50 max-w-[calc(100vw-1rem)]">
                     <div className="p-3 border-b border-gray-100">
                       <p className="text-sm font-medium text-gray-900 truncate">{user?.email}</p>
                       <p className="text-xs text-gray-500 mt-0.5 truncate">{companyInfo.name}</p>
