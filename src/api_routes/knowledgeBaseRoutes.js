@@ -105,13 +105,13 @@ router.get('/docs', async (req, res) => {
 
     // Apply tenant filtering
     if (role === 'global_admin') {
-      // Global admin sees all knowledge base documents
-    } else if (role === 'enterprise_admin' || role === 'business_admin') {
-      // Filter to tenant-specific docs + global docs (where tenant_id is null)
-      query = query.or(`tenant_id.eq.${tenant_id},tenant_id.is.null`);
-    } else {
-      return res.status(403).json({ error: 'Insufficient permissions' });
-    }
+  // Global admin sees all knowledge base documents
+} else if (role === 'enterprise_admin' || role === 'business_admin' || role === 'user') {
+  // Filter to tenant-specific docs + global docs (where tenant_id is null)
+  query = query.or(`tenant_id.eq.${tenant_id},tenant_id.is.null`);
+} else {
+  return res.status(403).json({ error: 'Insufficient permissions' });
+}
 
     const { data, error } = await query;
 
@@ -130,48 +130,48 @@ router.get('/docs', async (req, res) => {
 
 // GET /api/knowledge/docs/:id
 router.get('/docs/:id', async (req, res) => {
-  const { id } = req.params;
-  const { role, tenant_id } = req.user || {};
-  
-  try {
-    // Security check
-    if (!tenant_id && role !== 'global_admin') {
-      return res.status(403).json({ error: 'No tenant access configured' });
-    }
+ const { id } = req.params;
+ const { role, tenant_id } = req.user || {};
+ 
+ try {
+   // Security check
+   if (!tenant_id && role !== 'global_admin') {
+     return res.status(403).json({ error: 'No tenant access configured' });
+   }
 
-    // Build query with security filter
-    let query = supabase
-      .from('knowledge_base')
-      .select('*')
-      .eq('id', id);
+   // Build query with security filter
+   let query = supabase
+     .from('knowledge_base')
+     .select('*')
+     .eq('id', id);
 
-    // Apply tenant filtering
-    if (role === 'global_admin') {
-      // Global admin can access any document
-    } else if (role === 'enterprise_admin' || role === 'business_admin') {
-      // Can only access their tenant's docs or global docs
-      query = query.or(`tenant_id.eq.${tenant_id},tenant_id.is.null`);
-    } else {
-      return res.status(403).json({ error: 'Insufficient permissions' });
-    }
+   // Apply tenant filtering
+   if (role === 'global_admin') {
+     // Global admin can access any document
+   } else if (role === 'enterprise_admin' || role === 'business_admin' || role === 'user') {
+     // Can only access their tenant's docs or global docs
+     query = query.or(`tenant_id.eq.${tenant_id},tenant_id.is.null`);
+   } else {
+     return res.status(403).json({ error: 'Insufficient permissions' });
+   }
 
-    const { data: record, error } = await query.single();
+   const { data: record, error } = await query.single();
 
-    if (error) {
-      if (error.code === 'PGRST116') {
-        return res.status(404).json({ error: 'Document not found or access denied' });
-      }
-      throw error;
-    }
-    
-    res.status(200).json({
-      ...record,
-      meta: { role, tenant_id }
-    });
-  } catch (err) {
-    console.error('Error fetching document by ID:', err.message);
-    res.status(500).json({ error: 'Failed to fetch document' });
-  }
+   if (error) {
+     if (error.code === 'PGRST116') {
+       return res.status(404).json({ error: 'Document not found or access denied' });
+     }
+     throw error;
+   }
+   
+   res.status(200).json({
+     ...record,
+     meta: { role, tenant_id }
+   });
+ } catch (err) {
+   console.error('Error fetching document by ID:', err.message);
+   res.status(500).json({ error: 'Failed to fetch document' });
+ }
 });
 
 // DELETE /api/knowledge/docs/:id
@@ -194,15 +194,15 @@ router.delete('/docs/:id', async (req, res) => {
       .select('id, tenant_id')
       .eq('id', id);
 
-    // Apply tenant filtering for permission check
-    if (role === 'global_admin') {
-      // Global admin can delete any document
-    } else if (role === 'enterprise_admin' || role === 'business_admin') {
-      // Can only delete their tenant's docs or global docs
-      checkQuery = checkQuery.or(`tenant_id.eq.${tenant_id},tenant_id.is.null`);
-    } else {
-      return res.status(403).json({ error: 'Insufficient permissions' });
-    }
+// Apply tenant filtering for permission check
+   if (role === 'global_admin') {
+     // Global admin can delete any document
+   } else if (role === 'enterprise_admin' || role === 'business_admin' || role === 'user') {
+     // Can only delete their tenant's docs or global docs
+     checkQuery = checkQuery.or(`tenant_id.eq.${tenant_id},tenant_id.is.null`);
+   } else {
+     return res.status(403).json({ error: 'Insufficient permissions' });
+   }
 
     const { data: checkResult, error: checkError } = await checkQuery.single();
 
