@@ -324,8 +324,11 @@ export default function Layout({ children }) {
   };
 
   // Add click outside handler to close menus
-  useEffect(() => {
-    const handleClickOutside = (event) => {
+  // Add click outside handler to close menus
+useEffect(() => {
+  const handleClickOutside = (event) => {
+    // Use setTimeout to prevent immediate closing when opening
+    setTimeout(() => {
       if (showTopUserMenu || showUserMenu) {
         const isClickInside = event.target.closest('.user-menu-container');
         if (!isClickInside) {
@@ -334,7 +337,6 @@ export default function Layout({ children }) {
         }
       }
       
-      // Close search results when clicking outside
       if (showSearchResults) {
         const isClickInsideSearch = event.target.closest('.search-container');
         if (!isClickInsideSearch) {
@@ -342,14 +344,21 @@ export default function Layout({ children }) {
         }
       }
 
-      // Close notifications when clicking outside
       if (showNotifications) {
         const isClickInsideNotifications = event.target.closest('.notifications-container');
         if (!isClickInsideNotifications) {
           setShowNotifications(false);
         }
       }
-    };
+    }, 0);
+  };
+
+  if (showTopUserMenu || showUserMenu || showSearchResults || showNotifications) {
+    document.addEventListener('mousedown', handleClickOutside);
+  }
+  
+  return () => document.removeEventListener('mousedown', handleClickOutside);
+}, [showTopUserMenu, showUserMenu, showSearchResults, showNotifications]);
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
