@@ -1009,6 +1009,27 @@ const proceed = window.confirm(
                 </span>
               )}
             </span>
+            <button
+    onClick={handleToggleAI}
+    disabled={togglingAI}
+    className={`
+      flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors
+      ${lead.ai_conversation_enabled 
+        ? 'bg-red-100 text-red-700 hover:bg-red-200' 
+        : 'bg-green-100 text-green-700 hover:bg-green-200'
+      }
+      ${togglingAI ? 'opacity-50 cursor-not-allowed' : 'hover:shadow-sm'}
+    `}
+  >
+    {togglingAI ? (
+      <div className="animate-spin rounded-full h-4 w-4 border-2 border-gray-500 border-t-transparent" />
+    ) : (
+      <>
+        {lead.ai_conversation_enabled ? <Pause size={16} /> : <Play size={16} />}
+      </>
+    )}
+    {lead.ai_conversation_enabled ? 'Disable AI' : 'Enable AI'}
+  </button>
             {lead.phone && (
               <button
                 onClick={() => handleCall(lead.phone)}
