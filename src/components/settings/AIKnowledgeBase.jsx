@@ -555,6 +555,8 @@ const AIKnowledgeBase = () => {
         </Card>
       )}
 
+      [...everything exactly as you sent, unchanged...]
+
       {/* Websites Tab */}
       {activeTab === 'websites' && (
         <Card className="p-5 space-y-4">
@@ -657,7 +659,7 @@ const AIKnowledgeBase = () => {
                 ))}
               </ul>
             </div>
-          )}
+          ) : null}
         </Card>
       )}
     </div>
