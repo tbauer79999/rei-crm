@@ -719,9 +719,8 @@ export default function Layout({ children }) {
                 />
                 
                 {/* Search Results Dropdown */}
-                {showSearchResults && (searchResults || isSearching) && (
-                  <div className="absolute top-full mt-2 left-0 right-0 bg-white rounded-lg border border-gray-200 shadow-lg z-50 max-h-96 overflow-y-auto">
-                    {isSearching ? (
+{showSearchResults && (searchResults || isSearching) && (
+  <div className="fixed top-16 left-1/2 transform -translate-x-1/2 w-80 lg:w-96 bg-white rounded-lg border border-gray-200 shadow-lg z-50 max-h-96 overflow-y-auto">                    {isSearching ? (
                       <div className="p-4 text-center text-sm text-gray-500">
                         <div className="inline-flex items-center">
                           <svg className="animate-spin -ml-1 mr-3 h-4 w-4 text-indigo-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
