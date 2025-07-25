@@ -23,6 +23,7 @@ export default function Layout({ children }) {
   const [searchResults, setSearchResults] = useState(null);
   const [isSearching, setIsSearching] = useState(false);
   const [showSearchResults, setShowSearchResults] = useState(false);
+  const [showMobileSearch, setShowMobileSearch] = useState(false);
   const [companyInfo, setCompanyInfo] = useState({
     name: 'REI-CRM',
     industry: 'real estate',
@@ -576,6 +577,7 @@ export default function Layout({ children }) {
     setSearchQuery('');
     setShowSearchResults(false);
     setSearchResults(null);
+    setShowMobileSearch(false); // Close mobile search overlay
   };
 
   const companyInitials = getCompanyInitials();
@@ -583,10 +585,13 @@ export default function Layout({ children }) {
   return (
     <div className="flex min-h-screen bg-gray-50">
       {/* Mobile backdrop */}
-      {mobileOpen && (
+      {(mobileOpen || showMobileSearch) && (
         <div 
           className="fixed inset-0 bg-black/50 z-40 lg:hidden"
-          onClick={() => setMobileOpen(false)}
+          onClick={() => {
+            setMobileOpen(false);
+            setShowMobileSearch(false);
+          }}
         />
       )}
 
@@ -603,18 +608,18 @@ export default function Layout({ children }) {
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-4 h-16 border-b border-gray-100">
           {!collapsed && (
-            <div className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center">
+            <div className="flex items-center space-x-2 min-w-0 flex-1">
+              <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center flex-shrink-0">
                 <span className="text-white font-bold text-xs">
                   {companyInitials}
                 </span>
               </div>
-              <div className="flex flex-col">
-                <span className="font-semibold text-gray-900 tracking-tight text-sm leading-tight">
+              <div className="flex flex-col min-w-0 flex-1">
+                <span className="font-semibold text-gray-900 tracking-tight text-sm leading-tight truncate">
                   {companyInfo.loading ? 'Loading...' : companyInfo.name}
                 </span>
                 {!companyInfo.loading && companyInfo.name !== 'REI-CRM' && (
-                  <span className="text-xs text-gray-500 capitalize">
+                  <span className="text-xs text-gray-500 capitalize truncate">
                     {companyInfo.industry} CRM
                   </span>
                 )}
@@ -630,13 +635,13 @@ export default function Layout({ children }) {
           )}
           <button 
             onClick={() => setCollapsed(!collapsed)}
-            className="hidden lg:flex p-1.5 rounded-lg hover:bg-gray-100 transition-colors text-gray-500 hover:text-gray-700"
+            className="hidden lg:flex p-1.5 rounded-lg hover:bg-gray-100 transition-colors text-gray-500 hover:text-gray-700 flex-shrink-0"
           >
             {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
           </button>
           <button 
             onClick={() => setMobileOpen(false)}
-            className="lg:hidden p-1.5 rounded-lg hover:bg-gray-100 transition-colors text-gray-500"
+            className="lg:hidden p-1.5 rounded-lg hover:bg-gray-100 transition-colors text-gray-500 flex-shrink-0"
           >
             <X size={18} />
           </button>
@@ -661,18 +666,15 @@ export default function Layout({ children }) {
                   }
                 `}
               >
-                <Icon className={`h-5 w-5 ${collapsed ? '' : 'mr-3'} ${isActive ? 'text-white' : 'text-gray-500 group-hover:text-gray-700'}`} />
-                {!collapsed && <span>{label}</span>}
+                <Icon className={`h-5 w-5 ${collapsed ? '' : 'mr-3'} ${isActive ? 'text-white' : 'text-gray-500 group-hover:text-gray-700'} flex-shrink-0`} />
+                {!collapsed && <span className="truncate">{label}</span>}
                 {!collapsed && isActive && (
-                  <div className="ml-auto w-1.5 h-1.5 bg-white rounded-full opacity-75" />
+                  <div className="ml-auto w-1.5 h-1.5 bg-white rounded-full opacity-75 flex-shrink-0" />
                 )}
               </Link>
             );
           })}
         </nav>
-
-        {/* Bottom spacing */}
-  
       </aside>
 
       {/* Main content */}
@@ -680,28 +682,28 @@ export default function Layout({ children }) {
         {/* Top header */}
         <header className="bg-white border-b border-gray-200 px-4 lg:px-6 py-3 h-16">
           <div className="flex justify-between items-center h-full">
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-4 min-w-0 flex-1">
               <button
                 onClick={() => setMobileOpen(true)}
-                className="lg:hidden p-2 rounded-lg hover:bg-gray-100 transition-colors text-gray-600"
+                className="lg:hidden p-2 rounded-lg hover:bg-gray-100 transition-colors text-gray-600 flex-shrink-0"
               >
                 <Menu size={20} />
               </button>
               
               {/* Breadcrumb style navigation */}
-              <div className="flex items-center space-x-2">
-                <Link to="/dashboard" className="text-sm text-gray-500 hover:text-gray-700">
+              <div className="flex items-center space-x-2 min-w-0 flex-1">
+                <Link to="/dashboard" className="text-sm text-gray-500 hover:text-gray-700 truncate">
                   {companyInfo.name}
                 </Link>
-                <ChevronRight className="w-4 h-4 text-gray-400" />
-                <h1 className="text-sm font-semibold text-gray-900">
+                <ChevronRight className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                <h1 className="text-sm font-semibold text-gray-900 truncate">
                   {messages.title}
                 </h1>
               </div>
             </div>
             
-            <div className="flex items-center space-x-3">
-              {/* Search Box */}
+            <div className="flex items-center space-x-2 lg:space-x-3 flex-shrink-0">
+              {/* Desktop Search Box */}
               <div className="tour-global-search hidden md:flex items-center relative search-container">
                 <Search className="absolute left-3 w-4 h-4 text-gray-400" />
                 <input
@@ -713,7 +715,7 @@ export default function Layout({ children }) {
                   className="pl-10 pr-4 py-2 w-64 lg:w-80 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200 placeholder-gray-400"
                 />
                 
-                {/* Search Results Dropdown */}
+                {/* Desktop Search Results Dropdown */}
                 {showSearchResults && (searchResults || isSearching) && (
                   <div className="absolute top-full mt-2 left-0 right-0 bg-white rounded-lg border border-gray-200 shadow-lg z-50 max-h-96 overflow-y-auto">
                     {isSearching ? (
@@ -740,15 +742,15 @@ export default function Layout({ children }) {
                                 onClick={() => handleSearchResultClick('lead', lead)}
                                 className="w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors flex items-center justify-between group"
                               >
-                                <div>
-                                  <div className="text-sm font-medium text-gray-900">
+                                <div className="min-w-0 flex-1">
+                                  <div className="text-sm font-medium text-gray-900 truncate">
                                     {lead.name || 'Unnamed Lead'}
                                   </div>
-                                  <div className="text-xs text-gray-500 mt-0.5">
+                                  <div className="text-xs text-gray-500 mt-0.5 truncate">
                                     {lead.email || lead.phone || 'No contact info'}
                                   </div>
                                 </div>
-                                <div className="flex items-center space-x-2">
+                                <div className="flex items-center space-x-2 flex-shrink-0 ml-2">
                                   {lead.ai_score && (
                                     <span className="text-xs font-medium text-gray-600">
                                       Score: {lead.ai_score}
@@ -781,11 +783,11 @@ export default function Layout({ children }) {
                                 onClick={() => handleSearchResultClick('campaign', campaign)}
                                 className="w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors flex items-center justify-between group"
                               >
-                                <div className="flex-1">
-                                  <div className="text-sm font-medium text-gray-900">
+                                <div className="flex-1 min-w-0">
+                                  <div className="text-sm font-medium text-gray-900 truncate">
                                     {campaign.name}
                                   </div>
-                                  <div className="text-xs text-gray-500 mt-0.5">
+                                  <div className="text-xs text-gray-500 mt-0.5 truncate">
                                     {campaign.description ? 
                                       (campaign.description.length > 50 ? 
                                         campaign.description.substring(0, 50) + '...' : 
@@ -795,7 +797,7 @@ export default function Layout({ children }) {
                                     }
                                   </div>
                                 </div>
-                                <div className="flex items-center space-x-2 ml-2">
+                                <div className="flex items-center space-x-2 ml-2 flex-shrink-0">
                                   {campaign.ai_on && (
                                     <span className="text-xs px-2 py-1 rounded-full bg-purple-100 text-purple-700">
                                       AI
@@ -826,11 +828,14 @@ export default function Layout({ children }) {
               </div>
               
               {/* Mobile Search Button */}
-              <button className="md:hidden p-2 rounded-lg hover:bg-gray-100 transition-colors text-gray-600">
+              <button 
+                onClick={() => setShowMobileSearch(true)}
+                className="md:hidden p-2 rounded-lg hover:bg-gray-100 transition-colors text-gray-600"
+              >
                 <Search size={18} />
               </button>
               
-              {/* Notifications - UPDATED */}
+              {/* Notifications */}
               <div className="relative notifications-container">
                 <button 
                   onClick={() => setShowNotifications(!showNotifications)}
@@ -846,7 +851,7 @@ export default function Layout({ children }) {
                 
                 {/* Notifications Dropdown */}
                 {showNotifications && (
-                  <div className="absolute right-0 mt-2 w-96 max-h-[600px] bg-white rounded-lg border border-gray-200 shadow-xl z-50 flex flex-col">
+                  <div className="absolute right-0 mt-2 w-80 sm:w-96 max-h-[600px] bg-white rounded-lg border border-gray-200 shadow-xl z-50 flex flex-col max-w-[calc(100vw-2rem)] sm:max-w-none">
                     {/* Header */}
                     <div className="p-4 border-b border-gray-100 flex items-center justify-between">
                       <h3 className="font-semibold text-gray-900">Notifications</h3>
@@ -901,7 +906,7 @@ export default function Layout({ children }) {
                             >
                               <div className="flex items-start space-x-3">
                                 {/* Priority indicator */}
-                                <div className={`mt-0.5 px-2 py-1 rounded-full text-xs font-medium ${
+                                <div className={`mt-0.5 px-2 py-1 rounded-full text-xs font-medium flex-shrink-0 ${
                                   priorityColors[notification.priority] || priorityColors.low
                                 }`}>
                                   {notification.priority?.toUpperCase() || 'LOW'}
@@ -910,12 +915,12 @@ export default function Layout({ children }) {
                                 {/* Content */}
                                 <div className="flex-1 min-w-0">
                                   <div className="flex items-center justify-between">
-                                    <p className={`text-sm ${!notification.read ? 'font-semibold' : 'font-medium'} text-gray-900`}>
+                                    <p className={`text-sm ${!notification.read ? 'font-semibold' : 'font-medium'} text-gray-900 truncate`}>
                                       {notification.title}
                                     </p>
-                                    <div className="flex items-center space-x-2 ml-2">
+                                    <div className="flex items-center space-x-2 ml-2 flex-shrink-0">
                                       {!notification.read && (
-                                        <div className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0" />
+                                        <div className="w-2 h-2 bg-blue-500 rounded-full" />
                                       )}
                                       <button
                                         onClick={(e) => dismissNotification(e, notification.id)}
@@ -932,12 +937,12 @@ export default function Layout({ children }) {
                                   </p>
                                   
                                   {notification.leads && (
-                                    <div className="mt-2 flex items-center text-xs text-gray-500">
-                                      <span className="font-medium">
+                                    <div className="mt-2 flex items-center text-xs text-gray-500 truncate">
+                                      <span className="font-medium truncate">
                                         {notification.leads.name || 'Unknown Lead'}
                                       </span>
-                                      <span className="mx-1">•</span>
-                                      <span>{notification.leads.campaigns?.name || 'No Campaign'}</span>
+                                      <span className="mx-1 flex-shrink-0">•</span>
+                                      <span className="truncate">{notification.leads.campaigns?.name || 'No Campaign'}</span>
                                     </div>
                                   )}
                                   
@@ -976,42 +981,42 @@ export default function Layout({ children }) {
               <div className="relative user-menu-container">
                 <button
                   onClick={() => setShowTopUserMenu(!showTopUserMenu)}
-                  className="flex items-center space-x-2 px-3 py-1.5 rounded-lg hover:bg-gray-100 transition-all duration-200"
+                  className="flex items-center space-x-2 px-2 sm:px-3 py-1.5 rounded-lg hover:bg-gray-100 transition-all duration-200"
                 >
-                  <div className="w-8 h-8 bg-gradient-to-br from-indigo-400 via-purple-400 to-pink-400 rounded-full flex items-center justify-center">
+                  <div className="w-8 h-8 bg-gradient-to-br from-indigo-400 via-purple-400 to-pink-400 rounded-full flex items-center justify-center flex-shrink-0">
                     <span className="text-white text-xs font-semibold">
                       {user?.email?.substring(0, 2).toUpperCase() || 'US'}
                     </span>
                   </div>
-                  <div className="hidden sm:block text-left">
-                    <p className="text-sm font-medium text-gray-900 leading-tight">
+                  <div className="hidden sm:block text-left min-w-0 flex-1">
+                    <p className="text-sm font-medium text-gray-900 leading-tight truncate">
                       {user?.email?.split('@')[0] || 'User'}
                     </p>
-                    <p className="text-xs text-gray-500">
+                    <p className="text-xs text-gray-500 truncate">
                       {role?.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()) || 'User'}
                     </p>
                   </div>
-                  <ChevronDown className="w-4 h-4 text-gray-400" />
+                  <ChevronDown className="w-4 h-4 text-gray-400 flex-shrink-0" />
                 </button>
                 
                 {/* Dropdown */}
                 {showTopUserMenu && (
                   <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg border border-gray-200 shadow-lg z-50">
                     <div className="p-3 border-b border-gray-100">
-                      <p className="text-sm font-medium text-gray-900">{user?.email}</p>
-                      <p className="text-xs text-gray-500 mt-0.5">{companyInfo.name}</p>
+                      <p className="text-sm font-medium text-gray-900 truncate">{user?.email}</p>
+                      <p className="text-xs text-gray-500 mt-0.5 truncate">{companyInfo.name}</p>
                     </div>
                     <div className="py-1">
                       <Link to="/profile" className="flex items-center px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">
-                        <User className="w-4 h-4 mr-3 text-gray-400" />
+                        <User className="w-4 h-4 mr-3 text-gray-400 flex-shrink-0" />
                         My Profile
                       </Link>
                       <Link to="/settings" className="flex items-center px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">
-                        <Settings className="w-4 h-4 mr-3 text-gray-400" />
+                        <Settings className="w-4 h-4 mr-3 text-gray-400 flex-shrink-0" />
                         Settings & Preferences
                       </Link>
                       <Link to="/help" className="flex items-center px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">
-                        <HelpCircle className="w-4 h-4 mr-3 text-gray-400" />
+                        <HelpCircle className="w-4 h-4 mr-3 text-gray-400 flex-shrink-0" />
                         Help & Support
                       </Link>
                     </div>
@@ -1020,7 +1025,7 @@ export default function Layout({ children }) {
                         onClick={handleLogout}
                         className="w-full flex items-center px-3 py-2 text-sm text-red-600 hover:bg-red-50"
                       >
-                        <LogOut className="w-4 h-4 mr-3" />
+                        <LogOut className="w-4 h-4 mr-3 flex-shrink-0" />
                         Sign Out
                       </button>
                     </div>
@@ -1031,7 +1036,150 @@ export default function Layout({ children }) {
           </div>
         </header>
 
-{/* Main content area */}
+        {/* Mobile Search Overlay */}
+        {showMobileSearch && (
+          <div className="fixed inset-0 z-50 md:hidden">
+            <div className="bg-white h-full flex flex-col">
+              {/* Search Header */}
+              <div className="flex items-center p-4 border-b border-gray-200">
+                <button
+                  onClick={() => setShowMobileSearch(false)}
+                  className="p-2 -ml-2 rounded-lg hover:bg-gray-100 transition-colors text-gray-600 mr-3"
+                >
+                  <X size={20} />
+                </button>
+                <div className="flex-1 relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search leads, campaigns..."
+                    className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    autoFocus
+                  />
+                </div>
+              </div>
+              
+              {/* Mobile Search Results */}
+              <div className="flex-1 overflow-y-auto">
+                {isSearching ? (
+                  <div className="p-8 text-center text-sm text-gray-500">
+                    <div className="inline-flex items-center">
+                      <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-indigo-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Searching...
+                    </div>
+                  </div>
+                ) : searchResults && (searchResults.leads.length > 0 || searchResults.campaigns.length > 0) ? (
+                  <div>
+                    {/* Mobile Leads Section */}
+                    {searchResults.leads.length > 0 && (
+                      <div>
+                        <div className="px-4 py-3 text-xs font-semibold text-gray-500 bg-gray-50 border-b border-gray-100">
+                          LEADS
+                        </div>
+                        {searchResults.leads.map((lead) => (
+                          <button
+                            key={`mobile-lead-${lead.id}`}
+                            onClick={() => handleSearchResultClick('lead', lead)}
+                            className="w-full px-4 py-4 text-left hover:bg-gray-50 transition-colors border-b border-gray-100"
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="min-w-0 flex-1">
+                                <div className="text-base font-medium text-gray-900 truncate">
+                                  {lead.name || 'Unnamed Lead'}
+                                </div>
+                                <div className="text-sm text-gray-500 mt-1 truncate">
+                                  {lead.email || lead.phone || 'No contact info'}
+                                </div>
+                                {lead.ai_score && (
+                                  <div className="text-xs text-gray-600 mt-1">
+                                    Score: {lead.ai_score}
+                                  </div>
+                                )}
+                              </div>
+                              <div className="ml-3 flex-shrink-0">
+                                <span className={`text-xs px-2 py-1 rounded-full ${
+                                  lead.status === 'active' ? 'bg-green-100 text-green-700' :
+                                  lead.status === 'qualified' ? 'bg-blue-100 text-blue-700' :
+                                  lead.status === 'disqualified' ? 'bg-red-100 text-red-700' :
+                                  lead.status === 'contacted' ? 'bg-yellow-100 text-yellow-700' :
+                                  'bg-gray-100 text-gray-700'
+                                }`}>
+                                  {lead.status || 'Unknown'}
+                                </span>
+                              </div>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    
+                    {/* Mobile Campaigns Section */}
+                    {searchResults.campaigns.length > 0 && (
+                      <div>
+                        <div className="px-4 py-3 text-xs font-semibold text-gray-500 bg-gray-50 border-b border-gray-100">
+                          CAMPAIGNS
+                        </div>
+                        {searchResults.campaigns.map((campaign) => (
+                          <button
+                            key={`mobile-campaign-${campaign.id}`}
+                            onClick={() => handleSearchResultClick('campaign', campaign)}
+                            className="w-full px-4 py-4 text-left hover:bg-gray-50 transition-colors border-b border-gray-100"
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="min-w-0 flex-1">
+                                <div className="text-base font-medium text-gray-900 truncate">
+                                  {campaign.name}
+                                </div>
+                                <div className="text-sm text-gray-500 mt-1 line-clamp-2">
+                                  {campaign.description || `Started: ${campaign.start_date ? new Date(campaign.start_date).toLocaleDateString() : 'No start date'}`}
+                                </div>
+                              </div>
+                              <div className="ml-3 flex-shrink-0 flex flex-col items-end space-y-1">
+                                {campaign.ai_on && (
+                                  <span className="text-xs px-2 py-1 rounded-full bg-purple-100 text-purple-700">
+                                    AI
+                                  </span>
+                                )}
+                                <span className={`text-xs px-2 py-1 rounded-full ${
+                                  campaign.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'
+                                }`}>
+                                  {campaign.is_active ? 'Active' : 'Inactive'}
+                                </span>
+                              </div>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ) : searchQuery.length >= 2 ? (
+                  <div className="p-8 text-center">
+                    <div className="text-gray-400 mb-3">
+                      <Search size={48} className="mx-auto" />
+                    </div>
+                    <p className="text-base text-gray-500 mb-1">No results found for "{searchQuery}"</p>
+                    <p className="text-sm text-gray-400">Try searching with different keywords</p>
+                  </div>
+                ) : (
+                  <div className="p-8 text-center">
+                    <div className="text-gray-400 mb-3">
+                      <Search size={48} className="mx-auto" />
+                    </div>
+                    <p className="text-base text-gray-500 mb-1">Search your leads and campaigns</p>
+                    <p className="text-sm text-gray-400">Type at least 2 characters to start searching</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Main content area */}
         <main className="flex-1 p-4 lg:p-6 bg-gray-50">
           {children}
         </main>
