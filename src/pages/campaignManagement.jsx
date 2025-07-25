@@ -20,7 +20,10 @@ import {
   AlertCircle,
   MessageSquare,
   AlertTriangle,
-  RefreshCcw
+  RefreshCcw,
+  ChevronDown,
+  Eye,
+  Settings
 } from 'lucide-react';
 
 // API Base URL
@@ -60,7 +63,7 @@ const KnowledgeAssetsDropdown = ({ campaign, knowledgeAssets, selectedAssets, on
         minWidth: `${Math.max(dropdownPosition.width, 256)}px`
       }}
     >
-      <div className="w-64 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-auto">
+      <div className="w-64 sm:w-72 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-auto">
         {knowledgeAssets.length === 0 ? (
           <div className="px-3 py-2 text-sm text-gray-500">No knowledge assets available</div>
         ) : (
@@ -81,15 +84,15 @@ const KnowledgeAssetsDropdown = ({ campaign, knowledgeAssets, selectedAssets, on
                     type="checkbox"
                     checked={isSelected}
                     onChange={(e) => onUpdate(asset.id, e.target.checked)}
-                    className="mr-2 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                    className="mr-2 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded flex-shrink-0"
                   />
                   <span className="text-sm flex items-center flex-1 min-w-0">
-                    <span className="mr-2">{icon}</span>
+                    <span className="mr-2 flex-shrink-0">{icon}</span>
                     <span className="truncate" title={displayText}>
                       {displayText}
                     </span>
                   </span>
-                  <span className="ml-2 text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
+                  <span className="ml-2 text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded flex-shrink-0">
                     {asset.source_type}
                   </span>
                 </label>
@@ -212,27 +215,247 @@ const CampaignProgress = ({ campaignId }) => {
       {progress.processed > 0 && (
         <div className="grid grid-cols-2 gap-2 text-xs">
           <div className="flex items-center gap-1">
-            <CheckCircle className="w-3 h-3 text-green-500" />
-            <span className="text-gray-600">Delivered:</span>
+            <CheckCircle className="w-3 h-3 text-green-500 flex-shrink-0" />
+            <span className="text-gray-600 truncate">Delivered:</span>
             <span className="font-medium text-green-600">{progress.delivered}</span>
           </div>
           
           <div className="flex items-center gap-1">
-            <AlertCircle className="w-3 h-3 text-red-500" />
-            <span className="text-gray-600">Failed:</span>
+            <AlertCircle className="w-3 h-3 text-red-500 flex-shrink-0" />
+            <span className="text-gray-600 truncate">Failed:</span>
             <span className="font-medium text-red-600">{progress.failed}</span>
           </div>
           
           <div className="flex items-center gap-1">
-            <RefreshCcw className="w-3 h-3 text-blue-500" />
-            <span className="text-gray-600">Retries:</span>
+            <RefreshCcw className="w-3 h-3 text-blue-500 flex-shrink-0" />
+            <span className="text-gray-600 truncate">Retries:</span>
             <span className="font-medium text-blue-600">{progress.retries}</span>
           </div>
           
           <div className="flex items-center gap-1">
-            <Clock className="w-3 h-3 text-yellow-500" />
-            <span className="text-gray-600">Queued:</span>
+            <Clock className="w-3 h-3 text-yellow-500 flex-shrink-0" />
+            <span className="text-gray-600 truncate">Queued:</span>
             <span className="font-medium text-yellow-600">{progress.queued}</span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Mobile Campaign Card Component
+const CampaignCard = ({ 
+  campaign, 
+  isGlobalAdmin, 
+  tenantNames, 
+  salesTeamMembers, 
+  phoneNumbers, 
+  knowledgeAssets, 
+  selectedKnowledgeAssets, 
+  knowledgeDropdownOpen, 
+  setKnowledgeDropdownOpen,
+  showArchived,
+  showDynamicColumn,
+  getDynamicColumnHeader,
+  getDynamicDropdownOptions,
+  getStatusBadge,
+  updateCampaignAssignment,
+  updateCampaignPhoneNumber,
+  updateCampaignDynamicField,
+  updateCampaignKnowledgeLinks,
+  setSelectedKnowledgeAssets,
+  toggleAiOn,
+  archiveCampaign,
+  unarchiveCampaign
+}) => {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-lg p-4 space-y-3">
+      {/* Header */}
+      <div className="flex items-start justify-between">
+        <div className="min-w-0 flex-1">
+          <h3 className="font-medium text-gray-900 truncate">{campaign.name}</h3>
+          {campaign.description && (
+            <p className="text-sm text-gray-500 mt-1 line-clamp-2">{campaign.description}</p>
+          )}
+          {isGlobalAdmin && (
+            <div className="flex items-center space-x-2 mt-2">
+              <Building2 className="w-4 h-4 text-gray-400 flex-shrink-0" />
+              <span className="text-sm text-gray-600 truncate">
+                {tenantNames[campaign.tenant_id] || campaign.tenants?.name || 'Unknown Tenant'}
+              </span>
+            </div>
+          )}
+        </div>
+        <div className="flex items-center space-x-2 ml-3 flex-shrink-0">
+          {getStatusBadge(campaign)}
+          <button
+            onClick={() => setExpanded(!expanded)}
+            className="p-1 hover:bg-gray-100 rounded"
+            aria-label={expanded ? "Collapse details" : "Expand details"}
+          >
+            <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${expanded ? 'rotate-180' : ''}`} />
+          </button>
+        </div>
+      </div>
+
+      {/* Progress - Always Visible */}
+      <div>
+        <CampaignProgress campaignId={campaign.id} />
+      </div>
+
+      {/* AI Toggle - Always Visible */}
+      <div className="flex items-center justify-between">
+        <span className="text-sm font-medium text-gray-700">AI Processing</span>
+        <button
+          onClick={() => toggleAiOn(campaign.id, campaign.ai_on)}
+          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
+            campaign.ai_on 
+              ? 'bg-blue-600' 
+              : 'bg-gray-200'
+          }`}
+          title={campaign.ai_on ? 'AI Enabled - Click to disable' : 'AI Disabled - Click to enable'}
+        >
+          <span
+            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+              campaign.ai_on ? 'translate-x-6' : 'translate-x-1'
+            }`}
+          />
+        </button>
+      </div>
+
+      {/* Expanded Details */}
+      {expanded && (
+        <div className="space-y-4 pt-2 border-t border-gray-100">
+          {/* Assignment */}
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-gray-700">Assigned To</label>
+            <select
+              value={campaign.assigned_to_sales_team_id || ''}
+              onChange={(e) => updateCampaignAssignment(campaign.id, e.target.value || null)}
+              className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            >
+              <option value="">Unassigned</option>
+              {salesTeamMembers.map(member => (
+                <option key={member.sales_team_id} value={member.sales_team_id}>
+                  {member.full_name || member.email}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Phone Number */}
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-gray-700">Phone Number</label>
+            <select
+              value={campaign.phone_number_id || ''}
+              onChange={(e) => updateCampaignPhoneNumber(campaign.id, e.target.value || null)}
+              className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            >
+              <option value="">No phone assigned</option>
+              {phoneNumbers.map(phone => (
+                <option key={phone.id} value={phone.id}>
+                  {phone.phone_number}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Dynamic Field */}
+          {showDynamicColumn && (
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">{getDynamicColumnHeader()}</label>
+              <select
+                value={
+                  campaign.talk_track || 
+                  campaign.service_type || 
+                  campaign.vehicle_type || 
+                  ''
+                }
+                onChange={(e) => updateCampaignDynamicField(campaign.id, e.target.value || null)}
+                className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              >
+                <option value="">Select {getDynamicColumnHeader().toLowerCase()}...</option>
+                {getDynamicDropdownOptions().map(option => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* Knowledge Assets */}
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-gray-700">Knowledge Assets</label>
+            <div className="relative">
+              <button
+                id={`knowledge-dropdown-${campaign.id}`}
+                onClick={() => setKnowledgeDropdownOpen({
+                  ...knowledgeDropdownOpen,
+                  [campaign.id]: !knowledgeDropdownOpen[campaign.id]
+                })}
+                className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 flex items-center justify-between bg-white hover:bg-gray-50"
+              >
+                <span className="truncate">
+                  {selectedKnowledgeAssets[campaign.id]?.length > 0
+                    ? `${selectedKnowledgeAssets[campaign.id].length} selected`
+                    : 'Select knowledge assets...'}
+                </span>
+                <ChevronDown className="w-4 h-4 ml-2 flex-shrink-0" />
+              </button>
+              
+              <KnowledgeAssetsDropdown
+                campaign={campaign}
+                knowledgeAssets={knowledgeAssets}
+                selectedAssets={selectedKnowledgeAssets[campaign.id]}
+                isOpen={knowledgeDropdownOpen[campaign.id]}
+                onToggle={() => setKnowledgeDropdownOpen({
+                  ...knowledgeDropdownOpen,
+                  [campaign.id]: !knowledgeDropdownOpen[campaign.id]
+                })}
+                onUpdate={async (assetId, checked) => {
+                  const currentSelected = selectedKnowledgeAssets[campaign.id] || [];
+                  let newSelected;
+                  
+                  if (checked) {
+                    newSelected = [...currentSelected, assetId];
+                  } else {
+                    newSelected = currentSelected.filter(id => id !== assetId);
+                  }
+                  
+                  setSelectedKnowledgeAssets({
+                    ...selectedKnowledgeAssets,
+                    [campaign.id]: newSelected
+                  });
+                  
+                  // Update in database
+                  await updateCampaignKnowledgeLinks(campaign.id, newSelected);
+                }}
+              />
+            </div>
+          </div>
+
+          {/* Actions */}
+          <div className="flex justify-end pt-2">
+            {showArchived ? (
+              <button 
+                className="inline-flex items-center px-3 py-2 text-sm text-green-600 hover:text-green-700 hover:bg-green-50 rounded-lg transition-colors"
+                onClick={() => unarchiveCampaign(campaign.id)}
+              >
+                <ArchiveRestore className="w-4 h-4 mr-2" />
+                Restore
+              </button>
+            ) : (
+              <button 
+                className="inline-flex items-center px-3 py-2 text-sm text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
+                onClick={() => archiveCampaign(campaign.id)}
+              >
+                <Archive className="w-4 h-4 mr-2" />
+                Archive
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -263,6 +486,7 @@ export default function CampaignManagement() {
   const [selectedKnowledgeAssets, setSelectedKnowledgeAssets] = useState({});
   const [knowledgeDropdownOpen, setKnowledgeDropdownOpen] = useState({});
   const [phoneNumbers, setPhoneNumbers] = useState([]);
+  const [viewMode, setViewMode] = useState('table'); // 'table' or 'cards'
   
   // Campaign creation form state
   const [isCreating, setIsCreating] = useState(false);
@@ -277,6 +501,23 @@ export default function CampaignManagement() {
     document.title = "Campaign Manager – SurFox";
   }, []);
 
+  // Auto-switch to mobile view on small screens
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth < 1024) { // lg breakpoint
+        setViewMode('cards');
+      } else {
+        setViewMode('table');
+      }
+    };
+
+    // Set initial view mode
+    handleResize();
+    
+    // Listen for resize events
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Fetch tenant industry
   const fetchTenantIndustry = async () => {
@@ -878,7 +1119,7 @@ export default function CampaignManagement() {
     if (isArchived) {
       return (
         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-          <Archive className="w-3 h-3 mr-1" />
+          <Archive className="w-3 h-3 mr-1 flex-shrink-0" />
           Archived
         </span>
       );
@@ -887,21 +1128,21 @@ export default function CampaignManagement() {
     if (aiOn && isActive) {
       return (
         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-          <Zap className="w-3 h-3 mr-1" />
+          <Zap className="w-3 h-3 mr-1 flex-shrink-0" />
           AI Active
         </span>
       );
     } else if (isActive) {
       return (
         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-          <CheckCircle className="w-3 h-3 mr-1" />
+          <CheckCircle className="w-3 h-3 mr-1 flex-shrink-0" />
           Ready
         </span>
       );
     } else {
       return (
         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-          <Clock className="w-3 h-3 mr-1" />
+          <Clock className="w-3 h-3 mr-1 flex-shrink-0" />
           Inactive
         </span>
       );
@@ -1025,81 +1266,108 @@ useEffect(() => {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 lg:space-y-6">
       {/* Error Message */}
       {error && (
         <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-center space-x-3">
-          <AlertCircle className="w-5 h-5 text-red-600" />
+          <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0" />
           <span className="text-red-800">{error}</span>
         </div>
       )}
 
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">
+        <div className="min-w-0 flex-1">
+          <h1 className="text-xl lg:text-2xl font-bold text-gray-900">
             {showArchived ? 'Archived Campaigns' : 'Campaign Management'}
           </h1>
-          <p className="text-gray-600">
+          <p className="text-sm lg:text-base text-gray-600 mt-1">
             {showArchived 
               ? 'View and restore archived campaigns'
               : 'Create, manage, and track your messaging campaigns'
             }
           </p>
         </div>
-        <div className="flex items-center space-x-3">
+        <div className="flex items-center space-x-3 flex-shrink-0">
+          {/* Desktop View Toggle */}
+          <div className="hidden lg:flex items-center bg-gray-100 rounded-lg p-1">
+            <button
+              onClick={() => setViewMode('table')}
+              className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                viewMode === 'table' 
+                  ? 'bg-white text-gray-900 shadow-sm' 
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              Table
+            </button>
+            <button
+              onClick={() => setViewMode('cards')}
+              className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                viewMode === 'cards' 
+                  ? 'bg-white text-gray-900 shadow-sm' 
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              Cards
+            </button>
+          </div>
+          
           <Button 
             variant="outline"
             onClick={() => setShowArchived(!showArchived)}
-            className="inline-flex items-center px-4 py-2"
+            className="inline-flex items-center px-3 lg:px-4 py-2"
           >
             {showArchived ? (
               <>
                 <ArchiveRestore className="w-4 h-4 mr-2" />
-                Show Active
+                <span className="hidden sm:inline">Show Active</span>
+                <span className="sm:hidden">Active</span>
               </>
             ) : (
               <>
                 <Archive className="w-4 h-4 mr-2" />
-                Show Archived
+                <span className="hidden sm:inline">Show Archived</span>
+                <span className="sm:hidden">Archived</span>
               </>
             )}
           </Button>
           {!showArchived && (
             <Button 
               onClick={() => setShowCreateModal(true)}
-              className="inline-flex items-center px-4 py-2"
+              className="inline-flex items-center px-3 lg:px-4 py-2"
             >
               <Plus className="w-4 h-4 mr-2" />
-              Create Campaign
+              <span className="hidden sm:inline">Create Campaign</span>
+              <span className="sm:hidden">Create</span>
             </Button>
           )}
         </div>
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-6">
+        <div className="bg-white rounded-xl border border-gray-200 p-4 lg:p-6">
           <div className="flex items-center">
-            <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center">
-              <Megaphone className="w-5 h-5 text-blue-600" />
+            <div className="w-8 h-8 lg:w-10 lg:h-10 bg-blue-50 rounded-lg flex items-center justify-center flex-shrink-0">
+              <Megaphone className="w-4 h-4 lg:w-5 lg:h-5 text-blue-600" />
             </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Total Campaigns</p>
-              <p className="text-2xl font-bold text-gray-900">{totalCampaigns}</p>
+            <div className="ml-3 lg:ml-4 min-w-0 flex-1">
+              <p className="text-xs lg:text-sm font-medium text-gray-600">Total Campaigns</p>
+              <p className="text-lg lg:text-2xl font-bold text-gray-900">{totalCampaigns}</p>
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
+        <div className="bg-white rounded-xl border border-gray-200 p-4 lg:p-6">
           <div className="flex items-center">
-            <div className="w-10 h-10 bg-green-50 rounded-lg flex items-center justify-center">
-              <CheckCircle className="w-5 h-5 text-green-600" />
+            <div className="w-8 h-8 lg:w-10 lg:h-10 bg-green-50 rounded-lg flex items-center justify-center flex-shrink-0">
+              <CheckCircle className="w-4 h-4 lg:w-5 lg:h-5 text-green-600" />
             </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Leads Analyzed</p>
-              <p className="text-2xl font-bold text-gray-900">{campaignStats.processedLeads.toLocaleString()}</p>
-              <p className="text-xs text-gray-500 mt-1">
+            <div className="ml-3 lg:ml-4 min-w-0 flex-1">
+              <p className="text-xs lg:text-sm font-medium text-gray-600">Leads Analyzed</p>
+              <p className="text-lg lg:text-2xl font-bold text-gray-900">{campaignStats.processedLeads.toLocaleString()}</p>
+              <p className="text-xs text-gray-500 mt-1 truncate">
                 {campaignStats.totalLeads > 0 
                   ? `${Math.round((campaignStats.processedLeads / campaignStats.totalLeads) * 100)}% complete`
                   : 'No leads yet'
@@ -1109,32 +1377,32 @@ useEffect(() => {
           </div>
         </div>
 
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
+        <div className="bg-white rounded-xl border border-gray-200 p-4 lg:p-6">
           <div className="flex items-center">
-            <div className="w-10 h-10 bg-orange-50 rounded-lg flex items-center justify-center">
-              <Clock className="w-5 h-5 text-orange-600" />
+            <div className="w-8 h-8 lg:w-10 lg:h-10 bg-orange-50 rounded-lg flex items-center justify-center flex-shrink-0">
+              <Clock className="w-4 h-4 lg:w-5 lg:h-5 text-orange-600" />
             </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Remaining Leads</p>
-              <p className="text-2xl font-bold text-gray-900">{campaignStats.remainingLeads.toLocaleString()}</p>
-              <p className="text-xs text-gray-500 mt-1">
+            <div className="ml-3 lg:ml-4 min-w-0 flex-1">
+              <p className="text-xs lg:text-sm font-medium text-gray-600">Remaining</p>
+              <p className="text-lg lg:text-2xl font-bold text-gray-900">{campaignStats.remainingLeads.toLocaleString()}</p>
+              <p className="text-xs text-gray-500 mt-1 truncate">
                 {campaignStats.remainingLeads > 0 && activeCampaigns > 0
-                  ? `~${Math.ceil(campaignStats.remainingLeads / (activeCampaigns * 120))} hours to complete`
-                  : campaignStats.remainingLeads > 0 ? 'Activate campaigns to start' : 'All processed'
+                  ? `~${Math.ceil(campaignStats.remainingLeads / (activeCampaigns * 120))} hrs`
+                  : campaignStats.remainingLeads > 0 ? 'Start campaigns' : 'All processed'
                 }
               </p>
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
+        <div className="bg-white rounded-xl border border-gray-200 p-4 lg:p-6">
           <div className="flex items-center">
-            <div className="w-10 h-10 bg-purple-50 rounded-lg flex items-center justify-center">
-              <TrendingUp className="w-5 h-5 text-purple-600" />
+            <div className="w-8 h-8 lg:w-10 lg:h-10 bg-purple-50 rounded-lg flex items-center justify-center flex-shrink-0">
+              <TrendingUp className="w-4 h-4 lg:w-5 lg:h-5 text-purple-600" />
             </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">AI Analysis Speed</p>
-              <p className="text-2xl font-bold text-gray-900">
+            <div className="ml-3 lg:ml-4 min-w-0 flex-1">
+              <p className="text-xs lg:text-sm font-medium text-gray-600">AI Speed</p>
+              <p className="text-lg lg:text-2xl font-bold text-gray-900">
                 {activeCampaigns > 0 ? `${activeCampaigns * 120}` : '0'}
               </p>
               <p className="text-xs text-gray-500 mt-1">leads/hour</p>
@@ -1144,27 +1412,27 @@ useEffect(() => {
       </div>
 
       {/* Filters and Search */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6">
-        <div className="flex flex-col sm:flex-row gap-4">
+      <div className="bg-white rounded-xl border border-gray-200 p-4 lg:p-6">
+        <div className="flex flex-col space-y-4 lg:flex-row lg:space-y-0 lg:space-x-4">
           <div className="flex-1">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
               <input
                 type="text"
                 placeholder={isGlobalAdmin ? "Search campaigns or tenants..." : "Search campaigns..."}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full pl-10 pr-4 py-2 lg:py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm lg:text-base"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
           </div>
           
-          <div className="flex items-center space-x-2">
-            <Filter className="w-4 h-4 text-gray-500" />
+          <div className="flex items-center space-x-2 lg:space-x-3">
+            <Filter className="w-4 h-4 text-gray-500 flex-shrink-0" />
             
             {/* Status Filter */}
             <select
-              className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="border border-gray-300 rounded-lg px-2 lg:px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm lg:text-base min-w-0 flex-1 lg:flex-initial"
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
             >
@@ -1177,7 +1445,7 @@ useEffect(() => {
             {/* Tenant Filter - Only for Global Admins */}
             {isGlobalAdmin && (
               <select
-                className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="border border-gray-300 rounded-lg px-2 lg:px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm lg:text-base min-w-0 flex-1 lg:flex-initial"
                 value={tenantFilter}
                 onChange={(e) => setTenantFilter(e.target.value)}
               >
@@ -1193,232 +1461,269 @@ useEffect(() => {
         </div>
       </div>
 
-      {/* Condensed Campaigns Table */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Campaign
-                </th>
-                {isGlobalAdmin && (
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Tenant
-                  </th>
-                )}
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Status
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Progress & Delivery
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Assignment & Phone
-                </th>
-                {/* Dynamic Column Header */}
-                {showDynamicColumn && (
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    {getDynamicColumnHeader()}
-                  </th>
-                )}
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Knowledge Assets
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  AI Toggle
-                </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {filteredCampaigns.map((campaign) => (
-                <tr key={campaign.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4">
-                    <div>
-                      <div className="text-sm font-medium text-gray-900">{campaign.name}</div>
-                      <div className="text-sm text-gray-500">
-                        {campaign.description || 'No description'}
-                      </div>
-                    </div>
-                  </td>
-                  {isGlobalAdmin && (
-                    <td className="px-6 py-4">
-                      <div className="flex items-center space-x-2">
-                        <Building2 className="w-4 h-4 text-gray-400" />
-                        <span className="text-sm text-gray-900">
-                          {tenantNames[campaign.tenant_id] || campaign.tenants?.name || 'Unknown Tenant'}
-                        </span>
-                      </div>
-                    </td>
-                  )}
-                  <td className="px-6 py-4">
-                    {getStatusBadge(campaign)}
-                  </td>
-                  <td className="px-6 py-4">
-                    <CampaignProgress campaignId={campaign.id} />
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="space-y-2">
-                      {/* Assigned To */}
-                      <div>
-                        <select
-                          value={campaign.assigned_to_sales_team_id || ''}
-                          onChange={(e) => updateCampaignAssignment(campaign.id, e.target.value || null)}
-                          className="text-xs border border-gray-300 rounded px-2 py-1 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 w-full"
-                          title={campaign.assigned_to_name ? `Assigned to ${campaign.assigned_to_name}` : 'Not assigned'}
-                        >
-                          <option value="">Unassigned</option>
-                          {salesTeamMembers.map(member => (
-                            <option key={member.sales_team_id} value={member.sales_team_id}>
-                              {member.full_name || member.email}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      
-                      {/* Phone Number */}
-                      <div>
-                        <select
-                          value={campaign.phone_number_id || ''}
-                          onChange={(e) => updateCampaignPhoneNumber(campaign.id, e.target.value || null)}
-                          className="text-xs border border-gray-300 rounded px-2 py-1 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 w-full"
-                          title={campaign.phone_number ? `Current: ${campaign.phone_number}` : 'Not assigned'}
-                        >
-                          <option value="">No phone assigned</option>
-                          {phoneNumbers.map(phone => (
-                            <option key={phone.id} value={phone.id}>
-                              {phone.phone_number}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-                  </td>
-                  {/* Dynamic Dropdown Cell */}
-                  {showDynamicColumn && (
-                    <td className="px-6 py-4">
-                      <select
-                        value={
-                          campaign.talk_track || 
-                          campaign.service_type || 
-                          campaign.vehicle_type || 
-                          ''
-                        }
-                        onChange={(e) => updateCampaignDynamicField(campaign.id, e.target.value || null)}
-                        className="text-sm border border-gray-300 rounded-lg px-2 py-1 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 w-full"
-                      >
-                        <option value="">Select {getDynamicColumnHeader().toLowerCase()}...</option>
-                        {getDynamicDropdownOptions().map(option => (
-                          <option key={option.value} value={option.value}>
-                            {option.label}
-                          </option>
-                        ))}
-                      </select>
-                    </td>
-                  )}
-                  {/* Knowledge Assets Multi-Select */}
-                  <td className="px-6 py-4">
-                    <div className="relative">
-                      <button
-                        id={`knowledge-dropdown-${campaign.id}`}
-                        onClick={() => setKnowledgeDropdownOpen({
-                          ...knowledgeDropdownOpen,
-                          [campaign.id]: !knowledgeDropdownOpen[campaign.id]
-                        })}
-                        className="text-sm border border-gray-300 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 flex items-center justify-between min-w-[120px] bg-white hover:bg-gray-50"
-                      >
-                        <span className="truncate">
-                          {selectedKnowledgeAssets[campaign.id]?.length > 0
-                            ? `${selectedKnowledgeAssets[campaign.id].length} selected`
-                            : 'Select...'}
-                        </span>
-                        <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                        </svg>
-                      </button>
-                      
-                      <KnowledgeAssetsDropdown
-                        campaign={campaign}
-                        knowledgeAssets={knowledgeAssets}
-                        selectedAssets={selectedKnowledgeAssets[campaign.id]}
-                        isOpen={knowledgeDropdownOpen[campaign.id]}
-                        onToggle={() => setKnowledgeDropdownOpen({
-                          ...knowledgeDropdownOpen,
-                          [campaign.id]: !knowledgeDropdownOpen[campaign.id]
-                        })}
-                        onUpdate={async (assetId, checked) => {
-                          const currentSelected = selectedKnowledgeAssets[campaign.id] || [];
-                          let newSelected;
-                          
-                          if (checked) {
-                            newSelected = [...currentSelected, assetId];
-                          } else {
-                            newSelected = currentSelected.filter(id => id !== assetId);
-                          }
-                          
-                          setSelectedKnowledgeAssets({
-                            ...selectedKnowledgeAssets,
-                            [campaign.id]: newSelected
-                          });
-                          
-                          // Update in database
-                          await updateCampaignKnowledgeLinks(campaign.id, newSelected);
-                        }}
-                      />
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center justify-center">
-                      {/* AI Toggle Switch */}
-                      <button
-                        onClick={() => toggleAiOn(campaign.id, campaign.ai_on)}
-                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
-                          campaign.ai_on 
-                            ? 'bg-blue-600' 
-                            : 'bg-gray-200'
-                        }`}
-                        title={campaign.ai_on ? 'AI Enabled - Click to disable' : 'AI Disabled - Click to enable'}
-                      >
-                        <span
-                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                            campaign.ai_on ? 'translate-x-6' : 'translate-x-1'
-                          }`}
-                        />
-                      </button>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center justify-end space-x-2">
-                      {showArchived ? (
-                        <button 
-                          className="p-2 text-gray-400 hover:text-green-600 rounded-lg hover:bg-green-50"
-                          title="Restore Campaign"
-                          onClick={() => unarchiveCampaign(campaign.id)}
-                        >
-                          <ArchiveRestore className="w-4 h-4" />
-                        </button>
-                      ) : (
-                        <button 
-                          className="p-2 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50"
-                          title="Archive Campaign"
-                          onClick={() => archiveCampaign(campaign.id)}
-                        >
-                          <Archive className="w-4 h-4" />
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      {/* Campaign List - Responsive Layout */}
+      {viewMode === 'cards' ? (
+        /* Mobile/Card View */
+        <div className="space-y-4">
+          {filteredCampaigns.map((campaign) => (
+            <CampaignCard
+              key={campaign.id}
+              campaign={campaign}
+              isGlobalAdmin={isGlobalAdmin}
+              tenantNames={tenantNames}
+              salesTeamMembers={salesTeamMembers}
+              phoneNumbers={phoneNumbers}
+              knowledgeAssets={knowledgeAssets}
+              selectedKnowledgeAssets={selectedKnowledgeAssets}
+              knowledgeDropdownOpen={knowledgeDropdownOpen}
+              setKnowledgeDropdownOpen={setKnowledgeDropdownOpen}
+              showArchived={showArchived}
+              showDynamicColumn={showDynamicColumn}
+              getDynamicColumnHeader={getDynamicColumnHeader}
+              getDynamicDropdownOptions={getDynamicDropdownOptions}
+              getStatusBadge={getStatusBadge}
+              updateCampaignAssignment={updateCampaignAssignment}
+              updateCampaignPhoneNumber={updateCampaignPhoneNumber}
+              updateCampaignDynamicField={updateCampaignDynamicField}
+              updateCampaignKnowledgeLinks={updateCampaignKnowledgeLinks}
+              setSelectedKnowledgeAssets={setSelectedKnowledgeAssets}
+              toggleAiOn={toggleAiOn}
+              archiveCampaign={archiveCampaign}
+              unarchiveCampaign={unarchiveCampaign}
+            />
+          ))}
         </div>
+      ) : (
+        /* Desktop Table View */
+        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Campaign
+                  </th>
+                  {isGlobalAdmin && (
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Tenant
+                    </th>
+                  )}
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Status
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Progress & Delivery
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Assignment & Phone
+                  </th>
+                  {/* Dynamic Column Header */}
+                  {showDynamicColumn && (
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      {getDynamicColumnHeader()}
+                    </th>
+                  )}
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Knowledge Assets
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    AI Toggle
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {filteredCampaigns.map((campaign) => (
+                  <tr key={campaign.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4">
+                      <div>
+                        <div className="text-sm font-medium text-gray-900">{campaign.name}</div>
+                        <div className="text-sm text-gray-500">
+                          {campaign.description || 'No description'}
+                        </div>
+                      </div>
+                    </td>
+                    {isGlobalAdmin && (
+                      <td className="px-6 py-4">
+                        <div className="flex items-center space-x-2">
+                          <Building2 className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                          <span className="text-sm text-gray-900 truncate">
+                            {tenantNames[campaign.tenant_id] || campaign.tenants?.name || 'Unknown Tenant'}
+                          </span>
+                        </div>
+                      </td>
+                    )}
+                    <td className="px-6 py-4">
+                      {getStatusBadge(campaign)}
+                    </td>
+                    <td className="px-6 py-4">
+                      <CampaignProgress campaignId={campaign.id} />
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="space-y-2">
+                        {/* Assigned To */}
+                        <div>
+                          <select
+                            value={campaign.assigned_to_sales_team_id || ''}
+                            onChange={(e) => updateCampaignAssignment(campaign.id, e.target.value || null)}
+                            className="text-xs border border-gray-300 rounded px-2 py-1 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 w-full"
+                            title={campaign.assigned_to_name ? `Assigned to ${campaign.assigned_to_name}` : 'Not assigned'}
+                          >
+                            <option value="">Unassigned</option>
+                            {salesTeamMembers.map(member => (
+                              <option key={member.sales_team_id} value={member.sales_team_id}>
+                                {member.full_name || member.email}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        
+                        {/* Phone Number */}
+                        <div>
+                          <select
+                            value={campaign.phone_number_id || ''}
+                            onChange={(e) => updateCampaignPhoneNumber(campaign.id, e.target.value || null)}
+                            className="text-xs border border-gray-300 rounded px-2 py-1 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 w-full"
+                            title={campaign.phone_number ? `Current: ${campaign.phone_number}` : 'Not assigned'}
+                          >
+                            <option value="">No phone assigned</option>
+                            {phoneNumbers.map(phone => (
+                              <option key={phone.id} value={phone.id}>
+                                {phone.phone_number}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                    </td>
+                    {/* Dynamic Dropdown Cell */}
+                    {showDynamicColumn && (
+                      <td className="px-6 py-4">
+                        <select
+                          value={
+                            campaign.talk_track || 
+                            campaign.service_type || 
+                            campaign.vehicle_type || 
+                            ''
+                          }
+                          onChange={(e) => updateCampaignDynamicField(campaign.id, e.target.value || null)}
+                          className="text-sm border border-gray-300 rounded-lg px-2 py-1 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 w-full"
+                        >
+                          <option value="">Select {getDynamicColumnHeader().toLowerCase()}...</option>
+                          {getDynamicDropdownOptions().map(option => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
+                    )}
+                    {/* Knowledge Assets Multi-Select */}
+                    <td className="px-6 py-4">
+                      <div className="relative">
+                        <button
+                          id={`knowledge-dropdown-${campaign.id}`}
+                          onClick={() => setKnowledgeDropdownOpen({
+                            ...knowledgeDropdownOpen,
+                            [campaign.id]: !knowledgeDropdownOpen[campaign.id]
+                          })}
+                          className="text-sm border border-gray-300 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 flex items-center justify-between min-w-[120px] bg-white hover:bg-gray-50"
+                        >
+                          <span className="truncate">
+                            {selectedKnowledgeAssets[campaign.id]?.length > 0
+                              ? `${selectedKnowledgeAssets[campaign.id].length} selected`
+                              : 'Select...'}
+                          </span>
+                          <svg className="w-4 h-4 ml-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </button>
+                        
+                        <KnowledgeAssetsDropdown
+                          campaign={campaign}
+                          knowledgeAssets={knowledgeAssets}
+                          selectedAssets={selectedKnowledgeAssets[campaign.id]}
+                          isOpen={knowledgeDropdownOpen[campaign.id]}
+                          onToggle={() => setKnowledgeDropdownOpen({
+                            ...knowledgeDropdownOpen,
+                            [campaign.id]: !knowledgeDropdownOpen[campaign.id]
+                          })}
+                          onUpdate={async (assetId, checked) => {
+                            const currentSelected = selectedKnowledgeAssets[campaign.id] || [];
+                            let newSelected;
+                            
+                            if (checked) {
+                              newSelected = [...currentSelected, assetId];
+                            } else {
+                              newSelected = currentSelected.filter(id => id !== assetId);
+                            }
+                            
+                            setSelectedKnowledgeAssets({
+                              ...selectedKnowledgeAssets,
+                              [campaign.id]: newSelected
+                            });
+                            
+                            // Update in database
+                            await updateCampaignKnowledgeLinks(campaign.id, newSelected);
+                          }}
+                        />
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center justify-center">
+                        {/* AI Toggle Switch */}
+                        <button
+                          onClick={() => toggleAiOn(campaign.id, campaign.ai_on)}
+                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
+                            campaign.ai_on 
+                              ? 'bg-blue-600' 
+                              : 'bg-gray-200'
+                          }`}
+                          title={campaign.ai_on ? 'AI Enabled - Click to disable' : 'AI Disabled - Click to enable'}
+                        >
+                          <span
+                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                              campaign.ai_on ? 'translate-x-6' : 'translate-x-1'
+                            }`}
+                          />
+                        </button>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center justify-end space-x-2">
+                        {showArchived ? (
+                          <button 
+                            className="p-2 text-gray-400 hover:text-green-600 rounded-lg hover:bg-green-50"
+                            title="Restore Campaign"
+                            onClick={() => unarchiveCampaign(campaign.id)}
+                          >
+                            <ArchiveRestore className="w-4 h-4" />
+                          </button>
+                        ) : (
+                          <button 
+                            className="p-2 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50"
+                            title="Archive Campaign"
+                            onClick={() => archiveCampaign(campaign.id)}
+                          >
+                            <Archive className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
-        {filteredCampaigns.length === 0 && !loading && (
-          <div className="text-center py-12">
+      {/* Empty State */}
+      {filteredCampaigns.length === 0 && !loading && (
+        <div className="bg-white rounded-xl border border-gray-200 p-8 lg:p-12">
+          <div className="text-center">
             {showArchived ? (
               <Archive className="w-12 h-12 text-gray-400 mx-auto mb-4" />
             ) : (
@@ -1427,7 +1732,7 @@ useEffect(() => {
             <h3 className="text-lg font-medium text-gray-900 mb-2">
               {showArchived ? 'No archived campaigns found' : 'No campaigns found'}
             </h3>
-            <p className="text-gray-600 mb-6">
+            <p className="text-gray-600 mb-6 max-w-md mx-auto">
               {showArchived ? (
                 'There are no archived campaigns to display.'
               ) : (
@@ -1443,8 +1748,8 @@ useEffect(() => {
               </Button>
             )}
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Create Campaign Modal */}
       {showCreateModal && (
@@ -1457,27 +1762,27 @@ useEffect(() => {
             onClick={handleCloseModal}
           ></div>
           
-          {/* Sliding Modal */}
-          <div className={`fixed right-0 top-0 h-full w-full max-w-lg bg-white shadow-2xl z-50 transform transition-all duration-500 ease-out ${
+          {/* Sliding Modal - Responsive */}
+          <div className={`fixed right-0 top-0 h-full w-full sm:max-w-lg bg-white shadow-2xl z-50 transform transition-all duration-500 ease-out ${
             showCreateModal ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0'
           }`}>
-            <div className="p-6">
+            <div className="p-4 lg:p-6 h-full flex flex-col">
               {/* Header */}
-              <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center justify-between mb-6 flex-shrink-0">
                 <div>
                   <h2 className="text-xl font-bold text-gray-900">Create Campaign</h2>
-                  <p className="text-sm text-gray-600">Start your AI-powered outreach</p>
+                  <p className="text-sm text-gray-600 mt-1">Start your AI-powered outreach</p>
                 </div>
                 <button
                   onClick={handleCloseModal}
-                  className="p-2 hover:bg-gray-100 rounded-lg transition-all duration-200"
+                  className="p-2 hover:bg-gray-100 rounded-lg transition-all duration-200 flex-shrink-0"
                 >
                   <X className="w-5 h-5 text-gray-500" />
                 </button>
               </div>
 
               {/* Form Content */}
-              <div className="space-y-6">
+              <div className="space-y-6 flex-1">
                 <div>
                   <label className="block text-sm font-medium text-gray-900 mb-2">
                     Campaign Name
@@ -1487,7 +1792,7 @@ useEffect(() => {
                     value={campaignForm.name}
                     onChange={(e) => setCampaignForm({ ...campaignForm, name: e.target.value })}
                     placeholder="e.g. Summer Promotion, Q4 Outreach"
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base"
                     onKeyPress={(e) => {
                       if (e.key === 'Enter' && campaignForm.name.trim()) {
                         handleCreateCampaign();
@@ -1496,31 +1801,32 @@ useEffect(() => {
                     autoFocus
                   />
                 </div>
+              </div>
 
-                {/* Buttons */}
-                <div className="flex justify-end space-x-3 pt-2">
-                  <Button 
-                    variant="outline" 
-                    onClick={handleCloseModal}
-                    disabled={isCreating}
-                  >
-                    Cancel
-                  </Button>
-                  <Button 
-                    onClick={handleCreateCampaign}
-                    disabled={isCreating || !campaignForm.name.trim()}
-                    className="bg-blue-600 hover:bg-blue-700"
-                  >
-                    {isCreating ? (
-                      <>
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                        Creating...
-                      </>
-                    ) : (
-                      'Create Campaign'
-                    )}
-                  </Button>
-                </div>
+              {/* Buttons */}
+              <div className="flex flex-col-reverse sm:flex-row sm:justify-end space-y-reverse space-y-3 sm:space-y-0 sm:space-x-3 pt-6 border-t border-gray-200 flex-shrink-0">
+                <Button 
+                  variant="outline" 
+                  onClick={handleCloseModal}
+                  disabled={isCreating}
+                  className="w-full sm:w-auto"
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={handleCreateCampaign}
+                  disabled={isCreating || !campaignForm.name.trim()}
+                  className="bg-blue-600 hover:bg-blue-700 w-full sm:w-auto"
+                >
+                  {isCreating ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      Creating...
+                    </>
+                  ) : (
+                    'Create Campaign'
+                  )}
+                </Button>
               </div>
             </div>
           </div>
