@@ -4,7 +4,7 @@ import {
   TrendingUp, Users, Target, DollarSign, Calendar, Filter, Download, RefreshCw, 
   BarChart3, Brain, Settings, Plus, Eye, ArrowRight, Award, TestTube, Database, 
   Activity, MessageSquare, Lock, AlertCircle, Menu, X, ChevronDown, ChevronRight,
-  Smartphone, Monitor, Grid, List, MoreHorizontal
+  Smartphone, Monitor, Grid, List, MoreHorizontal, ChevronUp
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { PERMISSIONS } from '../lib/permissions';
@@ -15,7 +15,7 @@ import CustomReportsBuilder from '../components/CustomReportsBuilder';
 import LearningAnalytics from '../components/LearningAnalytics';
 import { PLAN_FEATURES } from '../lib/plans';
 
-// Mobile Card Components
+// Simplified Mobile Components - More Intuitive
 const MobileMetricCard = ({ title, value, subtitle, icon: Icon, color = 'blue', trend, onClick }) => {
   const colors = {
     blue: 'from-blue-50 to-blue-100 text-blue-600 border-blue-200',
@@ -27,11 +27,11 @@ const MobileMetricCard = ({ title, value, subtitle, icon: Icon, color = 'blue', 
 
   return (
     <div 
-      className={`bg-gradient-to-r ${colors[color]} rounded-xl p-4 border cursor-pointer hover:shadow-md transition-all`}
+      className={`bg-gradient-to-r ${colors[color]} rounded-lg p-4 border cursor-pointer hover:shadow-md transition-all`}
       onClick={onClick}
     >
       <div className="flex items-center justify-between mb-2">
-        <Icon className="w-6 h-6 flex-shrink-0" />
+        <Icon className="w-5 h-5 flex-shrink-0" />
         {trend && (
           <div className={`flex items-center text-xs ${trend > 0 ? 'text-green-600' : 'text-red-600'}`}>
             <TrendingUp className={`w-3 h-3 mr-1 ${trend < 0 ? 'rotate-180' : ''}`} />
@@ -41,242 +41,104 @@ const MobileMetricCard = ({ title, value, subtitle, icon: Icon, color = 'blue', 
       </div>
       <div className="space-y-1">
         <p className="text-xs font-medium opacity-80">{title}</p>
-        <p className="text-lg font-bold">{value}</p>
+        <p className="text-xl font-bold">{value}</p>
         {subtitle && <p className="text-xs opacity-70">{subtitle}</p>}
       </div>
     </div>
   );
 };
 
-const MobileFunnelStage = ({ stage, isLast = false }) => {
-  return (
-    <div className="relative">
-      <div className="bg-white rounded-xl border border-gray-200 p-4 hover:shadow-md transition-all">
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center space-x-2">
-            <div 
-              className="w-3 h-3 rounded-full" 
-              style={{ backgroundColor: stage.color }}
-            />
-            <span className="text-sm font-semibold text-gray-900 truncate">{stage.stage}</span>
-          </div>
-          <div className="text-right">
-            <span className="text-lg font-bold text-gray-900">
-              {typeof stage.count === 'number' ? stage.count.toLocaleString() : stage.count}
-            </span>
-          </div>
-        </div>
-        
-        <div className="mb-2">
-          <div className="w-full bg-gray-200 rounded-full h-2">
-            <div
-              className="h-2 rounded-full transition-all duration-500"
-              style={{ 
-                width: `${Math.min(100, stage.rate)}%`, 
-                backgroundColor: stage.color 
-              }}
-            />
-          </div>
-        </div>
-        
-        <div className="flex items-center justify-between text-xs text-gray-500">
-          <span>{stage.rate}%</span>
-          {stage.sublabel && <span>{stage.sublabel}</span>}
-        </div>
-        
-        {stage.tooltip && (
-          <div className="mt-2 p-2 bg-gray-50 rounded-lg">
-            <p className="text-xs text-gray-600">{stage.tooltip}</p>
-          </div>
-        )}
-      </div>
-      
-      {!isLast && (
-        <div className="flex justify-center py-2">
-          <ChevronDown className="w-4 h-4 text-gray-400" />
-        </div>
-      )}
-    </div>
-  );
-};
-
-const MobileFilterPanel = ({ 
-  dateRange, 
-  setDateRange, 
-  selectedCampaign, 
-  setSelectedCampaign, 
-  campaigns, 
+// Mobile Sticky Header with Quick Actions
+const MobileHeader = ({ 
+  activeView, 
   onRefresh, 
-  onExport, 
-  loading,
-  canFilterCampaigns,
-  canExportData 
+  onFilters, 
+  loading, 
+  tabs,
+  onViewChange 
 }) => {
-  const [isOpen, setIsOpen] = useState(false);
-
-  return (
-    <>
-      {/* Mobile Filter Button */}
-      <div className="lg:hidden bg-white border-b border-gray-200 px-4 py-3">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-gray-900">Analytics</h2>
-          <div className="flex items-center space-x-2">
-            <button
-              onClick={onRefresh}
-              disabled={loading}
-              className="p-2 text-gray-500 hover:text-gray-700 disabled:opacity-50"
-            >
-              <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
-            </button>
-            <button
-              onClick={() => setIsOpen(true)}
-              className="flex items-center px-3 py-2 bg-gray-100 rounded-lg text-sm font-medium text-gray-700"
-            >
-              <Filter className="w-4 h-4 mr-2" />
-              Filters
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Mobile Filter Overlay */}
-      {isOpen && (
-        <>
-          <div 
-            className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
-            onClick={() => setIsOpen(false)}
-          />
-          <div className="fixed inset-x-0 bottom-0 bg-white rounded-t-xl z-50 lg:hidden">
-            <div className="p-4">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-900">Filters</h3>
-                <button
-                  onClick={() => setIsOpen(false)}
-                  className="p-2 text-gray-500 hover:text-gray-700"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-              
-              {canFilterCampaigns && (
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Date Range
-                    </label>
-                    <select 
-                      value={dateRange}
-                      onChange={(e) => setDateRange(parseInt(e.target.value))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value={7}>Last 7 Days</option>
-                      <option value={30}>Last 30 Days</option>
-                      <option value={60}>Last 60 Days</option>
-                      <option value={90}>Last 90 Days</option>
-                    </select>
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Campaign
-                    </label>
-                    <select 
-                      value={selectedCampaign}
-                      onChange={(e) => setSelectedCampaign(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="all">All Campaigns</option>
-                      {campaigns.map(campaign => (
-                        <option key={campaign.id} value={campaign.id}>{campaign.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-              )}
-              
-              <div className="flex space-x-3 mt-6 pt-4 border-t border-gray-200">
-                {canExportData && (
-                  <button 
-                    onClick={() => {
-                      onExport();
-                      setIsOpen(false);
-                    }}
-                    className="flex-1 flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                  >
-                    <Download className="w-4 h-4 mr-2" />
-                    Export
-                  </button>
-                )}
-                <button
-                  onClick={() => setIsOpen(false)}
-                  className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
-                >
-                  Done
-                </button>
-              </div>
-            </div>
-          </div>
-        </>
-      )}
-    </>
-  );
-};
-
-const MobileNavigationTabs = ({ activeView, setActiveView, tabs }) => {
-  const [isOpen, setIsOpen] = useState(false);
+  const [showViewSelector, setShowViewSelector] = useState(false);
   const activeTab = tabs.find(tab => tab.id === activeView);
 
   return (
-    <div className="lg:hidden bg-white border-b border-gray-200 px-4 py-3">
-      <button
-        onClick={() => setIsOpen(true)}
-        className="flex items-center justify-between w-full text-left"
-      >
-        <div className="flex items-center space-x-2">
-          <activeTab.icon className="w-5 h-5 text-blue-600" />
-          <span className="font-medium text-gray-900">{activeTab.name}</span>
-        </div>
-        <ChevronDown className="w-5 h-5 text-gray-400" />
-      </button>
+    <>
+      <div className="lg:hidden sticky top-0 z-50 bg-white border-b border-gray-200 shadow-sm">
+        <div className="px-4 py-3">
+          <div className="flex items-center justify-between">
+            {/* Current View + Selector */}
+            <button
+              onClick={() => setShowViewSelector(true)}
+              className="flex items-center space-x-2 px-3 py-2 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+            >
+              <activeTab.icon className="w-4 h-4 text-blue-600" />
+              <span className="font-medium text-gray-900 text-sm truncate max-w-32">
+                {activeTab.name}
+              </span>
+              <ChevronDown className="w-4 h-4 text-gray-500" />
+            </button>
 
-      {/* Mobile Tab Selector Overlay */}
-      {isOpen && (
+            {/* Quick Actions */}
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={onRefresh}
+                disabled={loading}
+                className="p-2 text-gray-500 hover:text-gray-700 disabled:opacity-50 hover:bg-gray-50 rounded-lg transition-colors"
+              >
+                <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+              </button>
+              <button
+                onClick={onFilters}
+                className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-50 rounded-lg transition-colors"
+              >
+                <Filter className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* View Selector Bottom Sheet */}
+      {showViewSelector && (
         <>
           <div 
-            className="fixed inset-0 bg-black bg-opacity-50 z-40"
-            onClick={() => setIsOpen(false)}
+            className="fixed inset-0 bg-black bg-opacity-50 z-50"
+            onClick={() => setShowViewSelector(false)}
           />
-          <div className="fixed inset-x-0 bottom-0 bg-white rounded-t-xl z-50 max-h-96 overflow-y-auto">
-            <div className="p-4">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-900">Analytics Views</h3>
+          <div className="fixed inset-x-4 bottom-4 bg-white rounded-2xl shadow-2xl z-50 max-h-96 overflow-hidden">
+            <div className="p-4 border-b border-gray-100">
+              <div className="flex items-center justify-between">
+                <h3 className="font-semibold text-gray-900">Analytics Views</h3>
                 <button
-                  onClick={() => setIsOpen(false)}
-                  className="p-2 text-gray-500 hover:text-gray-700"
+                  onClick={() => setShowViewSelector(false)}
+                  className="p-1 text-gray-400 hover:text-gray-600"
                 >
                   <X className="w-5 h-5" />
                 </button>
               </div>
-              
-              <div className="space-y-2">
+            </div>
+            
+            <div className="p-2 max-h-80 overflow-y-auto">
+              <div className="grid grid-cols-1 gap-1">
                 {tabs.map((tab) => {
                   const Icon = tab.icon;
+                  const isActive = activeView === tab.id;
+                  
                   return (
                     <button
                       key={tab.id}
                       onClick={() => {
-                        setActiveView(tab.id);
-                        setIsOpen(false);
+                        onViewChange(tab.id);
+                        setShowViewSelector(false);
                       }}
-                      className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-left transition-colors ${
-                        activeView === tab.id
-                          ? 'bg-blue-50 text-blue-600 border border-blue-200'
+                      className={`flex items-center space-x-3 px-4 py-3 rounded-xl text-left transition-all ${
+                        isActive
+                          ? 'bg-blue-50 text-blue-600 border border-blue-100'
                           : 'text-gray-700 hover:bg-gray-50'
                       }`}
                     >
                       <Icon className="w-5 h-5 flex-shrink-0" />
                       <span className="font-medium">{tab.name}</span>
-                      {activeView === tab.id && (
+                      {isActive && (
                         <div className="ml-auto w-2 h-2 bg-blue-600 rounded-full" />
                       )}
                     </button>
@@ -287,70 +149,179 @@ const MobileNavigationTabs = ({ activeView, setActiveView, tabs }) => {
           </div>
         </>
       )}
-    </div>
+    </>
   );
 };
 
-const MobileTableCard = ({ title, data, headers, renderRow, emptyMessage }) => {
-  const [expanded, setExpanded] = useState(false);
+// Mobile Filter Bottom Sheet - Cleaner Design
+const MobileFilters = ({ 
+  isOpen,
+  onClose,
+  dateRange, 
+  setDateRange, 
+  selectedCampaign, 
+  setSelectedCampaign, 
+  campaigns,
+  onExport,
+  canFilterCampaigns,
+  canExportData 
+}) => {
+  if (!isOpen) return null;
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+    <>
+      <div 
+        className="fixed inset-0 bg-black bg-opacity-50 z-50"
+        onClick={onClose}
+      />
+      <div className="fixed inset-x-4 bottom-4 bg-white rounded-2xl shadow-2xl z-50">
+        <div className="p-4 border-b border-gray-100">
+          <div className="flex items-center justify-between">
+            <h3 className="font-semibold text-gray-900">Filters & Settings</h3>
+            <button
+              onClick={onClose}
+              className="p-1 text-gray-400 hover:text-gray-600"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+        
+        <div className="p-4">
+          {canFilterCampaigns && (
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <Calendar className="w-4 h-4 inline mr-2" />
+                  Date Range
+                </label>
+                <select 
+                  value={dateRange}
+                  onChange={(e) => setDateRange(parseInt(e.target.value))}
+                  className="w-full px-3 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value={7}>Last 7 Days</option>
+                  <option value={30}>Last 30 Days</option>
+                  <option value={60}>Last 60 Days</option>
+                  <option value={90}>Last 90 Days</option>
+                </select>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <Target className="w-4 h-4 inline mr-2" />
+                  Campaign
+                </label>
+                <select 
+                  value={selectedCampaign}
+                  onChange={(e) => setSelectedCampaign(e.target.value)}
+                  className="w-full px-3 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="all">All Campaigns</option>
+                  {campaigns.map(campaign => (
+                    <option key={campaign.id} value={campaign.id}>{campaign.name}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          )}
+          
+          <div className="flex space-x-3 mt-6 pt-4 border-t border-gray-100">
+            {canExportData && (
+              <button 
+                onClick={() => {
+                  onExport();
+                  onClose();
+                }}
+                className="flex-1 flex items-center justify-center px-4 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 font-medium"
+              >
+                <Download className="w-4 h-4 mr-2" />
+                Export Data
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 font-medium"
+            >
+              Done
+            </button>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+};
+
+// Collapsible Section Component
+const CollapsibleSection = ({ title, children, defaultExpanded = true, className = "" }) => {
+  const [isExpanded, setIsExpanded] = useState(defaultExpanded);
+
+  return (
+    <div className={`bg-white rounded-xl border border-gray-200 overflow-hidden ${className}`}>
       <button
-        onClick={() => setExpanded(!expanded)}
+        onClick={() => setIsExpanded(!isExpanded)}
         className="w-full px-4 py-4 text-left hover:bg-gray-50 transition-colors"
       >
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
-          <div className="flex items-center space-x-2">
-            <span className="text-sm text-gray-500">{data.length} items</span>
-            <ChevronDown className={`w-5 h-5 text-gray-400 transition-transform ${expanded ? 'rotate-180' : ''}`} />
-          </div>
+          <ChevronDown className={`w-5 h-5 text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
         </div>
       </button>
       
-      {expanded && (
-        <div className="border-t border-gray-200">
-          {data.length === 0 ? (
-            <div className="p-8 text-center text-gray-500">
-              {emptyMessage}
-            </div>
-          ) : (
-            <div className="divide-y divide-gray-200">
-              {data.map((item, index) => (
-                <div key={index} className="p-4">
-                  {renderRow(item, index)}
-                </div>
-              ))}
-            </div>
-          )}
+      {isExpanded && (
+        <div className="border-t border-gray-100">
+          <div className="p-4">
+            {children}
+          </div>
         </div>
       )}
     </div>
   );
 };
 
-const MobileChartCard = ({ title, description, children, actions }) => {
+// Funnel Stage Component - Simplified
+const FunnelStage = ({ stage, isLast = false }) => {
   return (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
-      <div className="px-4 py-4 border-b border-gray-100">
-        <div className="flex items-center justify-between">
-          <div className="min-w-0 flex-1">
-            <h3 className="text-lg font-semibold text-gray-900 truncate">{title}</h3>
-            {description && (
-              <p className="text-sm text-gray-600 mt-1 line-clamp-2">{description}</p>
-            )}
-          </div>
-          {actions && (
-            <div className="ml-4 flex-shrink-0">
-              {actions}
-            </div>
-          )}
+    <div className="space-y-2">
+      <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+        <div className="flex items-center space-x-2">
+          <div 
+            className="w-3 h-3 rounded-full" 
+            style={{ backgroundColor: stage.color }}
+          />
+          <span className="text-sm font-semibold text-gray-900">{stage.stage}</span>
+        </div>
+        <div className="text-right">
+          <span className="text-lg font-bold text-gray-900">
+            {typeof stage.count === 'number' ? stage.count.toLocaleString() : stage.count}
+          </span>
+          <span className="text-sm text-gray-500 ml-2">({stage.rate}%)</span>
         </div>
       </div>
-      <div className="p-4">
-        {children}
+      
+      <div className="px-3">
+        <div className="w-full bg-gray-200 rounded-full h-2">
+          <div
+            className="h-2 rounded-full transition-all duration-500"
+            style={{ 
+              width: `${Math.min(100, stage.rate)}%`, 
+              backgroundColor: stage.color 
+            }}
+          />
+        </div>
+        
+        {stage.tooltip && (
+          <div className="mt-2 p-2 bg-blue-50 rounded-lg">
+            <p className="text-xs text-blue-700">{stage.tooltip}</p>
+          </div>
+        )}
       </div>
+      
+      {!isLast && (
+        <div className="flex justify-center py-1">
+          <ChevronDown className="w-4 h-4 text-gray-300" />
+        </div>
+      )}
     </div>
   );
 };
@@ -363,7 +334,7 @@ export default function BusinessAnalytics() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [pipelineValue, setPipelineValue] = useState(0);
-  const [viewMode, setViewMode] = useState('responsive'); // 'mobile', 'desktop', 'responsive'
+  const [showMobileFilters, setShowMobileFilters] = useState(false);
   
   // Use refs to prevent multiple initializations
   const isInitialized = useRef(false);
@@ -393,19 +364,6 @@ export default function BusinessAnalytics() {
   
   // Check if user has access to analytics at all
   const hasAnalyticsAccess = canViewFunnelStats || canViewPerformanceAnalytics;
-
-  // Auto-detect screen size for responsive mode
-  useEffect(() => {
-    const handleResize = () => {
-      if (viewMode === 'responsive') {
-        // The responsive behavior is handled by CSS classes
-      }
-    };
-
-    handleResize();
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, [viewMode]);
 
   // Helper function to get date filter
   const getDateFilter = useCallback(() => {
@@ -994,32 +952,6 @@ const viewPermissions = {
         )}
         
         <div className="ml-auto flex items-center space-x-3">
-          {/* View Mode Toggle - Desktop Only */}
-          <div className="flex items-center bg-gray-100 rounded-lg p-1">
-            <button
-              onClick={() => setViewMode('desktop')}
-              className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors flex items-center space-x-2 ${
-                viewMode === 'desktop' 
-                  ? 'bg-white text-gray-900 shadow-sm' 
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              <Monitor className="w-4 h-4" />
-              <span>Desktop</span>
-            </button>
-            <button
-              onClick={() => setViewMode('responsive')}
-              className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors flex items-center space-x-2 ${
-                viewMode === 'responsive' 
-                  ? 'bg-white text-gray-900 shadow-sm' 
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              <Smartphone className="w-4 h-4" />
-              <span>Auto</span>
-            </button>
-          </div>
-          
           <button 
             onClick={loadAllData}
             disabled={loading || isLoadingData.current}
@@ -1106,7 +1038,7 @@ const viewPermissions = {
   return (
     <>
       {/* Desktop Navigation */}
-      <div className={`hidden lg:block bg-white border-b border-gray-200 ${viewMode === 'responsive' ? 'lg:block' : ''}`}>
+      <div className="hidden lg:block bg-white border-b border-gray-200">
         <div className="px-6">
           <nav className="flex space-x-8 overflow-x-auto">
             {allowedTabs.map((tab) => {
@@ -1146,12 +1078,7 @@ const viewPermissions = {
         </div>
       </div>
 
-      {/* Mobile Navigation */}
-      <MobileNavigationTabs 
-        activeView={activeView} 
-        setActiveView={setActiveView} 
-        tabs={allowedTabs} 
-      />
+      {/* Mobile Navigation handled by MobileHeader */}
     </>
   );
 };
@@ -1244,27 +1171,24 @@ const viewPermissions = {
     ];
 
     return (
-      <div className="space-y-4 lg:space-y-6">
-        {/* Mobile AI Engagement Flow */}
+      <div className="space-y-6">
+        {/* Mobile: Collapsible AI Engagement Flow */}
         <div className="lg:hidden">
-          <MobileChartCard
-            title="AI Engagement Flow"
-            description="Real-time interaction tracking from AI-driven outreach"
-          >
+          <CollapsibleSection title="AI Engagement Flow" defaultExpanded={true}>
             <div className="space-y-3">
               {macroFunnelData.map((stage, index) => (
-                <MobileFunnelStage 
+                <FunnelStage 
                   key={stage.stage} 
                   stage={stage} 
                   isLast={index === macroFunnelData.length - 1}
                 />
               ))}
             </div>
-          </MobileChartCard>
+          </CollapsibleSection>
         </div>
 
         {/* Desktop AI Engagement Flow */}
-        <div className={`hidden lg:block ${viewMode === 'responsive' ? 'lg:block' : ''}`}>
+        <div className="hidden lg:block">
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
             <div className="px-6 py-4 border-b border-gray-100">
               <h3 className="text-lg font-semibold text-gray-900">AI Engagement Flow</h3>
@@ -1313,28 +1237,25 @@ const viewPermissions = {
           <>
             {/* Mobile Historical Trends */}
             <div className="lg:hidden">
-              <MobileChartCard
-                title="Historical Performance Trends"
-                description="Real cost and performance data from your campaigns"
-              >
-                <ResponsiveContainer width="100%" height={300}>
+              <CollapsibleSection title="Historical Performance Trends" defaultExpanded={false}>
+                <ResponsiveContainer width="100%" height={250}>
                   <LineChart data={dashboardData.historicalTrends}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                     <XAxis dataKey="period" stroke="#6b7280" fontSize={10} />
                     <YAxis yAxisId="rate" orientation="left" stroke="#6b7280" fontSize={10} />
                     <YAxis yAxisId="cost" orientation="right" stroke="#6b7280" fontSize={10} />
                     <Tooltip />
-                    <Legend fontSize={12} />
+                    <Legend fontSize={10} />
                     <Line yAxisId="rate" dataKey="hotLeadRate" stroke="#10b981" strokeWidth={2} name="Hot Lead Rate %" />
                     <Line yAxisId="rate" dataKey="replyRate" stroke="#3b82f6" strokeWidth={2} name="Reply Rate %" />
                     <Line yAxisId="cost" dataKey="costPerHot" stroke="#f59e0b" strokeWidth={2} name="Cost per Hot Lead $" />
                   </LineChart>
                 </ResponsiveContainer>
-              </MobileChartCard>
+              </CollapsibleSection>
             </div>
 
             {/* Desktop Historical Trends */}
-            <div className={`hidden lg:block ${viewMode === 'responsive' ? 'lg:block' : ''}`}>
+            <div className="hidden lg:block">
               <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
                 <div className="px-6 py-4 border-b border-gray-100">
                   <h3 className="text-lg font-semibold text-gray-900">Historical Performance Trends</h3>
@@ -1365,44 +1286,42 @@ const viewPermissions = {
           <>
             {/* Mobile Lead Source ROI */}
             <div className="lg:hidden">
-              <MobileTableCard
-                title="Lead Source ROI Analysis"
-                data={dashboardData.leadSourceROI}
-                headers={['Source', 'Leads', 'Hot Leads', 'Revenue', 'ROI %']}
-                renderRow={(source) => (
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="font-medium text-gray-900">{source.source}</span>
-                      <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                        source.roi === null ? 'bg-green-100 text-green-800' :
-                        source.roi > 200 ? 'bg-green-100 text-green-800' :
-                        'bg-yellow-100 text-yellow-800'
-                      }`}>
-                        {source.roi === null ? 'Free' : `${source.roi}%`}
-                      </span>
+              <CollapsibleSection title="Lead Source ROI Analysis" defaultExpanded={false}>
+                <div className="space-y-3">
+                  {dashboardData.leadSourceROI.map((source, index) => (
+                    <div key={index} className="p-3 bg-gray-50 rounded-lg">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="font-medium text-gray-900">{source.source}</span>
+                        <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                          source.roi === null ? 'bg-green-100 text-green-800' :
+                          source.roi > 200 ? 'bg-green-100 text-green-800' :
+                          'bg-yellow-100 text-yellow-800'
+                        }`}>
+                          {source.roi === null ? 'Free' : `${source.roi}%`}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-3 text-sm">
+                        <div className="text-center">
+                          <div className="text-xs text-gray-500">Leads</div>
+                          <div className="font-semibold">{source.leads.toLocaleString()}</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-xs text-gray-500">Hot</div>
+                          <div className="font-semibold text-green-600">{source.hotLeads}</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-xs text-gray-500">Revenue</div>
+                          <div className="font-semibold">${(source.revenue/1000).toFixed(0)}K</div>
+                        </div>
+                      </div>
                     </div>
-                    <div className="grid grid-cols-3 gap-4 text-sm text-gray-600">
-                      <div>
-                        <span className="block text-xs text-gray-500">Leads</span>
-                        <span className="font-medium">{source.leads.toLocaleString()}</span>
-                      </div>
-                      <div>
-                        <span className="block text-xs text-gray-500">Hot</span>
-                        <span className="font-medium">{source.hotLeads}</span>
-                      </div>
-                      <div>
-                        <span className="block text-xs text-gray-500">Revenue</span>
-                        <span className="font-medium">${source.revenue.toLocaleString()}</span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-                emptyMessage="No lead source data available"
-              />
+                  ))}
+                </div>
+              </CollapsibleSection>
             </div>
 
             {/* Desktop Lead Source ROI */}
-            <div className={`hidden lg:block ${viewMode === 'responsive' ? 'lg:block' : ''}`}>
+            <div className="hidden lg:block">
               <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
                 <div className="px-6 py-4 border-b border-gray-100">
                   <h3 className="text-lg font-semibold text-gray-900">Lead Source ROI Analysis</h3>
@@ -1466,14 +1385,11 @@ const viewPermissions = {
     }
 
     return (
-      <div className="space-y-4 lg:space-y-6">
+      <div className="space-y-6">
         {/* Mobile AI Confidence Chart */}
         <div className="lg:hidden">
-          <MobileChartCard
-            title="AI Confidence vs Actual Outcome"
-            description="How well AI predictions match real results"
-          >
-            <ResponsiveContainer width="100%" height={250}>
+          <CollapsibleSection title="AI Confidence vs Actual Outcome" defaultExpanded={true}>
+            <ResponsiveContainer width="100%" height={200}>
               <ScatterChart data={dashboardData.aiInsights.confidenceData || []}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                 <XAxis 
@@ -1499,11 +1415,11 @@ const viewPermissions = {
                 <Scatter dataKey="actualHot" fill="#3b82f6" />
               </ScatterChart>
             </ResponsiveContainer>
-          </MobileChartCard>
+          </CollapsibleSection>
         </div>
 
         {/* Desktop AI Confidence Chart */}
-        <div className={`hidden lg:block ${viewMode === 'responsive' ? 'lg:block' : ''}`}>
+        <div className="hidden lg:block">
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
             <div className="px-6 py-4 border-b border-gray-100">
               <h3 className="text-lg font-semibold text-gray-900">AI Confidence vs Actual Outcome</h3>
@@ -1562,10 +1478,10 @@ const viewPermissions = {
     const totalHotLeads = dashboardData.campaigns.reduce((sum, campaign) => sum + campaign.hotLeads, 0);
 
     return (
-      <div className="space-y-4 lg:space-y-6">
-        {/* Mobile Metrics Cards */}
+      <div className="space-y-6">
+        {/* Mobile Metrics Grid */}
         <div className="lg:hidden">
-          <div className="grid grid-cols-2 gap-3 mb-4">
+          <div className="grid grid-cols-2 gap-4">
             <MobileMetricCard
               title="Contacts Processed"
               value={totalLeads.toLocaleString()}
@@ -1578,19 +1494,23 @@ const viewPermissions = {
               icon={Target}
               color="green"
             />
-          </div>
-          <div className="grid grid-cols-1 gap-3">
             <MobileMetricCard
-              title="AI-to-Handoff Success Rate"
+              title="Success Rate"
               value={`${dashboardData.performanceMetrics.averagePerformance || 0}%`}
               icon={BarChart3}
               color="purple"
+            />
+            <MobileMetricCard
+              title="Response Rate"
+              value={`${dashboardData.performanceMetrics.responseRate || 0}%`}
+              icon={MessageSquare}
+              color="orange"
             />
           </div>
         </div>
 
         {/* Desktop Metrics Cards */}
-        <div className={`hidden lg:block ${viewMode === 'responsive' ? 'lg:block' : ''}`}>
+        <div className="hidden lg:block">
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
             <div className="px-6 py-4 border-b border-gray-100">
               <h3 className="text-lg font-semibold text-gray-900">Lead Performance Overview</h3>
@@ -1625,10 +1545,7 @@ const viewPermissions = {
 
         {/* Mobile Conversion Funnel */}
         <div className="lg:hidden">
-          <MobileChartCard
-            title="Lead Conversion Funnel"
-            description="Step-by-step conversion tracking"
-          >
+          <CollapsibleSection title="Lead Conversion Funnel" defaultExpanded={true}>
             <div className="space-y-3">
               <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
                 <span className="font-medium text-gray-900 text-sm">Inbound Volume</span>
@@ -1649,11 +1566,11 @@ const viewPermissions = {
                 </span>
               </div>
             </div>
-          </MobileChartCard>
+          </CollapsibleSection>
         </div>
 
         {/* Desktop Conversion Funnel */}
-        <div className={`hidden lg:block ${viewMode === 'responsive' ? 'lg:block' : ''}`}>
+        <div className="hidden lg:block">
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
             <div className="px-6 py-4 border-b border-gray-100">
               <h3 className="text-lg font-semibold text-gray-900">Lead Conversion Funnel</h3>
@@ -1707,7 +1624,7 @@ const viewPermissions = {
     const { performanceMetrics, campaignPerformance, aiInsights } = dashboardData;
 
     return (
-      <div className="space-y-4 lg:space-y-8">
+      <div className="space-y-6">
         {/* Mobile Performance Overview Cards */}
         <div className="lg:hidden">
           <div className="grid grid-cols-2 gap-3">
@@ -1743,7 +1660,7 @@ const viewPermissions = {
         </div>
 
         {/* Desktop Performance Overview Cards */}
-        <div className={`hidden lg:block ${viewMode === 'responsive' ? 'lg:block' : ''}`}>
+        <div className="hidden lg:block">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
             <div className="bg-gradient-to-r from-blue-50 to-blue-100 rounded-xl p-6">
               <div className="flex items-center justify-between">
@@ -1795,57 +1712,48 @@ const viewPermissions = {
           </div>
         </div>
 
-        {/* Mobile Campaign Performance Table */}
+        {/* Mobile Campaign Performance */}
         <div className="lg:hidden">
-          <MobileTableCard
-            title="Campaign Performance Breakdown"
-            data={campaignPerformance}
-            renderRow={(row) => (
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="font-medium text-gray-900">{row.campaign}</span>
-                  <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                    row.rate >= 15 
-                      ? 'bg-green-100 text-green-800'
-                      : row.rate >= 10
-                      ? 'bg-yellow-100 text-yellow-800'
-                      : 'bg-red-100 text-red-800'
-                  }`}>
-                    {row.rate || 0}%
-                  </span>
-                </div>
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <span className="block text-xs text-gray-500">Touchpoints</span>
-                    <span className="font-medium">{row.sent?.toLocaleString() || 0}</span>
-                  </div>
-                  <div>
-                    <span className="block text-xs text-gray-500">Viewed</span>
-                    <span className="font-medium">{row.opened?.toLocaleString() || 0}</span>
-                    <span className="text-xs text-gray-400 ml-1">
-                      ({row.sent > 0 ? ((row.opened / row.sent) * 100).toFixed(1) : 0}%)
+          <CollapsibleSection title="Campaign Performance" defaultExpanded={false}>
+            <div className="space-y-3">
+              {campaignPerformance.map((campaign, index) => (
+                <div key={index} className="p-3 bg-gray-50 rounded-lg">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="font-medium text-gray-900">{campaign.campaign}</span>
+                    <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                      campaign.rate >= 15 ? 'bg-green-100 text-green-800' :
+                      campaign.rate >= 10 ? 'bg-yellow-100 text-yellow-800' :
+                      'bg-red-100 text-red-800'
+                    }`}>
+                      {campaign.rate || 0}%
                     </span>
                   </div>
-                  <div>
-                    <span className="block text-xs text-gray-500">Engaged</span>
-                    <span className="font-medium">{row.replied?.toLocaleString() || 0}</span>
-                    <span className="text-xs text-gray-400 ml-1">
-                      ({row.sent > 0 ? ((row.replied / row.sent) * 100).toFixed(1) : 0}%)
-                    </span>
-                  </div>
-                  <div>
-                    <span className="block text-xs text-gray-500">Escalated</span>
-                    <span className="font-medium">{row.converted?.toLocaleString() || 0}</span>
+                  <div className="grid grid-cols-4 gap-2 text-xs text-center">
+                    <div>
+                      <div className="text-gray-500">Sent</div>
+                      <div className="font-semibold">{campaign.sent?.toLocaleString() || 0}</div>
+                    </div>
+                    <div>
+                      <div className="text-gray-500">Opened</div>
+                      <div className="font-semibold">{campaign.opened?.toLocaleString() || 0}</div>
+                    </div>
+                    <div>
+                      <div className="text-gray-500">Replied</div>
+                      <div className="font-semibold">{campaign.replied?.toLocaleString() || 0}</div>
+                    </div>
+                    <div>
+                      <div className="text-gray-500">Converted</div>
+                      <div className="font-semibold">{campaign.converted?.toLocaleString() || 0}</div>
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
-            emptyMessage="No campaign performance data available"
-          />
+              ))}
+            </div>
+          </CollapsibleSection>
         </div>
 
         {/* Desktop Campaign Performance Table */}
-        <div className={`hidden lg:block ${viewMode === 'responsive' ? 'lg:block' : ''}`}>
+        <div className="hidden lg:block">
           <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
             <div className="p-6 border-b border-gray-200">
               <h3 className="text-lg font-bold text-gray-900">Campaign Performance Breakdown</h3>
@@ -1917,16 +1825,16 @@ const viewPermissions = {
           </div>
         </div>
 
-        {/* Follow-up Timing Cards */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-8">
+        {/* Follow-up Timing Cards - Mobile Friendly */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Card 1: Cold Leads Follow-Up */}
-          <div className="bg-white rounded-xl lg:rounded-2xl border border-gray-200 p-4 lg:p-6 hover:shadow-lg transition-shadow">
+          <div className="bg-white rounded-xl border border-gray-200 p-4 lg:p-6 hover:shadow-lg transition-shadow">
             <h3 className="text-base lg:text-lg font-bold text-gray-900 mb-1">Follow-Up Results: No Response</h3>
             <p className="text-sm text-gray-600 mb-4">
               For contacts who haven't responded yet
             </p>
             
-            <div className="space-y-3 lg:space-y-4">
+            <div className="space-y-3">
               {/* Using dynamic follow-up days from platform_settings */}
               {aiInsights.followupTiming && aiInsights.followupTiming.length > 0 ? (
                 aiInsights.followupTiming.map((timing, index) => (
@@ -1988,8 +1896,8 @@ const viewPermissions = {
               )}
             </div>
             
-            {/* Insight footer with stronger copy */}
-            <div className="mt-4 p-3 lg:p-4 bg-blue-50 rounded-xl">
+            {/* Insight footer */}
+            <div className="mt-4 p-3 bg-blue-50 rounded-xl">
               <div className="text-sm font-medium text-blue-900">💡 Insight</div>
               <div className="text-xs lg:text-sm text-blue-700 mt-1">
                 Early follow-ups are 5x more likely to get replies — reach back out before interest fades.
@@ -1998,11 +1906,11 @@ const viewPermissions = {
           </div>
 
           {/* Card 2: AI-Paced Re-Engagement */}
-          <div className="bg-white rounded-xl lg:rounded-2xl border border-gray-200 p-4 lg:p-6 hover:shadow-lg transition-shadow">
+          <div className="bg-white rounded-xl border border-gray-200 p-4 lg:p-6 hover:shadow-lg transition-shadow">
             <h3 className="text-base lg:text-lg font-bold text-gray-900 mb-1">AI Re-Engagement Timing</h3>
             <p className="text-sm text-gray-600 mb-4">For leads that previously replied</p>
             
-            <div className="space-y-3 lg:space-y-4">
+            <div className="space-y-3">
               {/* Dynamic timing metrics */}
               <div className="p-3 bg-gray-50 rounded-lg">
                 <div className="flex items-center justify-between">
@@ -2034,7 +1942,7 @@ const viewPermissions = {
                 </div>
               </div>
 
-              {/* Visual timing indicator - extended to 12 hours */}
+              {/* Visual timing indicator */}
               <div className="mt-2">
                 <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
                   <span>0</span>
@@ -2059,8 +1967,8 @@ const viewPermissions = {
               </div>
             </div>
             
-            {/* Insight footer with polished copy */}
-            <div className="mt-4 p-3 lg:p-4 bg-purple-50 rounded-xl">
+            {/* Insight footer */}
+            <div className="mt-4 p-3 bg-purple-50 rounded-xl">
               <div className="text-sm font-medium text-purple-900">💡 Insight</div>
               <div className="text-xs lg:text-sm text-purple-700 mt-1">
                 AI tailors re-engagement timing based on urgency, hesitation, and conversation tone.
@@ -2097,32 +2005,30 @@ const viewPermissions = {
     const conversionRate = totalAssigned > 0 ? ((totalHot / totalAssigned) * 100).toFixed(1) : '0';
 
     return (
-      <div className="space-y-4 lg:space-y-6">
+      <div className="space-y-6">
         {/* Mobile Summary Cards */}
         <div className="lg:hidden">
-          <div className="grid grid-cols-2 gap-3 mb-4">
+          <div className="grid grid-cols-2 gap-3">
             <MobileMetricCard
-              title="AI Handoffs to You"
+              title="AI Handoffs"
               value={totalAssigned}
               icon={Users}
               color="blue"
             />
             <MobileMetricCard
-              title="You Marked as Hot"
+              title="Marked Hot"
               value={totalHot}
               icon={Target}
               color="green"
             />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
             <MobileMetricCard
-              title="Your Conversion %"
+              title="Conversion %"
               value={`${conversionRate}%`}
               icon={TrendingUp}
               color="purple"
             />
             <MobileMetricCard
-              title="Pipeline Value"
+              title="Pipeline"
               value={`${(pipelineValue/1000).toFixed(0)}K`}
               icon={DollarSign}
               color="orange"
@@ -2131,7 +2037,7 @@ const viewPermissions = {
         </div>
 
         {/* Desktop Summary Cards */}
-        <div className={`hidden lg:block ${viewMode === 'responsive' ? 'lg:block' : ''}`}>
+        <div className="hidden lg:block">
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
             <div className="px-6 py-4 border-b border-gray-100">
               <h3 className="text-lg font-semibold text-gray-900">Lead Qualification Summary</h3>
@@ -2171,46 +2077,53 @@ const viewPermissions = {
           </div>
         </div>
 
-        {/* Mobile Handoff Performance Table */}
+        {/* Mobile Team Performance */}
         <div className="lg:hidden">
-          <MobileTableCard
-            title="Handoff Performance"
-            data={salesRepPerformance}
-            renderRow={(rep) => (
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="font-medium text-gray-900">{rep.rep}</span>
-                  <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                    rep.conversionRate >= 75 ? 'bg-green-100 text-green-800' :
-                    rep.conversionRate >= 50 ? 'bg-yellow-100 text-yellow-800' :
-                    rep.conversionRate > 0 ? 'bg-orange-100 text-orange-800' :
-                    'bg-gray-100 text-gray-800'
-                  }`}>
-                    {rep.conversionRate || 0}%
-                  </span>
+          <CollapsibleSection title="Team Performance" defaultExpanded={true}>
+            <div className="space-y-3">
+              {salesRepPerformance && salesRepPerformance.length > 0 ? (
+                salesRepPerformance.map((rep, index) => (
+                  <div key={index} className="p-3 bg-gray-50 rounded-lg">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="font-medium text-gray-900">{rep.rep}</span>
+                      <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                        rep.conversionRate >= 75 ? 'bg-green-100 text-green-800' :
+                        rep.conversionRate >= 50 ? 'bg-yellow-100 text-yellow-800' :
+                        rep.conversionRate > 0 ? 'bg-orange-100 text-orange-800' :
+                        'bg-gray-100 text-gray-800'
+                      }`}>
+                        {rep.conversionRate || 0}%
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-3 text-sm text-center">
+                      <div>
+                        <div className="text-xs text-gray-500">Received</div>
+                        <div className="font-semibold">{rep.totalLeadsAssigned || 0}</div>
+                      </div>
+                      <div>
+                        <div className="text-xs text-gray-500">Accepted</div>
+                        <div className="font-semibold text-green-600">{rep.hotLeadsGenerated || 0}</div>
+                      </div>
+                      <div>
+                        <div className="text-xs text-gray-500">Pipeline</div>
+                        <div className="font-semibold">${((rep.pipelineValue || 0)/1000).toFixed(0)}K</div>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-6 text-gray-500">
+                  <Users className="w-12 h-12 mx-auto mb-2 text-gray-400" />
+                  <p>No team data available.</p>
+                  <p className="text-sm">Add team members in the Sales Team section.</p>
                 </div>
-                <div className="grid grid-cols-3 gap-4 text-sm">
-                  <div>
-                    <span className="block text-xs text-gray-500">Received</span>
-                    <span className="font-medium">{rep.totalLeadsAssigned || 0}</span>
-                  </div>
-                  <div>
-                    <span className="block text-xs text-gray-500">Accepted</span>
-                    <span className="font-medium text-green-600">{rep.hotLeadsGenerated || 0}</span>
-                  </div>
-                  <div>
-                    <span className="block text-xs text-gray-500">Pipeline</span>
-                    <span className="font-medium">${(rep.pipelineValue || 0).toLocaleString()}</span>
-                  </div>
-                </div>
-              </div>
-            )}
-            emptyMessage="No team data available. Add team members in the Sales Team section."
-          />
+              )}
+            </div>
+          </CollapsibleSection>
         </div>
 
-        {/* Desktop Handoff Performance Table */}
-        <div className={`hidden lg:block ${viewMode === 'responsive' ? 'lg:block' : ''}`}>
+        {/* Desktop Team Performance Table */}
+        <div className="hidden lg:block">
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
             <div className="px-6 py-4 border-b border-gray-100">
               <h3 className="text-lg font-semibold text-gray-900">Handoff Performance</h3>
@@ -2268,30 +2181,30 @@ const viewPermissions = {
   };
 
   const ABTestingView = () => {
-  if (currentPlan && PLAN_FEATURES[currentPlan]?.messageAbTesting) {
-    return <ABTestingDashboard />;
-  }
-  return (
-    <div className="text-center py-12">
-      <TestTube className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-      <p className="text-gray-600 mb-4">A/B Testing requires a plan upgrade</p>
-      <p className="text-sm text-gray-500">This feature is available on Scale and Enterprise plans</p>
-    </div>
-  );
-};
+    if (currentPlan && PLAN_FEATURES[currentPlan]?.messageAbTesting) {
+      return <ABTestingDashboard />;
+    }
+    return (
+      <div className="text-center py-12">
+        <TestTube className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+        <p className="text-gray-600 mb-4">A/B Testing requires a plan upgrade</p>
+        <p className="text-sm text-gray-500">This feature is available on Scale and Enterprise plans</p>
+      </div>
+    );
+  };
 
-const LearningView = () => {
-  if (currentPlan && PLAN_FEATURES[currentPlan]?.aiLearning) {
-    return <LearningAnalytics />;
-  }
-  return (
-    <div className="text-center py-12">
-      <Brain className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-      <p className="text-gray-600 mb-4">AI Learning requires a plan upgrade</p>
-      <p className="text-sm text-gray-500">This feature is available on Growth and higher plans</p>
-    </div>
-  );
-};
+  const LearningView = () => {
+    if (currentPlan && PLAN_FEATURES[currentPlan]?.aiLearning) {
+      return <LearningAnalytics />;
+    }
+    return (
+      <div className="text-center py-12">
+        <Brain className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+        <p className="text-gray-600 mb-4">AI Learning requires a plan upgrade</p>
+        <p className="text-sm text-gray-500">This feature is available on Growth and higher plans</p>
+      </div>
+    );
+  };
   
   const CustomReports = () => <CustomReportsBuilder />;
 
@@ -2337,6 +2250,68 @@ const LearningView = () => {
     }
   };
 
+  // Get allowed tabs for mobile header
+  const getAllowedTabs = () => {
+    const tabs = [
+      { 
+        id: 'overview', 
+        name: 'Overview Reports', 
+        icon: BarChart3,
+        permission: canViewFunnelStats,
+        planFeature: null
+      },
+      { 
+        id: 'lead-performance', 
+        name: 'AI Conversion Metrics', 
+        icon: Users,
+        permission: canViewFunnelStats,
+        planFeature: null
+      },
+      { 
+        id: 'performance-analytics', 
+        name: 'Performance Analytics', 
+        icon: Activity,
+        permission: canViewPerformanceAnalytics,
+        planFeature: null
+      },
+      { 
+        id: 'abtesting', 
+        name: 'A/B Testing', 
+        icon: TestTube,
+        permission: canViewPerformanceAnalytics,
+        planFeature: 'messageAbTesting'
+      },
+      { 
+        id: 'learning', 
+        name: 'AI Learning', 
+        icon: Brain,
+        permission: canViewPerformanceAnalytics,
+        planFeature: 'aiLearning'
+      },                       
+      { 
+        id: 'sales-outcomes', 
+        name: 'Team Performance', 
+        icon: Award,
+        permission: canViewEscalationSummaries,
+        planFeature: null
+      },
+      { 
+        id: 'custom-reports', 
+        name: 'Custom Reports', 
+        icon: Settings,
+        permission: canViewPerformanceAnalytics,
+        planFeature: null
+      }
+    ];
+
+    return tabs.filter(tab => {
+      const hasPermission = tab.permission;
+      const hasFeatureAccess = !tab.planFeature || 
+        (currentPlan && PLAN_FEATURES[currentPlan]?.[tab.planFeature]);
+      return hasPermission && hasFeatureAccess;
+    });
+  };
+
   // Main render - check access first
   if (!hasAnalyticsAccess) {
     return renderAccessDenied();
@@ -2347,16 +2322,26 @@ const LearningView = () => {
       {/* Desktop Filter Bar */}
       <GlobalFilterBar />
       
-      {/* Mobile Filter Panel */}
-      <MobileFilterPanel
+      {/* Mobile Header */}
+      <MobileHeader
+        activeView={activeView}
+        onRefresh={loadAllData}
+        onFilters={() => setShowMobileFilters(true)}
+        loading={loading}
+        tabs={getAllowedTabs()}
+        onViewChange={handleViewChange}
+      />
+      
+      {/* Mobile Filters */}
+      <MobileFilters
+        isOpen={showMobileFilters}
+        onClose={() => setShowMobileFilters(false)}
         dateRange={dateRange}
         setDateRange={setDateRange}
         selectedCampaign={selectedCampaign}
         setSelectedCampaign={setSelectedCampaign}
         campaigns={dashboardData.campaigns}
-        onRefresh={loadAllData}
         onExport={() => console.log('Export clicked')}
-        loading={loading}
         canFilterCampaigns={canFilterCampaigns}
         canExportData={canExportData}
       />
@@ -2374,4 +2359,4 @@ const LearningView = () => {
       </div>
     </div>
   );
-}
+}}
