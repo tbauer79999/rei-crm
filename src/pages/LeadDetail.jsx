@@ -9,6 +9,8 @@ import {
   MessageCircle,
   User,
   Send,
+  Play,
+  Pause,
   Bot,
   AlertCircle,
   Eye,
@@ -67,11 +69,39 @@ export default function LeadDetail() {
   const [newMessage, setNewMessage] = useState('');
   const [sendingMessage, setSendingMessage] = useState(false);
   const [expandedRetries, setExpandedRetries] = useState(new Set());
-
+  const [togglingAI, setTogglingAI] = useState(false);
   const { user, hasPermission } = useAuth();
   const [twilioDevice, setTwilioDevice] = useState(null);
   const [isCallInProgress, setIsCallInProgress] = useState(false);
   const [callStatus, setCallStatus] = useState('');
+
+  const handleToggleAI = async () => {
+  if (togglingAI) return;
+  
+  setTogglingAI(true);
+  
+  try {
+    const newStatus = !lead.ai_conversation_enabled;
+    
+    const { error } = await supabase
+      .from('leads')
+      .update({ ai_conversation_enabled: newStatus })
+      .eq('id', id);
+    
+    if (error) throw error;
+    
+    setLead(prev => ({
+      ...prev,
+      ai_conversation_enabled: newStatus
+    }));
+    
+  } catch (error) {
+    console.error('Error toggling AI:', error);
+    alert('Failed to toggle AI conversation');
+  } finally {
+    setTogglingAI(false);
+  }
+};
 
   // RBAC Permission Checks
   const canViewLeads = hasPermission(PERMISSIONS.VIEW_LEADS);
