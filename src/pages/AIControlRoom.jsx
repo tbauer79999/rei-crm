@@ -126,29 +126,29 @@ const MobileSectionCard = ({
   
   return (
     <div className={clsx(
-      "bg-white rounded-xl shadow-sm border transition-all duration-200 w-full max-w-full overflow-hidden",
+      "bg-white rounded-xl shadow-sm border transition-all duration-200 w-full min-w-0",
       statusConfig.borderColor,
       isExpanded ? "shadow-md" : "hover:shadow-md"
     )}>
       {/* Mobile Header */}
       <button
         onClick={onToggle}
-        className="w-full p-3 text-left hover:bg-gray-50/50 transition-colors rounded-xl"
+        className="w-full min-w-0 p-3 text-left hover:bg-gray-50/50 transition-colors rounded-xl"
       >
-        <div className="flex items-center justify-between w-full">
-          <div className="flex items-center space-x-3 min-w-0 flex-1 overflow-hidden">
+        <div className="flex items-center justify-between w-full min-w-0">
+          <div className="flex items-center space-x-2 min-w-0 flex-1">
             {/* Icon */}
             <div className={clsx(
-              "w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0",
+              "w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0",
               statusConfig.bgColor
             )}>
-              <section.icon className={clsx("w-4 h-4", statusConfig.color)} />
+              <section.icon className={clsx("w-3.5 h-3.5", statusConfig.color)} />
             </div>
             
             {/* Content */}
-            <div className="min-w-0 flex-1 overflow-hidden">
-              <div className="flex items-center space-x-2 mb-1">
-                <h3 className="font-semibold text-gray-900 truncate text-sm">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center space-x-1.5 mb-0.5">
+                <h3 className="font-semibold text-gray-900 text-sm truncate">
                   {section.shortLabel}
                 </h3>
                 <div className="flex items-center space-x-1 flex-shrink-0">
@@ -159,7 +159,7 @@ const MobileSectionCard = ({
                 </div>
               </div>
               
-              <p className="text-xs text-gray-500 truncate mb-1">
+              <p className="text-xs text-gray-500 truncate mb-0.5">
                 {section.shortDescription}
               </p>
               
@@ -182,22 +182,20 @@ const MobileSectionCard = ({
       
       {/* Expandable Content */}
       {isExpanded && (
-        <div className="border-t border-gray-100 w-full">
-          <div className="p-3 w-full overflow-hidden">
+        <div className="border-t border-gray-100 w-full min-w-0">
+          <div className="p-3 w-full min-w-0">
             {/* Full Description on Expand */}
-            <div className="mb-3 p-3 bg-gray-50 rounded-lg w-full">
+            <div className="mb-3 p-2.5 bg-gray-50 rounded-lg w-full min-w-0">
               <h4 className="font-medium text-gray-900 text-sm mb-1 break-words">{section.label}</h4>
               <p className="text-xs text-gray-600 break-words">{section.description}</p>
               {statusReason && (
-                <p className="text-xs text-gray-500 mt-2 font-mono break-all">{statusReason}</p>
+                <p className="text-xs text-gray-500 mt-2 font-mono break-all overflow-wrap-anywhere">{statusReason}</p>
               )}
             </div>
             
             {/* Component Content */}
-            <div className="w-full overflow-hidden">
-              <div className="w-full max-w-full">
-                {children}
-              </div>
+            <div className="w-full min-w-0">
+              {children}
             </div>
           </div>
         </div>
@@ -290,37 +288,37 @@ const MobileStatusBar = ({ sections, sectionStatuses, sectionMetrics }) => {
   const reviewCount = sections.filter(s => (sectionStatuses[s.id] || s.status) === 'review').length;
   
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-3 mb-3 w-full max-w-full overflow-hidden">
+    <div className="bg-white rounded-xl border border-gray-200 p-3 mb-3 w-full min-w-0">
       <div className="flex items-center justify-between mb-3">
-        <h2 className="font-semibold text-gray-900 text-sm truncate">System Status</h2>
+        <h2 className="font-semibold text-gray-900 text-sm truncate flex-1">System Status</h2>
         <div className="flex items-center space-x-1 flex-shrink-0">
           <BarChart3 className="w-4 h-4 text-gray-500" />
           <span className="text-xs text-gray-500">Live</span>
         </div>
       </div>
       
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-3 gap-2 w-full">
         <div className="text-center min-w-0">
-          <div className="w-7 h-7 bg-green-50 rounded-lg flex items-center justify-center mx-auto mb-1">
-            <CheckCircle className="w-3.5 h-3.5 text-green-500" />
+          <div className="w-6 h-6 bg-green-50 rounded-lg flex items-center justify-center mx-auto mb-1">
+            <CheckCircle className="w-3 h-3 text-green-500" />
           </div>
-          <div className="text-lg font-bold text-green-600">{healthyCount}</div>
+          <div className="text-base font-bold text-green-600">{healthyCount}</div>
           <div className="text-xs text-gray-500 truncate">Healthy</div>
         </div>
         
         <div className="text-center min-w-0">
-          <div className="w-7 h-7 bg-orange-50 rounded-lg flex items-center justify-center mx-auto mb-1">
-            <AlertTriangle className="w-3.5 h-3.5 text-orange-500" />
+          <div className="w-6 h-6 bg-orange-50 rounded-lg flex items-center justify-center mx-auto mb-1">
+            <AlertTriangle className="w-3 h-3 text-orange-500" />
           </div>
-          <div className="text-lg font-bold text-orange-600">{attentionCount}</div>
+          <div className="text-base font-bold text-orange-600">{attentionCount}</div>
           <div className="text-xs text-gray-500 truncate">Attention</div>
         </div>
         
         <div className="text-center min-w-0">
-          <div className="w-7 h-7 bg-blue-50 rounded-lg flex items-center justify-center mx-auto mb-1">
-            <Clock className="w-3.5 h-3.5 text-blue-500" />
+          <div className="w-6 h-6 bg-blue-50 rounded-lg flex items-center justify-center mx-auto mb-1">
+            <Clock className="w-3 h-3 text-blue-500" />
           </div>
-          <div className="text-lg font-bold text-blue-600">{reviewCount}</div>
+          <div className="text-base font-bold text-blue-600">{reviewCount}</div>
           <div className="text-xs text-gray-500 truncate">Review</div>
         </div>
       </div>
@@ -331,17 +329,17 @@ const MobileStatusBar = ({ sections, sectionStatuses, sectionMetrics }) => {
 // Quick Actions for Mobile
 const MobileQuickActions = ({ onExpandAll, onCollapseAll, allExpanded }) => {
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-3 mb-3 w-full max-w-full overflow-hidden">
+    <div className="bg-white rounded-xl border border-gray-200 p-3 mb-3 w-full min-w-0">
       <div className="flex items-center justify-between">
-        <h3 className="font-medium text-gray-900 text-sm truncate">Quick Actions</h3>
-        <div className="flex items-center space-x-2 flex-shrink-0">
+        <h3 className="font-medium text-gray-900 text-sm truncate flex-1">Quick Actions</h3>
+        <div className="flex items-center space-x-2 flex-shrink-0 ml-2">
           <button
             onClick={onExpandAll}
             disabled={allExpanded}
             className="flex items-center space-x-1 px-2 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Eye className="w-3 h-3" />
-            <span className="hidden sm:inline">Expand</span>
+            <span className="hidden xs:inline">Expand</span>
           </button>
           
           <button
@@ -350,7 +348,7 @@ const MobileQuickActions = ({ onExpandAll, onCollapseAll, allExpanded }) => {
             className="flex items-center space-x-1 px-2 py-1.5 text-xs font-medium text-gray-600 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <EyeOff className="w-3 h-3" />
-            <span className="hidden sm:inline">Collapse</span>
+            <span className="hidden xs:inline">Collapse</span>
           </button>
         </div>
       </div>
@@ -361,15 +359,15 @@ const MobileQuickActions = ({ onExpandAll, onCollapseAll, allExpanded }) => {
 // Mobile Header Component
 const MobileHeader = () => {
   return (
-    <div className="lg:hidden mb-4 w-full max-w-full overflow-hidden">
-      <div className="bg-white rounded-xl border border-gray-200 p-4">
-        <div className="flex items-center space-x-3">
-          <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center flex-shrink-0">
-            <Brain className="w-5 h-5 text-blue-600" />
+    <div className="lg:hidden mb-3 w-full min-w-0">
+      <div className="bg-white rounded-xl border border-gray-200 p-3">
+        <div className="flex items-center space-x-2">
+          <div className="w-8 h-8 bg-blue-50 rounded-xl flex items-center justify-center flex-shrink-0">
+            <Brain className="w-4 h-4 text-blue-600" />
           </div>
           <div className="min-w-0 flex-1">
-            <h1 className="text-lg font-bold text-gray-900 truncate">AI Control Room</h1>
-            <p className="text-sm text-gray-600 truncate">Monitor your AI pipeline</p>
+            <h1 className="text-base font-bold text-gray-900 truncate">AI Control Room</h1>
+            <p className="text-xs text-gray-600 truncate">Monitor your AI pipeline</p>
           </div>
         </div>
       </div>
@@ -557,30 +555,30 @@ const AIControlRoom = () => {
     switch (sectionLabel) {
       case 'Overview & Health':
         return (
-          <div className="space-y-4 w-full max-w-full overflow-hidden">
-            <div className="w-full max-w-full overflow-hidden">
+          <div className="space-y-3 w-full min-w-0">
+            <div className="w-full min-w-0">
               <OverviewMetrics />
             </div>
-            <div className="w-full max-w-full overflow-hidden">
+            <div className="w-full min-w-0">
               <OverviewTrendAndCost />
             </div>
           </div>
         );
       case 'Lead Journey & Funnel':
         return (
-          <div className="w-full max-w-full overflow-hidden">
+          <div className="w-full min-w-0">
             <LeadJourneyFunnel />
           </div>
         );
       case 'AI Optimization':
         return (
-          <div className="w-full max-w-full overflow-hidden">
+          <div className="w-full min-w-0">
             <AiOptimizationPanel />
           </div>
         );
       case 'Hot Lead Handoff':
         return (
-          <div className="w-full max-w-full overflow-hidden">
+          <div className="w-full min-w-0">
             <HotLeadHandoffPanel />
           </div>
         );
