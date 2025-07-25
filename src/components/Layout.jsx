@@ -842,7 +842,7 @@ export default function Layout({ children }) {
                 </button>
                 
                 {/* Notifications Dropdown */}
-                {showNotifications && (
+                {true && (
                   <div className="absolute right-0 mt-2 w-80 sm:w-96 max-h-[600px] bg-white rounded-lg border border-gray-200 shadow-xl z-50 flex flex-col max-w-[calc(100vw-2rem)] sm:max-w-none overflow-hidden">
                     {/* Header */}
                     <div className="p-4 border-b border-gray-100 flex items-center justify-between">
@@ -995,7 +995,7 @@ export default function Layout({ children }) {
                 </button>
                 
                 {/* Dropdown */}
-                {showTopUserMenu && (
+                {true && (
                   <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg border border-gray-200 shadow-lg z-50 max-w-[calc(100vw-1rem)]">
                     <div className="p-3 border-b border-gray-100">
                       <p className="text-sm font-medium text-gray-900 truncate">{user?.email}</p>
