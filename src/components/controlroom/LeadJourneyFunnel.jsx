@@ -774,18 +774,35 @@ const JourneyModalContent = ({ modalType, data, selectedPeriod, onPeriodChange }
   );
 };
 
-// Mobile Card Component
-const MobileCard = ({ title, children, onClick, subtitle }) => {
+// Mobile Card Component - Updated to match OverviewMetrics style
+const MobileCard = ({ title, children, onClick, subtitle, icon: Icon, trend }) => {
   return (
     <div 
       className="bg-white p-3 rounded-xl shadow border cursor-pointer hover:shadow-lg transition-shadow w-full min-w-0"
       onClick={onClick}
     >
-      <h3 className="text-sm font-semibold mb-2 truncate">{title}</h3>
-      <div className="w-full min-w-0">
-        {children}
+      <div className="flex items-center justify-between mb-2">
+        {Icon && <Icon className="w-4 h-4 text-blue-600 flex-shrink-0" />}
+        {trend && (
+          <div className={`flex items-center text-xs ${
+            trend.startsWith('+') ? 'text-green-600' : 'text-red-500'
+          }`}>
+            <span className="mr-1">
+              {trend.startsWith('+') ? '▲' : '▼'}
+            </span>
+            <span className="truncate">{trend.replace(/^[+-]/, '')}</span>
+          </div>
+        )}
       </div>
-      <p className="text-xs text-gray-400 text-center mt-2 truncate">{subtitle}</p>
+      
+      <div className="space-y-1 mb-3">
+        <h3 className="text-xs text-gray-500 font-medium truncate">{title}</h3>
+        <div className="w-full min-w-0">
+          {children}
+        </div>
+      </div>
+      
+      <p className="text-xs text-gray-400 text-center truncate">{subtitle}</p>
     </div>
   );
 };
@@ -1117,16 +1134,17 @@ const openModal = async (modalType) => {
             <MobileCard
               title="Lead Status Distribution"
               subtitle="Click for detailed breakdown"
+              icon={BarChart3}
               onClick={() => openModal('statusDistribution')}
             >
               {statusDistribution.length > 0 ? (
-                <ResponsiveContainer width="100%" height={180}>
+                <ResponsiveContainer width="100%" height={120}>
                   <PieChart>
                     <Pie 
                       data={statusDistribution} 
                       dataKey="value" 
                       nameKey="name" 
-                      outerRadius={60}
+                      outerRadius={45}
                       label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
                       labelLine={false}
                     >
@@ -1138,11 +1156,58 @@ const openModal = async (modalType) => {
                   </PieChart>
                 </ResponsiveContainer>
               ) : (
-                <div className="h-32 flex items-center justify-center text-gray-500">
+                <div className="h-20 flex items-center justify-center text-gray-500">
                   <div className="text-center">
-                    <div className="text-2xl mb-2">📈</div>
-                    <div className="text-sm">No funnel data available</div>
-                    <div className="text-xs mt-1">Lead progression will appear here</div>
+                    <div className="text-xl mb-1">📊</div>
+                    <div className="text-xs">No lead data available</div>
+                  </div>
+                </div>
+              )}
+            </MobileCard>
+
+            {/* Funnel */}
+            <MobileCard
+              title="Lead Progression Funnel"
+              subtitle="Click for conversion analytics"
+              icon={Target}
+              onClick={() => openModal('progressionFunnel')}
+            >
+              {funnelData.length > 0 ? (
+                <div className="space-y-2">
+                  {funnelData.slice(0, 3).map((item, index) => {
+                    const max = Math.max(...funnelData.map(i => i.count), 1);
+                    const conversionRate = funnelData[0]?.count > 0 
+                      ? Math.round((item.count / funnelData[0].count) * 100) 
+                      : 0;
+                    
+                    return (
+                      <div key={item.stage}>
+                        <div className="flex justify-between text-xs mb-1">
+                          <span className="font-medium truncate">{item.stage}</span>
+                          <span className="font-semibold text-blue-600 flex-shrink-0">
+                            {item.count} ({conversionRate}%)
+                          </span>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div
+                            className="bg-gradient-to-r from-blue-500 to-indigo-600 h-2 rounded-full transition-all duration-700"
+                            style={{ width: `${(item.count / max) * 100}%` }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {funnelData.length > 3 && (
+                    <div className="text-xs text-gray-500 text-center">
+                      +{funnelData.length - 3} more stages
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="h-20 flex items-center justify-center text-gray-500">
+                  <div className="text-center">
+                    <div className="text-xl mb-1">📈</div>
+                    <div className="text-xs">No funnel data available</div>
                   </div>
                 </div>
               )}
@@ -1152,10 +1217,11 @@ const openModal = async (modalType) => {
             <MobileCard
               title="Lead Upload Trend"
               subtitle="Click for acquisition analysis"
+              icon={Upload}
               onClick={() => openModal('uploadTrend')}
             >
               {trendData.length > 0 ? (
-                <ResponsiveContainer width="100%" height={120}>
+                <ResponsiveContainer width="100%" height={80}>
                   <LineChart data={trendData}>
                     <XAxis 
                       dataKey="date" 
@@ -1164,8 +1230,9 @@ const openModal = async (modalType) => {
                         return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
                       }}
                       fontSize={8}
+                      hide
                     />
-                    <YAxis fontSize={8} />
+                    <YAxis fontSize={8} hide />
                     <Tooltip 
                       labelFormatter={(date) => new Date(date).toLocaleDateString()}
                       formatter={(value) => [value, 'Leads']}
@@ -1175,16 +1242,15 @@ const openModal = async (modalType) => {
                       dataKey="leads" 
                       stroke="#3b82f6" 
                       strokeWidth={2}
-                      dot={{ r: 3, fill: '#3b82f6' }}
+                      dot={{ r: 2, fill: '#3b82f6' }}
                     />
                   </LineChart>
                 </ResponsiveContainer>
               ) : (
-                <div className="h-32 flex items-center justify-center text-gray-500">
+                <div className="h-20 flex items-center justify-center text-gray-500">
                   <div className="text-center">
-                    <div className="text-2xl mb-2">📊</div>
-                    <div className="text-sm">No trend data available</div>
-                    <div className="text-xs mt-1">Upload history will appear here</div>
+                    <div className="text-xl mb-1">📊</div>
+                    <div className="text-xs">No trend data available</div>
                   </div>
                 </div>
               )}
@@ -1194,40 +1260,33 @@ const openModal = async (modalType) => {
             <MobileCard
               title="Lead Status Transitions"
               subtitle="Click for flow analysis"
+              icon={Shuffle}
               onClick={() => openModal('statusTransitions')}
             >
               {transitionData.length > 0 ? (
-                <div className="max-h-32 overflow-y-auto">
-                  <table className="min-w-full text-sm">
-                    <thead className="bg-gray-50 sticky top-0">
-                      <tr>
-                        <th className="px-2 py-2 text-left font-medium text-gray-700 text-xs">Transition</th>
-                        <th className="px-2 py-2 text-right font-medium text-gray-700 text-xs">Count</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-200">
-                      {transitionData.slice(0, 4).map((item, idx) => (
-                        <tr key={idx} className="hover:bg-gray-50">
-                          <td className="px-2 py-2 text-xs">
-                            <div className="font-medium text-gray-900 truncate">{item.transition}</div>
-                          </td>
-                          <td className="px-2 py-2 text-right">
-                            <div className="flex flex-col items-end">
-                              <span className="font-bold text-sm text-blue-600">{item.count}</span>
-                              <span className="text-xs text-gray-500">{item.percent}</span>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                <div className="space-y-1">
+                  {transitionData.slice(0, 3).map((item, idx) => (
+                    <div key={idx} className="flex items-center justify-between">
+                      <div className="flex items-center space-x-1 min-w-0 flex-1">
+                        <span className="text-xs text-gray-600 truncate">{item.transition}</span>
+                      </div>
+                      <div className="flex items-center space-x-1 flex-shrink-0">
+                        <span className="text-xs font-bold text-blue-600">{item.count}</span>
+                        <span className="text-xs text-gray-500">({item.percent})</span>
+                      </div>
+                    </div>
+                  ))}
+                  {transitionData.length > 3 && (
+                    <div className="text-xs text-gray-500 text-center">
+                      +{transitionData.length - 3} more transitions
+                    </div>
+                  )}
                 </div>
               ) : (
-                <div className="h-32 flex items-center justify-center text-gray-500">
+                <div className="h-20 flex items-center justify-center text-gray-500">
                   <div className="text-center">
-                    <div className="text-2xl mb-2">🔄</div>
-                    <div className="text-sm">No transition data available</div>
-                    <div className="text-xs mt-1">Status changes will appear here</div>
+                    <div className="text-xl mb-1">🔄</div>
+                    <div className="text-xs">No transition data available</div>
                   </div>
                 </div>
               )}
@@ -1235,7 +1294,7 @@ const openModal = async (modalType) => {
           </div>
         </div>
 
-        {/* Desktop Layout */}
+        {/* Desktop Layout - UNCHANGED */}
         <div className="hidden lg:block w-full">
           <div className="space-y-6">
             {/* Date Range Selector */}
@@ -1468,50 +1527,3 @@ const openModal = async (modalType) => {
     </>
   );
 }
-                  <div className="text-center">
-                    <div className="text-2xl mb-2">📊</div>
-                    <div className="text-sm">No lead data available</div>
-                    <div className="text-xs mt-1">Add some leads to see analytics</div>
-                  </div>
-                </div>
-              )}
-            </MobileCard>
-
-            {/* Funnel */}
-            <MobileCard
-              title="Lead Progression Funnel"
-              subtitle="Click for conversion analytics"
-              onClick={() => openModal('progressionFunnel')}
-            >
-              {funnelData.length > 0 ? (
-                <div className="space-y-3">
-                  {funnelData.map((item) => {
-                    const max = Math.max(...funnelData.map(i => i.count), 1);
-                    const conversionRate = funnelData[0]?.count > 0 
-                      ? Math.round((item.count / funnelData[0].count) * 100) 
-                      : 0;
-                    
-                    return (
-                      <div key={item.stage}>
-                        <div className="flex justify-between text-sm mb-1">
-                          <span className="font-medium truncate">{item.stage}</span>
-                          <span className="font-semibold text-blue-600 flex-shrink-0">
-                            {item.count} ({conversionRate}%)
-                          </span>
-                        </div>
-                        <div className="w-full bg-gray-200 rounded-full h-3">
-                          <div
-                            className="bg-gradient-to-r from-blue-500 to-indigo-600 h-3 rounded-full transition-all duration-700 flex items-center justify-end pr-2"
-                            style={{ width: `${(item.count / max) * 100}%` }}
-                          >
-                            {item.count > 0 && (
-                              <span className="text-white text-xs font-bold">{item.count}</span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div className="h-32 flex items-center justify-center text-gray-500">
