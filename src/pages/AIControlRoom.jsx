@@ -9,7 +9,12 @@ import {
   CheckCircle,
   AlertTriangle,
   Clock,
-  Lock
+  Lock,
+  BarChart3,
+  Smartphone,
+  Monitor,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import clsx from 'clsx';
 import OverviewMetrics from '../components/controlroom/OverviewMetrics';
@@ -26,34 +31,46 @@ const SECTIONS = [
   { 
     id: 'overview', 
     label: 'Overview & Health',
+    shortLabel: 'Overview',
     description: 'System performance, lead counts, and key metrics',
+    shortDescription: 'Performance & metrics',
     icon: Activity,
     status: 'healthy',
-    metrics: '24 hot leads today'
+    metrics: '24 hot leads today',
+    priority: 'high'
   },
   { 
     id: 'handoff', 
     label: 'Hot Lead Handoff',
+    shortLabel: 'Handoff',
     description: 'Sales team notifications and response tracking',
+    shortDescription: 'Sales notifications',
     icon: Users,
     status: 'attention',
-    metrics: 'Avg response: 12m'
+    metrics: 'Avg response: 12m',
+    priority: 'high'
   },
   { 
     id: 'journey', 
     label: 'Lead Journey & Funnel',
+    shortLabel: 'Journey',
     description: 'Conversion rates and pipeline analytics',
+    shortDescription: 'Pipeline analytics',
     icon: TrendingUp,
     status: 'healthy',
-    metrics: '18% conversion rate'
+    metrics: '18% conversion rate',
+    priority: 'medium'
   },
   { 
     id: 'optimization', 
     label: 'AI Optimization',
+    shortLabel: 'AI Optimize',
     description: 'Message analysis, keywords, and conversation insights',
+    shortDescription: 'AI insights',
     icon: Brain,
     status: 'healthy',
-    metrics: '89% AI accuracy'
+    metrics: '89% AI accuracy',
+    priority: 'medium'
   },
 ];
 
@@ -64,30 +81,279 @@ const getStatusConfig = (status) => {
         icon: CheckCircle,
         color: 'text-green-500',
         bgColor: 'bg-green-50',
-        borderColor: 'border-green-200'
+        borderColor: 'border-green-200',
+        dotColor: 'bg-green-400'
       };
     case 'attention':
       return {
         icon: AlertTriangle,
         color: 'text-orange-500',
         bgColor: 'bg-orange-50',
-        borderColor: 'border-orange-200'
+        borderColor: 'border-orange-200',
+        dotColor: 'bg-orange-400'
       };
     case 'review':
       return {
         icon: Clock,
         color: 'text-blue-500',
         bgColor: 'bg-blue-50',
-        borderColor: 'border-blue-200'
+        borderColor: 'border-blue-200',
+        dotColor: 'bg-blue-400'
       };
     default:
       return {
         icon: CheckCircle,
         color: 'text-gray-500',
         bgColor: 'bg-gray-50',
-        borderColor: 'border-gray-200'
+        borderColor: 'border-gray-200',
+        dotColor: 'bg-gray-400'
       };
   }
+};
+
+// Mobile Section Card Component
+const MobileSectionCard = ({ 
+  section, 
+  status, 
+  metrics, 
+  statusConfig, 
+  statusReason, 
+  isExpanded, 
+  onToggle, 
+  children 
+}) => {
+  const StatusIcon = statusConfig.icon;
+  
+  return (
+    <div className={clsx(
+      "bg-white rounded-xl shadow-sm border transition-all duration-200",
+      statusConfig.borderColor,
+      isExpanded ? "shadow-md" : "hover:shadow-md"
+    )}>
+      {/* Mobile Header */}
+      <button
+        onClick={onToggle}
+        className="w-full p-4 text-left hover:bg-gray-50/50 transition-colors rounded-xl"
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-3 min-w-0 flex-1">
+            {/* Icon */}
+            <div className={clsx(
+              "w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0",
+              statusConfig.bgColor
+            )}>
+              <section.icon className={clsx("w-5 h-5", statusConfig.color)} />
+            </div>
+            
+            {/* Content */}
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center space-x-2 mb-1">
+                <h3 className="font-semibold text-gray-900 truncate text-sm">
+                  {section.shortLabel}
+                </h3>
+                <div className="flex items-center space-x-1 flex-shrink-0">
+                  <div className={clsx("w-2 h-2 rounded-full", statusConfig.dotColor)} />
+                  <span className={clsx("text-xs font-medium capitalize", statusConfig.color)}>
+                    {status}
+                  </span>
+                </div>
+              </div>
+              
+              <p className="text-xs text-gray-500 truncate mb-1">
+                {section.shortDescription}
+              </p>
+              
+              <div className="text-xs text-gray-400 font-medium truncate">
+                {metrics}
+              </div>
+            </div>
+          </div>
+          
+          {/* Expand/Collapse Indicator */}
+          <div className="ml-2 flex-shrink-0">
+            {isExpanded ? (
+              <ChevronDown className="w-4 h-4 text-gray-400" />
+            ) : (
+              <ChevronRight className="w-4 h-4 text-gray-400" />
+            )}
+          </div>
+        </div>
+      </button>
+      
+      {/* Expandable Content */}
+      {isExpanded && (
+        <div className="border-t border-gray-100">
+          <div className="p-4">
+            {/* Full Description on Expand */}
+            <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+              <h4 className="font-medium text-gray-900 text-sm mb-1">{section.label}</h4>
+              <p className="text-xs text-gray-600">{section.description}</p>
+              {statusReason && (
+                <p className="text-xs text-gray-500 mt-2 font-mono">{statusReason}</p>
+              )}
+            </div>
+            
+            {/* Component Content */}
+            <div className="space-y-4">
+              {children}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Desktop Section Component (Original Layout)
+const DesktopSectionCard = ({ 
+  section, 
+  status, 
+  metrics, 
+  statusConfig, 
+  statusReason, 
+  isExpanded, 
+  onToggle, 
+  children 
+}) => {
+  const StatusIcon = statusConfig.icon;
+  
+  return (
+    <div className={clsx(
+      "control-room-section bg-white rounded-2xl shadow-sm border transition-all duration-200 hover:shadow-md",
+      statusConfig.borderColor
+    )}>
+      <button
+        onClick={onToggle}
+        className="w-full flex items-center justify-between px-6 py-5 text-left hover:bg-gray-50/50 transition-colors rounded-2xl"
+      >
+        <div className="flex items-center space-x-4 flex-1">
+          {/* Section Icon */}
+          <div className={clsx(
+            "w-12 h-12 rounded-xl flex items-center justify-center",
+            statusConfig.bgColor
+          )}>
+            <section.icon className={clsx("w-6 h-6", statusConfig.color)} />
+          </div>
+          
+          {/* Content */}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center space-x-3 mb-1">
+              <h3 className="text-lg font-semibold text-gray-900">{section.label}</h3>
+              <div 
+                className="flex items-center space-x-1 cursor-help"
+                title={statusReason || `Status: ${status}`}
+              >
+                <StatusIcon className={clsx("w-4 h-4", statusConfig.color)} />
+                <span className={clsx("text-xs font-medium capitalize", statusConfig.color)}>
+                  {status}
+                </span>
+              </div>
+            </div>
+            <p className="text-sm text-gray-500 mb-1">{section.description}</p>
+            <span className="text-xs text-gray-400 font-medium">{metrics}</span>
+          </div>
+        </div>
+        <div className="ml-4">
+          {isExpanded ? (
+            <ChevronDown className="w-5 h-5 text-gray-400" />
+          ) : (
+            <ChevronRight className="w-5 h-5 text-gray-400" />
+          )}
+        </div>
+      </button>
+      
+      {/* Section Content */}
+      <div
+        className={clsx(
+          'transition-all duration-300 ease-in-out',
+          isExpanded 
+            ? 'opacity-100 overflow-visible' 
+            : 'max-h-0 opacity-0 overflow-hidden'
+        )}
+      >
+        <div className="px-6 pb-6 border-t border-gray-100">
+          <div className="pt-6">
+            {children}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Status Summary Bar for Mobile
+const MobileStatusBar = ({ sections, sectionStatuses, sectionMetrics }) => {
+  const healthyCount = sections.filter(s => (sectionStatuses[s.id] || s.status) === 'healthy').length;
+  const attentionCount = sections.filter(s => (sectionStatuses[s.id] || s.status) === 'attention').length;
+  const reviewCount = sections.filter(s => (sectionStatuses[s.id] || s.status) === 'review').length;
+  
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4">
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="font-semibold text-gray-900 text-sm">System Status</h2>
+        <div className="flex items-center space-x-1">
+          <BarChart3 className="w-4 h-4 text-gray-500" />
+          <span className="text-xs text-gray-500">Live</span>
+        </div>
+      </div>
+      
+      <div className="grid grid-cols-3 gap-3">
+        <div className="text-center">
+          <div className="w-8 h-8 bg-green-50 rounded-lg flex items-center justify-center mx-auto mb-1">
+            <CheckCircle className="w-4 h-4 text-green-500" />
+          </div>
+          <div className="text-lg font-bold text-green-600">{healthyCount}</div>
+          <div className="text-xs text-gray-500">Healthy</div>
+        </div>
+        
+        <div className="text-center">
+          <div className="w-8 h-8 bg-orange-50 rounded-lg flex items-center justify-center mx-auto mb-1">
+            <AlertTriangle className="w-4 h-4 text-orange-500" />
+          </div>
+          <div className="text-lg font-bold text-orange-600">{attentionCount}</div>
+          <div className="text-xs text-gray-500">Attention</div>
+        </div>
+        
+        <div className="text-center">
+          <div className="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center mx-auto mb-1">
+            <Clock className="w-4 h-4 text-blue-500" />
+          </div>
+          <div className="text-lg font-bold text-blue-600">{reviewCount}</div>
+          <div className="text-xs text-gray-500">Review</div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Quick Actions for Mobile
+const MobileQuickActions = ({ onExpandAll, onCollapseAll, allExpanded }) => {
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4">
+      <div className="flex items-center justify-between">
+        <h3 className="font-medium text-gray-900 text-sm">Quick Actions</h3>
+        <div className="flex items-center space-x-2">
+          <button
+            onClick={onExpandAll}
+            disabled={allExpanded}
+            className="flex items-center space-x-1 px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Eye className="w-3 h-3" />
+            <span>Expand All</span>
+          </button>
+          
+          <button
+            onClick={onCollapseAll}
+            disabled={!allExpanded}
+            className="flex items-center space-x-1 px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <EyeOff className="w-3 h-3" />
+            <span>Collapse</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 };
 
 const AIControlRoom = () => {
@@ -97,12 +363,26 @@ const AIControlRoom = () => {
   const [sectionMetrics, setSectionMetrics] = useState({});
   const [statusReasons, setStatusReasons] = useState({});
   const [ready, setReady] = useState(false);
+  const [viewMode, setViewMode] = useState('responsive'); // 'mobile', 'desktop', 'responsive'
 
   console.log('🎛️ AI Control Room - Plan:', currentPlan);
 
+  // Auto-detect screen size for responsive mode
   useEffect(() => {
-  document.title = "Control Room – SurFox";
-}, []);
+    const handleResize = () => {
+      if (viewMode === 'responsive') {
+        // No need to update state, just rely on CSS classes
+      }
+    };
+
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [viewMode]);
+
+  useEffect(() => {
+    document.title = "Control Room – SurFox";
+  }, []);
 
   useEffect(() => {
     const saved = localStorage.getItem('controlroom-collapse');
@@ -231,130 +511,181 @@ const AIControlRoom = () => {
     localStorage.setItem('controlroom-collapse', JSON.stringify(updated));
   };
 
+  const expandAll = () => {
+    const updated = {};
+    SECTIONS.forEach(section => {
+      updated[section.id] = false; // false means expanded
+    });
+    setCollapsed(updated);
+    localStorage.setItem('controlroom-collapse', JSON.stringify(updated));
+  };
+
+  const collapseAll = () => {
+    const updated = {};
+    SECTIONS.forEach(section => {
+      updated[section.id] = true; // true means collapsed
+    });
+    setCollapsed(updated);
+    localStorage.setItem('controlroom-collapse', JSON.stringify(updated));
+  };
+
+  const allExpanded = SECTIONS.every(section => !collapsed[section.id]);
+
   const renderSectionContent = (sectionLabel) => {
-  // Always show the actual components - no feature gating at section level
-  switch (sectionLabel) {
-    case 'Overview & Health':
-      return (
-        <div className="px-6 pb-6 border-t border-gray-100">
-          <div className="pt-6">
+    // Always show the actual components - no feature gating at section level
+    switch (sectionLabel) {
+      case 'Overview & Health':
+        return (
+          <div className="space-y-4">
             <OverviewMetrics />
             <OverviewTrendAndCost />
           </div>
-        </div>
-      );
-    case 'Lead Journey & Funnel':
-      return (
-        <div className="px-6 pb-6 border-t border-gray-100">
-          <div className="pt-6">
-            <LeadJourneyFunnel />
-          </div>
-        </div>
-      );
-    case 'AI Optimization':
-      return (
-        <div className="px-6 pb-6 border-t border-gray-100">
-          <div className="pt-6">
-            <AiOptimizationPanel />
-          </div>
-        </div>
-      );
-    case 'Hot Lead Handoff':
-      return (
-        <div className="px-6 pb-6 border-t border-gray-100">
-          <div className="pt-6">
-            <HotLeadHandoffPanel />
-          </div>
-        </div>
-      );
-    default:
-      return null;
-  }
-};
+        );
+      case 'Lead Journey & Funnel':
+        return <LeadJourneyFunnel />;
+      case 'AI Optimization':
+        return <AiOptimizationPanel />;
+      case 'Hot Lead Handoff':
+        return <HotLeadHandoffPanel />;
+      default:
+        return null;
+    }
+  };
 
   return (
-    <div className="p-6 space-y-4">
+    <div className="p-4 lg:p-6 space-y-4 lg:space-y-4">
       {/* Plan indicator for debugging */}
-        {process.env.NODE_ENV === 'development' && (
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
-            <div className="text-sm">
-              <strong>Debug:</strong> Plan: {currentPlan} | Sections: Always Accessible | Feature Gating: At Component Level
-            </div>
+      {process.env.NODE_ENV === 'development' && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
+          <div className="text-sm">
+            <strong>Debug:</strong> Plan: {currentPlan} | Sections: Always Accessible | Feature Gating: At Component Level
           </div>
-        )}
+        </div>
+      )}
 
-      {SECTIONS.map((section) => {
-        const { id, label, description, icon: SectionIcon } = section;
+      {/* Mobile-Only Status Bar */}
+      <div className="lg:hidden">
+        <MobileStatusBar 
+          sections={SECTIONS}
+          sectionStatuses={sectionStatuses}
+          sectionMetrics={sectionMetrics}
+        />
+        <MobileQuickActions 
+          onExpandAll={expandAll}
+          onCollapseAll={collapseAll}
+          allExpanded={allExpanded}
+        />
+      </div>
 
-        const status = sectionStatuses[id] || section.status;
-        const metrics = sectionMetrics[id] || section.metrics;
-        const statusConfig = getStatusConfig(status);
-        const StatusIcon = statusConfig.icon;
-
-        return (
-          <div 
-            key={id} 
-            className={clsx(
-              "control-room-section bg-white rounded-2xl shadow-sm border transition-all duration-200 hover:shadow-md",
-              statusConfig.borderColor
-            )}
-            data-section={id}
-          >
+      {/* Desktop View Toggle - Only shown on desktop */}
+      <div className="hidden lg:flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">AI Control Room</h1>
+          <p className="text-gray-600 mt-1">Monitor and manage your AI-powered pipeline</p>
+        </div>
+        
+        <div className="flex items-center space-x-3">
+          <div className="flex items-center bg-gray-100 rounded-lg p-1">
             <button
-              onClick={() => toggleSection(id)}
-              className="w-full flex items-center justify-between px-6 py-5 text-left hover:bg-gray-50/50 transition-colors rounded-2xl"
-            >
-              <div className="flex items-center space-x-4 flex-1">
-                {/* Section Icon */}
-                <div className={clsx(
-                  "w-12 h-12 rounded-xl flex items-center justify-center",
-                  statusConfig.bgColor
-                )}>
-                  <SectionIcon className={clsx("w-6 h-6", statusConfig.color)} />
-                </div>
-                
-                {/* Content */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center space-x-3 mb-1">
-                    <h3 className="text-lg font-semibold text-gray-900">{label}</h3>
-                    <div 
-                      className="flex items-center space-x-1 cursor-help"
-                      title={statusReasons[id] || `Status: ${status}`}
-                    >
-                      <StatusIcon className={clsx("w-4 h-4", statusConfig.color)} />
-                      <span className={clsx("text-xs font-medium capitalize", statusConfig.color)}>
-                        {status}
-                      </span>
-                    </div>
-    
-                  </div>
-                  <p className="text-sm text-gray-500 mb-1">{description}</p>
-                  <span className="text-xs text-gray-400 font-medium">{metrics}</span>
-                </div>
-              </div>
-              <div className="ml-4">
-                {collapsed[id] ? (
-                  <ChevronRight className="w-5 h-5 text-gray-400" />
-                ) : (
-                  <ChevronDown className="w-5 h-5 text-gray-400" />
-                )}
-              </div>
-            </button>
-            
-            {/* Section Content */}
-            <div
+              onClick={() => setViewMode('desktop')}
               className={clsx(
-                'transition-all duration-300 ease-in-out',
-                collapsed[id] 
-                  ? 'max-h-0 opacity-0 overflow-hidden' 
-                  : 'opacity-100 overflow-visible'
+                "px-3 py-1.5 text-sm font-medium rounded-md transition-colors flex items-center space-x-2",
+                viewMode === 'desktop' 
+                  ? 'bg-white text-gray-900 shadow-sm' 
+                  : 'text-gray-600 hover:text-gray-900'
               )}
             >
-              {ready && renderSectionContent(label)}
-            </div>
+              <Monitor className="w-4 h-4" />
+              <span>Desktop</span>
+            </button>
+            <button
+              onClick={() => setViewMode('responsive')}
+              className={clsx(
+                "px-3 py-1.5 text-sm font-medium rounded-md transition-colors flex items-center space-x-2",
+                viewMode === 'responsive' 
+                  ? 'bg-white text-gray-900 shadow-sm' 
+                  : 'text-gray-600 hover:text-gray-900'
+              )}
+            >
+              <Smartphone className="w-4 h-4" />
+              <span>Auto</span>
+            </button>
           </div>
-        );
-      })}
+          
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={expandAll}
+              disabled={allExpanded}
+              className="flex items-center space-x-1 px-3 py-2 text-sm font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Eye className="w-4 h-4" />
+              <span>Expand All</span>
+            </button>
+            
+            <button
+              onClick={collapseAll}
+              disabled={!allExpanded}
+              className="flex items-center space-x-1 px-3 py-2 text-sm font-medium text-gray-600 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <EyeOff className="w-4 h-4" />
+              <span>Collapse All</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Sections */}
+      <div className="space-y-3 lg:space-y-4">
+        {SECTIONS.map((section) => {
+          const status = sectionStatuses[section.id] || section.status;
+          const metrics = sectionMetrics[section.id] || section.metrics;
+          const statusConfig = getStatusConfig(status);
+          const statusReason = statusReasons[section.id];
+          const isExpanded = !collapsed[section.id];
+
+          const content = ready ? renderSectionContent(section.label) : null;
+
+          return (
+            <div key={section.id} data-section={section.id}>
+              {/* Mobile View */}
+              <div className={clsx(
+                "lg:hidden",
+                viewMode === 'desktop' && "hidden"
+              )}>
+                <MobileSectionCard
+                  section={section}
+                  status={status}
+                  metrics={metrics}
+                  statusConfig={statusConfig}
+                  statusReason={statusReason}
+                  isExpanded={isExpanded}
+                  onToggle={() => toggleSection(section.id)}
+                >
+                  {content}
+                </MobileSectionCard>
+              </div>
+
+              {/* Desktop View */}
+              <div className={clsx(
+                "hidden lg:block",
+                viewMode === 'responsive' && "lg:block"
+              )}>
+                <DesktopSectionCard
+                  section={section}
+                  status={status}
+                  metrics={metrics}
+                  statusConfig={statusConfig}
+                  statusReason={statusReason}
+                  isExpanded={isExpanded}
+                  onToggle={() => toggleSection(section.id)}
+                >
+                  {content}
+                </DesktopSectionCard>
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 };
