@@ -149,12 +149,12 @@ export default function Layout({ children }) {
             read,
             created_at,
             data,
-            leads!inner (
+            leads (
               id,
               name,
               phone,
               campaign_id,
-              campaigns!inner (
+              campaigns (
                 id,
                 name,
                 assigned_to_sales_team_id
