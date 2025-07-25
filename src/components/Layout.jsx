@@ -709,7 +709,11 @@ export default function Layout({ children }) {
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  onFocus={() => searchQuery.length >= 2 && setShowSearchResults(true)}
+                  onFocus={() => {
+  if (searchQuery.length >= 2) {
+    setShowSearchResults(true);
+  }
+}}
                   placeholder="Search leads, campaigns..."
                   className="pl-10 pr-4 py-2 w-full bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200 placeholder-gray-400"
                 />
@@ -845,10 +849,9 @@ export default function Layout({ children }) {
                   )}
                 </button>
                 
-                {/* Notifications Dropdown */}
-                {showNotifications && (
-                  <div className="absolute right-0 mt-2 w-80 sm:w-96 max-h-[600px] bg-white rounded-lg border border-gray-200 shadow-xl z-50 flex flex-col origin-top-right">
-                    {/* Header */}
+{/* Notifications Dropdown */}
+{showNotifications && (
+  <div className="fixed top-16 right-4 w-80 sm:w-96 max-h-[600px] bg-white rounded-lg border border-gray-200 shadow-xl z-50 flex flex-col">                    {/* Header */}
                     <div className="p-4 border-b border-gray-100 flex items-center justify-between">
                       <h3 className="font-semibold text-gray-900">Notifications</h3>
                       {unreadCount > 0 && (
