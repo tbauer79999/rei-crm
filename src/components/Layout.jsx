@@ -843,10 +843,13 @@ useEffect(() => {
               
               {/* Notifications */}
               <div className="relative notifications-container">
-                <button 
-                  onClick={() => setShowNotifications(!showNotifications)}
-                  className="relative p-2 rounded-lg hover:bg-gray-100 transition-colors text-gray-600"
-                >
+<button 
+  onClick={(e) => {
+    e.stopPropagation();
+    setShowNotifications(!showNotifications);
+  }}
+  className="relative p-2 rounded-lg hover:bg-gray-100 transition-colors text-gray-600"
+>
                   <Bell size={18} />
                   {unreadCount > 0 && (
                     <span className="absolute -top-1 -right-1 min-w-[20px] h-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center px-1">
@@ -985,10 +988,13 @@ useEffect(() => {
               
               {/* User menu */}
               <div className="relative user-menu-container">
-                <button
-                  onClick={() => setShowTopUserMenu(!showTopUserMenu)}
-                  className="flex items-center space-x-2 px-2 sm:px-3 py-1.5 rounded-lg hover:bg-gray-100 transition-all duration-200 min-w-0"
-                >
+<button
+  onClick={(e) => {
+    e.stopPropagation();
+    setShowTopUserMenu(!showTopUserMenu);
+  }}
+  className="flex items-center space-x-2 px-2 sm:px-3 py-1.5 rounded-lg hover:bg-gray-100 transition-all duration-200 min-w-0"
+>
                   <div className="w-8 h-8 bg-gradient-to-br from-indigo-400 via-purple-400 to-pink-400 rounded-full flex items-center justify-center flex-shrink-0">
                     <span className="text-white text-xs font-semibold">
                       {user?.email?.substring(0, 2).toUpperCase() || 'US'}
