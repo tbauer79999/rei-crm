@@ -31,6 +31,11 @@ const AIKnowledgeBase = () => {
   const [processingWebsites, setProcessingWebsites] = useState(new Set());
 
   useEffect(() => {
+      // ADD THESE DEBUG LOGS:
+  console.log('🔍 Current user:', user);
+  console.log('🔍 User tenant_id:', user?.tenant_id);
+  console.log('🔍 User role:', user?.role);
+  console.log('🔍 canViewKnowledgeBase:', canViewKnowledgeBase);
     if (canViewKnowledgeBase) {
       fetchKnowledgeBase();
       if (activeTab === 'websites') {
