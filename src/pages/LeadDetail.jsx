@@ -39,7 +39,7 @@ import {
 } from 'recharts';
 import supabase from '../lib/supabaseClient';
 
-// Mobile-optimized StatusPill component
+// Reusable StatusPill component
 const StatusPill = ({ type, label, tooltip }) => (
   <span 
     className={`text-xs px-2 py-1 rounded-full font-medium ${
@@ -54,9 +54,9 @@ const StatusPill = ({ type, label, tooltip }) => (
   </span>
 );
 
-// Mobile Alert component
+// Alert component for retry banner
 const Alert = ({ variant, children }) => (
-  <div className={`p-3 rounded-lg border text-sm ${
+  <div className={`p-3 rounded-lg border ${
     variant === 'warning' ? 'bg-yellow-50 border-yellow-200 text-yellow-800' :
     variant === 'error' ? 'bg-red-50 border-red-200 text-red-800' :
     'bg-blue-50 border-blue-200 text-blue-800'
@@ -65,7 +65,7 @@ const Alert = ({ variant, children }) => (
   </div>
 );
 
-// Mobile Tab Component
+// Mobile-only Tab Component
 const MobileTab = ({ active, onClick, icon: Icon, label, badge }) => (
   <button
     onClick={onClick}
@@ -87,12 +87,12 @@ const MobileTab = ({ active, onClick, icon: Icon, label, badge }) => (
   </button>
 );
 
-// Collapsible Section Component
+// Mobile-only Collapsible Section Component
 const CollapsibleSection = ({ title, icon: Icon, children, defaultOpen = false, badge }) => {
   const [isOpen, setIsOpen] = useState(defaultOpen);
   
   return (
-    <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+    <div className="bg-white rounded-lg border border-gray-200 overflow-hidden lg:hidden">
       <button
         onClick={() => setIsOpen(!isOpen)}
         className="w-full px-4 py-3 flex items-center justify-between bg-gray-50 hover:bg-gray-100 transition-colors"
@@ -772,40 +772,52 @@ export default function LeadDetail() {
       const sentimentZone = getSentimentZone(data.sentimentScore);
       
       return (
-        <div className="bg-white p-3 border border-gray-200 rounded-lg shadow-lg max-w-[200px]">
+        <div className="bg-white p-4 border border-gray-200 rounded-lg shadow-lg min-w-[200px]">
           <div className="flex items-center gap-2 mb-2">
-            <span className="font-medium text-gray-900 text-sm">{label}</span>
+            <span className="font-medium text-gray-900">{label}</span>
+            <span className="text-sm text-gray-500">• {data.timestamp}</span>
           </div>
           
           {data.hasScore ? (
-            <div className="space-y-2 text-xs">
+            <div className="space-y-2">
+              {/* Lead Score */}
               <div className="flex items-center justify-between">
-                <span className="text-gray-600">Lead Score</span>
-                <div className="flex items-center gap-1">
-                  <span className="font-bold" style={{ color: leadZone.color }}>
+                <span className="text-sm text-gray-600">Lead Score</span>
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-lg" style={{ color: leadZone.color }}>
                     {data.leadScore}
                   </span>
-                  <span style={{ color: leadZone.color }}>
-                    {leadZone.emoji}
+                  <span className="text-xs px-2 py-1 rounded-full" 
+                        style={{ backgroundColor: leadZone.bg, color: leadZone.color }}>
+                    {leadZone.emoji} {leadZone.label}
                   </span>
                 </div>
               </div>
               
+              {/* Sentiment */}
               <div className="flex items-center justify-between">
-                <span className="text-gray-600">Sentiment</span>
-                <div className="flex items-center gap-1">
+                <span className="text-sm text-gray-600">Sentiment</span>
+                <div className="flex items-center gap-2">
                   <span className="font-medium" style={{ color: sentimentZone.color }}>
                     {data.sentimentScore}
                   </span>
-                  <span style={{ color: sentimentZone.color }}>
-                    {sentimentZone.emoji}
+                  <span className="text-xs px-2 py-1 rounded-full" 
+                        style={{ backgroundColor: sentimentZone.bg, color: sentimentZone.color }}>
+                    {sentimentZone.emoji} {sentimentZone.label}
                   </span>
                 </div>
               </div>
+              
+              {/* Raw sentiment for reference */}
+              <div className="text-xs text-gray-400 border-t pt-2 mt-2">
+                Raw sentiment: {data.rawSentiment.toFixed(2)} 
+                {data.hesitation && ` • Hesitation: ${data.hesitation}`}
+                {data.urgency && ` • Urgency: ${data.urgency}`}
+              </div>
             </div>
           ) : (
-            <div className="text-center py-1">
-              <span className="text-xs text-gray-500">Processing...</span>
+            <div className="text-center py-2">
+              <span className="text-sm text-gray-500">Processing...</span>
             </div>
           )}
         </div>
@@ -953,7 +965,7 @@ export default function LeadDetail() {
   // Permission check - show access denied if user can't view leads
   if (!canViewLeads) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center max-w-md">
           <Lock className="w-12 h-12 text-red-500 mx-auto mb-4" />
           <h3 className="text-lg font-semibold text-gray-900 mb-2">Access Restricted</h3>
@@ -982,7 +994,7 @@ export default function LeadDetail() {
 
   if (!lead) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <AlertCircle size={48} className="text-red-500 mx-auto mb-4" />
           <h2 className="text-xl font-semibold text-gray-900 mb-2">Lead not found</h2>
@@ -1004,8 +1016,99 @@ export default function LeadDetail() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Mobile Header */}
-      <div className="bg-white border-b border-gray-200 px-4 py-3 sticky top-0 z-50">
+      {/* Desktop Header (lg and up) */}
+      <div className="hidden lg:block bg-white border-b border-gray-200 px-6 py-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => navigate('/dashboard')}
+              className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors"
+            >
+              <ArrowLeft size={20} />
+              <span className="font-medium">Conversations</span>
+            </button>
+            <div className="w-px h-6 bg-gray-300"></div>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
+                <span className="text-white font-semibold">
+                  {lead.name ? lead.name.charAt(0).toUpperCase() : '?'}
+                </span>
+              </div>
+              <div>
+                <h1 className="text-xl font-semibold text-gray-900">
+                  {lead.name || 'Anonymous Lead'}
+                </h1>
+                <div className="flex items-center gap-2 text-sm text-gray-500">
+                  {lead.phone && (
+                    <>
+                      <Phone size={14} />
+                      <span>{lead.phone}</span>
+                    </>
+                  )}
+                  {lead.email && lead.phone && <span>•</span>}
+                  {lead.email && (
+                    <>
+                      <Mail size={14} />
+                      <span>{lead.email}</span>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <span
+              className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm font-medium border ${statusConfig.bgColor} ${statusConfig.textColor} ${statusConfig.borderColor}`}
+            >
+              <span>{statusConfig.icon}</span>
+              {displayStatus}
+              {lead.stage_override_reason && (
+                <span className="text-xs opacity-75">
+                  (auto)
+                </span>
+              )}
+            </span>
+            <button
+              onClick={handleToggleAI}
+              disabled={togglingAI}
+              className={`
+                flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors
+                ${lead.ai_conversation_enabled 
+                  ? 'bg-red-100 text-red-700 hover:bg-red-200' 
+                  : 'bg-green-100 text-green-700 hover:bg-green-200'
+                }
+                ${togglingAI ? 'opacity-50 cursor-not-allowed' : 'hover:shadow-sm'}
+              `}
+            >
+              {togglingAI ? (
+                <div className="animate-spin rounded-full h-4 w-4 border-2 border-gray-500 border-t-transparent" />
+              ) : (
+                <>
+                  {lead.ai_conversation_enabled ? <Pause size={16} /> : <Play size={16} />}
+                </>
+              )}
+              {lead.ai_conversation_enabled ? 'Disable AI' : 'Enable AI'}
+            </button>
+            {lead.phone && (
+              <button
+                onClick={() => handleCall(lead.phone)}
+                disabled={!twilioDevice || isCallInProgress}
+                className={`flex items-center gap-2 px-4 py-2 text-sm font-medium text-white rounded-lg transition-colors ${
+                  isCallInProgress 
+                    ? 'bg-red-600 hover:bg-red-700' 
+                    : 'bg-green-600 hover:bg-green-700'
+                } ${!twilioDevice ? 'opacity-50 cursor-not-allowed' : ''}`}
+              >
+                <Phone size={16} />
+                {isCallInProgress ? 'End Call' : 'Call'}
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Mobile Header (lg and below) */}
+      <div className="lg:hidden bg-white border-b border-gray-200 px-4 py-3 sticky top-0 z-50">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3 min-w-0 flex-1">
             <button
@@ -1098,30 +1201,56 @@ export default function LeadDetail() {
         )}
       </div>
 
-      {/* Mobile Alert Banner */}
+      {/* Alert Banner */}
       {lead.requires_immediate_attention && (
-        <div className="bg-red-50 border-b border-red-200 px-4 py-3">
-          <div className="flex items-center gap-3">
-            <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0" />
-            <div className="min-w-0 flex-1">
-              <div className="text-sm font-medium text-red-900">
-                Immediate Attention Required
+        <div className="bg-red-50 border-y border-red-200 px-4 lg:px-6 py-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="flex-shrink-0">
+                {lead.alert_priority === 'critical' ? (
+                  <AlertCircle className="h-5 w-5 text-red-600 animate-pulse" />
+                ) : (
+                  <AlertCircle className="h-5 w-5 text-orange-600" />
+                )}
               </div>
-              <div className="text-xs text-red-700 mt-1">
-                {lead.attention_reasons?.join(' • ')}
+              <div>
+                <h3 className="text-sm font-medium text-red-900">
+                  Immediate Attention Required - {lead.alert_priority?.toUpperCase()} Priority
+                </h3>
+                <div className="mt-1 text-sm text-red-700 lg:block hidden">
+                  {lead.attention_reasons?.map((reason, idx) => (
+                    <span key={reason}>
+                      {idx > 0 && ' • '}
+                      {reason === 'agreed_to_meeting' && '✅ Lead agreed to schedule a call'}
+                      {reason === 'requested_callback' && '📞 Lead requested phone contact'}
+                      {reason === 'buying_signal' && '💰 Strong buying signal detected'}
+                      {reason === 'timeline_urgent' && '⏰ Urgent timeline mentioned'}
+                      {reason === 'high_interest_question' && '❓ Multiple questions showing high interest'}
+                      {reason === 'explicit_timeline' && '📅 Specific timeline mentioned'}
+                    </span>
+                  ))}
+                </div>
+                <div className="mt-1 text-sm text-red-700 lg:hidden">
+                  {lead.attention_reasons?.join(' • ')}
+                </div>
               </div>
             </div>
-            {canTagAsHot && (
-              <button className="px-3 py-1 bg-red-600 text-white text-xs rounded-md">
-                Action
-              </button>
-            )}
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-500 hidden lg:block">
+                Triggered {lead.alert_details?.triggered_at && new Date(lead.alert_details.triggered_at).toLocaleTimeString()}
+              </span>
+              {canTagAsHot && (
+                <button className="px-3 py-1 bg-red-600 text-white text-sm rounded-md hover:bg-red-700">
+                  Take Action
+                </button>
+              )}
+            </div>
           </div>
         </div>
       )}
 
-      {/* Mobile Tab Navigation */}
-      <div className="bg-white border-b border-gray-200 sticky top-16 z-40">
+      {/* Mobile Tab Navigation (lg and below) */}
+      <div className="lg:hidden bg-white border-b border-gray-200 sticky top-16 z-40">
         <div className="flex">
           <MobileTab
             active={activeTab === 'conversation'}
@@ -1146,8 +1275,622 @@ export default function LeadDetail() {
         </div>
       </div>
 
-      {/* Tab Content */}
-      <div className="flex-1 overflow-hidden">
+      {/* Desktop Layout (lg and up) */}
+      <div className="hidden lg:flex h-[calc(100vh-80px)]">
+        <div className="flex-1 flex flex-col bg-white">
+          {/* Updated Chart Block */}
+          <div className="px-6 mt-4">
+            <div className="bg-white border border-gray-200 rounded-xl p-4 shadow">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-semibold text-gray-900">Lead Scoring Trends</h3>
+                <div className="text-xs text-gray-500">
+                  {inboundMessages.length} messages • {inboundMessages.filter(msg => msg.weighted_score !== null).length} scored
+                </div>
+              </div>
+              
+              {motivationChartData.length > 0 ? (
+                <div>
+                  <ResponsiveContainer width="100%" height={220}>
+                    <LineChart data={motivationChartData}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                      <XAxis 
+                        dataKey="name" 
+                        tick={{ fontSize: 12 }}
+                        stroke="#64748b"
+                      />
+                      <YAxis 
+                        domain={[0, 100]} 
+                        tick={{ fontSize: 12 }}
+                        stroke="#64748b"
+                        label={{ value: 'Score (0-100)', angle: -90, position: 'insideLeft' }}
+                      />
+                      <Tooltip content={<CustomTooltip />} />
+                      
+                      {/* Lead Score Line */}
+                      <Line 
+                        type="monotone" 
+                        dataKey="leadScore" 
+                        stroke="#6366f1" 
+                        strokeWidth={3}
+                        dot={{ fill: '#6366f1', strokeWidth: 2, r: 5 }}
+                        activeDot={{ r: 7, fill: '#4f46e5', stroke: '#ffffff', strokeWidth: 2 }}
+                        name="Lead Score"
+                      />
+                      
+                      {/* Sentiment Line */}
+                      <Line 
+                        type="monotone" 
+                        dataKey="sentimentScore" 
+                        stroke="#10b981" 
+                        strokeWidth={2}
+                        strokeDasharray="5 5"
+                        dot={{ fill: '#10b981', strokeWidth: 2, r: 4 }}
+                        activeDot={{ r: 6, fill: '#059669', stroke: '#ffffff', strokeWidth: 2 }}
+                        name="Sentiment"
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                  
+                  {/* Score Zone Legend */}
+                  <div className="flex items-center justify-center gap-4 mt-4 pt-3 border-t border-gray-100">
+                    <div className="flex items-center gap-1">
+                      <div className="w-3 h-3 bg-indigo-600 rounded-full"></div>
+                      <span className="text-xs text-gray-600 font-medium">Lead Score</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <div className="w-3 h-3 border-2 border-green-600 rounded-full bg-white" 
+                           style={{ borderStyle: 'dashed' }}></div>
+                      <span className="text-xs text-gray-600">Sentiment</span>
+                    </div>
+                    <div className="h-4 w-px bg-gray-300"></div>
+                    
+                    {/* Lead Score Legend */}
+                    <div className="flex items-center gap-2 text-xs">
+                      <span className="text-gray-500 font-medium">Lead:</span>
+                      <span className="text-red-500">🔥 Hot</span>
+                      <span className="text-orange-500">🌶️ Warm</span>
+                      <span className="text-yellow-500">☀️ Cool</span>
+                      <span className="text-blue-500">❄️ Cold</span>
+                    </div>
+                    
+                    <div className="h-4 w-px bg-gray-300"></div>
+                    
+                    {/* Sentiment Legend */}
+                    <div className="flex items-center gap-2 text-xs">
+                      <span className="text-gray-500 font-medium">Sentiment:</span>
+                      <span className="text-green-500">😍 V.Pos</span>
+                      <span className="text-green-600">😊 Pos</span>
+                      <span className="text-gray-500">😐 Neutral</span>
+                      <span className="text-red-500">😠 Neg</span>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-12">
+                  <div className="w-12 h-12 bg-gradient-to-br from-blue-100 to-purple-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <Activity size={20} className="text-blue-600" />
+                  </div>
+                  <p className="text-gray-500 text-sm font-medium">No scored messages yet</p>
+                  <p className="text-gray-400 text-xs mt-1">Chart will appear once messages are analyzed</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Conversation Header */}
+          <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-blue-50 rounded-lg">
+                  <MessageCircle size={20} className="text-blue-600" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-900">AI Conversation</h2>
+                  <p className="text-sm text-gray-500">
+                    {messages.length} message{messages.length !== 1 ? 's' : ''} • Started{' '}
+                    {formatDate(lead.created_at)}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <button className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100">
+                  <Eye size={16} />
+                </button>
+                <button className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100">
+                  <MoreHorizontal size={16} />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* First Message Failure Banner */}
+          {canViewMessages && hasFirstMessageFailure() && (
+            <div className="px-6 pt-4">
+              <Alert variant="warning">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle size={16} />
+                  <span>⚠️ First message failed to send. SurFox automatically retried with a new message.</span>
+                </div>
+              </Alert>
+            </div>
+          )}
+
+          {/* Messages - Desktop */}
+          <div className="flex-1 overflow-y-auto p-6 space-y-4">
+            {!canViewMessages ? (
+              <div className="text-center py-12">
+                <div className="w-16 h-16 bg-gradient-to-br from-red-100 to-orange-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Lock size={24} className="text-red-600" />
+                </div>
+                <p className="text-lg font-medium text-gray-900 mb-2">Messages Restricted</p>
+                <p className="text-gray-500 mb-6">You don't have permission to view conversation messages</p>
+              </div>
+            ) : messages.length === 0 ? (
+              <div className="text-center py-12">
+                <div className="w-16 h-16 bg-gradient-to-br from-blue-100 to-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Bot size={24} className="text-blue-600" />
+                </div>
+                <p className="text-lg font-medium text-gray-900 mb-2">No conversation yet</p>
+                <p className="text-gray-500 mb-6">This lead hasn't engaged with your AI assistant</p>
+                {canSendMessages && (
+                  <button className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                    Send First Message
+                  </button>
+                )}
+              </div>
+            ) : (
+              groupedMessages.map((messageGroup, groupIndex) => {
+                const { original, retries } = messageGroup;
+                const isInbound = original.direction?.toLowerCase() === 'inbound';
+                const isAI = !isInbound;
+                const showTimestamp =
+                  groupIndex === 0 ||
+                  new Date(original.timestamp) - new Date(groupedMessages[groupIndex - 1].original.timestamp) >
+                    5 * 60 * 1000;
+
+                return (
+                  <div key={original.id}>
+                    {showTimestamp && (
+                      <div className="text-center my-4">
+                        <span className="px-3 py-1 bg-gray-100 text-gray-500 text-xs rounded-full">
+                          {formatDate(original.timestamp)}
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Original Message */}
+                    <div
+                      className={`flex ${isInbound ? 'justify-start' : 'justify-end'} items-start gap-3`}
+                    >
+                      {isInbound && (
+                        <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center flex-shrink-0">
+                          <User size={16} className="text-gray-600" />
+                        </div>
+                      )}
+
+                      <div className={`max-w-md ${isInbound ? 'mr-12' : 'ml-12'}`}>
+                        <div
+                          className={`px-4 py-3 rounded-2xl ${
+                            isInbound
+                              ? 'bg-gray-100 text-gray-900'
+                              : 'bg-gradient-to-r from-blue-600 to-blue-700 text-white'
+                          }`}
+                        >
+                          <p className="text-sm leading-relaxed">{original.message_body || '—'}</p>
+                        </div>
+
+                        <div
+                          className={`flex items-center gap-2 mt-1 text-xs text-gray-500 ${
+                            isInbound ? 'justify-start' : 'justify-end'
+                          }`}
+                        >
+                          <span>{formatTime(original.timestamp)}</span>
+                          {isAI && (
+                            <>
+                              <span>•</span>
+                              <div className="flex items-center gap-1">
+                                <Sparkles size={12} />
+                                <span>{original.sender === 'Manual' ? 'Manual' : 'AI'}</span>
+                              </div>
+                            </>
+                          )}
+                          {/* Show scoring info for inbound messages with scores */}
+                          {original.direction === 'inbound' && original.weighted_score && (
+                            <>
+                              <span>•</span>
+                              <span className="text-xs text-gray-400">
+                                Score: {original.weighted_score}
+                              </span>
+                            </>
+                          )}
+                        </div>
+
+                        {/* Status Pill for Outbound Messages */}
+                        {original.direction === 'outbound' && (
+                          <div className={`mt-2 ${isInbound ? 'text-left' : 'text-right'}`}>
+                            {original.status === 'failed' && (
+                              <StatusPill 
+                                type="error" 
+                                label="Failed" 
+                                tooltip={`Error Code: ${original.error_code || 'Unknown'}`} 
+                              />
+                            )}
+                            {original.status === 'sent' && (
+                              <StatusPill type="warning" label="Sent" tooltip="Delivered to carrier" />
+                            )}
+                            {original.status === 'queued' && (
+                              <StatusPill type="warning" label="Queued" />
+                            )}
+                            {original.status === 'delivered' && (
+                              <StatusPill type="success" label="Delivered" tooltip="Delivered to recipient" />
+                            )}
+                          </div>
+                        )}
+                        
+                        {/* Show if this message triggered an alert */}
+                        {lead.alert_details?.last_message && 
+                         original.message_body?.toLowerCase().includes(lead.alert_details.last_message.toLowerCase()) && (
+                          <div className="mt-2 flex items-center gap-2 text-xs text-orange-600">
+                            <AlertCircle size={12} />
+                            <span>This message triggered an alert</span>
+                          </div>
+                        )}
+
+                        {/* Retry Messages Section */}
+                        {retries.length > 0 && (
+                          <div className="mt-3 space-y-2">
+                            <button
+                              onClick={() => toggleRetryExpansion(original.id)}
+                              className="flex items-center gap-2 text-xs text-gray-500 hover:text-gray-700 transition-colors"
+                            >
+                              {expandedRetries.has(original.id) ? (
+                                <ChevronDown size={14} />
+                              ) : (
+                                <ChevronRight size={14} />
+                              )}
+                              <span>{retries.length} retry attempt{retries.length > 1 ? 's' : ''}</span>
+                              <span className="text-gray-400">
+                                (Last: {formatTime(retries[retries.length - 1].timestamp)})
+                              </span>
+                            </button>
+
+                            {/* Expanded Retry Messages */}
+                            {expandedRetries.has(original.id) && (
+                              <div className="ml-4 space-y-3 border-l-2 border-gray-200 pl-4">
+                                {retries.map((retry, retryIndex) => (
+                                  <div key={retry.id} className="space-y-1">
+                                    <div className="px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg text-sm">
+                                      <p className="text-gray-900">{retry.message_body}</p>
+                                    </div>
+                                    
+                                    <div className="flex items-center justify-between text-xs text-gray-500">
+                                      <div className="flex items-center gap-2">
+                                        <span>Retry #{retryIndex + 1}</span>
+                                        <span>•</span>
+                                        <span>{formatTime(retry.timestamp)}</span>
+                                      </div>
+                                      
+                                      <div>
+                                        {retry.status === 'failed' && (
+                                          <StatusPill 
+                                            type="error" 
+                                            label="Failed" 
+                                            tooltip={`Error Code: ${retry.error_code || 'Unknown'}`} 
+                                          />
+                                        )}
+                                        {retry.status === 'sent' && (
+                                          <StatusPill type="warning" label="Sent" tooltip="Delivered to carrier" />
+                                        )}
+                                        {retry.status === 'queued' && (
+                                          <StatusPill type="warning" label="Queued" />
+                                        )}
+                                        {retry.status === 'delivered' && (
+                                          <StatusPill type="success" label="Delivered" tooltip="Delivered to recipient" />
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      {!isInbound && (
+                        <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center flex-shrink-0">
+                          <Bot size={16} className="text-white" />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          {/* Message Input - Desktop */}
+          {canSendMessages && (
+            <div className="p-6 border-t border-gray-200 bg-gray-50">
+              <div className="flex gap-3">
+                <input
+                  type="text"
+                  value={newMessage}
+                  onChange={(e) => setNewMessage(e.target.value)}
+                  placeholder="Send a message to this lead..."
+                  className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+                  onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+                />
+                <button
+                  onClick={handleSendMessage}
+                  disabled={!newMessage.trim() || sendingMessage}
+                  className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  <Send size={16} />
+                  {sendingMessage ? 'Sending...' : 'Send'}
+                </button>
+              </div>
+              <p className="text-xs text-gray-500 mt-2">
+                <Bot size={12} className="inline mr-1" />
+                Messages will be sent through your AI assistant
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* Desktop Sidebar */}
+        <div className="w-80 bg-gray-50 border-l border-gray-200 overflow-y-auto">
+          <div className="p-6 space-y-6">
+            {/* Quick Actions for Alerts */}
+            {lead.requires_immediate_attention && canTagAsHot && (
+              <div className="bg-yellow-50 rounded-xl border border-yellow-200 p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <AlertCircle size={18} className="text-yellow-600" />
+                  <h3 className="text-sm font-semibold text-gray-900">Recommended Actions</h3>
+                </div>
+                
+                <div className="space-y-2">
+                  {lead.attention_reasons?.includes('agreed_to_meeting') && (
+                    <button className="w-full flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200 hover:border-blue-300 hover:shadow-sm transition-all">
+                      <div className="flex items-center gap-3">
+                        <Phone className="h-4 w-4 text-blue-600" />
+                        <span className="text-sm font-medium">Call Now</span>
+                      </div>
+                      <span className="text-xs text-gray-500">Lead is expecting your call</span>
+                    </button>
+                  )}
+                  
+                  {lead.attention_reasons?.includes('requested_callback') && (
+                    <button className="w-full flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200 hover:border-green-300 hover:shadow-sm transition-all">
+                      <div className="flex items-center gap-3">
+                        <Calendar className="h-4 w-4 text-green-600" />
+                        <span className="text-sm font-medium">Schedule Call</span>
+                      </div>
+                      <span className="text-xs text-gray-500">Set up callback time</span>
+                    </button>
+                  )}
+                  
+                  {lead.attention_reasons?.includes('timeline_urgent') && (
+                    <button className="w-full flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200 hover:border-orange-300 hover:shadow-sm transition-all">
+                      <div className="flex items-center gap-3">
+                        <MessageCircle className="h-4 w-4 text-orange-600" />
+                        <span className="text-sm font-medium">Send Proposal</span>
+                      </div>
+                      <span className="text-xs text-gray-500">Urgent timeline detected</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Updated AI Insights Card */}
+            <div className="bg-white rounded-xl border border-gray-200 p-4">
+              <div className="flex items-center gap-2 mb-4">
+                <Sparkles size={18} className="text-purple-600" />
+                <h3 className="text-sm font-semibold text-gray-900">AI Insights</h3>
+                {lead.requires_immediate_attention && (
+                  <span className="ml-auto">
+                    <span className="flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-red-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                    </span>
+                  </span>
+                )}
+              </div>
+
+              <div className="space-y-4">
+                {/* Hot Score if available */}
+                {lead.hot_score !== undefined && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-600">Hot Score</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-semibold text-gray-900">
+                        {lead.hot_score}
+                      </span>
+                      <div className="w-16 bg-gray-200 rounded-full h-2">
+                        <div 
+                          className={`h-2 rounded-full ${
+                            lead.hot_score >= 80 ? 'bg-red-500' :
+                            lead.hot_score >= 60 ? 'bg-orange-500' :
+                            lead.hot_score >= 40 ? 'bg-yellow-500' : 'bg-blue-500'
+                          }`}
+                          style={{ width: `${lead.hot_score || 0}%` }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-600">Lead Score</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-semibold text-gray-900">
+                      {aiInsights.leadScore}
+                    </span>
+                    {typeof aiInsights.leadScore === 'number' && (
+                      <span className={`text-xs px-2 py-1 rounded-full ${getScoreZone(aiInsights.leadScore).bg}`} 
+                            style={{ color: getScoreZone(aiInsights.leadScore).color }}>
+                        {getScoreZone(aiInsights.leadScore).emoji}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-600">Sentiment</span>
+                  <span className="text-sm font-semibold text-gray-900">
+                    {aiInsights.sentiment}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-600">Engagement</span>
+                  <div className="flex items-center gap-1">
+                    <div className={`w-2 h-2 ${aiInsights.engagementColor} rounded-full`}></div>
+                    <span className="text-sm font-semibold text-gray-900">{aiInsights.engagement}</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-600">Last Activity</span>
+                  <span className="text-sm font-semibold text-gray-900">
+                    {aiInsights.lastActivity}
+                  </span>
+                </div>
+
+                {/* Show Alert Triggers if any */}
+                {lead.alert_triggers && Object.entries(lead.alert_triggers).some(([_, v]) => v) && (
+                  <div className="pt-3 border-t border-gray-100">
+                    <div className="text-xs font-medium text-gray-700 mb-2">Active Triggers:</div>
+                    <div className="space-y-1">
+                      {Object.entries(lead.alert_triggers)
+                        .filter(([_, triggered]) => triggered)
+                        .map(([trigger, _]) => (
+                          <div key={trigger} className="flex items-center gap-2 text-xs">
+                            <div className="w-1.5 h-1.5 bg-green-500 rounded-full"></div>
+                            <span className="text-gray-600">
+                              {trigger.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                            </span>
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Message Statistics */}
+            <div className="bg-white rounded-xl border border-gray-200 p-4">
+              <div className="flex items-center gap-2 mb-4">
+                <Activity size={18} className="text-blue-600" />
+                <h3 className="text-sm font-semibold text-gray-900">Conversation Stats</h3>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-blue-600">{inboundMessages.length}</div>
+                  <div className="text-xs text-gray-500">Inbound</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-green-600">{outboundMessages.length}</div>
+                  <div className="text-xs text-gray-500">Outbound</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-orange-600">{retryStats.failedMessages}</div>
+                  <div className="text-xs text-gray-500">Failed</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-purple-600">{retryStats.retryMessages}</div>
+                  <div className="text-xs text-gray-500">Retries</div>
+                </div>
+              </div>
+
+              {retryStats.retryMessages > 0 && (
+                <div className="mt-4 pt-4 border-t border-gray-100">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-gray-600">Retry Success Rate</span>
+                    <span className="font-semibold text-gray-900">{retryStats.retrySuccessRate}%</span>
+                  </div>
+                  <div className="mt-2 w-full bg-gray-200 rounded-full h-2">
+                    <div 
+                      className="bg-green-500 h-2 rounded-full transition-all duration-300"
+                      style={{ width: `${retryStats.retrySuccessRate}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Lead Information */}
+            <div className="bg-white rounded-xl border border-gray-200 p-4">
+              <div className="flex items-center gap-2 mb-4">
+                <User size={18} className="text-gray-600" />
+                <h3 className="text-sm font-semibold text-gray-900">Lead Information</h3>
+              </div>
+
+              <div className="space-y-3">
+                {lead.name && (
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-600">Name</span>
+                    <span className="text-sm font-medium text-gray-900">{lead.name}</span>
+                  </div>
+                )}
+                
+                {lead.phone && (
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-600">Phone</span>
+                    <span className="text-sm font-medium text-gray-900">{lead.phone}</span>
+                  </div>
+                )}
+                
+                {lead.email && (
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-600">Email</span>
+                    <span className="text-sm font-medium text-gray-900">{lead.email}</span>
+                  </div>
+                )}
+                
+                <div className="flex justify-between">
+                  <span className="text-sm text-gray-600">Status</span>
+                  <span className={`text-sm font-medium ${statusConfig.textColor}`}>
+                    {statusConfig.icon} {displayStatus}
+                  </span>
+                </div>
+                
+                <div className="flex justify-between">
+                  <span className="text-sm text-gray-600">Created</span>
+                  <span className="text-sm font-medium text-gray-900">
+                    {new Date(lead.created_at).toLocaleDateString()}
+                  </span>
+                </div>
+                
+                {lead.last_message_at && (
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-600">Last Message</span>
+                    <span className="text-sm font-medium text-gray-900">
+                      {new Date(lead.last_message_at).toLocaleDateString()}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Call Status */}
+            {callStatus && (
+              <div className="bg-white rounded-xl border border-gray-200 p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <Phone size={18} className="text-green-600" />
+                  <h3 className="text-sm font-semibold text-gray-900">Call Status</h3>
+                </div>
+                <p className="text-sm text-gray-600">{callStatus}</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Mobile Content (lg and below) */}
+      <div className="lg:hidden flex-1 overflow-hidden">
         {/* Conversation Tab */}
         {activeTab === 'conversation' && (
           <div className="h-full flex flex-col">
