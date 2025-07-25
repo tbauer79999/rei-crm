@@ -14,7 +14,7 @@ export default function Layout({ children }) {
   const navigate = useNavigate();
   const { user, canAccessEnterprise, role } = useAuth();
   const isControlRoom = location.pathname === '/control-room';
-
+  const [showMobileSearch, setShowMobileSearch] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
@@ -581,7 +581,7 @@ export default function Layout({ children }) {
   const companyInitials = getCompanyInitials();
 
   return (
-    <div className="flex min-h-screen bg-gray-50">
+    <div className="flex min-h-screen bg-gray-50 overflow-x-hidden max-w-full">
       {/* Mobile backdrop */}
       {mobileOpen && (
         <div 
@@ -591,15 +591,16 @@ export default function Layout({ children }) {
       )}
 
       {/* Sidebar */}
-      <aside className={`
-        tour-sidebar
-        ${collapsed ? 'w-16' : 'w-64'} 
-        ${mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
-        fixed lg:static inset-y-0 left-0 z-50
-        bg-white border-r border-gray-200/80 
-        transition-all duration-300 ease-out
-        shadow-xl lg:shadow-none
-      `}>
+<aside className={`
+  tour-sidebar
+  ${collapsed ? 'w-16' : 'w-64'} 
+  ${mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+  fixed lg:static inset-y-0 left-0 z-50
+  bg-white border-r border-gray-200/80 
+  transition-all duration-300 ease-out
+  shadow-xl lg:shadow-none
+  max-w-full
+`}>
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-4 h-16 border-b border-gray-100">
           {!collapsed && (
@@ -679,8 +680,8 @@ export default function Layout({ children }) {
       <div className="flex flex-col flex-1 min-h-screen lg:ml-0">
         {/* Top header */}
         <header className="bg-white border-b border-gray-200 px-4 lg:px-6 py-3 h-16">
-          <div className="flex justify-between items-center h-full">
-            <div className="flex items-center space-x-4">
+<div className="flex justify-between items-center h-full w-full min-w-0">
+  <div className="flex items-center space-x-4 min-w-0 flex-1">
               <button
                 onClick={() => setMobileOpen(true)}
                 className="lg:hidden p-2 rounded-lg hover:bg-gray-100 transition-colors text-gray-600"
@@ -700,9 +701,9 @@ export default function Layout({ children }) {
               </div>
             </div>
             
-            <div className="flex items-center space-x-3">
+            <div className="flex items-center space-x-2 lg:space-x-3 flex-shrink-0 ml-2">
               {/* Search Box */}
-              <div className="tour-global-search hidden md:flex items-center relative search-container">
+              <div className="tour-global-search hidden md:flex items-center relative search-container min-w-0 max-w-sm">
                 <Search className="absolute left-3 w-4 h-4 text-gray-400" />
                 <input
                   type="text"
@@ -710,7 +711,7 @@ export default function Layout({ children }) {
                   onChange={(e) => setSearchQuery(e.target.value)}
                   onFocus={() => searchQuery.length >= 2 && setShowSearchResults(true)}
                   placeholder="Search leads, campaigns..."
-                  className="pl-10 pr-4 py-2 w-64 lg:w-80 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200 placeholder-gray-400"
+                  className="pl-10 pr-4 py-2 w-full bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200 placeholder-gray-400"
                 />
                 
                 {/* Search Results Dropdown */}
