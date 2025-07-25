@@ -126,33 +126,33 @@ const MobileSectionCard = ({
   
   return (
     <div className={clsx(
-      "bg-white rounded-xl shadow-sm border transition-all duration-200",
+      "bg-white rounded-xl shadow-sm border transition-all duration-200 w-full max-w-full overflow-hidden",
       statusConfig.borderColor,
       isExpanded ? "shadow-md" : "hover:shadow-md"
     )}>
       {/* Mobile Header */}
       <button
         onClick={onToggle}
-        className="w-full p-4 text-left hover:bg-gray-50/50 transition-colors rounded-xl"
+        className="w-full p-3 text-left hover:bg-gray-50/50 transition-colors rounded-xl"
       >
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3 min-w-0 flex-1">
+        <div className="flex items-center justify-between w-full">
+          <div className="flex items-center space-x-3 min-w-0 flex-1 overflow-hidden">
             {/* Icon */}
             <div className={clsx(
-              "w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0",
+              "w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0",
               statusConfig.bgColor
             )}>
-              <section.icon className={clsx("w-5 h-5", statusConfig.color)} />
+              <section.icon className={clsx("w-4 h-4", statusConfig.color)} />
             </div>
             
             {/* Content */}
-            <div className="min-w-0 flex-1">
+            <div className="min-w-0 flex-1 overflow-hidden">
               <div className="flex items-center space-x-2 mb-1">
                 <h3 className="font-semibold text-gray-900 truncate text-sm">
                   {section.shortLabel}
                 </h3>
                 <div className="flex items-center space-x-1 flex-shrink-0">
-                  <div className={clsx("w-2 h-2 rounded-full", statusConfig.dotColor)} />
+                  <div className={clsx("w-1.5 h-1.5 rounded-full", statusConfig.dotColor)} />
                   <span className={clsx("text-xs font-medium capitalize", statusConfig.color)}>
                     {status}
                   </span>
@@ -182,20 +182,22 @@ const MobileSectionCard = ({
       
       {/* Expandable Content */}
       {isExpanded && (
-        <div className="border-t border-gray-100">
-          <div className="p-4">
+        <div className="border-t border-gray-100 w-full">
+          <div className="p-3 w-full overflow-hidden">
             {/* Full Description on Expand */}
-            <div className="mb-4 p-3 bg-gray-50 rounded-lg">
-              <h4 className="font-medium text-gray-900 text-sm mb-1">{section.label}</h4>
-              <p className="text-xs text-gray-600">{section.description}</p>
+            <div className="mb-3 p-3 bg-gray-50 rounded-lg w-full">
+              <h4 className="font-medium text-gray-900 text-sm mb-1 break-words">{section.label}</h4>
+              <p className="text-xs text-gray-600 break-words">{section.description}</p>
               {statusReason && (
-                <p className="text-xs text-gray-500 mt-2 font-mono">{statusReason}</p>
+                <p className="text-xs text-gray-500 mt-2 font-mono break-all">{statusReason}</p>
               )}
             </div>
             
             {/* Component Content */}
-            <div className="space-y-4">
-              {children}
+            <div className="w-full overflow-hidden">
+              <div className="w-full max-w-full">
+                {children}
+              </div>
             </div>
           </div>
         </div>
@@ -288,38 +290,38 @@ const MobileStatusBar = ({ sections, sectionStatuses, sectionMetrics }) => {
   const reviewCount = sections.filter(s => (sectionStatuses[s.id] || s.status) === 'review').length;
   
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4">
+    <div className="bg-white rounded-xl border border-gray-200 p-3 mb-3 w-full max-w-full overflow-hidden">
       <div className="flex items-center justify-between mb-3">
-        <h2 className="font-semibold text-gray-900 text-sm">System Status</h2>
-        <div className="flex items-center space-x-1">
+        <h2 className="font-semibold text-gray-900 text-sm truncate">System Status</h2>
+        <div className="flex items-center space-x-1 flex-shrink-0">
           <BarChart3 className="w-4 h-4 text-gray-500" />
           <span className="text-xs text-gray-500">Live</span>
         </div>
       </div>
       
-      <div className="grid grid-cols-3 gap-3">
-        <div className="text-center">
-          <div className="w-8 h-8 bg-green-50 rounded-lg flex items-center justify-center mx-auto mb-1">
-            <CheckCircle className="w-4 h-4 text-green-500" />
+      <div className="grid grid-cols-3 gap-2">
+        <div className="text-center min-w-0">
+          <div className="w-7 h-7 bg-green-50 rounded-lg flex items-center justify-center mx-auto mb-1">
+            <CheckCircle className="w-3.5 h-3.5 text-green-500" />
           </div>
           <div className="text-lg font-bold text-green-600">{healthyCount}</div>
-          <div className="text-xs text-gray-500">Healthy</div>
+          <div className="text-xs text-gray-500 truncate">Healthy</div>
         </div>
         
-        <div className="text-center">
-          <div className="w-8 h-8 bg-orange-50 rounded-lg flex items-center justify-center mx-auto mb-1">
-            <AlertTriangle className="w-4 h-4 text-orange-500" />
+        <div className="text-center min-w-0">
+          <div className="w-7 h-7 bg-orange-50 rounded-lg flex items-center justify-center mx-auto mb-1">
+            <AlertTriangle className="w-3.5 h-3.5 text-orange-500" />
           </div>
           <div className="text-lg font-bold text-orange-600">{attentionCount}</div>
-          <div className="text-xs text-gray-500">Attention</div>
+          <div className="text-xs text-gray-500 truncate">Attention</div>
         </div>
         
-        <div className="text-center">
-          <div className="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center mx-auto mb-1">
-            <Clock className="w-4 h-4 text-blue-500" />
+        <div className="text-center min-w-0">
+          <div className="w-7 h-7 bg-blue-50 rounded-lg flex items-center justify-center mx-auto mb-1">
+            <Clock className="w-3.5 h-3.5 text-blue-500" />
           </div>
           <div className="text-lg font-bold text-blue-600">{reviewCount}</div>
-          <div className="text-xs text-gray-500">Review</div>
+          <div className="text-xs text-gray-500 truncate">Review</div>
         </div>
       </div>
     </div>
@@ -329,27 +331,46 @@ const MobileStatusBar = ({ sections, sectionStatuses, sectionMetrics }) => {
 // Quick Actions for Mobile
 const MobileQuickActions = ({ onExpandAll, onCollapseAll, allExpanded }) => {
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4">
+    <div className="bg-white rounded-xl border border-gray-200 p-3 mb-3 w-full max-w-full overflow-hidden">
       <div className="flex items-center justify-between">
-        <h3 className="font-medium text-gray-900 text-sm">Quick Actions</h3>
-        <div className="flex items-center space-x-2">
+        <h3 className="font-medium text-gray-900 text-sm truncate">Quick Actions</h3>
+        <div className="flex items-center space-x-2 flex-shrink-0">
           <button
             onClick={onExpandAll}
             disabled={allExpanded}
-            className="flex items-center space-x-1 px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex items-center space-x-1 px-2 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Eye className="w-3 h-3" />
-            <span>Expand All</span>
+            <span className="hidden sm:inline">Expand</span>
           </button>
           
           <button
             onClick={onCollapseAll}
             disabled={!allExpanded}
-            className="flex items-center space-x-1 px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex items-center space-x-1 px-2 py-1.5 text-xs font-medium text-gray-600 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <EyeOff className="w-3 h-3" />
-            <span>Collapse</span>
+            <span className="hidden sm:inline">Collapse</span>
           </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Mobile Header Component
+const MobileHeader = () => {
+  return (
+    <div className="lg:hidden mb-4 w-full max-w-full overflow-hidden">
+      <div className="bg-white rounded-xl border border-gray-200 p-4">
+        <div className="flex items-center space-x-3">
+          <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center flex-shrink-0">
+            <Brain className="w-5 h-5 text-blue-600" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <h1 className="text-lg font-bold text-gray-900 truncate">AI Control Room</h1>
+            <p className="text-sm text-gray-600 truncate">Monitor your AI pipeline</p>
+          </div>
         </div>
       </div>
     </div>
@@ -536,155 +557,176 @@ const AIControlRoom = () => {
     switch (sectionLabel) {
       case 'Overview & Health':
         return (
-          <div className="space-y-4">
-            <OverviewMetrics />
-            <OverviewTrendAndCost />
+          <div className="space-y-4 w-full max-w-full overflow-hidden">
+            <div className="w-full max-w-full overflow-hidden">
+              <OverviewMetrics />
+            </div>
+            <div className="w-full max-w-full overflow-hidden">
+              <OverviewTrendAndCost />
+            </div>
           </div>
         );
       case 'Lead Journey & Funnel':
-        return <LeadJourneyFunnel />;
+        return (
+          <div className="w-full max-w-full overflow-hidden">
+            <LeadJourneyFunnel />
+          </div>
+        );
       case 'AI Optimization':
-        return <AiOptimizationPanel />;
+        return (
+          <div className="w-full max-w-full overflow-hidden">
+            <AiOptimizationPanel />
+          </div>
+        );
       case 'Hot Lead Handoff':
-        return <HotLeadHandoffPanel />;
+        return (
+          <div className="w-full max-w-full overflow-hidden">
+            <HotLeadHandoffPanel />
+          </div>
+        );
       default:
         return null;
     }
   };
 
   return (
-    <div className="p-4 lg:p-6 space-y-4 lg:space-y-4">
-      {/* Plan indicator for debugging */}
-      {process.env.NODE_ENV === 'development' && (
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
-          <div className="text-sm">
-            <strong>Debug:</strong> Plan: {currentPlan} | Sections: Always Accessible | Feature Gating: At Component Level
+    <div className="w-full max-w-full overflow-hidden">
+      <div className="p-3 lg:p-6 space-y-3 lg:space-y-4 w-full max-w-full">
+        {/* Plan indicator for debugging */}
+        {process.env.NODE_ENV === 'development' && (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4 w-full max-w-full overflow-hidden">
+            <div className="text-sm break-words">
+              <strong>Debug:</strong> Plan: {currentPlan} | Sections: Always Accessible | Feature Gating: At Component Level
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Mobile-Only Status Bar */}
-      <div className="lg:hidden">
-        <MobileStatusBar 
-          sections={SECTIONS}
-          sectionStatuses={sectionStatuses}
-          sectionMetrics={sectionMetrics}
-        />
-        <MobileQuickActions 
-          onExpandAll={expandAll}
-          onCollapseAll={collapseAll}
-          allExpanded={allExpanded}
-        />
-      </div>
+        {/* Mobile Header */}
+        <MobileHeader />
 
-      {/* Desktop View Toggle - Only shown on desktop */}
-      <div className="hidden lg:flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">AI Control Room</h1>
-          <p className="text-gray-600 mt-1">Monitor and manage your AI-powered pipeline</p>
+        {/* Mobile-Only Status Bar and Actions */}
+        <div className="lg:hidden w-full max-w-full">
+          <MobileStatusBar 
+            sections={SECTIONS}
+            sectionStatuses={sectionStatuses}
+            sectionMetrics={sectionMetrics}
+          />
+          <MobileQuickActions 
+            onExpandAll={expandAll}
+            onCollapseAll={collapseAll}
+            allExpanded={allExpanded}
+          />
         </div>
-        
-        <div className="flex items-center space-x-3">
-          <div className="flex items-center bg-gray-100 rounded-lg p-1">
-            <button
-              onClick={() => setViewMode('desktop')}
-              className={clsx(
-                "px-3 py-1.5 text-sm font-medium rounded-md transition-colors flex items-center space-x-2",
-                viewMode === 'desktop' 
-                  ? 'bg-white text-gray-900 shadow-sm' 
-                  : 'text-gray-600 hover:text-gray-900'
-              )}
-            >
-              <Monitor className="w-4 h-4" />
-              <span>Desktop</span>
-            </button>
-            <button
-              onClick={() => setViewMode('responsive')}
-              className={clsx(
-                "px-3 py-1.5 text-sm font-medium rounded-md transition-colors flex items-center space-x-2",
-                viewMode === 'responsive' 
-                  ? 'bg-white text-gray-900 shadow-sm' 
-                  : 'text-gray-600 hover:text-gray-900'
-              )}
-            >
-              <Smartphone className="w-4 h-4" />
-              <span>Auto</span>
-            </button>
+
+        {/* Desktop View Toggle - Only shown on desktop */}
+        <div className="hidden lg:flex items-center justify-between mb-6">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">AI Control Room</h1>
+            <p className="text-gray-600 mt-1">Monitor and manage your AI-powered pipeline</p>
           </div>
           
-          <div className="flex items-center space-x-2">
-            <button
-              onClick={expandAll}
-              disabled={allExpanded}
-              className="flex items-center space-x-1 px-3 py-2 text-sm font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <Eye className="w-4 h-4" />
-              <span>Expand All</span>
-            </button>
+          <div className="flex items-center space-x-3">
+            <div className="flex items-center bg-gray-100 rounded-lg p-1">
+              <button
+                onClick={() => setViewMode('desktop')}
+                className={clsx(
+                  "px-3 py-1.5 text-sm font-medium rounded-md transition-colors flex items-center space-x-2",
+                  viewMode === 'desktop' 
+                    ? 'bg-white text-gray-900 shadow-sm' 
+                    : 'text-gray-600 hover:text-gray-900'
+                )}
+              >
+                <Monitor className="w-4 h-4" />
+                <span>Desktop</span>
+              </button>
+              <button
+                onClick={() => setViewMode('responsive')}
+                className={clsx(
+                  "px-3 py-1.5 text-sm font-medium rounded-md transition-colors flex items-center space-x-2",
+                  viewMode === 'responsive' 
+                    ? 'bg-white text-gray-900 shadow-sm' 
+                    : 'text-gray-600 hover:text-gray-900'
+                )}
+              >
+                <Smartphone className="w-4 h-4" />
+                <span>Auto</span>
+              </button>
+            </div>
             
-            <button
-              onClick={collapseAll}
-              disabled={!allExpanded}
-              className="flex items-center space-x-1 px-3 py-2 text-sm font-medium text-gray-600 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <EyeOff className="w-4 h-4" />
-              <span>Collapse All</span>
-            </button>
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={expandAll}
+                disabled={allExpanded}
+                className="flex items-center space-x-1 px-3 py-2 text-sm font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Eye className="w-4 h-4" />
+                <span>Expand All</span>
+              </button>
+              
+              <button
+                onClick={collapseAll}
+                disabled={!allExpanded}
+                className="flex items-center space-x-1 px-3 py-2 text-sm font-medium text-gray-600 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <EyeOff className="w-4 h-4" />
+                <span>Collapse All</span>
+              </button>
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Sections */}
-      <div className="space-y-3 lg:space-y-4">
-        {SECTIONS.map((section) => {
-          const status = sectionStatuses[section.id] || section.status;
-          const metrics = sectionMetrics[section.id] || section.metrics;
-          const statusConfig = getStatusConfig(status);
-          const statusReason = statusReasons[section.id];
-          const isExpanded = !collapsed[section.id];
+        {/* Sections */}
+        <div className="space-y-3 lg:space-y-4 w-full max-w-full">
+          {SECTIONS.map((section) => {
+            const status = sectionStatuses[section.id] || section.status;
+            const metrics = sectionMetrics[section.id] || section.metrics;
+            const statusConfig = getStatusConfig(status);
+            const statusReason = statusReasons[section.id];
+            const isExpanded = !collapsed[section.id];
 
-          const content = ready ? renderSectionContent(section.label) : null;
+            const content = ready ? renderSectionContent(section.label) : null;
 
-          return (
-            <div key={section.id} data-section={section.id}>
-              {/* Mobile View */}
-              <div className={clsx(
-                "lg:hidden",
-                viewMode === 'desktop' && "hidden"
-              )}>
-                <MobileSectionCard
-                  section={section}
-                  status={status}
-                  metrics={metrics}
-                  statusConfig={statusConfig}
-                  statusReason={statusReason}
-                  isExpanded={isExpanded}
-                  onToggle={() => toggleSection(section.id)}
-                >
-                  {content}
-                </MobileSectionCard>
+            return (
+              <div key={section.id} data-section={section.id} className="w-full max-w-full">
+                {/* Mobile View */}
+                <div className={clsx(
+                  "lg:hidden w-full max-w-full",
+                  viewMode === 'desktop' && "hidden"
+                )}>
+                  <MobileSectionCard
+                    section={section}
+                    status={status}
+                    metrics={metrics}
+                    statusConfig={statusConfig}
+                    statusReason={statusReason}
+                    isExpanded={isExpanded}
+                    onToggle={() => toggleSection(section.id)}
+                  >
+                    {content}
+                  </MobileSectionCard>
+                </div>
+
+                {/* Desktop View */}
+                <div className={clsx(
+                  "hidden lg:block",
+                  viewMode === 'responsive' && "lg:block"
+                )}>
+                  <DesktopSectionCard
+                    section={section}
+                    status={status}
+                    metrics={metrics}
+                    statusConfig={statusConfig}
+                    statusReason={statusReason}
+                    isExpanded={isExpanded}
+                    onToggle={() => toggleSection(section.id)}
+                  >
+                    {content}
+                  </DesktopSectionCard>
+                </div>
               </div>
-
-              {/* Desktop View */}
-              <div className={clsx(
-                "hidden lg:block",
-                viewMode === 'responsive' && "lg:block"
-              )}>
-                <DesktopSectionCard
-                  section={section}
-                  status={status}
-                  metrics={metrics}
-                  statusConfig={statusConfig}
-                  statusReason={statusReason}
-                  isExpanded={isExpanded}
-                  onToggle={() => toggleSection(section.id)}
-                >
-                  {content}
-                </DesktopSectionCard>
-              </div>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
     </div>
   );
