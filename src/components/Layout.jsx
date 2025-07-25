@@ -677,7 +677,7 @@ export default function Layout({ children }) {
       </aside>
 
       {/* Main content */}
-      <div className="flex flex-col flex-1 min-h-screen lg:ml-0">
+      <div className="flex flex-col flex-1 min-h-screen lg:ml-0 w-full max-w-full overflow-x-hidden">
         {/* Top header */}
         <header className="bg-white border-b border-gray-200 px-4 lg:px-6 py-3 h-16">
 <div className="flex justify-between items-center h-full w-full min-w-0">
@@ -847,7 +847,7 @@ export default function Layout({ children }) {
                 
                 {/* Notifications Dropdown */}
                 {showNotifications && (
-                  <div className="absolute right-0 mt-2 w-96 max-h-[600px] bg-white rounded-lg border border-gray-200 shadow-xl z-50 flex flex-col">
+                  <div className="absolute right-0 mt-2 w-80 sm:w-96 max-h-[600px] bg-white rounded-lg border border-gray-200 shadow-xl z-50 flex flex-col max-w-[calc(100vw-2rem)]">
                     {/* Header */}
                     <div className="p-4 border-b border-gray-100 flex items-center justify-between">
                       <h3 className="font-semibold text-gray-900">Notifications</h3>
@@ -1033,7 +1033,7 @@ export default function Layout({ children }) {
         </header>
 
 {/* Main content area */}
-        <main className="flex-1 p-4 lg:p-6 bg-gray-50">
+        <main className="flex-1 p-4 lg:p-6 bg-gray-50 w-full max-w-full overflow-x-hidden">
           {children}
         </main>
         
