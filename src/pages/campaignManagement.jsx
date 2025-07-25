@@ -980,7 +980,7 @@ export default function CampaignManagement() {
 
     try {
       const token = localStorage.getItem('auth_token');
-      const response = await fetch(`${API_BASE}/api/campaigns/${campaignId}/archive`, {
+      const response = await fetch(`${API_BASE}/campaigns/${campaignId}/archive`, {
         method: 'PATCH',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -1007,7 +1007,7 @@ export default function CampaignManagement() {
 
     try {
       const token = localStorage.getItem('auth_token');
-      const response = await fetch(`${API_BASE}/api/campaigns/${campaignId}/unarchive`, {
+      const response = await fetch(`${API_BASE}/campaigns/${campaignId}/unarchive`, {
         method: 'PATCH',
         headers: {
           'Authorization': `Bearer ${token}`,
