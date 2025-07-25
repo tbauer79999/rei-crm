@@ -28,7 +28,7 @@ export default function Layout({ children }) {
     industry: 'real estate',
     loading: true
   });
-console.log("hello")
+console.log()
   // Notification state
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -1062,7 +1062,7 @@ console.log("hello")
           />
         </div>
       </div>
-      
+     </div>
       {/* Mobile Search Results */}
 <div className="flex-1 overflow-y-auto">
   {isSearching ? (
