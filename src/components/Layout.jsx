@@ -703,7 +703,7 @@ export default function Layout({ children }) {
             
             <div className="flex items-center space-x-2 lg:space-x-3 flex-shrink-0 ml-2">
               {/* Search Box */}
-              <div className="tour-global-search hidden md:flex items-center relative search-container min-w-0 max-w-sm">
+              <div className="tour-global-search hidden md:flex items-center relative search-container">
                 <Search className="absolute left-3 w-4 h-4 text-gray-400" />
                 <input
                   type="text"
@@ -715,12 +715,12 @@ export default function Layout({ children }) {
   }
 }}
                   placeholder="Search leads, campaigns..."
-                  className="pl-10 pr-4 py-2 w-full bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200 placeholder-gray-400"
+                  className="pl-10 pr-4 py-2 w-64 lg:w-80 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200 placeholder-gray-400"
                 />
                 
                 {/* Search Results Dropdown */}
                 {showSearchResults && (searchResults || isSearching) && (
-                  <div className="absolute top-full mt-2 left-0 right-0 bg-white rounded-lg border border-gray-200 shadow-lg z-50 max-h-96 overflow-y-auto min-w-max">
+                  <div className="absolute top-full mt-2 left-0 right-0 bg-white rounded-lg border border-gray-200 shadow-lg z-50 max-h-96 overflow-y-auto">
                     {isSearching ? (
                       <div className="p-4 text-center text-sm text-gray-500">
                         <div className="inline-flex items-center">
