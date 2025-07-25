@@ -1,6 +1,11 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ScatterChart, Scatter } from 'recharts';
-import { TrendingUp, Users, Target, DollarSign, Calendar, Filter, Download, RefreshCw, BarChart3, Brain, Settings, Plus, Eye, ArrowRight, Award, TestTube, Database, Activity, MessageSquare, Lock, AlertCircle } from 'lucide-react';
+import { 
+  TrendingUp, Users, Target, DollarSign, Calendar, Filter, Download, RefreshCw, 
+  BarChart3, Brain, Settings, Plus, Eye, ArrowRight, Award, TestTube, Database, 
+  Activity, MessageSquare, Lock, AlertCircle, Menu, X, ChevronDown, ChevronRight,
+  Smartphone, Monitor, Grid, List, MoreHorizontal
+} from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { PERMISSIONS } from '../lib/permissions';
 import { hasFeature, FeatureGate } from '../lib/plans';
@@ -10,6 +15,346 @@ import CustomReportsBuilder from '../components/CustomReportsBuilder';
 import LearningAnalytics from '../components/LearningAnalytics';
 import { PLAN_FEATURES } from '../lib/plans';
 
+// Mobile Card Components
+const MobileMetricCard = ({ title, value, subtitle, icon: Icon, color = 'blue', trend, onClick }) => {
+  const colors = {
+    blue: 'from-blue-50 to-blue-100 text-blue-600 border-blue-200',
+    green: 'from-green-50 to-green-100 text-green-600 border-green-200',
+    purple: 'from-purple-50 to-purple-100 text-purple-600 border-purple-200',
+    orange: 'from-orange-50 to-orange-100 text-orange-600 border-orange-200',
+    red: 'from-red-50 to-red-100 text-red-600 border-red-200'
+  };
+
+  return (
+    <div 
+      className={`bg-gradient-to-r ${colors[color]} rounded-xl p-4 border cursor-pointer hover:shadow-md transition-all`}
+      onClick={onClick}
+    >
+      <div className="flex items-center justify-between mb-2">
+        <Icon className="w-6 h-6 flex-shrink-0" />
+        {trend && (
+          <div className={`flex items-center text-xs ${trend > 0 ? 'text-green-600' : 'text-red-600'}`}>
+            <TrendingUp className={`w-3 h-3 mr-1 ${trend < 0 ? 'rotate-180' : ''}`} />
+            {Math.abs(trend)}%
+          </div>
+        )}
+      </div>
+      <div className="space-y-1">
+        <p className="text-xs font-medium opacity-80">{title}</p>
+        <p className="text-lg font-bold">{value}</p>
+        {subtitle && <p className="text-xs opacity-70">{subtitle}</p>}
+      </div>
+    </div>
+  );
+};
+
+const MobileFunnelStage = ({ stage, isLast = false }) => {
+  return (
+    <div className="relative">
+      <div className="bg-white rounded-xl border border-gray-200 p-4 hover:shadow-md transition-all">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center space-x-2">
+            <div 
+              className="w-3 h-3 rounded-full" 
+              style={{ backgroundColor: stage.color }}
+            />
+            <span className="text-sm font-semibold text-gray-900 truncate">{stage.stage}</span>
+          </div>
+          <div className="text-right">
+            <span className="text-lg font-bold text-gray-900">
+              {typeof stage.count === 'number' ? stage.count.toLocaleString() : stage.count}
+            </span>
+          </div>
+        </div>
+        
+        <div className="mb-2">
+          <div className="w-full bg-gray-200 rounded-full h-2">
+            <div
+              className="h-2 rounded-full transition-all duration-500"
+              style={{ 
+                width: `${Math.min(100, stage.rate)}%`, 
+                backgroundColor: stage.color 
+              }}
+            />
+          </div>
+        </div>
+        
+        <div className="flex items-center justify-between text-xs text-gray-500">
+          <span>{stage.rate}%</span>
+          {stage.sublabel && <span>{stage.sublabel}</span>}
+        </div>
+        
+        {stage.tooltip && (
+          <div className="mt-2 p-2 bg-gray-50 rounded-lg">
+            <p className="text-xs text-gray-600">{stage.tooltip}</p>
+          </div>
+        )}
+      </div>
+      
+      {!isLast && (
+        <div className="flex justify-center py-2">
+          <ChevronDown className="w-4 h-4 text-gray-400" />
+        </div>
+      )}
+    </div>
+  );
+};
+
+const MobileFilterPanel = ({ 
+  dateRange, 
+  setDateRange, 
+  selectedCampaign, 
+  setSelectedCampaign, 
+  campaigns, 
+  onRefresh, 
+  onExport, 
+  loading,
+  canFilterCampaigns,
+  canExportData 
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <>
+      {/* Mobile Filter Button */}
+      <div className="lg:hidden bg-white border-b border-gray-200 px-4 py-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-gray-900">Analytics</h2>
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={onRefresh}
+              disabled={loading}
+              className="p-2 text-gray-500 hover:text-gray-700 disabled:opacity-50"
+            >
+              <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
+            </button>
+            <button
+              onClick={() => setIsOpen(true)}
+              className="flex items-center px-3 py-2 bg-gray-100 rounded-lg text-sm font-medium text-gray-700"
+            >
+              <Filter className="w-4 h-4 mr-2" />
+              Filters
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Mobile Filter Overlay */}
+      {isOpen && (
+        <>
+          <div 
+            className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
+            onClick={() => setIsOpen(false)}
+          />
+          <div className="fixed inset-x-0 bottom-0 bg-white rounded-t-xl z-50 lg:hidden">
+            <div className="p-4">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-gray-900">Filters</h3>
+                <button
+                  onClick={() => setIsOpen(false)}
+                  className="p-2 text-gray-500 hover:text-gray-700"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              
+              {canFilterCampaigns && (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Date Range
+                    </label>
+                    <select 
+                      value={dateRange}
+                      onChange={(e) => setDateRange(parseInt(e.target.value))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value={7}>Last 7 Days</option>
+                      <option value={30}>Last 30 Days</option>
+                      <option value={60}>Last 60 Days</option>
+                      <option value={90}>Last 90 Days</option>
+                    </select>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Campaign
+                    </label>
+                    <select 
+                      value={selectedCampaign}
+                      onChange={(e) => setSelectedCampaign(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="all">All Campaigns</option>
+                      {campaigns.map(campaign => (
+                        <option key={campaign.id} value={campaign.id}>{campaign.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              )}
+              
+              <div className="flex space-x-3 mt-6 pt-4 border-t border-gray-200">
+                {canExportData && (
+                  <button 
+                    onClick={() => {
+                      onExport();
+                      setIsOpen(false);
+                    }}
+                    className="flex-1 flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                  >
+                    <Download className="w-4 h-4 mr-2" />
+                    Export
+                  </button>
+                )}
+                <button
+                  onClick={() => setIsOpen(false)}
+                  className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
+                >
+                  Done
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+    </>
+  );
+};
+
+const MobileNavigationTabs = ({ activeView, setActiveView, tabs }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const activeTab = tabs.find(tab => tab.id === activeView);
+
+  return (
+    <div className="lg:hidden bg-white border-b border-gray-200 px-4 py-3">
+      <button
+        onClick={() => setIsOpen(true)}
+        className="flex items-center justify-between w-full text-left"
+      >
+        <div className="flex items-center space-x-2">
+          <activeTab.icon className="w-5 h-5 text-blue-600" />
+          <span className="font-medium text-gray-900">{activeTab.name}</span>
+        </div>
+        <ChevronDown className="w-5 h-5 text-gray-400" />
+      </button>
+
+      {/* Mobile Tab Selector Overlay */}
+      {isOpen && (
+        <>
+          <div 
+            className="fixed inset-0 bg-black bg-opacity-50 z-40"
+            onClick={() => setIsOpen(false)}
+          />
+          <div className="fixed inset-x-0 bottom-0 bg-white rounded-t-xl z-50 max-h-96 overflow-y-auto">
+            <div className="p-4">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-gray-900">Analytics Views</h3>
+                <button
+                  onClick={() => setIsOpen(false)}
+                  className="p-2 text-gray-500 hover:text-gray-700"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              
+              <div className="space-y-2">
+                {tabs.map((tab) => {
+                  const Icon = tab.icon;
+                  return (
+                    <button
+                      key={tab.id}
+                      onClick={() => {
+                        setActiveView(tab.id);
+                        setIsOpen(false);
+                      }}
+                      className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-left transition-colors ${
+                        activeView === tab.id
+                          ? 'bg-blue-50 text-blue-600 border border-blue-200'
+                          : 'text-gray-700 hover:bg-gray-50'
+                      }`}
+                    >
+                      <Icon className="w-5 h-5 flex-shrink-0" />
+                      <span className="font-medium">{tab.name}</span>
+                      {activeView === tab.id && (
+                        <div className="ml-auto w-2 h-2 bg-blue-600 rounded-full" />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
+
+const MobileTableCard = ({ title, data, headers, renderRow, emptyMessage }) => {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="w-full px-4 py-4 text-left hover:bg-gray-50 transition-colors"
+      >
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
+          <div className="flex items-center space-x-2">
+            <span className="text-sm text-gray-500">{data.length} items</span>
+            <ChevronDown className={`w-5 h-5 text-gray-400 transition-transform ${expanded ? 'rotate-180' : ''}`} />
+          </div>
+        </div>
+      </button>
+      
+      {expanded && (
+        <div className="border-t border-gray-200">
+          {data.length === 0 ? (
+            <div className="p-8 text-center text-gray-500">
+              {emptyMessage}
+            </div>
+          ) : (
+            <div className="divide-y divide-gray-200">
+              {data.map((item, index) => (
+                <div key={index} className="p-4">
+                  {renderRow(item, index)}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+const MobileChartCard = ({ title, description, children, actions }) => {
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
+      <div className="px-4 py-4 border-b border-gray-100">
+        <div className="flex items-center justify-between">
+          <div className="min-w-0 flex-1">
+            <h3 className="text-lg font-semibold text-gray-900 truncate">{title}</h3>
+            {description && (
+              <p className="text-sm text-gray-600 mt-1 line-clamp-2">{description}</p>
+            )}
+          </div>
+          {actions && (
+            <div className="ml-4 flex-shrink-0">
+              {actions}
+            </div>
+          )}
+        </div>
+      </div>
+      <div className="p-4">
+        {children}
+      </div>
+    </div>
+  );
+};
+
 export default function BusinessAnalytics() {
   const { user, hasPermission, currentPlan } = useAuth();
   const [activeView, setActiveView] = useState('overview');
@@ -18,6 +363,7 @@ export default function BusinessAnalytics() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [pipelineValue, setPipelineValue] = useState(0);
+  const [viewMode, setViewMode] = useState('responsive'); // 'mobile', 'desktop', 'responsive'
   
   // Use refs to prevent multiple initializations
   const isInitialized = useRef(false);
@@ -41,12 +387,25 @@ export default function BusinessAnalytics() {
     salesRepPerformance: []
   });
 
-    useEffect(() => {
+  useEffect(() => {
     document.title = "Business Analytics – SurFox";
   }, []);
   
   // Check if user has access to analytics at all
   const hasAnalyticsAccess = canViewFunnelStats || canViewPerformanceAnalytics;
+
+  // Auto-detect screen size for responsive mode
+  useEffect(() => {
+    const handleResize = () => {
+      if (viewMode === 'responsive') {
+        // The responsive behavior is handled by CSS classes
+      }
+    };
+
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [viewMode]);
 
   // Helper function to get date filter
   const getDateFilter = useCallback(() => {
@@ -586,7 +945,7 @@ const viewPermissions = {
 
   // Render access denied screen
   const renderAccessDenied = () => (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
       <div className="text-center max-w-md">
         <Lock className="w-16 h-16 text-red-500 mx-auto mb-4" />
         <h3 className="text-xl font-semibold text-gray-900 mb-2">Access Restricted</h3>
@@ -601,7 +960,7 @@ const viewPermissions = {
   );
 
   const GlobalFilterBar = () => (
-    <div className="bg-white border-b border-gray-200 px-6 py-4 sticky top-0 z-50">
+    <div className="hidden lg:block bg-white border-b border-gray-200 px-6 py-4 sticky top-0 z-50">
       <div className="flex flex-wrap items-center gap-4">
         {canFilterCampaigns && (
           <>
@@ -635,6 +994,32 @@ const viewPermissions = {
         )}
         
         <div className="ml-auto flex items-center space-x-3">
+          {/* View Mode Toggle - Desktop Only */}
+          <div className="flex items-center bg-gray-100 rounded-lg p-1">
+            <button
+              onClick={() => setViewMode('desktop')}
+              className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors flex items-center space-x-2 ${
+                viewMode === 'desktop' 
+                  ? 'bg-white text-gray-900 shadow-sm' 
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              <Monitor className="w-4 h-4" />
+              <span>Desktop</span>
+            </button>
+            <button
+              onClick={() => setViewMode('responsive')}
+              className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors flex items-center space-x-2 ${
+                viewMode === 'responsive' 
+                  ? 'bg-white text-gray-900 shadow-sm' 
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              <Smartphone className="w-4 h-4" />
+              <span>Auto</span>
+            </button>
+          </div>
+          
           <button 
             onClick={loadAllData}
             disabled={loading || isLoadingData.current}
@@ -719,45 +1104,55 @@ const viewPermissions = {
   });
 
   return (
-    <div className="bg-white border-b border-gray-200">
-      <div className="px-6">
-        <nav className="flex space-x-8 overflow-x-auto">
-          {allowedTabs.map((tab) => {
-            const Icon = tab.icon;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveView(tab.id)}
-                className={`flex items-center py-4 px-1 border-b-2 font-medium text-sm transition-colors whitespace-nowrap ${
-                  activeView === tab.id
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                <Icon className="w-4 h-4 mr-2" />
-                {tab.name}
-              </button>
-            );
-          })}
-          
-          {/* Show locked tabs for plan upgrades */}
-          {tabs.filter(tab => tab.planFeature && !(currentPlan && PLAN_FEATURES[currentPlan]?.[tab.planFeature]) && tab.permission).map((tab) => {
-            const Icon = tab.icon;
-            return (
-              <div
-                key={`locked-${tab.id}`}
-                className="flex items-center py-4 px-1 border-b-2 border-transparent text-gray-300 cursor-not-allowed"
-                title={`Requires plan upgrade for ${tab.planFeature}`}
-              >
-                <Icon className="w-4 h-4 mr-2" />
-                {tab.name}
-                <Lock className="w-3 h-3 ml-1" />
-              </div>
-            );
-          })}
-        </nav>
+    <>
+      {/* Desktop Navigation */}
+      <div className={`hidden lg:block bg-white border-b border-gray-200 ${viewMode === 'responsive' ? 'lg:block' : ''}`}>
+        <div className="px-6">
+          <nav className="flex space-x-8 overflow-x-auto">
+            {allowedTabs.map((tab) => {
+              const Icon = tab.icon;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveView(tab.id)}
+                  className={`flex items-center py-4 px-1 border-b-2 font-medium text-sm transition-colors whitespace-nowrap ${
+                    activeView === tab.id
+                      ? 'border-blue-500 text-blue-600'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  }`}
+                >
+                  <Icon className="w-4 h-4 mr-2" />
+                  {tab.name}
+                </button>
+              );
+            })}
+            
+            {/* Show locked tabs for plan upgrades */}
+            {tabs.filter(tab => tab.planFeature && !(currentPlan && PLAN_FEATURES[currentPlan]?.[tab.planFeature]) && tab.permission).map((tab) => {
+              const Icon = tab.icon;
+              return (
+                <div
+                  key={`locked-${tab.id}`}
+                  className="flex items-center py-4 px-1 border-b-2 border-transparent text-gray-300 cursor-not-allowed"
+                  title={`Requires plan upgrade for ${tab.planFeature}`}
+                >
+                  <Icon className="w-4 h-4 mr-2" />
+                  {tab.name}
+                  <Lock className="w-3 h-3 ml-1" />
+                </div>
+              );
+            })}
+          </nav>
+        </div>
       </div>
-    </div>
+
+      {/* Mobile Navigation */}
+      <MobileNavigationTabs 
+        activeView={activeView} 
+        setActiveView={setActiveView} 
+        tabs={allowedTabs} 
+      />
+    </>
   );
 };
 
@@ -849,113 +1244,204 @@ const viewPermissions = {
     ];
 
     return (
-      <div className="space-y-6">
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
-          <div className="px-6 py-4 border-b border-gray-100">
-            <h3 className="text-lg font-semibold text-gray-900">AI Engagement Flow</h3>
-            <p className="text-sm text-gray-600 mt-1">Real-time interaction tracking from AI-driven outreach</p>
-          </div>
-          <div className="p-6">
-            <div className="space-y-4">
-              {macroFunnelData.map((stage, index) => {
-                const isHighestRate = parseFloat(stage.rate) === maxRate && parseFloat(stage.rate) > 0;
-                return (
-                  <div key={stage.stage} className="p-4 rounded-lg hover:bg-gray-50 transition-colors relative group">
-                    <div className="flex items-center justify-between mb-3">
-                      <div>
-                        <span className="text-sm font-semibold text-gray-900">{stage.stage}</span>
-                        {stage.sublabel && (
-                          <span className="text-xs text-gray-500 ml-2">{stage.sublabel}</span>
-                        )}
+      <div className="space-y-4 lg:space-y-6">
+        {/* Mobile AI Engagement Flow */}
+        <div className="lg:hidden">
+          <MobileChartCard
+            title="AI Engagement Flow"
+            description="Real-time interaction tracking from AI-driven outreach"
+          >
+            <div className="space-y-3">
+              {macroFunnelData.map((stage, index) => (
+                <MobileFunnelStage 
+                  key={stage.stage} 
+                  stage={stage} 
+                  isLast={index === macroFunnelData.length - 1}
+                />
+              ))}
+            </div>
+          </MobileChartCard>
+        </div>
+
+        {/* Desktop AI Engagement Flow */}
+        <div className={`hidden lg:block ${viewMode === 'responsive' ? 'lg:block' : ''}`}>
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
+            <div className="px-6 py-4 border-b border-gray-100">
+              <h3 className="text-lg font-semibold text-gray-900">AI Engagement Flow</h3>
+              <p className="text-sm text-gray-600 mt-1">Real-time interaction tracking from AI-driven outreach</p>
+            </div>
+            <div className="p-6">
+              <div className="space-y-4">
+                {macroFunnelData.map((stage, index) => {
+                  const isHighestRate = parseFloat(stage.rate) === maxRate && parseFloat(stage.rate) > 0;
+                  return (
+                    <div key={stage.stage} className="p-4 rounded-lg hover:bg-gray-50 transition-colors relative group">
+                      <div className="flex items-center justify-between mb-3">
+                        <div>
+                          <span className="text-sm font-semibold text-gray-900">{stage.stage}</span>
+                          {stage.sublabel && (
+                            <span className="text-xs text-gray-500 ml-2">{stage.sublabel}</span>
+                          )}
+                        </div>
+                        <div className="text-right">
+                          <span className="text-lg font-bold text-gray-900">{typeof stage.count === 'number' ? stage.count.toLocaleString() : stage.count}</span>
+                          <span className="text-sm text-gray-500 ml-2">({stage.rate}%)</span>
+                        </div>
                       </div>
-                      <div className="text-right">
-                        <span className="text-lg font-bold text-gray-900">{typeof stage.count === 'number' ? stage.count.toLocaleString() : stage.count}</span>
-                        <span className="text-sm text-gray-500 ml-2">({stage.rate}%)</span>
+                      <div className="w-full bg-gray-200 rounded-full h-6 relative overflow-hidden">
+                        <div
+                          className={`h-6 rounded-full transition-all duration-500 ${isHighestRate ? 'animate-pulse' : ''}`}
+                          style={{ width: `${Math.min(100, stage.rate)}%`, backgroundColor: stage.color }}
+                        />
                       </div>
+                      {stage.tooltip && (
+                        <div className="absolute bottom-full left-0 mb-2 w-64 p-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10">
+                          {stage.tooltip}
+                          <div className="absolute top-full left-8 w-0 h-0 border-l-4 border-l-transparent border-r-4 border-r-transparent border-t-4 border-t-gray-900"></div>
+                        </div>
+                      )}
                     </div>
-                    <div className="w-full bg-gray-200 rounded-full h-6 relative overflow-hidden">
-                      <div
-                        className={`h-6 rounded-full transition-all duration-500 ${isHighestRate ? 'animate-pulse' : ''}`}
-                        style={{ width: `${Math.min(100, stage.rate)}%`, backgroundColor: stage.color }}
-                      />
-                    </div>
-                    {stage.tooltip && (
-                      <div className="absolute bottom-full left-0 mb-2 w-64 p-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10">
-                        {stage.tooltip}
-                        <div className="absolute top-full left-8 w-0 h-0 border-l-4 border-l-transparent border-r-4 border-r-transparent border-t-4 border-t-gray-900"></div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
           </div>
         </div>
 
         {/* Historical Trends - only show if user has performance analytics permission */}
         {canViewPerformanceAnalytics && (
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
-            <div className="px-6 py-4 border-b border-gray-100">
-              <h3 className="text-lg font-semibold text-gray-900">Historical Performance Trends</h3>
-              <p className="text-sm text-gray-600 mt-1">Real cost and performance data from your campaigns</p>
+          <>
+            {/* Mobile Historical Trends */}
+            <div className="lg:hidden">
+              <MobileChartCard
+                title="Historical Performance Trends"
+                description="Real cost and performance data from your campaigns"
+              >
+                <ResponsiveContainer width="100%" height={300}>
+                  <LineChart data={dashboardData.historicalTrends}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                    <XAxis dataKey="period" stroke="#6b7280" fontSize={10} />
+                    <YAxis yAxisId="rate" orientation="left" stroke="#6b7280" fontSize={10} />
+                    <YAxis yAxisId="cost" orientation="right" stroke="#6b7280" fontSize={10} />
+                    <Tooltip />
+                    <Legend fontSize={12} />
+                    <Line yAxisId="rate" dataKey="hotLeadRate" stroke="#10b981" strokeWidth={2} name="Hot Lead Rate %" />
+                    <Line yAxisId="rate" dataKey="replyRate" stroke="#3b82f6" strokeWidth={2} name="Reply Rate %" />
+                    <Line yAxisId="cost" dataKey="costPerHot" stroke="#f59e0b" strokeWidth={2} name="Cost per Hot Lead $" />
+                  </LineChart>
+                </ResponsiveContainer>
+              </MobileChartCard>
             </div>
-            <div className="p-6">
-              <ResponsiveContainer width="100%" height={400}>
-                <LineChart data={dashboardData.historicalTrends}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                  <XAxis dataKey="period" stroke="#6b7280" fontSize={12} />
-                  <YAxis yAxisId="rate" orientation="left" stroke="#6b7280" fontSize={12} />
-                  <YAxis yAxisId="cost" orientation="right" stroke="#6b7280" fontSize={12} />
-                  <Tooltip />
-                  <Legend />
-                  <Line yAxisId="rate" dataKey="hotLeadRate" stroke="#10b981" strokeWidth={3} name="Hot Lead Rate %" />
-                  <Line yAxisId="rate" dataKey="replyRate" stroke="#3b82f6" strokeWidth={3} name="Reply Rate %" />
-                  <Line yAxisId="cost" dataKey="costPerHot" stroke="#f59e0b" strokeWidth={3} name="Cost per Hot Lead $" />
-                </LineChart>
-              </ResponsiveContainer>
+
+            {/* Desktop Historical Trends */}
+            <div className={`hidden lg:block ${viewMode === 'responsive' ? 'lg:block' : ''}`}>
+              <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
+                <div className="px-6 py-4 border-b border-gray-100">
+                  <h3 className="text-lg font-semibold text-gray-900">Historical Performance Trends</h3>
+                  <p className="text-sm text-gray-600 mt-1">Real cost and performance data from your campaigns</p>
+                </div>
+                <div className="p-6">
+                  <ResponsiveContainer width="100%" height={400}>
+                    <LineChart data={dashboardData.historicalTrends}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                      <XAxis dataKey="period" stroke="#6b7280" fontSize={12} />
+                      <YAxis yAxisId="rate" orientation="left" stroke="#6b7280" fontSize={12} />
+                      <YAxis yAxisId="cost" orientation="right" stroke="#6b7280" fontSize={12} />
+                      <Tooltip />
+                      <Legend />
+                      <Line yAxisId="rate" dataKey="hotLeadRate" stroke="#10b981" strokeWidth={3} name="Hot Lead Rate %" />
+                      <Line yAxisId="rate" dataKey="replyRate" stroke="#3b82f6" strokeWidth={3} name="Reply Rate %" />
+                      <Line yAxisId="cost" dataKey="costPerHot" stroke="#f59e0b" strokeWidth={3} name="Cost per Hot Lead $" />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
             </div>
-          </div>
+          </>
         )}
 
         {/* Lead Source ROI - only show if user can view escalation summaries */}
         {canViewEscalationSummaries && (
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
-            <div className="px-6 py-4 border-b border-gray-100">
-              <h3 className="text-lg font-semibold text-gray-900">Lead Source ROI Analysis</h3>
+          <>
+            {/* Mobile Lead Source ROI */}
+            <div className="lg:hidden">
+              <MobileTableCard
+                title="Lead Source ROI Analysis"
+                data={dashboardData.leadSourceROI}
+                headers={['Source', 'Leads', 'Hot Leads', 'Revenue', 'ROI %']}
+                renderRow={(source) => (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium text-gray-900">{source.source}</span>
+                      <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                        source.roi === null ? 'bg-green-100 text-green-800' :
+                        source.roi > 200 ? 'bg-green-100 text-green-800' :
+                        'bg-yellow-100 text-yellow-800'
+                      }`}>
+                        {source.roi === null ? 'Free' : `${source.roi}%`}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-4 text-sm text-gray-600">
+                      <div>
+                        <span className="block text-xs text-gray-500">Leads</span>
+                        <span className="font-medium">{source.leads.toLocaleString()}</span>
+                      </div>
+                      <div>
+                        <span className="block text-xs text-gray-500">Hot</span>
+                        <span className="font-medium">{source.hotLeads}</span>
+                      </div>
+                      <div>
+                        <span className="block text-xs text-gray-500">Revenue</span>
+                        <span className="font-medium">${source.revenue.toLocaleString()}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                emptyMessage="No lead source data available"
+              />
             </div>
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Source</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Leads</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Hot Leads</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Revenue</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">ROI %</th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {dashboardData.leadSourceROI.map((source, index) => (
-                    <tr key={index} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 text-sm font-medium text-gray-900">{source.source}</td>
-                      <td className="px-6 py-4 text-sm text-gray-900">{source.leads.toLocaleString()}</td>
-                      <td className="px-6 py-4 text-sm text-gray-900">{source.hotLeads}</td>
-                      <td className="px-6 py-4 text-sm text-gray-900">${source.revenue.toLocaleString()}</td>
-                      <td className="px-6 py-4">
-                        <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                          source.roi === null ? 'bg-green-100 text-green-800' :
-                          source.roi > 200 ? 'bg-green-100 text-green-800' :
-                          'bg-yellow-100 text-yellow-800'
-                        }`}>
-                          {source.roi === null ? 'Free' : `${source.roi}%`}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+
+            {/* Desktop Lead Source ROI */}
+            <div className={`hidden lg:block ${viewMode === 'responsive' ? 'lg:block' : ''}`}>
+              <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
+                <div className="px-6 py-4 border-b border-gray-100">
+                  <h3 className="text-lg font-semibold text-gray-900">Lead Source ROI Analysis</h3>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Source</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Leads</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Hot Leads</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Revenue</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">ROI %</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {dashboardData.leadSourceROI.map((source, index) => (
+                        <tr key={index} className="hover:bg-gray-50">
+                          <td className="px-6 py-4 text-sm font-medium text-gray-900">{source.source}</td>
+                          <td className="px-6 py-4 text-sm text-gray-900">{source.leads.toLocaleString()}</td>
+                          <td className="px-6 py-4 text-sm text-gray-900">{source.hotLeads}</td>
+                          <td className="px-6 py-4 text-sm text-gray-900">${source.revenue.toLocaleString()}</td>
+                          <td className="px-6 py-4">
+                            <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                              source.roi === null ? 'bg-green-100 text-green-800' :
+                              source.roi > 200 ? 'bg-green-100 text-green-800' :
+                              'bg-yellow-100 text-yellow-800'
+                            }`}>
+                              {source.roi === null ? 'Free' : `${source.roi}%`}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             </div>
-          </div>
+          </>
         )}
       </div>
     );
@@ -980,13 +1466,14 @@ const viewPermissions = {
     }
 
     return (
-      <div className="space-y-6">
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
-          <div className="px-6 py-4 border-b border-gray-100">
-            <h3 className="text-lg font-semibold text-gray-900">AI Confidence vs Actual Outcome</h3>
-          </div>
-          <div className="p-6">
-            <ResponsiveContainer width="100%" height={300}>
+      <div className="space-y-4 lg:space-y-6">
+        {/* Mobile AI Confidence Chart */}
+        <div className="lg:hidden">
+          <MobileChartCard
+            title="AI Confidence vs Actual Outcome"
+            description="How well AI predictions match real results"
+          >
+            <ResponsiveContainer width="100%" height={250}>
               <ScatterChart data={dashboardData.aiInsights.confidenceData || []}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                 <XAxis 
@@ -994,12 +1481,14 @@ const viewPermissions = {
                   domain={[0, 1]} 
                   type="number"
                   tickFormatter={(value) => `${(value * 100).toFixed(0)}%`}
+                  fontSize={10}
                 />
                 <YAxis 
                   dataKey="actualHot" 
                   domain={[0, 1]} 
                   type="number"
                   tickFormatter={(value) => `${(value * 100).toFixed(0)}%`}
+                  fontSize={10}
                 />
                 <Tooltip 
                   formatter={(value, name) => [
@@ -1010,6 +1499,41 @@ const viewPermissions = {
                 <Scatter dataKey="actualHot" fill="#3b82f6" />
               </ScatterChart>
             </ResponsiveContainer>
+          </MobileChartCard>
+        </div>
+
+        {/* Desktop AI Confidence Chart */}
+        <div className={`hidden lg:block ${viewMode === 'responsive' ? 'lg:block' : ''}`}>
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
+            <div className="px-6 py-4 border-b border-gray-100">
+              <h3 className="text-lg font-semibold text-gray-900">AI Confidence vs Actual Outcome</h3>
+            </div>
+            <div className="p-6">
+              <ResponsiveContainer width="100%" height={300}>
+                <ScatterChart data={dashboardData.aiInsights.confidenceData || []}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                  <XAxis 
+                    dataKey="confidence" 
+                    domain={[0, 1]} 
+                    type="number"
+                    tickFormatter={(value) => `${(value * 100).toFixed(0)}%`}
+                  />
+                  <YAxis 
+                    dataKey="actualHot" 
+                    domain={[0, 1]} 
+                    type="number"
+                    tickFormatter={(value) => `${(value * 100).toFixed(0)}%`}
+                  />
+                  <Tooltip 
+                    formatter={(value, name) => [
+                      name === 'actualHot' ? `${(value * 100).toFixed(1)}%` : `${(value * 100).toFixed(0)}%`,
+                      name === 'actualHot' ? 'Actual Hot %' : 'AI Confidence'
+                    ]}
+                  />
+                  <Scatter dataKey="actualHot" fill="#3b82f6" />
+                </ScatterChart>
+              </ResponsiveContainer>
+            </div>
           </div>
         </div>
       </div>
@@ -1034,62 +1558,126 @@ const viewPermissions = {
       );
     }
 
+    const totalLeads = dashboardData.campaigns.reduce((sum, campaign) => sum + campaign.totalLeads, 0);
+    const totalHotLeads = dashboardData.campaigns.reduce((sum, campaign) => sum + campaign.hotLeads, 0);
+
     return (
-      <div className="space-y-6">
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
-          <div className="px-6 py-4 border-b border-gray-100">
-            <h3 className="text-lg font-semibold text-gray-900">Lead Performance Overview</h3>
+      <div className="space-y-4 lg:space-y-6">
+        {/* Mobile Metrics Cards */}
+        <div className="lg:hidden">
+          <div className="grid grid-cols-2 gap-3 mb-4">
+            <MobileMetricCard
+              title="Contacts Processed"
+              value={totalLeads.toLocaleString()}
+              icon={Users}
+              color="blue"
+            />
+            <MobileMetricCard
+              title="Escalation-Ready"
+              value={totalHotLeads}
+              icon={Target}
+              color="green"
+            />
           </div>
-          <div className="p-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="text-center p-6 bg-blue-50 rounded-xl">
-                <Users className="w-12 h-12 mx-auto text-blue-600 mb-4" />
-                <div className="text-3xl font-bold text-blue-600">
-                  {dashboardData.campaigns.reduce((sum, campaign) => sum + campaign.totalLeads, 0).toLocaleString()}
+          <div className="grid grid-cols-1 gap-3">
+            <MobileMetricCard
+              title="AI-to-Handoff Success Rate"
+              value={`${dashboardData.performanceMetrics.averagePerformance || 0}%`}
+              icon={BarChart3}
+              color="purple"
+            />
+          </div>
+        </div>
+
+        {/* Desktop Metrics Cards */}
+        <div className={`hidden lg:block ${viewMode === 'responsive' ? 'lg:block' : ''}`}>
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
+            <div className="px-6 py-4 border-b border-gray-100">
+              <h3 className="text-lg font-semibold text-gray-900">Lead Performance Overview</h3>
+            </div>
+            <div className="p-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="text-center p-6 bg-blue-50 rounded-xl">
+                  <Users className="w-12 h-12 mx-auto text-blue-600 mb-4" />
+                  <div className="text-3xl font-bold text-blue-600">
+                    {totalLeads.toLocaleString()}
+                  </div>
+                  <div className="text-sm text-gray-600 mt-2">Contacts Processed</div>
                 </div>
-                <div className="text-sm text-gray-600 mt-2">Contacts Processed</div>
-              </div>
-              <div className="text-center p-6 bg-green-50 rounded-xl">
-                <Target className="w-12 h-12 mx-auto text-green-600 mb-4" />
-                <div className="text-3xl font-bold text-green-600">
-                  {dashboardData.campaigns.reduce((sum, campaign) => sum + campaign.hotLeads, 0)}
+                <div className="text-center p-6 bg-green-50 rounded-xl">
+                  <Target className="w-12 h-12 mx-auto text-green-600 mb-4" />
+                  <div className="text-3xl font-bold text-green-600">
+                    {totalHotLeads}
+                  </div>
+                  <div className="text-sm text-gray-600 mt-2">Escalation-Ready</div>
                 </div>
-                <div className="text-sm text-gray-600 mt-2">Escalation-Ready</div>
-              </div>
-              <div className="text-center p-6 bg-purple-50 rounded-xl">
-                <BarChart3 className="w-12 h-12 mx-auto text-purple-600 mb-4" />
-                <div className="text-3xl font-bold text-purple-600">
-                  {dashboardData.performanceMetrics.averagePerformance || 0}%
+                <div className="text-center p-6 bg-purple-50 rounded-xl">
+                  <BarChart3 className="w-12 h-12 mx-auto text-purple-600 mb-4" />
+                  <div className="text-3xl font-bold text-purple-600">
+                    {dashboardData.performanceMetrics.averagePerformance || 0}%
+                  </div>
+                  <div className="text-sm text-gray-600 mt-2">AI-to-Handoff Success Rate</div>
                 </div>
-                <div className="text-sm text-gray-600 mt-2">AI-to-Handoff Success Rate</div>
               </div>
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
-          <div className="px-6 py-4 border-b border-gray-100">
-            <h3 className="text-lg font-semibold text-gray-900">Lead Conversion Funnel</h3>
-          </div>
-          <div className="p-6">
-            <div className="space-y-4">
-              <div className="flex items-center justify-between p-4 bg-blue-50 rounded-lg">
-                <span className="font-medium text-gray-900">Inbound Volume</span>
-                <span className="text-xl font-bold text-blue-600">
-                  {dashboardData.campaigns.reduce((sum, campaign) => sum + campaign.totalLeads, 0).toLocaleString()}
+        {/* Mobile Conversion Funnel */}
+        <div className="lg:hidden">
+          <MobileChartCard
+            title="Lead Conversion Funnel"
+            description="Step-by-step conversion tracking"
+          >
+            <div className="space-y-3">
+              <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
+                <span className="font-medium text-gray-900 text-sm">Inbound Volume</span>
+                <span className="text-lg font-bold text-blue-600">
+                  {totalLeads.toLocaleString()}
                 </span>
               </div>
-              <div className="flex items-center justify-between p-4 bg-green-50 rounded-lg">
-                <span className="font-medium text-gray-900">Conversational Attempts</span>
-                <span className="text-xl font-bold text-green-600">
-                  {Math.floor(dashboardData.campaigns.reduce((sum, campaign) => sum + campaign.totalLeads, 0) * 0.7).toLocaleString()}
+              <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
+                <span className="font-medium text-gray-900 text-sm">Conversational Attempts</span>
+                <span className="text-lg font-bold text-green-600">
+                  {Math.floor(totalLeads * 0.7).toLocaleString()}
                 </span>
               </div>
-              <div className="flex items-center justify-between p-4 bg-orange-50 rounded-lg">
-                <span className="font-medium text-gray-900">Handoff Candidates</span>
-                <span className="text-xl font-bold text-orange-600">
-                  {dashboardData.campaigns.reduce((sum, campaign) => sum + campaign.hotLeads, 0)}
+              <div className="flex items-center justify-between p-3 bg-orange-50 rounded-lg">
+                <span className="font-medium text-gray-900 text-sm">Handoff Candidates</span>
+                <span className="text-lg font-bold text-orange-600">
+                  {totalHotLeads}
                 </span>
+              </div>
+            </div>
+          </MobileChartCard>
+        </div>
+
+        {/* Desktop Conversion Funnel */}
+        <div className={`hidden lg:block ${viewMode === 'responsive' ? 'lg:block' : ''}`}>
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
+            <div className="px-6 py-4 border-b border-gray-100">
+              <h3 className="text-lg font-semibold text-gray-900">Lead Conversion Funnel</h3>
+            </div>
+            <div className="p-6">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between p-4 bg-blue-50 rounded-lg">
+                  <span className="font-medium text-gray-900">Inbound Volume</span>
+                  <span className="text-xl font-bold text-blue-600">
+                    {totalLeads.toLocaleString()}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between p-4 bg-green-50 rounded-lg">
+                  <span className="font-medium text-gray-900">Conversational Attempts</span>
+                  <span className="text-xl font-bold text-green-600">
+                    {Math.floor(totalLeads * 0.7).toLocaleString()}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between p-4 bg-orange-50 rounded-lg">
+                  <span className="font-medium text-gray-900">Handoff Candidates</span>
+                  <span className="text-xl font-bold text-orange-600">
+                    {totalHotLeads}
+                  </span>
+                </div>
               </div>
             </div>
           </div>
@@ -1119,139 +1707,226 @@ const viewPermissions = {
     const { performanceMetrics, campaignPerformance, aiInsights } = dashboardData;
 
     return (
-      <div className="space-y-8">
-        {/* Performance Overview Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          <div className="bg-gradient-to-r from-blue-50 to-blue-100 rounded-xl p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-blue-600 text-sm font-medium">AI Touchpoints Delivered</p>
-                <p className="text-3xl font-bold text-blue-900">{performanceMetrics.totalMessages?.toLocaleString() || 0}</p>
-                <p className="text-xs text-blue-600 mt-1">Last {dateRange} days</p>
-              </div>
-              <MessageSquare className="w-10 h-10 text-blue-600" />
-            </div>
+      <div className="space-y-4 lg:space-y-8">
+        {/* Mobile Performance Overview Cards */}
+        <div className="lg:hidden">
+          <div className="grid grid-cols-2 gap-3">
+            <MobileMetricCard
+              title="AI Touchpoints"
+              value={performanceMetrics.totalMessages?.toLocaleString() || '0'}
+              subtitle={`Last ${dateRange} days`}
+              icon={MessageSquare}
+              color="blue"
+            />
+            <MobileMetricCard
+              title="Engagement Rate"
+              value={`${performanceMetrics.responseRate || 0}%`}
+              subtitle={`${performanceMetrics.totalResponses || 0} responses`}
+              icon={Activity}
+              color="green"
+            />
+            <MobileMetricCard
+              title="Handoff Rate"
+              value={`${performanceMetrics.conversionRate || 0}%`}
+              subtitle={`${performanceMetrics.totalConversions || 0} conversions`}
+              icon={Target}
+              color="purple"
+            />
+            <MobileMetricCard
+              title="Active Campaigns"
+              value={performanceMetrics.activeCampaigns || 0}
+              subtitle="Currently running"
+              icon={BarChart3}
+              color="orange"
+            />
           </div>
+        </div>
 
-          <div className="bg-gradient-to-r from-green-50 to-green-100 rounded-xl p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-green-600 text-sm font-medium">Engagement Rate</p>
-                <p className="text-3xl font-bold text-green-900">{performanceMetrics.responseRate || 0}%</p>
-                <p className="text-xs text-green-600 mt-1">
-                  {performanceMetrics.totalResponses || 0} responses
-                </p>
+        {/* Desktop Performance Overview Cards */}
+        <div className={`hidden lg:block ${viewMode === 'responsive' ? 'lg:block' : ''}`}>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <div className="bg-gradient-to-r from-blue-50 to-blue-100 rounded-xl p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-blue-600 text-sm font-medium">AI Touchpoints Delivered</p>
+                  <p className="text-3xl font-bold text-blue-900">{performanceMetrics.totalMessages?.toLocaleString() || 0}</p>
+                  <p className="text-xs text-blue-600 mt-1">Last {dateRange} days</p>
+                </div>
+                <MessageSquare className="w-10 h-10 text-blue-600" />
               </div>
-              <Activity className="w-10 h-10 text-green-600" />
             </div>
-          </div>
 
-          <div className="bg-gradient-to-r from-purple-50 to-purple-100 rounded-xl p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-purple-600 text-sm font-medium">Handoff Conversion Rate</p>
-                <p className="text-3xl font-bold text-purple-900">{performanceMetrics.conversionRate || 0}%</p>
-                <p className="text-xs text-purple-600 mt-1">
-                  {performanceMetrics.totalConversions || 0} conversions
-                </p>
+            <div className="bg-gradient-to-r from-green-50 to-green-100 rounded-xl p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-green-600 text-sm font-medium">Engagement Rate</p>
+                  <p className="text-3xl font-bold text-green-900">{performanceMetrics.responseRate || 0}%</p>
+                  <p className="text-xs text-green-600 mt-1">
+                    {performanceMetrics.totalResponses || 0} responses
+                  </p>
+                </div>
+                <Activity className="w-10 h-10 text-green-600" />
               </div>
-              <Target className="w-10 h-10 text-purple-600" />
             </div>
-          </div>
 
-          <div className="bg-gradient-to-r from-orange-50 to-orange-100 rounded-xl p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-orange-600 text-sm font-medium">Active Campaigns</p>
-                <p className="text-3xl font-bold text-orange-900">{performanceMetrics.activeCampaigns || 0}</p>
-                <p className="text-xs text-orange-600 mt-1">Currently running</p>
+            <div className="bg-gradient-to-r from-purple-50 to-purple-100 rounded-xl p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-purple-600 text-sm font-medium">Handoff Conversion Rate</p>
+                  <p className="text-3xl font-bold text-purple-900">{performanceMetrics.conversionRate || 0}%</p>
+                  <p className="text-xs text-purple-600 mt-1">
+                    {performanceMetrics.totalConversions || 0} conversions
+                  </p>
+                </div>
+                <Target className="w-10 h-10 text-purple-600" />
               </div>
-              <BarChart3 className="w-10 h-10 text-orange-600" />
+            </div>
+
+            <div className="bg-gradient-to-r from-orange-50 to-orange-100 rounded-xl p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-orange-600 text-sm font-medium">Active Campaigns</p>
+                  <p className="text-3xl font-bold text-orange-900">{performanceMetrics.activeCampaigns || 0}</p>
+                  <p className="text-xs text-orange-600 mt-1">Currently running</p>
+                </div>
+                <BarChart3 className="w-10 h-10 text-orange-600" />
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Campaign Performance Table */}
-        <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
-          <div className="p-6 border-b border-gray-200">
-            <h3 className="text-lg font-bold text-gray-900">Campaign Performance Breakdown</h3>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Campaign
-                  </th>
-                  <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Touchpoints
-                  </th>
-                  <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Viewed
-                  </th>
-                  <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Engaged
-                  </th>
-                  <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Escalated
-                  </th>
-                  <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Handoff Success %
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {campaignPerformance.map((row, index) => (
-                  <tr key={index} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="font-medium text-gray-900">{row.campaign}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-gray-900">
-                      {row.sent?.toLocaleString() || 0}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-gray-900">{row.opened?.toLocaleString() || 0}</div>
-                      <div className="text-xs text-gray-500">
-                        {row.sent > 0 ? ((row.opened / row.sent) * 100).toFixed(1) : 0}%
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-gray-900">{row.replied?.toLocaleString() || 0}</div>
-                      <div className="text-xs text-gray-500">
-                        {row.sent > 0 ? ((row.replied / row.sent) * 100).toFixed(1) : 0}%
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-gray-900">{row.converted?.toLocaleString() || 0}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex px-3 py-1 text-xs font-semibold rounded-full ${
-                        row.rate >= 15 
-                          ? 'bg-green-100 text-green-800'
-                          : row.rate >= 10
-                          ? 'bg-yellow-100 text-yellow-800'
-                          : 'bg-red-100 text-red-800'
-                      }`}>
-                        {row.rate || 0}%
-                      </span>
-                    </td>
+        {/* Mobile Campaign Performance Table */}
+        <div className="lg:hidden">
+          <MobileTableCard
+            title="Campaign Performance Breakdown"
+            data={campaignPerformance}
+            renderRow={(row) => (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="font-medium text-gray-900">{row.campaign}</span>
+                  <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                    row.rate >= 15 
+                      ? 'bg-green-100 text-green-800'
+                      : row.rate >= 10
+                      ? 'bg-yellow-100 text-yellow-800'
+                      : 'bg-red-100 text-red-800'
+                  }`}>
+                    {row.rate || 0}%
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="block text-xs text-gray-500">Touchpoints</span>
+                    <span className="font-medium">{row.sent?.toLocaleString() || 0}</span>
+                  </div>
+                  <div>
+                    <span className="block text-xs text-gray-500">Viewed</span>
+                    <span className="font-medium">{row.opened?.toLocaleString() || 0}</span>
+                    <span className="text-xs text-gray-400 ml-1">
+                      ({row.sent > 0 ? ((row.opened / row.sent) * 100).toFixed(1) : 0}%)
+                    </span>
+                  </div>
+                  <div>
+                    <span className="block text-xs text-gray-500">Engaged</span>
+                    <span className="font-medium">{row.replied?.toLocaleString() || 0}</span>
+                    <span className="text-xs text-gray-400 ml-1">
+                      ({row.sent > 0 ? ((row.replied / row.sent) * 100).toFixed(1) : 0}%)
+                    </span>
+                  </div>
+                  <div>
+                    <span className="block text-xs text-gray-500">Escalated</span>
+                    <span className="font-medium">{row.converted?.toLocaleString() || 0}</span>
+                  </div>
+                </div>
+              </div>
+            )}
+            emptyMessage="No campaign performance data available"
+          />
+        </div>
+
+        {/* Desktop Campaign Performance Table */}
+        <div className={`hidden lg:block ${viewMode === 'responsive' ? 'lg:block' : ''}`}>
+          <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+            <div className="p-6 border-b border-gray-200">
+              <h3 className="text-lg font-bold text-gray-900">Campaign Performance Breakdown</h3>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Campaign
+                    </th>
+                    <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Touchpoints
+                    </th>
+                    <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Viewed
+                    </th>
+                    <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Engaged
+                    </th>
+                    <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Escalated
+                    </th>
+                    <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Handoff Success %
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {campaignPerformance.map((row, index) => (
+                    <tr key={index} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="font-medium text-gray-900">{row.campaign}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-gray-900">
+                        {row.sent?.toLocaleString() || 0}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-gray-900">{row.opened?.toLocaleString() || 0}</div>
+                        <div className="text-xs text-gray-500">
+                          {row.sent > 0 ? ((row.opened / row.sent) * 100).toFixed(1) : 0}%
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-gray-900">{row.replied?.toLocaleString() || 0}</div>
+                        <div className="text-xs text-gray-500">
+                          {row.sent > 0 ? ((row.replied / row.sent) * 100).toFixed(1) : 0}%
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-gray-900">{row.converted?.toLocaleString() || 0}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`inline-flex px-3 py-1 text-xs font-semibold rounded-full ${
+                          row.rate >= 15 
+                            ? 'bg-green-100 text-green-800'
+                            : row.rate >= 10
+                            ? 'bg-yellow-100 text-yellow-800'
+                            : 'bg-red-100 text-red-800'
+                        }`}>
+                          {row.rate || 0}%
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
 
         {/* Follow-up Timing Cards */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-8">
           {/* Card 1: Cold Leads Follow-Up */}
-          <div className="bg-white rounded-2xl border border-gray-200 p-6 hover:shadow-lg transition-shadow">
-            <h3 className="text-lg font-bold text-gray-900 mb-1">Follow-Up Results: No Response</h3>
+          <div className="bg-white rounded-xl lg:rounded-2xl border border-gray-200 p-4 lg:p-6 hover:shadow-lg transition-shadow">
+            <h3 className="text-base lg:text-lg font-bold text-gray-900 mb-1">Follow-Up Results: No Response</h3>
             <p className="text-sm text-gray-600 mb-4">
               For contacts who haven't responded yet
             </p>
             
-            <div className="space-y-4">
+            <div className="space-y-3 lg:space-y-4">
               {/* Using dynamic follow-up days from platform_settings */}
               {aiInsights.followupTiming && aiInsights.followupTiming.length > 0 ? (
                 aiInsights.followupTiming.map((timing, index) => (
@@ -1262,17 +1937,17 @@ const viewPermissions = {
                         timing.responseRate > 10 ? 'bg-blue-500' : 
                         'bg-gray-400'
                       }`} />
-                      <span className="font-medium text-gray-700">Day {timing.day}</span>
+                      <span className="font-medium text-gray-700 text-sm lg:text-base">Day {timing.day}</span>
                     </div>
                     <div className="text-right">
-                      <span className={`text-lg font-bold ${
+                      <span className={`text-base lg:text-lg font-bold ${
                         timing.responseRate > 15 ? 'text-green-600' : 
                         timing.responseRate > 10 ? 'text-blue-600' : 
                         'text-gray-600'
                       }`}>
                         {timing.responseRate}%
                       </span>
-                      <span className="text-sm text-gray-500 ml-1">response</span>
+                      <span className="text-xs lg:text-sm text-gray-500 ml-1">response</span>
                     </div>
                   </div>
                 ))
@@ -1282,31 +1957,31 @@ const viewPermissions = {
                   <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                     <div className="flex items-center space-x-2">
                       <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                      <span className="font-medium text-gray-700">Day {aiInsights.followupSettings?.followup_delay_1 || 3}</span>
+                      <span className="font-medium text-gray-700 text-sm lg:text-base">Day {aiInsights.followupSettings?.followup_delay_1 || 3}</span>
                     </div>
                     <div className="text-right">
-                      <span className="text-lg font-bold text-green-600">18.4%</span>
-                      <span className="text-sm text-gray-500 ml-1">response</span>
+                      <span className="text-base lg:text-lg font-bold text-green-600">18.4%</span>
+                      <span className="text-xs lg:text-sm text-gray-500 ml-1">response</span>
                     </div>
                   </div>
                   <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                     <div className="flex items-center space-x-2">
                       <div className="w-2 h-2 rounded-full bg-blue-500" />
-                      <span className="font-medium text-gray-700">Day {aiInsights.followupSettings?.followup_delay_2 || 7}</span>
+                      <span className="font-medium text-gray-700 text-sm lg:text-base">Day {aiInsights.followupSettings?.followup_delay_2 || 7}</span>
                     </div>
                     <div className="text-right">
-                      <span className="text-lg font-bold text-blue-600">9.2%</span>
-                      <span className="text-sm text-gray-500 ml-1">response</span>
+                      <span className="text-base lg:text-lg font-bold text-blue-600">9.2%</span>
+                      <span className="text-xs lg:text-sm text-gray-500 ml-1">response</span>
                     </div>
                   </div>
                   <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                     <div className="flex items-center space-x-2">
                       <div className="w-2 h-2 rounded-full bg-gray-400" />
-                      <span className="font-medium text-gray-700">Day {aiInsights.followupSettings?.followup_delay_3 || 14}</span>
+                      <span className="font-medium text-gray-700 text-sm lg:text-base">Day {aiInsights.followupSettings?.followup_delay_3 || 14}</span>
                     </div>
                     <div className="text-right">
-                      <span className="text-lg font-bold text-gray-600">2.1%</span>
-                      <span className="text-sm text-gray-500 ml-1">response</span>
+                      <span className="text-base lg:text-lg font-bold text-gray-600">2.1%</span>
+                      <span className="text-xs lg:text-sm text-gray-500 ml-1">response</span>
                     </div>
                   </div>
                 </>
@@ -1314,48 +1989,48 @@ const viewPermissions = {
             </div>
             
             {/* Insight footer with stronger copy */}
-            <div className="mt-4 p-4 bg-blue-50 rounded-xl">
+            <div className="mt-4 p-3 lg:p-4 bg-blue-50 rounded-xl">
               <div className="text-sm font-medium text-blue-900">💡 Insight</div>
-              <div className="text-sm text-blue-700 mt-1">
+              <div className="text-xs lg:text-sm text-blue-700 mt-1">
                 Early follow-ups are 5x more likely to get replies — reach back out before interest fades.
               </div>
             </div>
           </div>
 
           {/* Card 2: AI-Paced Re-Engagement */}
-          <div className="bg-white rounded-2xl border border-gray-200 p-6 hover:shadow-lg transition-shadow">
-            <h3 className="text-lg font-bold text-gray-900 mb-1">AI Re-Engagement Timing</h3>
+          <div className="bg-white rounded-xl lg:rounded-2xl border border-gray-200 p-4 lg:p-6 hover:shadow-lg transition-shadow">
+            <h3 className="text-base lg:text-lg font-bold text-gray-900 mb-1">AI Re-Engagement Timing</h3>
             <p className="text-sm text-gray-600 mb-4">For leads that previously replied</p>
             
-            <div className="space-y-4">
+            <div className="space-y-3 lg:space-y-4">
               {/* Dynamic timing metrics */}
               <div className="p-3 bg-gray-50 rounded-lg">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">Avg. 2nd message delay</span>
+                  <span className="text-xs lg:text-sm text-gray-600">Avg. 2nd message delay</span>
                   <div className="flex items-center space-x-2">
                     <div className="w-2 h-2 rounded-full bg-purple-500 animate-pulse" />
-                    <span className="font-bold text-purple-600">3.9 hrs</span>
+                    <span className="font-bold text-purple-600 text-sm lg:text-base">3.9 hrs</span>
                   </div>
                 </div>
               </div>
               
               <div className="p-3 bg-gray-50 rounded-lg">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">Avg. 3rd message delay</span>
+                  <span className="text-xs lg:text-sm text-gray-600">Avg. 3rd message delay</span>
                   <div className="flex items-center space-x-2">
                     <div className="w-2 h-2 rounded-full bg-indigo-500" />
-                    <span className="font-bold text-indigo-600">1.5 days</span>
+                    <span className="font-bold text-indigo-600 text-sm lg:text-base">1.5 days</span>
                   </div>
                 </div>
               </div>
               
               <div className="p-3 bg-gradient-to-r from-green-50 to-green-100 rounded-lg border border-green-200">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-gray-700">
+                  <span className="text-xs lg:text-sm font-medium text-gray-700">
                     <span className="mr-1">⏱</span>
                     Best response window
                   </span>
-                  <span className="font-bold text-green-700">30–90 min</span>
+                  <span className="font-bold text-green-700 text-sm lg:text-base">30–90 min</span>
                 </div>
               </div>
 
@@ -1385,9 +2060,9 @@ const viewPermissions = {
             </div>
             
             {/* Insight footer with polished copy */}
-            <div className="mt-4 p-4 bg-purple-50 rounded-xl">
+            <div className="mt-4 p-3 lg:p-4 bg-purple-50 rounded-xl">
               <div className="text-sm font-medium text-purple-900">💡 Insight</div>
-              <div className="text-sm text-purple-700 mt-1">
+              <div className="text-xs lg:text-sm text-purple-700 mt-1">
                 AI tailors re-engagement timing based on urgency, hesitation, and conversation tone.
               </div>
             </div>
@@ -1417,99 +2092,174 @@ const viewPermissions = {
 
     const { salesRepPerformance } = dashboardData;
 
+    const totalAssigned = salesRepPerformance.reduce((acc, rep) => acc + (rep.totalLeadsAssigned || 0), 0);
+    const totalHot = salesRepPerformance.reduce((acc, rep) => acc + (rep.hotLeadsGenerated || 0), 0);
+    const conversionRate = totalAssigned > 0 ? ((totalHot / totalAssigned) * 100).toFixed(1) : '0';
+
     return (
-      <div className="space-y-6">
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
-          <div className="px-6 py-4 border-b border-gray-100">
-            <h3 className="text-lg font-semibold text-gray-900">Handoff Performance</h3>
-            <p className="text-sm text-gray-600 mt-1">Team performance in converting leads to hot status</p>
+      <div className="space-y-4 lg:space-y-6">
+        {/* Mobile Summary Cards */}
+        <div className="lg:hidden">
+          <div className="grid grid-cols-2 gap-3 mb-4">
+            <MobileMetricCard
+              title="AI Handoffs to You"
+              value={totalAssigned}
+              icon={Users}
+              color="blue"
+            />
+            <MobileMetricCard
+              title="You Marked as Hot"
+              value={totalHot}
+              icon={Target}
+              color="green"
+            />
           </div>
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Team Member</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">AI Handoffs Received</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Handoff Accepted</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Pipeline Value</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Conversion Rate</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {salesRepPerformance && salesRepPerformance.length > 0 ? (
-                  salesRepPerformance.map((rep, index) => (
-                    <tr key={index} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 text-sm font-medium text-gray-900">{rep.rep}</td>
-                      <td className="px-6 py-4 text-sm text-gray-900">{rep.totalLeadsAssigned || 0}</td>
-                      <td className="px-6 py-4 text-sm text-gray-900">
-                        <span className="font-semibold text-green-600">{rep.hotLeadsGenerated || 0}</span>
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-900">
-                        ${(rep.pipelineValue || 0).toLocaleString()}
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className={`inline-flex px-3 py-1 text-xs font-semibold rounded-full ${
-                          rep.conversionRate >= 75 ? 'bg-green-100 text-green-800' :
-                          rep.conversionRate >= 50 ? 'bg-yellow-100 text-yellow-800' :
-                          rep.conversionRate > 0 ? 'bg-orange-100 text-orange-800' :
-                          'bg-gray-100 text-gray-800'
-                        }`}>
-                          {rep.conversionRate || 0}%
-                        </span>
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan="5" className="px-6 py-8 text-center text-sm text-gray-500">
-                      No team data available. Add team members in the Sales Team section.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+          <div className="grid grid-cols-2 gap-3">
+            <MobileMetricCard
+              title="Your Conversion %"
+              value={`${conversionRate}%`}
+              icon={TrendingUp}
+              color="purple"
+            />
+            <MobileMetricCard
+              title="Pipeline Value"
+              value={`${(pipelineValue/1000).toFixed(0)}K`}
+              icon={DollarSign}
+              color="orange"
+            />
           </div>
         </div>
 
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
-          <div className="px-6 py-4 border-b border-gray-100">
-            <h3 className="text-lg font-semibold text-gray-900">Lead Qualification Summary</h3>
+        {/* Desktop Summary Cards */}
+        <div className={`hidden lg:block ${viewMode === 'responsive' ? 'lg:block' : ''}`}>
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
+            <div className="px-6 py-4 border-b border-gray-100">
+              <h3 className="text-lg font-semibold text-gray-900">Lead Qualification Summary</h3>
+            </div>
+            <div className="p-6">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                <div className="text-center p-4 bg-blue-50 rounded-lg">
+                  <Users className="w-8 h-8 mx-auto text-blue-600 mb-2" />
+                  <span className="text-2xl font-bold text-blue-600">
+                    {totalAssigned}
+                  </span>
+                  <p className="text-sm text-gray-600">AI Handoffs to You</p>
+                </div>
+                <div className="text-center p-4 bg-green-50 rounded-lg">
+                  <Target className="w-8 h-8 mx-auto text-green-600 mb-2" />
+                  <span className="text-2xl font-bold text-green-600">
+                    {totalHot}
+                  </span>
+                  <p className="text-sm text-gray-600">You Marked as Hot</p>
+                </div>
+                <div className="text-center p-4 bg-purple-50 rounded-lg">
+                  <TrendingUp className="w-8 h-8 mx-auto text-purple-600 mb-2" />
+                  <span className="text-2xl font-bold text-purple-600">
+                    {conversionRate}%
+                  </span>
+                  <p className="text-sm text-gray-600">Your Handoff Conversion %</p>
+                </div>
+                <div className="text-center p-4 bg-orange-50 rounded-lg">
+                  <DollarSign className="w-8 h-8 mx-auto text-orange-600 mb-2" />
+                  <span className="text-2xl font-bold text-orange-600">
+                    ${(pipelineValue/1000).toFixed(0)}K
+                  </span>
+                  <p className="text-sm text-gray-600">Total Pipeline Value</p>
+                </div>
+              </div>
+            </div>
           </div>
-          <div className="p-6">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-              <div className="text-center p-4 bg-blue-50 rounded-lg">
-                <Users className="w-8 h-8 mx-auto text-blue-600 mb-2" />
-                <span className="text-2xl font-bold text-blue-600">
-                  {salesRepPerformance.reduce((acc, rep) => acc + (rep.totalLeadsAssigned || 0), 0)}
-                </span>
-                <p className="text-sm text-gray-600">AI Handoffs to You</p>
+        </div>
+
+        {/* Mobile Handoff Performance Table */}
+        <div className="lg:hidden">
+          <MobileTableCard
+            title="Handoff Performance"
+            data={salesRepPerformance}
+            renderRow={(rep) => (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="font-medium text-gray-900">{rep.rep}</span>
+                  <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                    rep.conversionRate >= 75 ? 'bg-green-100 text-green-800' :
+                    rep.conversionRate >= 50 ? 'bg-yellow-100 text-yellow-800' :
+                    rep.conversionRate > 0 ? 'bg-orange-100 text-orange-800' :
+                    'bg-gray-100 text-gray-800'
+                  }`}>
+                    {rep.conversionRate || 0}%
+                  </span>
+                </div>
+                <div className="grid grid-cols-3 gap-4 text-sm">
+                  <div>
+                    <span className="block text-xs text-gray-500">Received</span>
+                    <span className="font-medium">{rep.totalLeadsAssigned || 0}</span>
+                  </div>
+                  <div>
+                    <span className="block text-xs text-gray-500">Accepted</span>
+                    <span className="font-medium text-green-600">{rep.hotLeadsGenerated || 0}</span>
+                  </div>
+                  <div>
+                    <span className="block text-xs text-gray-500">Pipeline</span>
+                    <span className="font-medium">${(rep.pipelineValue || 0).toLocaleString()}</span>
+                  </div>
+                </div>
               </div>
-              <div className="text-center p-4 bg-green-50 rounded-lg">
-                <Target className="w-8 h-8 mx-auto text-green-600 mb-2" />
-                <span className="text-2xl font-bold text-green-600">
-                  {salesRepPerformance.reduce((acc, rep) => acc + (rep.hotLeadsGenerated || 0), 0)}
-                </span>
-                <p className="text-sm text-gray-600">You Marked as Hot</p>
-              </div>
-              <div className="text-center p-4 bg-purple-50 rounded-lg">
-                <TrendingUp className="w-8 h-8 mx-auto text-purple-600 mb-2" />
-                <span className="text-2xl font-bold text-purple-600">
-                  {(() => {
-                    const totalAssigned = salesRepPerformance.reduce((acc, rep) => acc + (rep.totalLeadsAssigned || 0), 0);
-                    const totalHot = salesRepPerformance.reduce((acc, rep) => acc + (rep.hotLeadsGenerated || 0), 0);
-                    if (totalAssigned === 0) return '0%';
-                    return `${((totalHot / totalAssigned) * 100).toFixed(1)}%`;
-                  })()}
-                </span>
-                <p className="text-sm text-gray-600">Your Handoff Conversion %</p>
-              </div>
-              <div className="text-center p-4 bg-orange-50 rounded-lg">
-                <DollarSign className="w-8 h-8 mx-auto text-orange-600 mb-2" />
-                <span className="text-2xl font-bold text-orange-600">
-                  ${(pipelineValue/1000).toFixed(0)}K
-                </span>
-                <p className="text-sm text-gray-600">Total Pipeline Value</p>
-              </div>
+            )}
+            emptyMessage="No team data available. Add team members in the Sales Team section."
+          />
+        </div>
+
+        {/* Desktop Handoff Performance Table */}
+        <div className={`hidden lg:block ${viewMode === 'responsive' ? 'lg:block' : ''}`}>
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
+            <div className="px-6 py-4 border-b border-gray-100">
+              <h3 className="text-lg font-semibold text-gray-900">Handoff Performance</h3>
+              <p className="text-sm text-gray-600 mt-1">Team performance in converting leads to hot status</p>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Team Member</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">AI Handoffs Received</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Handoff Accepted</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Pipeline Value</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Conversion Rate</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {salesRepPerformance && salesRepPerformance.length > 0 ? (
+                    salesRepPerformance.map((rep, index) => (
+                      <tr key={index} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 text-sm font-medium text-gray-900">{rep.rep}</td>
+                        <td className="px-6 py-4 text-sm text-gray-900">{rep.totalLeadsAssigned || 0}</td>
+                        <td className="px-6 py-4 text-sm text-gray-900">
+                          <span className="font-semibold text-green-600">{rep.hotLeadsGenerated || 0}</span>
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-900">
+                          ${(rep.pipelineValue || 0).toLocaleString()}
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className={`inline-flex px-3 py-1 text-xs font-semibold rounded-full ${
+                            rep.conversionRate >= 75 ? 'bg-green-100 text-green-800' :
+                            rep.conversionRate >= 50 ? 'bg-yellow-100 text-yellow-800' :
+                            rep.conversionRate > 0 ? 'bg-orange-100 text-orange-800' :
+                            'bg-gray-100 text-gray-800'
+                          }`}>
+                            {rep.conversionRate || 0}%
+                          </span>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan="5" className="px-6 py-8 text-center text-sm text-gray-500">
+                        No team data available. Add team members in the Sales Team section.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
@@ -1594,12 +2344,32 @@ const LearningView = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Desktop Filter Bar */}
       <GlobalFilterBar />
+      
+      {/* Mobile Filter Panel */}
+      <MobileFilterPanel
+        dateRange={dateRange}
+        setDateRange={setDateRange}
+        selectedCampaign={selectedCampaign}
+        setSelectedCampaign={setSelectedCampaign}
+        campaigns={dashboardData.campaigns}
+        onRefresh={loadAllData}
+        onExport={() => console.log('Export clicked')}
+        loading={loading}
+        canFilterCampaigns={canFilterCampaigns}
+        canExportData={canExportData}
+      />
+      
+      {/* Navigation Tabs */}
       <NavigationTabs 
         key={currentPlan} 
         activeView={activeView} 
-        setActiveView={handleViewChange} />
-      <div className="px-6 py-8">
+        setActiveView={handleViewChange} 
+      />
+      
+      {/* Main Content */}
+      <div className="px-4 lg:px-6 py-4 lg:py-8">
         {renderActiveView()}
       </div>
     </div>
