@@ -324,41 +324,24 @@ export default function Layout({ children }) {
   };
 
   // Add click outside handler to close menus
-  // Add click outside handler to close menus
 useEffect(() => {
   const handleClickOutside = (event) => {
-    // Use setTimeout to prevent immediate closing when opening
-    setTimeout(() => {
-      if (showTopUserMenu || showUserMenu) {
-        const isClickInside = event.target.closest('.user-menu-container');
-        if (!isClickInside) {
-          setShowTopUserMenu(false);
-          setShowUserMenu(false);
-        }
-      }
-      
-      if (showSearchResults) {
-        const isClickInsideSearch = event.target.closest('.search-container');
-        if (!isClickInsideSearch) {
-          setShowSearchResults(false);
-        }
-      }
+    if (showTopUserMenu && !event.target.closest('.user-menu-container')) {
+      setShowTopUserMenu(false);
+    }
+    
+    if (showSearchResults && !event.target.closest('.search-container')) {
+      setShowSearchResults(false);
+    }
 
-      if (showNotifications) {
-        const isClickInsideNotifications = event.target.closest('.notifications-container');
-        if (!isClickInsideNotifications) {
-          setShowNotifications(false);
-        }
-      }
-    }, 0);
+    if (showNotifications && !event.target.closest('.notifications-container')) {
+      setShowNotifications(false);
+    }
   };
 
-  if (showTopUserMenu || showUserMenu || showSearchResults || showNotifications) {
-    document.addEventListener('mousedown', handleClickOutside);
-  }
-  
-  return () => document.removeEventListener('mousedown', handleClickOutside);
-}, [showTopUserMenu, showUserMenu, showSearchResults, showNotifications]);
+  document.addEventListener('click', handleClickOutside);
+  return () => document.removeEventListener('click', handleClickOutside);
+}, [showTopUserMenu, showSearchResults, showNotifications]);
 
   // Get page-specific messaging based on current route
   const getPageMessages = () => {
