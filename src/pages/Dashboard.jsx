@@ -157,115 +157,149 @@ export default function Dashboard() {
     setLeadFields(defaultFields);
   };
 
-  const fetchLeads = async () => {
-    if (!user) {
-      setLoading(false);
-      return;
-    }
+  // Updated fetchLeads function with proper role-based filtering
 
-    setLoading(true);
-    setError('');
+const fetchLeads = async () => {
+  if (!user) {
+    setLoading(false);
+    return;
+  }
 
-    try {
-      let query = supabase
-        .from('leads')
-        .select(`
-          *,
-          campaigns(name)
-        `)
-        .order(sortBy === 'hot_score' ? 'created_at' : sortBy, { ascending: sortDirection === 'asc' });
+  setLoading(true);
+  setError('');
 
-      // Check if user is global admin
-      const isGlobalAdmin = user?.role === 'global_admin' || user?.user_metadata?.role === 'global_admin';
+  try {
+    let query = supabase
+      .from('leads')
+      .select(`
+        *,
+        campaigns(name)
+      `)
+      .order(sortBy === 'hot_score' ? 'created_at' : sortBy, { ascending: sortDirection === 'asc' });
 
-      if (!isGlobalAdmin) {
-        // For regular tenant users, filter by their tenant_id
-        if (!user.tenant_id) {
-          console.warn("User is not admin and tenant_id is missing. Cannot fetch leads.");
-          setError("Unable to load leads: missing tenant information");
-          setLoading(false);
-          return;
-        }
-        query = query.eq('tenant_id', user.tenant_id);
-        console.log("Fetching leads for tenant_id:", user.tenant_id);
-      } else {
-        console.log("Fetching ALL leads as Global Admin.");
+    // Check user role for filtering
+    const isGlobalAdmin = user?.role === 'global_admin' || user?.user_metadata?.role === 'global_admin';
+    const isBusinessAdmin = user?.role === 'business_admin' || user?.user_metadata?.role === 'business_admin';
+
+    if (isGlobalAdmin) {
+      // Global admins see everything
+      console.log("Fetching ALL leads as Global Admin.");
+    } else if (isBusinessAdmin) {
+      // Business admins see everything in their tenant
+      if (!user.tenant_id) {
+        console.warn("Business admin missing tenant_id. Cannot fetch leads.");
+        setError("Unable to load leads: missing tenant information");
+        setLoading(false);
+        return;
       }
-
-      const { data, error } = await query;
-
-      if (error) {
-        console.error('Error fetching leads:', error);
-        setError('Failed to load leads: ' + error.message);
+      query = query.eq('tenant_id', user.tenant_id);
+      console.log("Fetching tenant leads for Business Admin. Tenant ID:", user.tenant_id);
+    } else {
+      // Regular users only see leads assigned to them
+      if (!user.tenant_id) {
+        console.warn("User missing tenant_id. Cannot fetch leads.");
+        setError("Unable to load leads: missing tenant information");
         setLoading(false);
         return;
       }
 
-      // Try to fetch leads with scores using a JOIN to avoid 414 errors
-      let leadsWithScores = data || [];
-      
-      if (data && data.length > 0) {
-        try {
-          // Use a single query with LEFT JOIN to get leads and their scores
-          let scoresQuery = supabase
-            .from('leads')
-            .select(`
-              id,
-              lead_scores (
-                hot_score,
-                requires_immediate_attention,
-                alert_priority,
-                alert_triggers,
-                attention_reasons,
-                funnel_stage
-              )
-            `);
+      // First, get the user's sales team ID
+      const { data: userProfile, error: profileError } = await supabase
+        .from('sales_team')
+        .select('id')
+        .eq('user_profile_id', user.id)
+        .single();
 
-          // Apply same tenant filter as main query
-          if (!isGlobalAdmin) {
-            scoresQuery = scoresQuery.eq('tenant_id', user.tenant_id);
+      if (profileError || !userProfile) {
+        console.warn("User not found in sales_team table:", profileError);
+        setError("Unable to load leads: user not assigned to sales team");
+        setLoading(false);
+        return;
+      }
+
+      // Filter by tenant AND assignment
+      query = query
+        .eq('tenant_id', user.tenant_id)
+        .eq('assigned_to_sales_team_id', userProfile.id);
+        
+      console.log("Fetching assigned leads for User. Tenant ID:", user.tenant_id, "Sales Team ID:", userProfile.id);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error('Error fetching leads:', error);
+      setError('Failed to load leads: ' + error.message);
+      setLoading(false);
+      return;
+    }
+
+    // Continue with the rest of your existing logic for scores...
+    let leadsWithScores = data || [];
+    
+    if (data && data.length > 0) {
+      try {
+        // Use a single query with LEFT JOIN to get leads and their scores
+        let scoresQuery = supabase
+          .from('leads')
+          .select(`
+            id,
+            lead_scores (
+              hot_score,
+              requires_immediate_attention,
+              alert_priority,
+              alert_triggers,
+              attention_reasons,
+              funnel_stage
+            )
+          `);
+
+        // Apply same filtering to scores query
+        if (isGlobalAdmin) {
+          // No filter needed
+        } else if (isBusinessAdmin) {
+          scoresQuery = scoresQuery.eq('tenant_id', user.tenant_id);
+        } else {
+          // Regular user - filter by tenant and assignment
+          const { data: userProfile } = await supabase
+            .from('sales_team')
+            .select('id')
+            .eq('user_profile_id', user.id)
+            .single();
+            
+          if (userProfile) {
+            scoresQuery = scoresQuery
+              .eq('tenant_id', user.tenant_id)
+              .eq('assigned_to_sales_team_id', userProfile.id);
           }
+        }
 
-          const { data: leadsWithScoresData, error: scoresError } = await scoresQuery;
+        const { data: leadsWithScoresData, error: scoresError } = await scoresQuery;
 
-          if (!scoresError && leadsWithScoresData) {
-            // Create a map for quick lookup
-            const scoresMap = {};
-            leadsWithScoresData.forEach(leadWithScore => {
-              if (leadWithScore.lead_scores) {
-                scoresMap[leadWithScore.id] = leadWithScore.lead_scores;
-              }
-            });
+        if (!scoresError && leadsWithScoresData) {
+          // Create a map for quick lookup
+          const scoresMap = {};
+          leadsWithScoresData.forEach(leadWithScore => {
+            if (leadWithScore.lead_scores) {
+              scoresMap[leadWithScore.id] = leadWithScore.lead_scores;
+            }
+          });
 
-            // Transform the data to include campaign name and lead scores
-            leadsWithScores = data.map(lead => ({
-              ...lead,
-              campaign: lead.campaigns?.name || 'No Campaign',
-              // Merge score data if it exists
-              hot_score: scoresMap[lead.id]?.hot_score || 0,
-              requires_immediate_attention: scoresMap[lead.id]?.requires_immediate_attention || false,
-              alert_priority: scoresMap[lead.id]?.alert_priority || 'none',
-              alert_triggers: scoresMap[lead.id]?.alert_triggers || {},
-              attention_reasons: scoresMap[lead.id]?.attention_reasons || [],
-              funnel_stage: scoresMap[lead.id]?.funnel_stage || lead.status
-            }));
-          } else {
-            console.log('Lead scores table not available, using basic lead data');
-            // Just use basic lead data with default values
-            leadsWithScores = data.map(lead => ({
-              ...lead,
-              campaign: lead.campaigns?.name || 'No Campaign',
-              hot_score: 0,
-              requires_immediate_attention: false,
-              alert_priority: 'none',
-              alert_triggers: {},
-              attention_reasons: [],
-              funnel_stage: lead.status
-            }));
-          }
-        } catch (scoresError) {
-          console.log('Lead scores not available, using basic lead data:', scoresError);
-          // Continue with basic lead data
+          // Transform the data to include campaign name and lead scores
+          leadsWithScores = data.map(lead => ({
+            ...lead,
+            campaign: lead.campaigns?.name || 'No Campaign',
+            // Merge score data if it exists
+            hot_score: scoresMap[lead.id]?.hot_score || 0,
+            requires_immediate_attention: scoresMap[lead.id]?.requires_immediate_attention || false,
+            alert_priority: scoresMap[lead.id]?.alert_priority || 'none',
+            alert_triggers: scoresMap[lead.id]?.alert_triggers || {},
+            attention_reasons: scoresMap[lead.id]?.attention_reasons || [],
+            funnel_stage: scoresMap[lead.id]?.funnel_stage || lead.status
+          }));
+        } else {
+          console.log('Lead scores table not available, using basic lead data');
+          // Just use basic lead data with default values
           leadsWithScores = data.map(lead => ({
             ...lead,
             campaign: lead.campaigns?.name || 'No Campaign',
@@ -277,19 +311,33 @@ export default function Dashboard() {
             funnel_stage: lead.status
           }));
         }
-      } else {
-        leadsWithScores = [];
+      } catch (scoresError) {
+        console.log('Lead scores not available, using basic lead data:', scoresError);
+        // Continue with basic lead data
+        leadsWithScores = data.map(lead => ({
+          ...lead,
+          campaign: lead.campaigns?.name || 'No Campaign',
+          hot_score: 0,
+          requires_immediate_attention: false,
+          alert_priority: 'none',
+          alert_triggers: {},
+          attention_reasons: [],
+          funnel_stage: lead.status
+        }));
       }
-
-      setLeads(leadsWithScores);
-      setFilteredLeads(leadsWithScores);
-    } catch (err) {
-      console.error('Error in fetchLeads:', err);
-      setError('Failed to load leads: ' + err.message);
-    } finally {
-      setLoading(false);
+    } else {
+      leadsWithScores = [];
     }
-  };
+
+    setLeads(leadsWithScores);
+    setFilteredLeads(leadsWithScores);
+  } catch (err) {
+    console.error('Error in fetchLeads:', err);
+    setError('Failed to load leads: ' + err.message);
+  } finally {
+    setLoading(false);
+  }
+};
 
   useEffect(() => {
     let updated = [...leads];
