@@ -245,22 +245,28 @@ router.delete('/docs/:id', async (req, res) => {
     }
 
 // First delete any campaign links to avoid foreign key constraint
-    const { error: linkError } = await supabase
-      .from('campaign_knowledge_links')
-      .delete()
-      .eq('knowledge_id', id);
+console.log('🔗 Checking for campaign links for knowledge_id:', id);
 
-    if (linkError) {
-      console.warn('⚠️ Error deleting campaign links (may not exist):', linkError.message);
-      // Continue anyway - links might not exist
-    }
+const { data: linkData, error: linkError } = await supabase
+  .from('campaign_knowledge_links')
+  .delete()
+  .eq('knowledge_id', id)
+  .select(); // Add select to see what was deleted
 
-    // Now delete the document
-    const { data, error } = await supabase
-      .from('knowledge_base')
-      .delete()
-      .eq('id', id)
-      .select(); // Return deleted record
+console.log('🔗 Campaign links delete result:', { linkData, linkError });
+
+if (linkError) {
+  console.warn('⚠️ Error deleting campaign links:', linkError.message);
+  // Continue anyway - links might not exist
+}
+
+// Now delete the document
+console.log('📄 Deleting knowledge base entry:', id);
+const { data, error } = await supabase
+  .from('knowledge_base')
+  .delete()
+  .eq('id', id)
+  .select(); // Return deleted record
 
     if (error) {
       console.error('❌ Supabase delete error:', error.message);
