@@ -2,6 +2,45 @@ const puppeteer = require('puppeteer');
 const { JSDOM } = require('jsdom');
 const { Readability } = require('@mozilla/readability');
 const { URL } = require('url');
+
+/**
+ * Get Puppeteer launch options based on environment
+ */
+function getPuppeteerOptions() {
+  const isProduction = process.env.NODE_ENV === 'production';
+  const isRender = process.env.RENDER === 'true';
+  
+  if (isProduction || isRender) {
+    return {
+      headless: 'new',
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-accelerated-2d-canvas',
+        '--no-first-run',
+        '--no-zygote',
+        '--single-process',
+        '--disable-gpu',
+        '--disable-background-timer-throttling',
+        '--disable-backgrounding-occluded-windows',
+        '--disable-renderer-backgrounding'
+      ]
+    };
+  }
+  
+  return {
+    headless: 'new',
+    args: [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--single-process',
+      '--disable-gpu'
+    ]
+  };
+}
+
 /**
  * Scrape a website and its navigation pages dynamically
  * @param {string} mainUrl - The main website URL
@@ -9,16 +48,42 @@ const { URL } = require('url');
  * @returns {Promise<Array<{url: string, title: string, content: string}>>}
  */
 async function scrapeWebsiteWithNavigation(mainUrl, maxPages = 5) {
-const browser = await puppeteer.launch({ 
-  headless: 'new',
-  args: [
-    '--no-sandbox',
-    '--disable-setuid-sandbox',
-    '--disable-dev-shm-usage',
-    '--single-process',
-    '--disable-gpu'
-  ]
-});
+  let browser;
+  
+  try {
+    console.log('🚀 Launching browser...');
+    browser = await puppeteer.launch(getPuppeteerOptions());
+    console.log('✅ Browser launched successfully');
+  } catch (error) {
+    console.error('❌ Failed to launch browser:', error.message);
+    
+    // Try alternative approach for production environments
+    if (process.env.NODE_ENV === 'production') {
+      console.log('🔄 Attempting alternative browser launch...');
+      try {
+        browser = await puppeteer.launch({
+          headless: 'new',
+          executablePath: '/usr/bin/google-chrome-stable',
+          args: [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-accelerated-2d-canvas',
+            '--no-first-run',
+            '--no-zygote',
+            '--single-process',
+            '--disable-gpu'
+          ]
+        });
+        console.log('✅ Alternative browser launch successful');
+      } catch (altError) {
+        console.error('❌ Alternative browser launch also failed:', altError.message);
+        throw new Error(`Browser launch failed: ${error.message}. Alternative attempt: ${altError.message}`);
+      }
+    } else {
+      throw error;
+    }
+  }
   
   const scrapedPages = [];
   const visitedUrls = new Set();
@@ -169,7 +234,9 @@ const browser = await puppeteer.launch({
     }
     
   } finally {
-    await browser.close();
+    if (browser) {
+      await browser.close();
+    }
   }
   
   console.log(`✅ Successfully scraped ${scrapedPages.length} pages`);
