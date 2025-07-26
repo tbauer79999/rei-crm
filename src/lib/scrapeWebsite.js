@@ -10,10 +10,17 @@ const { URL } = require('url');
  * @returns {Promise<Array<{url: string, title: string, content: string}>>}
  */
 async function scrapeWebsiteWithNavigation(mainUrl, maxPages = 5) {
-  const browser = await puppeteer.launch({ 
-    headless: 'new',
-    args: ['--no-sandbox', '--disable-setuid-sandbox']
-  });
+const browser = await puppeteer.launch({ 
+  headless: 'new',
+  executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/opt/render/.cache/puppeteer/chrome/linux-138.0.7204.49/chrome-linux64/chrome',
+  args: [
+    '--no-sandbox',
+    '--disable-setuid-sandbox',
+    '--disable-dev-shm-usage',
+    '--single-process', // Important for Render
+    '--disable-gpu'
+  ]
+});
   
   const scrapedPages = [];
   const visitedUrls = new Set();
