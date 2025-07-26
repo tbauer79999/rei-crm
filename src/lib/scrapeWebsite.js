@@ -3,6 +3,47 @@ const { JSDOM } = require('jsdom');
 const { Readability } = require('@mozilla/readability');
 const { URL } = require('url');
 
+// Add this helper function at the top of your scrapeWebsite.js file:
+function findChrome() {
+  const fs = require('fs');
+  const path = require('path');
+  
+  // Possible Chrome locations on Render
+  const possiblePaths = [
+    '/opt/render/.cache/puppeteer/chrome/linux-138.0.7204.49/chrome-linux64/chrome',
+    '/opt/render/project/src/.cache/puppeteer/chrome/linux-138.0.7204.49/chrome-linux64/chrome',
+    process.env.PUPPETEER_EXECUTABLE_PATH,
+    '/usr/bin/google-chrome-stable',
+    '/usr/bin/google-chrome',
+    '/usr/bin/chromium-browser',
+    '/usr/bin/chromium'
+  ];
+  
+  // Check which path actually exists
+  for (const chromePath of possiblePaths) {
+    if (chromePath && fs.existsSync(chromePath)) {
+      console.log(`✅ Found Chrome at: ${chromePath}`);
+      return chromePath;
+    }
+  }
+  
+  // If none found, log available files for debugging
+  console.log('❌ Chrome not found at any expected location');
+  console.log('🔍 Checking cache directory contents...');
+  
+  try {
+    const cacheDir = '/opt/render/.cache/puppeteer';
+    if (fs.existsSync(cacheDir)) {
+      console.log('Cache directory contents:', fs.readdirSync(cacheDir, { recursive: true }));
+    }
+  } catch (e) {
+    console.log('Could not read cache directory');
+  }
+  
+  // Fallback to undefined (use bundled Chromium)
+  return undefined;
+}
+
 /**
  * Scrape a website and its navigation pages dynamically
  * @param {string} mainUrl - The main website URL
@@ -12,13 +53,16 @@ const { URL } = require('url');
 async function scrapeWebsiteWithNavigation(mainUrl, maxPages = 5) {
 const browser = await puppeteer.launch({ 
   headless: 'new',
-  executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/opt/render/.cache/puppeteer/chrome/linux-138.0.7204.49/chrome-linux64/chrome',
+  // Try multiple possible Chrome locations
+  executablePath: findChrome(),
   args: [
     '--no-sandbox',
     '--disable-setuid-sandbox',
     '--disable-dev-shm-usage',
-    '--single-process', // Important for Render
-    '--disable-gpu'
+    '--single-process',
+    '--disable-gpu',
+    '--disable-web-security',
+    '--disable-features=VizDisplayCompositor'
   ]
 });
   
