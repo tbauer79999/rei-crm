@@ -2,86 +2,6 @@ const puppeteer = require('puppeteer');
 const { JSDOM } = require('jsdom');
 const { Readability } = require('@mozilla/readability');
 const { URL } = require('url');
-
-function findChrome() {
-  const fs = require('fs');
-  const path = require('path');
-  
-  console.log('🔍 Starting Chrome search...');
-  
-  // Possible Chrome locations on Render
-  const possiblePaths = [
-    '/opt/render/.cache/puppeteer/chrome/linux-138.0.7204.49/chrome-linux64/chrome',
-    '/opt/render/project/src/.cache/puppeteer/chrome/linux-138.0.7204.49/chrome-linux64/chrome',
-    process.env.PUPPETEER_EXECUTABLE_PATH,
-    '/usr/bin/google-chrome-stable',
-    '/usr/bin/google-chrome',
-    '/usr/bin/chromium-browser',
-    '/usr/bin/chromium'
-  ];
-  
-  // Check which path actually exists
-  for (const chromePath of possiblePaths) {
-    if (chromePath) {
-      console.log(`🔍 Checking: ${chromePath}`);
-      try {
-        if (fs.existsSync(chromePath)) {
-          console.log(`✅ Found Chrome at: ${chromePath}`);
-          return chromePath;
-        } else {
-          console.log(`❌ Not found: ${chromePath}`);
-        }
-      } catch (e) {
-        console.log(`❌ Error checking ${chromePath}:`, e.message);
-      }
-    }
-  }
-  
-  // Enhanced debugging - check multiple directories
-  console.log('🔍 Enhanced debugging - checking directories...');
-  
-  const directoriesToCheck = [
-    '/opt/render/.cache',
-    '/opt/render/.cache/puppeteer',
-    '/opt/render/project/src',
-    '/tmp',
-    process.cwd()
-  ];
-  
-  directoriesToCheck.forEach(dir => {
-    try {
-      if (fs.existsSync(dir)) {
-        console.log(`📁 Contents of ${dir}:`);
-        const contents = fs.readdirSync(dir, { withFileTypes: true });
-        contents.forEach(item => {
-          const type = item.isDirectory() ? '📁' : '📄';
-          console.log(`  ${type} ${item.name}`);
-        });
-      } else {
-        console.log(`❌ Directory doesn't exist: ${dir}`);
-      }
-    } catch (e) {
-      console.log(`❌ Error reading ${dir}:`, e.message);
-    }
-  });
-  
-  // Try to find ANY chrome executable
-  console.log('🔍 Searching for any chrome executable...');
-  try {
-    const { execSync } = require('child_process');
-    const result = execSync('which chrome || which google-chrome || which chromium || echo "none found"', { encoding: 'utf8' });
-    console.log(`🔍 System chrome search result: ${result.trim()}`);
-  } catch (e) {
-    console.log('❌ System chrome search failed:', e.message);
-  }
-  
-  console.log('❌ Chrome not found at any expected location');
-  console.log('🎯 Returning undefined to use bundled Chromium');
-  
-  // Return undefined to use bundled Chromium as fallback
-  return undefined;
-}
-
 /**
  * Scrape a website and its navigation pages dynamically
  * @param {string} mainUrl - The main website URL
@@ -91,16 +11,12 @@ function findChrome() {
 async function scrapeWebsiteWithNavigation(mainUrl, maxPages = 5) {
 const browser = await puppeteer.launch({ 
   headless: 'new',
-  // Try multiple possible Chrome locations
-  executablePath: findChrome(),
   args: [
     '--no-sandbox',
     '--disable-setuid-sandbox',
     '--disable-dev-shm-usage',
     '--single-process',
-    '--disable-gpu',
-    '--disable-web-security',
-    '--disable-features=VizDisplayCompositor'
+    '--disable-gpu'
   ]
 });
   
