@@ -29,7 +29,7 @@ import {
 // API Base URL
 const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
-// Knowledge Assets Dropdown Component
+// Updated KnowledgeAssetsDropdown Component with Fixed Positioning
 const KnowledgeAssetsDropdown = ({ campaign, knowledgeAssets, selectedAssets, onUpdate, isOpen, onToggle }) => {
   const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0, width: 0 });
   const [openUpward, setOpenUpward] = useState(false);
@@ -39,18 +39,48 @@ const KnowledgeAssetsDropdown = ({ campaign, knowledgeAssets, selectedAssets, on
       const button = document.getElementById(`knowledge-dropdown-${campaign.id}`);
       if (button) {
         const rect = button.getBoundingClientRect();
+        const scrollLeft = window.pageXOffset || document.documentElement.scrollLeft;
+        const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+        
+        // Calculate absolute position including scroll
+        const absoluteTop = rect.top + scrollTop;
+        const absoluteLeft = rect.left + scrollLeft;
+        
         const spaceBelow = window.innerHeight - rect.bottom;
+        const spaceAbove = rect.top;
         const dropdownHeight = 240;
         
-        setOpenUpward(spaceBelow < dropdownHeight);
+        // Determine if dropdown should open upward
+        const shouldOpenUpward = spaceBelow < dropdownHeight && spaceAbove > dropdownHeight;
+        setOpenUpward(shouldOpenUpward);
+        
+        // Calculate final position
+        const finalTop = shouldOpenUpward 
+          ? absoluteTop - dropdownHeight - 4 
+          : absoluteTop + rect.height + 4;
+        
+        // Ensure dropdown doesn't go off-screen horizontally
+        const dropdownWidth = Math.max(rect.width, 256);
+        let finalLeft = absoluteLeft;
+        
+        // Check if dropdown would go off the right edge
+        if (finalLeft + dropdownWidth > window.innerWidth + scrollLeft) {
+          finalLeft = window.innerWidth + scrollLeft - dropdownWidth - 8;
+        }
+        
+        // Check if dropdown would go off the left edge
+        if (finalLeft < scrollLeft + 8) {
+          finalLeft = scrollLeft + 8;
+        }
+        
         setDropdownPosition({
-          top: openUpward ? rect.top - dropdownHeight - 4 : rect.bottom + 4,
-          left: rect.left,
-          width: rect.width
+          top: finalTop,
+          left: finalLeft,
+          width: dropdownWidth
         });
       }
     }
-  }, [isOpen, campaign.id, openUpward]);
+  }, [isOpen, campaign.id]);
   
   if (!isOpen) return null;
   
@@ -60,10 +90,10 @@ const KnowledgeAssetsDropdown = ({ campaign, knowledgeAssets, selectedAssets, on
       style={{
         top: `${dropdownPosition.top}px`,
         left: `${dropdownPosition.left}px`,
-        minWidth: `${Math.max(dropdownPosition.width, 256)}px`
+        width: `${dropdownPosition.width}px`
       }}
     >
-      <div className="w-64 sm:w-72 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-auto">
+      <div className="bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-auto">
         {knowledgeAssets.length === 0 ? (
           <div className="px-3 py-2 text-sm text-gray-500">No knowledge assets available</div>
         ) : (
