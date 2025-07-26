@@ -2,6 +2,40 @@ const puppeteer = require('puppeteer');
 const { JSDOM } = require('jsdom');
 const { Readability } = require('@mozilla/readability');
 const { URL } = require('url');
+const { execSync } = require('child_process');
+
+/**
+ * Ensure Chrome is installed before launching
+ */
+async function ensureChromeInstalled() {
+  try {
+    console.log('🔍 Checking Chrome installation...');
+    
+    // Try to launch a test browser to see if Chrome is available
+    const testBrowser = await puppeteer.launch({
+      headless: 'new',
+      args: ['--no-sandbox', '--disable-setuid-sandbox']
+    });
+    await testBrowser.close();
+    console.log('✅ Chrome is already available');
+    return true;
+  } catch (error) {
+    console.log('⚠️ Chrome not found, installing...');
+    
+    try {
+      // Install Chrome using puppeteer
+      execSync('npx puppeteer browsers install chrome', { 
+        stdio: 'inherit',
+        timeout: 120000 // 2 minute timeout
+      });
+      console.log('✅ Chrome installed successfully');
+      return true;
+    } catch (installError) {
+      console.error('❌ Failed to install Chrome:', installError.message);
+      return false;
+    }
+  }
+}
 
 /**
  * Get Puppeteer launch options based on environment
@@ -50,6 +84,12 @@ function getPuppeteerOptions() {
  */
 async function scrapeWebsiteWithNavigation(mainUrl, maxPages = 5) {
   let browser;
+  
+  // Ensure Chrome is installed before trying to launch
+  const chromeReady = await ensureChromeInstalled();
+  if (!chromeReady) {
+    throw new Error('Chrome installation failed - cannot proceed with scraping');
+  }
   
   try {
     console.log('🚀 Launching browser...');
