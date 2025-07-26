@@ -10,6 +10,7 @@ function getPuppeteerOptions() {
   const isProduction = process.env.NODE_ENV === 'production';
   const isRender = process.env.RENDER === 'true';
   
+  // For production/Render, let Puppeteer find the installed Chrome automatically
   if (isProduction || isRender) {
     return {
       headless: 'new',
@@ -56,33 +57,7 @@ async function scrapeWebsiteWithNavigation(mainUrl, maxPages = 5) {
     console.log('✅ Browser launched successfully');
   } catch (error) {
     console.error('❌ Failed to launch browser:', error.message);
-    
-    // Try alternative approach for production environments
-    if (process.env.NODE_ENV === 'production') {
-      console.log('🔄 Attempting alternative browser launch...');
-      try {
-        browser = await puppeteer.launch({
-          headless: 'new',
-          executablePath: '/usr/bin/google-chrome-stable',
-          args: [
-            '--no-sandbox',
-            '--disable-setuid-sandbox',
-            '--disable-dev-shm-usage',
-            '--disable-accelerated-2d-canvas',
-            '--no-first-run',
-            '--no-zygote',
-            '--single-process',
-            '--disable-gpu'
-          ]
-        });
-        console.log('✅ Alternative browser launch successful');
-      } catch (altError) {
-        console.error('❌ Alternative browser launch also failed:', altError.message);
-        throw new Error(`Browser launch failed: ${error.message}. Alternative attempt: ${altError.message}`);
-      }
-    } else {
-      throw error;
-    }
+    throw new Error(`Browser launch failed: ${error.message}`);
   }
   
   const scrapedPages = [];
