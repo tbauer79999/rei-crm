@@ -48,9 +48,15 @@ async function processPendingContent() {
         }
 
         // 3. Scrape the website content
-        console.log(`🔍 Scraping: ${website_url}`);
+        console.log(`🔍 Starting scrape of: ${website_url}`);
+        console.log(`🔍 About to call scrapeWebsiteWithNavigation...`);
         
         const scrapedPages = await scrapeWebsiteWithNavigation(website_url, 5);
+        
+        console.log(`🔍 Scraping completed, returned:`, {
+          pages: scrapedPages?.length || 0,
+          firstPageTitle: scrapedPages?.[0]?.title || 'none'
+        });
         
         if (!scrapedPages || scrapedPages.length === 0) {
           throw new Error('No content could be scraped from website');
