@@ -1,105 +1,16 @@
-const puppeteer = require('puppeteer');
+const cheerio = require('cheerio');
 const { JSDOM } = require('jsdom');
 const { Readability } = require('@mozilla/readability');
 const { URL } = require('url');
-const { execSync } = require('child_process');
+const fetch = require('node-fetch');
 
 /**
- * Ensure Chrome is installed before launching
- */
-async function ensureChromeInstalled() {
-  try {
-    console.log('🔍 Checking Chrome installation...');
-    
-    // Try to launch a test browser to see if Chrome is available
-    const testBrowser = await puppeteer.launch({
-      headless: 'new',
-      args: ['--no-sandbox', '--disable-setuid-sandbox']
-    });
-    await testBrowser.close();
-    console.log('✅ Chrome is already available');
-    return true;
-  } catch (error) {
-    console.log('⚠️ Chrome not found, installing...');
-    
-    try {
-      // Install Chrome using puppeteer
-      execSync('npx puppeteer browsers install chrome', { 
-        stdio: 'inherit',
-        timeout: 120000 // 2 minute timeout
-      });
-      console.log('✅ Chrome installed successfully');
-      return true;
-    } catch (installError) {
-      console.error('❌ Failed to install Chrome:', installError.message);
-      return false;
-    }
-  }
-}
-
-/**
- * Get Puppeteer launch options based on environment
- */
-function getPuppeteerOptions() {
-  const isProduction = process.env.NODE_ENV === 'production';
-  const isRender = process.env.RENDER === 'true';
-  
-  // For production/Render, let Puppeteer find the installed Chrome automatically
-  if (isProduction || isRender) {
-    return {
-      headless: 'new',
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-accelerated-2d-canvas',
-        '--no-first-run',
-        '--no-zygote',
-        '--single-process',
-        '--disable-gpu',
-        '--disable-background-timer-throttling',
-        '--disable-backgrounding-occluded-windows',
-        '--disable-renderer-backgrounding'
-      ]
-    };
-  }
-  
-  return {
-    headless: 'new',
-    args: [
-      '--no-sandbox',
-      '--disable-setuid-sandbox',
-      '--disable-dev-shm-usage',
-      '--single-process',
-      '--disable-gpu'
-    ]
-  };
-}
-
-/**
- * Scrape a website and its navigation pages dynamically
+ * Scrape a website and its navigation pages using HTTP + Cheerio (no Chrome needed)
  * @param {string} mainUrl - The main website URL
  * @param {number} maxPages - Maximum number of navigation pages to scrape (default 5)
  * @returns {Promise<Array<{url: string, title: string, content: string}>>}
  */
 async function scrapeWebsiteWithNavigation(mainUrl, maxPages = 5) {
-  let browser;
-  
-  // Ensure Chrome is installed before trying to launch
-  const chromeReady = await ensureChromeInstalled();
-  if (!chromeReady) {
-    throw new Error('Chrome installation failed - cannot proceed with scraping');
-  }
-  
-  try {
-    console.log('🚀 Launching browser...');
-    browser = await puppeteer.launch(getPuppeteerOptions());
-    console.log('✅ Browser launched successfully');
-  } catch (error) {
-    console.error('❌ Failed to launch browser:', error.message);
-    throw new Error(`Browser launch failed: ${error.message}`);
-  }
-  
   const scrapedPages = [];
   const visitedUrls = new Set();
   
@@ -111,101 +22,32 @@ async function scrapeWebsiteWithNavigation(mainUrl, maxPages = 5) {
     console.log(`🏠 Starting with main URL: ${mainUrl}`);
     
     // Step 1: Scrape the main page and get navigation links
-    const mainPage = await browser.newPage();
+    console.log(`📄 Fetching main page: ${mainUrl}`);
     
-    // Set viewport and user agent to appear more like a real browser
-    await mainPage.setViewport({ width: 1920, height: 1080 });
-    await mainPage.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36');
-    
-    // Try to navigate with increased timeout and retry logic
-    try {
-      await mainPage.goto(mainUrl, { waitUntil: 'networkidle0', timeout: 60000 });
-    } catch (timeoutError) {
-      console.log('⚠️ First attempt timed out, trying with domcontentloaded...');
-      await mainPage.goto(mainUrl, { waitUntil: 'domcontentloaded', timeout: 45000 });
+    const mainResponse = await fetchWithRetry(mainUrl);
+    if (!mainResponse.ok) {
+      throw new Error(`Failed to fetch ${mainUrl}: ${mainResponse.status}`);
     }
     
-    // Handle cookie consent popups
-    await handleCookieConsent(mainPage);
-    
-    // Wait a bit for any dynamic content to load
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    // Get the main page content
-    const mainHtml = await mainPage.content();
+    const mainHtml = await mainResponse.text();
     const mainContent = extractContent(mainHtml, mainUrl);
     
     if (mainContent) {
+      const $ = cheerio.load(mainHtml);
+      const title = $('title').text().trim() || 'Home';
+      
       scrapedPages.push({
         url: mainUrl,
-        title: await mainPage.title() || 'Home',
+        title: title,
         content: mainContent
       });
       visitedUrls.add(mainUrl);
+      console.log(`✅ Main page scraped: ${title}`);
     }
     
-    // Find navigation links (common patterns for nav links)
-    const navLinks = await mainPage.evaluate(() => {
-      const links = [];
-      
-      // Strategy 1: Look for common navigation elements
-      const navSelectors = [
-        'nav a',
-        'header a',
-        '.nav a',
-        '.navigation a',
-        '.navbar a',
-        '#nav a',
-        '#navigation a',
-        '.menu a',
-        '#menu a',
-        '.header-menu a',
-        '[role="navigation"] a'
-      ];
-      
-      const foundLinks = new Set();
-      
-      navSelectors.forEach(selector => {
-        document.querySelectorAll(selector).forEach(link => {
-          const href = link.href;
-          const text = link.textContent.trim();
-          
-          if (href && !foundLinks.has(href)) {
-            foundLinks.add(href);
-            links.push({
-              url: href,
-              text: text,
-              isNavLink: true
-            });
-          }
-        });
-      });
-      
-      // Strategy 2: If no nav found, get prominent links from header/top of page
-      if (links.length === 0) {
-        // Get links from the top portion of the page
-        const allLinks = document.querySelectorAll('a');
-        const viewportHeight = window.innerHeight;
-        
-        allLinks.forEach(link => {
-          const rect = link.getBoundingClientRect();
-          const href = link.href;
-          const text = link.textContent.trim();
-          
-          // Get links in the top 25% of the viewport (likely navigation)
-          if (rect.top < viewportHeight * 0.25 && href && !foundLinks.has(href)) {
-            foundLinks.add(href);
-            links.push({
-              url: href,
-              text: text,
-              isNavLink: false
-            });
-          }
-        });
-      }
-      
-      return links;
-    });
+    // Find navigation links using Cheerio
+    const $ = cheerio.load(mainHtml);
+    const navLinks = findNavigationLinks($, baseDomain, mainUrl);
     
     console.log(`🔗 Found ${navLinks.length} potential navigation links`);
     
@@ -222,34 +64,27 @@ async function scrapeWebsiteWithNavigation(mainUrl, maxPages = 5) {
       try {
         console.log(`📄 Scraping: ${linkInfo.url}`);
         
-        const page = await browser.newPage();
-        await page.setViewport({ width: 1920, height: 1080 });
-        await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36');
-        
-        try {
-          await page.goto(linkInfo.url, { waitUntil: 'networkidle0', timeout: 60000 });
-        } catch (timeoutError) {
-          console.log(`⚠️ Timeout on ${linkInfo.url}, trying with domcontentloaded...`);
-          await page.goto(linkInfo.url, { waitUntil: 'domcontentloaded', timeout: 45000 });
+        const response = await fetchWithRetry(linkInfo.url);
+        if (!response.ok) {
+          console.warn(`⚠️ Failed to fetch ${linkInfo.url}: ${response.status}`);
+          continue;
         }
         
-        // Handle cookie consent on each page
-        await handleCookieConsent(page);
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        
-        const html = await page.content();
+        const html = await response.text();
         const content = extractContent(html, linkInfo.url);
         
         if (content && content.length > 100) {
+          const $page = cheerio.load(html);
+          const title = $page('title').text().trim() || linkInfo.text || 'Page';
+          
           scrapedPages.push({
             url: linkInfo.url,
-            title: await page.title() || linkInfo.text || 'Page',
+            title: title,
             content: content
           });
           visitedUrls.add(linkInfo.url);
+          console.log(`✅ Scraped: ${title}`);
         }
-        
-        await page.close();
         
         // Add a small delay to be respectful to the server
         await new Promise(resolve => setTimeout(resolve, 1000));
@@ -259,10 +94,9 @@ async function scrapeWebsiteWithNavigation(mainUrl, maxPages = 5) {
       }
     }
     
-  } finally {
-    if (browser) {
-      await browser.close();
-    }
+  } catch (error) {
+    console.error('❌ Scraping failed:', error.message);
+    throw error;
   }
   
   console.log(`✅ Successfully scraped ${scrapedPages.length} pages`);
@@ -270,93 +104,117 @@ async function scrapeWebsiteWithNavigation(mainUrl, maxPages = 5) {
 }
 
 /**
- * Handle common cookie consent popups
+ * Fetch with retry logic and proper headers
  */
-async function handleCookieConsent(page) {
-  try {
-    // Common cookie consent button selectors
-    const consentSelectors = [
-      // Generic patterns
-      '[id*="accept-cookie"]',
-      '[class*="accept-cookie"]',
-      '[id*="cookie-accept"]',
-      '[class*="cookie-accept"]',
-      'button[aria-label*="accept cookie"]',
-      'button[aria-label*="accept all"]',
-      
-      // Common text patterns
-      'button:has-text("Accept")',
-      'button:has-text("Accept all")',
-      'button:has-text("Accept cookies")',
-      'button:has-text("I agree")',
-      'button:has-text("Got it")',
-      'button:has-text("OK")',
-      'button:has-text("Agree")',
-      
-      // Common cookie banner services
-      '.cc-compliance .cc-btn',
-      '#onetrust-accept-btn-handler',
-      '.cookie-notice button.accept',
-      '.gdpr-cookie-notice button.accept',
-      '#cookieConsent button.allow',
-      '.cookie-banner button.accept',
-      
-      // More specific selectors for common implementations
-      '[data-testid="cookie-accept"]',
-      '[data-qa="cookie-accept"]',
-      '.CookieConsent__Button',
-      '.js-cookie-consent-accept'
-    ];
-    
-    // Try each selector
-    for (const selector of consentSelectors) {
-      try {
-        // Check if element exists and is visible
-        const element = await page.$(selector);
-        if (element) {
-          const isVisible = await element.isVisible();
-          if (isVisible) {
-            console.log(`🍪 Found cookie consent button: ${selector}`);
-            await element.click();
-            await new Promise(resolve => setTimeout(resolve, 1000)); // Wait for animation
-            return;
-          }
-        }
-      } catch (e) {
-        // Try next selector
-      }
-    }
-    
-    // Also try to remove cookie overlays by hiding them
-    await page.evaluate(() => {
-      // Common cookie overlay patterns
-      const overlaySelectors = [
-        '[class*="cookie-banner"]',
-        '[class*="cookie-popup"]',
-        '[class*="cookie-consent"]',
-        '[class*="cookie-notice"]',
-        '[id*="cookie-banner"]',
-        '[id*="cookie-popup"]',
-        '[id*="cookie-consent"]',
-        '[id*="cookie-notice"]',
-        '.gdpr-overlay',
-        '#gdpr-consent',
-        '.cc-window'
-      ];
-      
-      overlaySelectors.forEach(selector => {
-        const elements = document.querySelectorAll(selector);
-        elements.forEach(el => {
-          if (el && el.style) {
-            el.style.display = 'none';
-          }
-        });
+async function fetchWithRetry(url, maxRetries = 3) {
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      const response = await fetch(url, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.5',
+          'Accept-Encoding': 'gzip, deflate',
+          'Connection': 'keep-alive',
+          'Upgrade-Insecure-Requests': '1',
+        },
+        timeout: 30000, // 30 second timeout
+        follow: 5 // Follow up to 5 redirects
       });
-    });
-    
-  } catch (err) {
-    console.log('🍪 Cookie handling attempt finished');
+      
+      return response;
+    } catch (error) {
+      console.warn(`⚠️ Fetch attempt ${i + 1} failed for ${url}:`, error.message);
+      if (i === maxRetries - 1) throw error;
+      await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1))); // Exponential backoff
+    }
   }
+}
+
+/**
+ * Find navigation links using Cheerio
+ */
+function findNavigationLinks($, baseDomain, mainUrl) {
+  const links = [];
+  const foundLinks = new Set();
+  
+  // Strategy 1: Look for common navigation elements
+  const navSelectors = [
+    'nav a',
+    'header a',
+    '.nav a',
+    '.navigation a',
+    '.navbar a',
+    '#nav a',
+    '#navigation a',
+    '.menu a',
+    '#menu a',
+    '.header-menu a',
+    '[role="navigation"] a'
+  ];
+  
+  navSelectors.forEach(selector => {
+    $(selector).each((i, element) => {
+      const $link = $(element);
+      const href = $link.attr('href');
+      const text = $link.text().trim();
+      
+      if (href && !foundLinks.has(href)) {
+        try {
+          // Handle relative URLs
+          const fullUrl = new URL(href, mainUrl).href;
+          const linkDomain = new URL(fullUrl).origin;
+          
+          // Only include same-domain links
+          if (linkDomain === baseDomain) {
+            foundLinks.add(fullUrl);
+            links.push({
+              url: fullUrl,
+              text: text,
+              isNavLink: true
+            });
+          }
+        } catch (e) {
+          // Invalid URL, skip
+        }
+      }
+    });
+  });
+  
+  // Strategy 2: If no nav found, get prominent links from header area
+  if (links.length === 0) {
+    $('a').each((i, element) => {
+      const $link = $(element);
+      const href = $link.attr('href');
+      const text = $link.text().trim();
+      
+      if (href && !foundLinks.has(href)) {
+        try {
+          const fullUrl = new URL(href, mainUrl).href;
+          const linkDomain = new URL(fullUrl).origin;
+          
+          if (linkDomain === baseDomain) {
+            // Simple heuristic: links in the first part of the page are likely navigation
+            const linkHtml = $.html($link);
+            const isLikelyNav = text.length < 50 && text.length > 2; // Reasonable nav link text length
+            
+            if (isLikelyNav) {
+              foundLinks.add(fullUrl);
+              links.push({
+                url: fullUrl,
+                text: text,
+                isNavLink: false
+              });
+            }
+          }
+        } catch (e) {
+          // Invalid URL, skip
+        }
+      }
+    });
+  }
+  
+  return links;
 }
 
 /**
@@ -367,7 +225,7 @@ function extractContent(html, url) {
     const dom = new JSDOM(html, { url });
     const document = dom.window.document;
     
-    // Remove cookie consent elements before processing
+    // Remove unwanted elements
     const elementsToRemove = [
       '[class*="cookie"]',
       '[id*="cookie"]',
@@ -376,7 +234,14 @@ function extractContent(html, url) {
       '[class*="gdpr"]',
       '[id*="gdpr"]',
       '[class*="privacy-popup"]',
-      '[class*="privacy-banner"]'
+      '[class*="privacy-banner"]',
+      'script',
+      'style',
+      'nav',
+      '.nav',
+      '.navigation',
+      'header',
+      'footer'
     ];
     
     elementsToRemove.forEach(selector => {
@@ -390,18 +255,13 @@ function extractContent(html, url) {
       // Fallback to basic text extraction
       const bodyText = document.body.textContent.trim();
       
-      // Filter out privacy/cookie text
-      const lines = bodyText.split('\n')
-        .filter(line => {
-          const lower = line.toLowerCase();
-          return !lower.includes('cookie') || 
-                 !lower.includes('privacy policy') ||
-                 !lower.includes('opt-out') ||
-                 !lower.includes('advertising partners');
-        })
-        .join('\n');
+      // Clean up the text
+      const cleanText = bodyText
+        .replace(/\s+/g, ' ') // Replace multiple spaces with single space
+        .replace(/\n\s*\n/g, '\n') // Remove empty lines
+        .trim();
       
-      return lines;
+      return cleanText.length > 100 ? cleanText : null;
     }
     
     return article.textContent.trim();
@@ -412,7 +272,7 @@ function extractContent(html, url) {
 }
 
 /**
- * Filter and prioritize navigation links
+ * Filter and prioritize navigation links (same logic as before)
  */
 function filterRelevantLinks(links, baseDomain, mainUrl) {
   // Priority keywords for important pages
