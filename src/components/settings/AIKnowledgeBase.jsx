@@ -318,31 +318,36 @@ const AIKnowledgeBase = () => {
     }, 5000); // Check every 5 seconds
   };
 
-  const handleDeleteWebsite = async (websiteId) => {
-    if (!canDeleteDocs) {
-      setError("You don't have permission to delete knowledge base content.");
-      return;
-    }
+ const handleDeleteWebsite = async (websiteId) => {
+  if (!canDeleteDocs) {
+    setError("You don't have permission to delete knowledge base content.");
+    return;
+  }
 
-    if (!window.confirm('Are you sure you want to delete this website and all its content?')) return;
+  if (!window.confirm('Are you sure you want to delete this website and all its content?')) return;
 
-    try {
-      // Delete website and its chunks
-      const { error: deleteError } = await supabase
-        .from('knowledge_base')
-        .delete()
-        .eq('id', websiteId);
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token;
+    if (!token) throw new Error('No authentication token found');
 
-      if (deleteError) throw deleteError;
+    // Use the API route instead of direct Supabase
+    await axios.delete(
+      `${process.env.REACT_APP_API_URL}/knowledge/docs/${websiteId}`,
+      {
+        headers: { Authorization: `Bearer ${token}` }
+      }
+    );
 
-      setSuccess('Website deleted successfully!');
-      fetchWebsites();
-      setTimeout(() => setSuccess(''), 3000);
+    setSuccess('Website deleted successfully!');
+    fetchWebsites();
+    setTimeout(() => setSuccess(''), 3000);
 
-    } catch (err) {
-      setError(err.message || 'Failed to delete website');
-    }
-  };
+  } catch (err) {
+    const errorMessage = err.response?.data?.error || err.message || 'Failed to delete website';
+    setError(errorMessage);
+  }
+};
 
   const handleDelete = async (docId) => {
     if (!canDeleteDocs) {
