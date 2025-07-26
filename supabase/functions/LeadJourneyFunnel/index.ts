@@ -53,6 +53,12 @@ serve(async (req) => {
     }
 
     const { role, tenant_id } = profile
+// Add this after line 47 (after getting the profile)
+console.log('=== DEBUG PROFILE ===')
+console.log('profile:', profile)
+console.log('role:', role)
+console.log('tenant_id:', tenant_id)
+console.log('role check result:', ['global_admin', 'enterprise_admin', 'business_admin', 'user'].includes(role))
 
     // Security check for non-global admins
     if (!tenant_id && role !== 'global_admin') {
@@ -65,17 +71,16 @@ serve(async (req) => {
       )
     }
 
-    // Check permissions
-    if (!['global_admin', 'enterprise_admin', 'business_admin'].includes(role)) {
-      return new Response(
-        JSON.stringify({ error: 'Insufficient permissions' }),
-        {
-          status: 403,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        },
-      )
-    }
-
+// Check permissions
+if (!['global_admin', 'enterprise_admin', 'business_admin', 'user'].includes(role)) {
+  return new Response(
+    JSON.stringify({ error: 'Insufficient permissions' }),
+    {
+      status: 403,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    },
+  )
+}
     // Parse URL
     const url = new URL(req.url)
     const pathname = url.pathname

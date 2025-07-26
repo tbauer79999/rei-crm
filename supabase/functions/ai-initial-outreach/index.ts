@@ -548,10 +548,90 @@ ${is_retry ? 'RETRY ATTEMPT: ' : ''}Generate a personalized outreach message for
      }),
    });
 
-   if (!twilioResponse.ok) {
-     const twilioError = await twilioResponse.text();
-     throw new Error(`Twilio error: ${twilioError}`);
-   }
+if (!twilioResponse.ok) {
+  const twilioError = await twilioResponse.text();
+  console.error(`❌ Twilio SMS sending failed: ${twilioError}`);
+  
+  // Don't retry if this was already a retry attempt (prevent infinite loops)
+  if (is_retry) {
+    console.error(`❌ Retry attempt also failed. Stopping retry chain.`);
+    throw new Error(`Twilio error on retry: ${twilioError}`);
+  }
+  
+  console.log(`🔄 Logging failed message and triggering immediate retry...`);
+  
+  // Log the failed original message
+  const { data: failedMessage, error: logError } = await supabase
+    .from("messages")
+    .insert({
+      tenant_id,
+      lead_id,
+      message_id: `failed_${Date.now()}`,
+      direction: "outbound",
+      message_body: aiMessage,
+      sender: campaignPhoneNumber,
+      channel: "sms",
+      timestamp: new Date().toISOString(),
+      phone: lead.phone,
+      status: 'failed',
+      retry_eligible: true,
+      retry_count: 0,
+      error_code: twilioResponse.status,
+      retry_reason: 'twilio_api_failure'
+    })
+    .select()
+    .single();
+    
+  if (logError) {
+    console.error("❌ Error logging failed message:", logError);
+  }
+  
+  // Immediate retry by calling this same function recursively
+  console.log(`🔄 Triggering immediate retry with different AI message...`);
+  
+  try {
+    const retryResponse = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/ai-initial-outreach`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+      },
+      body: JSON.stringify({
+        tenant_id,
+        lead_id,
+        campaign_id,
+        is_retry: true,
+        original_message_id: failedMessage?.id || null
+      }),
+    });
+    
+    if (retryResponse.ok) {
+      const retryData = await retryResponse.json();
+      console.log(`✅ Immediate retry successful: ${retryData.twilio_sid}`);
+      
+      return new Response(
+        JSON.stringify({
+          success: true,
+          message: "Original message failed, but retry succeeded",
+          original_error: twilioError,
+          retry_result: retryData,
+          failed_message_id: failedMessage?.id
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    } else {
+      const retryError = await retryResponse.text();
+      console.error(`❌ Immediate retry also failed: ${retryError}`);
+      throw new Error(`Both original and retry attempts failed. Original: ${twilioError}, Retry: ${retryError}`);
+    }
+    
+  } catch (retryError) {
+    console.error(`❌ Error during immediate retry:`, retryError);
+    throw new Error(`Original failed (${twilioError}), retry failed (${retryError.message})`);
+  }
+}
 
    const twilioData = await twilioResponse.json();
    console.log(`📤 SMS sent successfully. Twilio SID: ${twilioData.sid}`);

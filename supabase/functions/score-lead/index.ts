@@ -411,6 +411,96 @@ serve(async (req) => {
       (recencyBonus * 0.05)             // 5%  - Recency bonus
     );
 
+// ✅ FETCH TENANT'S CUSTOM HOT LEAD THRESHOLD
+let hotThreshold = 70; // Default threshold
+
+try {
+  const { data: escalationSetting, error } = await supabase
+    .from('process_settings')
+    .select('value')
+    .eq('key', 'ai_min_escalation_score')
+    .eq('tenant_id', tenant_id)
+    .maybeSingle();
+
+  if (error) {
+    console.error('❌ Error fetching escalation setting:', error);
+  } else if (escalationSetting?.value) {
+    const parsedThreshold = parseInt(escalationSetting.value);
+    if (!isNaN(parsedThreshold) && parsedThreshold > 0 && parsedThreshold <= 100) {
+      hotThreshold = parsedThreshold;
+    } else {
+      console.warn('⚠️ Invalid escalation threshold value:', escalationSetting.value);
+    }
+  }
+} catch (settingError) {
+  console.error('❌ Exception fetching escalation setting:', settingError);
+}
+
+console.log(`🎯 Using hot lead threshold: ${hotThreshold} for tenant ${tenant_id}`);
+
+// Determine lead status based on comprehensive hot_score
+let newLeadStatus = '';
+if (hotScore >= hotThreshold) { // ← NOW DYNAMIC!
+  newLeadStatus = 'Hot Lead';
+} else if (hotScore >= 60) {
+  newLeadStatus = 'Engaged';
+} else if (hotScore >= 50) {
+  newLeadStatus = 'Warm Lead';
+} else if (hotScore >= 20) {
+  newLeadStatus = 'Cold Lead';
+} else {
+  newLeadStatus = 'Cold Lead';
+}
+
+// Update the actual leads table with the new status
+let updateData: any = { status: newLeadStatus };
+
+// ✅ DISABLE AI WHEN LEAD BECOMES HOT
+if (newLeadStatus === 'Hot Lead') {
+  updateData.ai_conversation_enabled = false;
+ console.log(`🔥 Lead hit ${hotScore}/${hotThreshold} threshold - disabling AI, handing off to sales`);
+}
+
+const { error: updateLeadError } = await supabase
+  .from('leads')
+  .update(updateData)
+  .eq('id', lead_id);
+
+if (updateLeadError) {
+  console.error('❌ Error updating lead status:', updateLeadError);
+} else {
+  console.log(`✅ Lead status updated to "${newLeadStatus}" based on hot_score: ${hotScore}`);
+  if (newLeadStatus === 'Hot Lead') {
+    console.log('🤖 AI conversation disabled - lead handed off to sales team');
+  }
+}
+
+// ===== A/B TESTING OUTCOME TRACKING =====
+// Track experiment outcomes when leads become "Hot Lead"
+if (newLeadStatus === 'Hot Lead') {
+  console.log('🧪 Hot Lead conversion detected - checking for experiment assignment...');
+  
+  try {
+    const { error: outcomeError } = await supabase
+      .from('experiment_results')
+      .update({
+        outcome_type: 'conversion',
+        metric_value: 1,
+        recorded_at: new Date()
+      })
+      .eq('lead_id', lead_id)
+      .is('recorded_at', null); // Only update if not already recorded
+
+    if (outcomeError) {
+      console.error('❌ Error recording experiment outcome:', outcomeError);
+    } else {
+      console.log('✅ Experiment conversion outcome recorded');
+    }
+  } catch (expError) {
+    console.error('❌ Error in experiment outcome tracking:', expError);
+  }
+}
+
     console.log('🔥 Hot Score Calculation Details:', {
       behavioralScore,
       emotionalScore,
@@ -476,66 +566,47 @@ serve(async (req) => {
                                 totalMessages >= MIN_TOTAL_ENGAGEMENT;
 
     // Enhanced critical triggers - More aggressive on genuine intent
-    const criticalTriggers = {
-      // EXPLICIT CALLBACK REQUEST - Direct request for human contact
-      requested_callback: /call me|phone me|give me a call|can you call|please call|speak.*phone/i.test(conversationText) && 
-                         inboundMessages.length >= 2, // Just need 2+ messages to show it's not a bot
-      
-      // STRONG AGREEMENT - Multiple confirmations or explicit agreement  
-      agreed_to_meeting: (followupAcceptance > 30 && hasMinimumEngagement) || 
-        (/let's schedule|book.*meeting|set.*appointment|when.*available/i.test(lastInboundMessage) && inboundMessages.length >= 2),
-      
-      // PRICING + ENGAGEMENT COMBO - Pricing question with sustained interest
-      pricing_inquiry: inboundMessages.length >= 3 && // At least 3 messages
-        motivationScore > 50 && // Reasonable motivation threshold
-        /what.*charge|what.*cost|what.*price|pricing|how much|what.*fee|quote/i.test(conversationText),
-      
-      // STRONG BUYING SIGNALS - Clear commercial intent
-      buying_signal: (
-        /ready to buy|want to purchase|let's get started|ready to proceed|sign me up/i.test(conversationText) ||
-        (motivationScore > 70 && /get started|move forward|next steps/i.test(conversationText))
-      ),
-      
-      // URGENT TIMELINE - Explicit urgency
-      timeline_urgent: /need.*(asap|today|tomorrow|this week|immediately|urgent|right away)/i.test(conversationText),
-      
-      // HIGH INTEREST - Sustained questioning with engagement
-      high_interest_question: questionDensity > 50 && 
-                             inboundMessages.length >= 4 && 
-                             messageFrequency > 0.5,
-      
-      // EXPLICIT TIMELINE - Business timeline mentioned
-      explicit_timeline: /timeline|when.*start|how long|next month|this quarter|planning.*months/i.test(conversationText)
-    };
+    // CRITICAL SCORE - Immediate attention needed (different from HOT)
+const criticalScore = Math.round(
+  (avgUrgency * 0.35) +              // High urgency signals
+  (escalationScore * 0.25) +         // "need", "asap", "help" keywords  
+  (confirmationScore * 0.20) +       // "yes", "let's do it", agreements
+  (questionDensity * 0.10) +         // Multiple questions = engagement
+  (followupAcceptance * 0.10)        // Accepting next steps
+);
 
-    // QUALIFIED BUYING SIGNAL - Multiple strong indicators
-    const qualifiedBuyingSignal = motivationScore > 75 && 
-      (criticalTriggers.pricing_inquiry || criticalTriggers.agreed_to_meeting || criticalTriggers.requested_callback) &&
-      objectionScore < 30; // Lower objection threshold
-    
-    // IMMEDIATE ATTENTION LOGIC - More actionable triggers
-    const requiresImmediateAttention = 
-      // ALWAYS trigger for callback requests (highest priority)
-      criticalTriggers.requested_callback ||
-      
-      // ALWAYS trigger for meeting agreements  
-      criticalTriggers.agreed_to_meeting ||
-      
-      // Trigger for pricing + engagement combo
-      (criticalTriggers.pricing_inquiry && hotScore > 50) ||
-      
-      // Trigger for strong buying signals
-      criticalTriggers.buying_signal ||
-      
-      // Trigger for qualified signals
-      qualifiedBuyingSignal ||
-      
-      // Trigger for urgent timelines
-      criticalTriggers.timeline_urgent;
+// Keep all triggers functional for notification system
+const criticalTriggers = {
+  ai_critical_score: criticalScore > 75,
+  requested_callback: /call me|phone me|give me a call/i.test(conversationText),
+  agreed_to_meeting: /let's schedule|book.*meeting/i.test(conversationText),
+  
+  // Keep these active for comprehensive detection
+  pricing_inquiry: inboundMessages.length >= 3 && 
+    motivationScore > 50 && 
+    /what.*charge|what.*cost|what.*price|pricing|how much|what.*fee|quote/i.test(conversationText),
+  buying_signal: /\b(ready to buy|want to purchase|let's get started|ready to proceed|sign me up)\b/i.test(conversationText),
+  timeline_urgent: /need.*(asap|today|tomorrow|this week|immediately|urgent|right away)/i.test(conversationText),
+  high_interest_question: questionDensity > 50 && 
+                         inboundMessages.length >= 4 && 
+                         messageFrequency > 0.5,
+  
+  explicit_timeline: /timeline|when.*start|how long|next month|this quarter|planning.*months/i.test(conversationText)
+};
 
-    const attentionReasons = Object.entries(criticalTriggers)
-      .filter(([_, triggered]) => triggered)
-      .map(([reason, _]) => reason);
+// AI-POWERED IMMEDIATE ATTENTION LOGIC
+const requiresImmediateAttention = 
+  criticalTriggers.ai_critical_score ||      // NEW: AI-based critical
+  criticalTriggers.requested_callback ||     // Explicit requests
+  criticalTriggers.agreed_to_meeting ||      // Meeting agreements  
+  criticalTriggers.pricing_inquiry ||        // Keep existing logic
+  criticalTriggers.buying_signal ||          // Keep existing logic
+  criticalTriggers.timeline_urgent;          // Keep existing logic
+// Generate attention reasons for notifications
+const attentionReasons = [];
+if (criticalScore > 75) attentionReasons.push('high_ai_critical_score');
+if (/call me|phone me|give me a call/i.test(conversationText)) attentionReasons.push('requested_callback');
+if (/let's schedule|book.*meeting/i.test(conversationText)) attentionReasons.push('agreed_to_meeting');
     
     // Create detailed alert information
     const alertDetails = requiresImmediateAttention ? {
@@ -546,38 +617,28 @@ serve(async (req) => {
     } : null;
     
     // Enhanced business rule overrides - More aggressive on genuine signals
-    let stageOverrideReason = null;
+   // Enhanced business rule overrides - More aggressive on genuine signals
+let stageOverrideReason = null;
 
-    if (criticalTriggers.requested_callback) {
-      funnelStage = 'Hot';
-      stageOverrideReason = 'explicit_callback_request';
-    } else if (qualifiedBuyingSignal) {
-      funnelStage = 'Qualified';
-      stageOverrideReason = 'qualified_buying_signal_detected';
-    } else if (criticalTriggers.pricing_inquiry && motivationScore > 60) {
-      funnelStage = 'Hot';
-      stageOverrideReason = 'pricing_inquiry_with_engagement';
-    } else if (criticalTriggers.agreed_to_meeting) {
-      funnelStage = 'Hot';
-      stageOverrideReason = 'lead_agreed_to_next_step';
-    } else if (criticalTriggers.buying_signal) {
-      funnelStage = 'Hot';
-      stageOverrideReason = 'buying_signal_detected';
-    }
+if (criticalTriggers.requested_callback) {
+  funnelStage = 'Hot';
+  stageOverrideReason = 'explicit_callback_request';
+} else if (criticalTriggers.agreed_to_meeting) {
+  funnelStage = 'Hot';
+  stageOverrideReason = 'lead_agreed_to_next_step';
+} else if (criticalTriggers.ai_critical_score) {
+  funnelStage = 'Hot';
+  stageOverrideReason = 'ai_critical_score_detected';
+} else if (criticalTriggers.buying_signal) {
+  funnelStage = 'Hot';
+  stageOverrideReason = 'buying_signal_detected';
+}
     
-    // More actionable alert priority
-    let alertPriority = 'none';
-    if (requiresImmediateAttention) {
-      if (criticalTriggers.requested_callback || criticalTriggers.agreed_to_meeting) {
-        alertPriority = 'critical'; // Human contact requested = critical
-      } else if (qualifiedBuyingSignal || criticalTriggers.buying_signal) {
-        alertPriority = 'critical';
-      } else if (criticalTriggers.pricing_inquiry || criticalTriggers.timeline_urgent) {
-        alertPriority = 'high';
-      } else {
-        alertPriority = 'medium';
-      }
-    }
+// Critical-only alert priority
+let alertPriority = 'none';
+if (requiresImmediateAttention) {
+  alertPriority = 'critical';
+}
 
     // Enhanced logging for debugging false positives
     console.log('🔍 Engagement Analysis:', {
@@ -689,11 +750,16 @@ serve(async (req) => {
     
     if (upsertError) throw upsertError;
 
-    // 🚨 REAL-TIME NOTIFICATION SYSTEM
-    if (requiresImmediateAttention) {
-      console.log('🚨 Lead requires immediate attention! Sending notifications...');
-      console.log('Alert Priority:', alertPriority);
-      console.log('Alert Reasons:', attentionReasons);
+// 🚨 REAL-TIME NOTIFICATION SYSTEM
+if (requiresImmediateAttention) {
+  console.log('🚨 Critical alert triggered - disabling AI and handing off to sales');
+  
+  // Disable AI immediately on critical alert
+  await supabase.from('leads').update({ 
+    ai_conversation_enabled: false 
+  }).eq('id', lead_id);
+  
+  console.log('🚨 AI disabled - sending notifications...');
 
       try {
         // Fetch notification preferences
@@ -722,22 +788,18 @@ serve(async (req) => {
           .single();
 
         // Build notification message
-        const priorityEmoji = {
-          'critical': '🔴',
-          'high': '🟡',
-          'medium': '🟢'
-        }[alertPriority] || '⚪';
+const priorityEmoji = alertPriority === 'critical' ? '🔴' : '⚪';
 
-        const reasonDescriptions = {
-          'agreed_to_meeting': 'Lead agreed to meeting',
-          'requested_callback': 'Lead requested callback',
-          'buying_signal': 'Strong buying signal detected',
-          'timeline_urgent': 'Urgent timeline mentioned',
-          'high_interest_question': 'Multiple high-interest questions',
-          'explicit_timeline': 'Specific timeline mentioned',
-          'pricing_inquiry': 'Sustained pricing inquiry with high motivation'
-        };
-
+const reasonDescriptions = {
+  'ai_critical_score': 'AI detected high critical score',
+  'agreed_to_meeting': 'Lead agreed to meeting',
+  'requested_callback': 'Lead requested callback',
+  'buying_signal': 'Strong buying signal detected',
+  'timeline_urgent': 'Urgent timeline mentioned',
+  'high_interest_question': 'Multiple high-interest questions',
+  'explicit_timeline': 'Specific timeline mentioned',
+  'pricing_inquiry': 'Sustained pricing inquiry with high motivation'
+};
         const primaryReason = reasonDescriptions[attentionReasons[0]] || attentionReasons[0];
         
         const notificationTitle = `${priorityEmoji} ${alertPriority.toUpperCase()} Lead Alert`;
@@ -981,7 +1043,7 @@ Last Message: "${lastInboundMessage.substring(0, 100)}..."
         console.error('❌ Error in notification system:', notificationError);
         // Don't fail the whole scoring process if notifications fail
       }
-    }
+  }
 
     return new Response(JSON.stringify({ success: true, leadScores }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

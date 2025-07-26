@@ -24,7 +24,13 @@ serve(async (req) => {
       });
     }
 
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    // ✅ CREATE SUPABASE CLIENT WITH SERVICE ROLE KEY (bypasses RLS)
+    const supabase = createClient(supabaseUrl, supabaseKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
+      }
+    });
 
     let formData;
     try {
@@ -87,7 +93,7 @@ serve(async (req) => {
     // Try the normalized format first
     let { data: lead, error: leadError } = await supabase
       .from('leads')
-      .select('id, tenant_id, name, phone')
+      .select('id, tenant_id, name, phone, ai_conversation_enabled')
       .eq('phone', normalizedFromPhone)
       .maybeSingle();
 
@@ -96,7 +102,7 @@ serve(async (req) => {
       console.log(`🔎 Trying original Twilio format: ${fromTwilio}`);
       const result = await supabase
         .from('leads')
-        .select('id, tenant_id, name, phone')
+        .select('id, tenant_id, name, phone, ai_conversation_enabled')
         .eq('phone', fromTwilio)
         .maybeSingle();
       
@@ -111,7 +117,7 @@ serve(async (req) => {
       
       const result = await supabase
         .from('leads')
-        .select('id, tenant_id, name, phone')
+        .select('id, tenant_id, name, phone, ai_conversation_enabled')
         .or(`phone.eq.${tenDigits},phone.like.%${tenDigits}`)
         .maybeSingle();
       
@@ -156,6 +162,33 @@ serve(async (req) => {
       });
     }
 
+    // ✅ CHECK IF AI CONVERSATION IS ENABLED
+    if (!lead.ai_conversation_enabled) {
+      console.log('🤖 AI conversation disabled for this lead - message saved but no AI processing');
+      
+      // Still save the message for record keeping
+      await supabase.from('messages').insert({
+        direction: 'inbound',
+        message_body: bodyText,
+        timestamp,
+        phone: fromTwilio,
+        tenant_id: lead.tenant_id,
+        lead_id: lead.id,
+        message_id: twilioMessageSid,
+        sender: lead.name || normalizedFromPhone,
+        channel: 'sms',
+      });
+      
+      // ✅ RETURN SUCCESS WITH PROPER HEADERS
+      return new Response('<Response/>', {
+        status: 200,
+        headers: { 
+          'Content-Type': 'text/xml',
+          ...corsHeaders 
+        }
+      });
+    }
+
     const tenant_id = lead.tenant_id;
     const lead_id = lead.id;
     const sender_name = lead.name || normalizedFromPhone;
@@ -178,18 +211,17 @@ serve(async (req) => {
       })
       .select('id');
 
-      if (!insertError) {
-  console.log(`📊 Triggering lead scoring for ${lead_id}`);
-  await fetch("https://wuuqrdlfgkasnwydyvgk.supabase.co/functions/v1/score-lead", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`
-    },
-    body: JSON.stringify({ lead_id })
-  });
-}
-
+    if (!insertError) {
+      console.log(`📊 Triggering lead scoring for ${lead_id}`);
+      await fetch("https://wuuqrdlfgkasnwydyvgk.supabase.co/functions/v1/score-lead", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`
+        },
+        body: JSON.stringify({ lead_id })
+      });
+    }
 
     if (insertError || !insertedMessage || insertedMessage.length === 0) {
       console.error('❌ Failed to insert message:', insertError);
@@ -227,16 +259,23 @@ serve(async (req) => {
       // Don't fail the main request if AI processing fails
     }
 
+    // ✅ RETURN SUCCESS WITH PROPER HEADERS
     return new Response('<Response/>', {
       status: 200,
-      headers: { 'Content-Type': 'text/xml' }
+      headers: { 
+        'Content-Type': 'text/xml',
+        ...corsHeaders 
+      }
     });
 
   } catch (err) {
     console.error('❗ Unexpected error in handleincomingmessage:', err);
     return new Response(`<Response><Message>Server error occurred. Please try again.</Message></Response>`, {
       status: 500,
-      headers: { 'Content-Type': 'text/xml' }
+      headers: { 
+        'Content-Type': 'text/xml',
+        ...corsHeaders 
+      }
     });
   }
 });
