@@ -69,6 +69,34 @@ router.post('/upload', async (req, res) => {
       .insert([insertData])
       .select();
 
+      // Trigger the edge function manually
+if (inserted?.[0]?.id) {
+  const edgeResponse = await fetch(
+    'https://wuuqrdlfgkasnwydyvgk.supabase.co/functions/v1/chunk-and-embed',
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-database-trigger': 'true'
+      },
+      body: JSON.stringify({
+        document_id: inserted[0].id,
+        tenant_id: inserted[0].tenant_id || tenant_id
+      })
+    }
+  );
+
+  if (!edgeResponse.ok) {
+    const errText = await edgeResponse.text();
+    console.error('Edge function failed:', edgeResponse.status, errText);
+  } else {
+    console.log('Edge function triggered successfully.');
+  }
+} else {
+  console.warn('Upload succeeded but no document ID returned.');
+}
+
+
     if (error) {
       console.error('Supabase insert error:', error);
       throw error;
@@ -86,7 +114,6 @@ router.post('/upload', async (req, res) => {
   }
 });
 
-// GET /api/knowledge/docs
 // GET /api/knowledge/docs
 router.get('/docs', async (req, res) => {
   try {
