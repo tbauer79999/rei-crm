@@ -69,33 +69,37 @@ router.post('/upload', async (req, res) => {
       .insert([insertData])
       .select();
 
-      // Trigger the edge function manually
-if (inserted?.[0]?.id) {
-  const edgeResponse = await fetch(
-    'https://wuuqrdlfgkasnwydyvgk.supabase.co/functions/v1/chunk-and-embed',
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-database-trigger': 'true'
-      },
-      body: JSON.stringify({
-        document_id: inserted[0].id,
-        tenant_id: inserted[0].tenant_id || tenant_id
-      })
+    // Trigger the edge function manually
+    if (inserted?.[0]?.id) {
+      const edgeResponse = await fetch(
+        'https://wuuqrdlfgkasnwydyvgk.supabase.co/functions/v1/chunk-and-embed',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-database-trigger': 'true',
+            'Authorization': req.headers.authorization // ✅ use token passed from frontend
+          },
+          body: JSON.stringify({
+            document_id: inserted[0].id,
+            tenant_id: inserted[0].tenant_id || tenant_id
+          })
+        }
+      );
+
+      // Optional: log or check edgeResponse if needed
+      const result = await edgeResponse.json();
+      console.log('Edge function response:', result);
+
+      if (!edgeResponse.ok) {
+        const errText = await edgeResponse.text();
+        console.error('Edge function failed:', edgeResponse.status, errText);
+      } else {
+        console.log('Edge function triggered successfully.');
+      }
+    } else {
+      console.warn('Upload succeeded but no document ID returned.');
     }
-  );
-
-  if (!edgeResponse.ok) {
-    const errText = await edgeResponse.text();
-    console.error('Edge function failed:', edgeResponse.status, errText);
-  } else {
-    console.log('Edge function triggered successfully.');
-  }
-} else {
-  console.warn('Upload succeeded but no document ID returned.');
-}
-
 
     if (error) {
       console.error('Supabase insert error:', error);
@@ -132,13 +136,13 @@ router.get('/docs', async (req, res) => {
 
     // Apply tenant filtering
     if (role === 'global_admin') {
-  // Global admin sees all knowledge base documents
-} else if (role === 'enterprise_admin' || role === 'business_admin' || role === 'user') {
-  // Filter to tenant-specific docs + global docs (where tenant_id is null)
-  query = query.or(`tenant_id.eq.${tenant_id},tenant_id.is.null`);
-} else {
-  return res.status(403).json({ error: 'Insufficient permissions' });
-}
+      // Global admin sees all knowledge base documents
+    } else if (role === 'enterprise_admin' || role === 'business_admin' || role === 'user') {
+      // Filter to tenant-specific docs + global docs (where tenant_id is null)
+      query = query.or(`tenant_id.eq.${tenant_id},tenant_id.is.null`);
+    } else {
+      return res.status(403).json({ error: 'Insufficient permissions' });
+    }
 
     const { data, error } = await query;
 
@@ -221,15 +225,15 @@ router.delete('/docs/:id', async (req, res) => {
       .select('id, tenant_id')
       .eq('id', id);
 
-// Apply tenant filtering for permission check
-   if (role === 'global_admin') {
-     // Global admin can delete any document
-   } else if (role === 'enterprise_admin' || role === 'business_admin' || role === 'user') {
-     // Can only delete their tenant's docs or global docs
-     checkQuery = checkQuery.or(`tenant_id.eq.${tenant_id},tenant_id.is.null`);
-   } else {
-     return res.status(403).json({ error: 'Insufficient permissions' });
-   }
+    // Apply tenant filtering for permission check
+    if (role === 'global_admin') {
+      // Global admin can delete any document
+    } else if (role === 'enterprise_admin' || role === 'business_admin' || role === 'user') {
+      // Can only delete their tenant's docs or global docs
+      checkQuery = checkQuery.or(`tenant_id.eq.${tenant_id},tenant_id.is.null`);
+    } else {
+      return res.status(403).json({ error: 'Insufficient permissions' });
+    }
 
     const { data: checkResult, error: checkError } = await checkQuery.single();
 
