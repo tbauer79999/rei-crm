@@ -117,7 +117,13 @@ async function scrapeWebsiteWithNavigation(mainUrl, maxPages = 5) {
     await mainPage.setViewport({ width: 1920, height: 1080 });
     await mainPage.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36');
     
-    await mainPage.goto(mainUrl, { waitUntil: 'networkidle2', timeout: 30000 });
+    // Try to navigate with increased timeout and retry logic
+    try {
+      await mainPage.goto(mainUrl, { waitUntil: 'networkidle0', timeout: 60000 });
+    } catch (timeoutError) {
+      console.log('⚠️ First attempt timed out, trying with domcontentloaded...');
+      await mainPage.goto(mainUrl, { waitUntil: 'domcontentloaded', timeout: 45000 });
+    }
     
     // Handle cookie consent popups
     await handleCookieConsent(mainPage);
@@ -220,7 +226,12 @@ async function scrapeWebsiteWithNavigation(mainUrl, maxPages = 5) {
         await page.setViewport({ width: 1920, height: 1080 });
         await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36');
         
-        await page.goto(linkInfo.url, { waitUntil: 'networkidle2', timeout: 30000 });
+        try {
+          await page.goto(linkInfo.url, { waitUntil: 'networkidle0', timeout: 60000 });
+        } catch (timeoutError) {
+          console.log(`⚠️ Timeout on ${linkInfo.url}, trying with domcontentloaded...`);
+          await page.goto(linkInfo.url, { waitUntil: 'domcontentloaded', timeout: 45000 });
+        }
         
         // Handle cookie consent on each page
         await handleCookieConsent(page);
