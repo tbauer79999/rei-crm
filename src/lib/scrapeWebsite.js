@@ -3,10 +3,11 @@ const { JSDOM } = require('jsdom');
 const { Readability } = require('@mozilla/readability');
 const { URL } = require('url');
 
-// Add this helper function at the top of your scrapeWebsite.js file:
 function findChrome() {
   const fs = require('fs');
   const path = require('path');
+  
+  console.log('🔍 Starting Chrome search...');
   
   // Possible Chrome locations on Render
   const possiblePaths = [
@@ -21,26 +22,63 @@ function findChrome() {
   
   // Check which path actually exists
   for (const chromePath of possiblePaths) {
-    if (chromePath && fs.existsSync(chromePath)) {
-      console.log(`✅ Found Chrome at: ${chromePath}`);
-      return chromePath;
+    if (chromePath) {
+      console.log(`🔍 Checking: ${chromePath}`);
+      try {
+        if (fs.existsSync(chromePath)) {
+          console.log(`✅ Found Chrome at: ${chromePath}`);
+          return chromePath;
+        } else {
+          console.log(`❌ Not found: ${chromePath}`);
+        }
+      } catch (e) {
+        console.log(`❌ Error checking ${chromePath}:`, e.message);
+      }
     }
   }
   
-  // If none found, log available files for debugging
-  console.log('❌ Chrome not found at any expected location');
-  console.log('🔍 Checking cache directory contents...');
+  // Enhanced debugging - check multiple directories
+  console.log('🔍 Enhanced debugging - checking directories...');
   
+  const directoriesToCheck = [
+    '/opt/render/.cache',
+    '/opt/render/.cache/puppeteer',
+    '/opt/render/project/src',
+    '/tmp',
+    process.cwd()
+  ];
+  
+  directoriesToCheck.forEach(dir => {
+    try {
+      if (fs.existsSync(dir)) {
+        console.log(`📁 Contents of ${dir}:`);
+        const contents = fs.readdirSync(dir, { withFileTypes: true });
+        contents.forEach(item => {
+          const type = item.isDirectory() ? '📁' : '📄';
+          console.log(`  ${type} ${item.name}`);
+        });
+      } else {
+        console.log(`❌ Directory doesn't exist: ${dir}`);
+      }
+    } catch (e) {
+      console.log(`❌ Error reading ${dir}:`, e.message);
+    }
+  });
+  
+  // Try to find ANY chrome executable
+  console.log('🔍 Searching for any chrome executable...');
   try {
-    const cacheDir = '/opt/render/.cache/puppeteer';
-    if (fs.existsSync(cacheDir)) {
-      console.log('Cache directory contents:', fs.readdirSync(cacheDir, { recursive: true }));
-    }
+    const { execSync } = require('child_process');
+    const result = execSync('which chrome || which google-chrome || which chromium || echo "none found"', { encoding: 'utf8' });
+    console.log(`🔍 System chrome search result: ${result.trim()}`);
   } catch (e) {
-    console.log('Could not read cache directory');
+    console.log('❌ System chrome search failed:', e.message);
   }
   
-  // Fallback to undefined (use bundled Chromium)
+  console.log('❌ Chrome not found at any expected location');
+  console.log('🎯 Returning undefined to use bundled Chromium');
+  
+  // Return undefined to use bundled Chromium as fallback
   return undefined;
 }
 
