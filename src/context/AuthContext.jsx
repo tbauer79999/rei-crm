@@ -211,7 +211,7 @@ const AuthProvider = ({ children }) => {
           const fallbackUser = {
             ...authUser,
             email: authUser.email,
-            role: 'business_admin',
+            role: 'user',
             tenant_id: authUser.id,
             plan: tenantPlan
           };
@@ -255,7 +255,7 @@ const AuthProvider = ({ children }) => {
         const ultimateFallbackUser = {
           ...authUser,
           email: authUser.email,
-          role: 'business_admin',
+          role: 'user',
           tenant_id: authUser.id,
           plan: 'starter'
         };
@@ -499,7 +499,7 @@ const AuthProvider = ({ children }) => {
           const fallbackRefreshUser = {
             ...data.user,
             email: data.user.email,
-            role: 'business_admin',
+            role: 'user',
             tenant_id: data.user.id,
             plan: tenantPlan
           };
