@@ -230,61 +230,73 @@ const QueueOverview = ({ data }) => {
   );
 };
 
-// Awaiting Action List Component
-const AwaitingActionList = ({ data }) => {
+AwaitingActionList = ({ data }) => {
   return (
     <div className="bg-white border border-gray-200 rounded-xl p-4 lg:p-6 w-full min-w-0">
       <h3 className="text-base lg:text-lg font-semibold text-gray-900 mb-4 flex items-center">
         <Users className="w-4 lg:w-5 h-4 lg:h-5 mr-2 text-orange-600" />
         <span className="truncate">Leads Awaiting Action</span>
       </h3>
-        <div className="overflow-x-auto w-full min-w-0">
-          <div className="min-w-max">
-            <table className="w-full">
-          <thead>
-            <tr className="border-b border-gray-200">
-              <th className="text-left py-3 px-2 lg:px-4 text-sm font-medium text-gray-700">Lead Name</th>
-              <th className="text-left py-3 px-2 lg:px-4 text-sm font-medium text-gray-700">Status</th>
-              <th className="text-left py-3 px-2 lg:px-4 text-sm font-medium text-gray-700">Time in Queue</th>
-              <th className="text-left py-3 px-2 lg:px-4 text-sm font-medium text-gray-700">Last Interaction</th>
-              <th className="text-left py-3 px-2 lg:px-4 text-sm font-medium text-gray-700">Assigned To</th>
-              <th className="text-left py-3 px-2 lg:px-4 text-sm font-medium text-gray-700">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {data.map((lead) => (
-              <tr key={lead.leadId} className="border-b border-gray-100 hover:bg-gray-50">
-                <td className="py-3 px-2 lg:px-4 text-sm font-medium text-gray-900">{lead.name}</td>
-                <td className="py-3 px-2 lg:px-4">
-                  <span className={`inline-flex items-center px-2 lg:px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                    lead.status === 'Voicemail Left' ? 'bg-yellow-100 text-yellow-800' :
-                    lead.status === 'No Answer' ? 'bg-gray-100 text-gray-800' :
-                    'bg-orange-100 text-orange-800'
-                  }`}>
-                    {lead.status}
-                  </span>
-                </td>
-                <td className="py-3 px-2 lg:px-4 text-sm text-gray-600">
-                  <span className={lead.timeInQueue > '02:00' ? 'text-red-600 font-medium' : ''}>
-                    {lead.timeInQueue}
-                  </span>
-                </td>
-                <td className="py-3 px-2 lg:px-4 text-sm text-gray-600">{lead.lastAttempt}</td>
-                <td className="py-3 px-2 lg:px-4 text-sm text-gray-600">{lead.assignedTo}</td>
-                <td className="py-3 px-2 lg:px-4">
-                  <button className="text-blue-600 hover:text-blue-800 text-sm font-medium">
-                    View Details
-                  </button>
-                </td>
+      <div className="overflow-x-auto w-full min-w-0">
+        <div className="min-w-max">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-gray-200">
+                <th className="text-left py-3 px-2 lg:px-4 text-sm font-medium text-gray-700">Lead Name</th>
+                <th className="text-left py-3 px-2 lg:px-4 text-sm font-medium text-gray-700">Status</th>
+                <th className="text-left py-3 px-2 lg:px-4 text-sm font-medium text-gray-700">Time in Queue</th>
+                <th className="text-left py-3 px-2 lg:px-4 text-sm font-medium text-gray-700">Last Interaction</th>
+                <th className="text-left py-3 px-2 lg:px-4 text-sm font-medium text-gray-700">Assigned To</th>
+                <th className="text-left py-3 px-2 lg:px-4 text-sm font-medium text-gray-700">Actions</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {data && data.length > 0 ? (
+                data.map((lead) => (
+                  <tr key={lead.leadId} className="border-b border-gray-100 hover:bg-gray-50">
+                    <td className="py-3 px-2 lg:px-4 text-sm font-medium text-gray-900">{lead.name}</td>
+                    <td className="py-3 px-2 lg:px-4">
+                      <span className={`inline-flex items-center px-2 lg:px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        lead.status === 'Voicemail Left' ? 'bg-yellow-100 text-yellow-800' :
+                        lead.status === 'No Answer' ? 'bg-gray-100 text-gray-800' :
+                        'bg-orange-100 text-orange-800'
+                      }`}>
+                        {lead.status}
+                      </span>
+                    </td>
+                    <td className="py-3 px-2 lg:px-4 text-sm text-gray-600">
+                      <span className={lead.timeInQueue > '02:00' ? 'text-red-600 font-medium' : ''}>
+                        {lead.timeInQueue}
+                      </span>
+                    </td>
+                    <td className="py-3 px-2 lg:px-4 text-sm text-gray-600">{lead.lastAttempt}</td>
+                    <td className="py-3 px-2 lg:px-4 text-sm text-gray-600">
+                      {lead.assignedTo || 'Unassigned'}
+                    </td>
+                    <td className="py-3 px-2 lg:px-4">
+                      <button className="text-blue-600 hover:text-blue-800 text-sm font-medium">
+                        View Details
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan="6" className="py-6 text-center text-gray-500">
+                    <AlertTriangle className="w-8 h-8 mx-auto mb-2 text-gray-400" />
+                    <p className="text-sm">No leads awaiting action</p>
+                    <p className="text-xs text-gray-400 mt-1">Great! Your queue is empty</p>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>
   );
 };
+
 
 // Queue Distribution Chart
 const QueueDistribution = ({ data }) => {
@@ -418,77 +430,89 @@ const ResponseTimeTrend = ({ data }) => {
   );
 };
 
-// Performance by Sales Rep
+// Updated PerformanceByRep Component to use real sales team data
 const PerformanceByRep = ({ data, metricType = 'responseTime' }) => {
   return (
     <div className="bg-white border border-gray-200 rounded-xl p-4 lg:p-6 w-full min-w-0">
       <h3 className="text-base lg:text-lg font-semibold text-gray-900 mb-4 truncate">
         {metricType === 'responseTime' ? 'Response Time by Sales Rep' : 'Outcomes by Sales Rep'}
       </h3>
-<div className="overflow-x-auto w-full min-w-0">
-  <div className="min-w-max">
-    <table className="w-full">
-          <thead>
-            <tr className="border-b border-gray-200">
-              <th className="text-left py-3 px-2 lg:px-4 text-sm font-medium text-gray-700">Sales Rep</th>
-              {metricType === 'responseTime' ? (
-                <>
-                  <th className="text-left py-3 px-2 lg:px-4 text-sm font-medium text-gray-700">Avg Response Time</th>
-                  <th className="text-left py-3 px-2 lg:px-4 text-sm font-medium text-gray-700">Leads Handled</th>
-                  <th className="text-left py-3 px-2 lg:px-4 text-sm font-medium text-gray-700">SLA Compliance</th>
-                </>
-              ) : (
-                <>
-                  <th className="text-left py-3 px-2 lg:px-4 text-sm font-medium text-gray-700">Total Handled</th>
-                  <th className="text-left py-3 px-2 lg:px-4 text-sm font-medium text-gray-700">Closed Won</th>
-                  <th className="text-left py-3 px-2 lg:px-4 text-sm font-medium text-gray-700">Disqualified</th>
-                  <th className="text-left py-3 px-2 lg:px-4 text-sm font-medium text-gray-700">Conversion Rate</th>
-                </>
-              )}
-            </tr>
-          </thead>
-          <tbody>
-            {data.map((rep, i) => (
-              <tr key={i} className="border-b border-gray-100 hover:bg-gray-50">
-                <td className="py-3 px-2 lg:px-4 text-sm font-medium text-gray-900">{rep.name}</td>
+      <div className="overflow-x-auto w-full min-w-0">
+        <div className="min-w-max">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-gray-200">
+                <th className="text-left py-3 px-2 lg:px-4 text-sm font-medium text-gray-700">Sales Rep</th>
                 {metricType === 'responseTime' ? (
                   <>
-                    <td className="py-3 px-2 lg:px-4 text-sm text-gray-600">
-                      <span className={rep.avgResponseMinutes > 15 ? 'text-red-600 font-medium' : 'text-green-600'}>
-                        {rep.avgResponseMinutes} min
-                      </span>
-                    </td>
-                    <td className="py-3 px-2 lg:px-4 text-sm text-gray-600">{rep.leadsHandled}</td>
-                    <td className="py-3 px-2 lg:px-4">
-                      <span className={`inline-flex items-center px-2 lg:px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        rep.slaCompliance >= 90 ? 'bg-green-100 text-green-800' :
-                        rep.slaCompliance >= 75 ? 'bg-yellow-100 text-yellow-800' :
-                        'bg-red-100 text-red-800'
-                      }`}>
-                        {rep.slaCompliance}%
-                      </span>
-                    </td>
+                    <th className="text-left py-3 px-2 lg:px-4 text-sm font-medium text-gray-700">Avg Response Time</th>
+                    <th className="text-left py-3 px-2 lg:px-4 text-sm font-medium text-gray-700">Leads Handled</th>
+                    <th className="text-left py-3 px-2 lg:px-4 text-sm font-medium text-gray-700">SLA Compliance</th>
                   </>
                 ) : (
                   <>
-                    <td className="py-3 px-2 lg:px-4 text-sm text-gray-600">{rep.totalHandled}</td>
-                    <td className="py-3 px-2 lg:px-4 text-sm text-green-600 font-medium">{rep.closedWon}</td>
-                    <td className="py-3 px-2 lg:px-4 text-sm text-red-600">{rep.disqualified}</td>
-                    <td className="py-3 px-2 lg:px-4">
-                      <span className={`inline-flex items-center px-2 lg:px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        rep.conversionRate >= 30 ? 'bg-green-100 text-green-800' :
-                        rep.conversionRate >= 20 ? 'bg-yellow-100 text-yellow-800' :
-                        'bg-red-100 text-red-800'
-                      }`}>
-                        {rep.conversionRate.toFixed(1)}%
-                      </span>
-                    </td>
+                    <th className="text-left py-3 px-2 lg:px-4 text-sm font-medium text-gray-700">Total Handled</th>
+                    <th className="text-left py-3 px-2 lg:px-4 text-sm font-medium text-gray-700">Closed Won</th>
+                    <th className="text-left py-3 px-2 lg:px-4 text-sm font-medium text-gray-700">Disqualified</th>
+                    <th className="text-left py-3 px-2 lg:px-4 text-sm font-medium text-gray-700">Conversion Rate</th>
                   </>
                 )}
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {data && data.length > 0 ? (
+                data.map((rep, i) => (
+                  <tr key={i} className="border-b border-gray-100 hover:bg-gray-50">
+                    <td className="py-3 px-2 lg:px-4 text-sm font-medium text-gray-900">
+                      {rep.name || 'Team Member'}
+                    </td>
+                    {metricType === 'responseTime' ? (
+                      <>
+                        <td className="py-3 px-2 lg:px-4 text-sm text-gray-600">
+                          <span className={(rep.avgResponseMinutes || 0) > 15 ? 'text-red-600 font-medium' : 'text-green-600'}>
+                            {rep.avgResponseMinutes || 0} min
+                          </span>
+                        </td>
+                        <td className="py-3 px-2 lg:px-4 text-sm text-gray-600">{rep.leadsHandled || 0}</td>
+                        <td className="py-3 px-2 lg:px-4">
+                          <span className={`inline-flex items-center px-2 lg:px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                            (rep.slaCompliance || 0) >= 90 ? 'bg-green-100 text-green-800' :
+                            (rep.slaCompliance || 0) >= 75 ? 'bg-yellow-100 text-yellow-800' :
+                            'bg-red-100 text-red-800'
+                          }`}>
+                            {rep.slaCompliance || 0}%
+                          </span>
+                        </td>
+                      </>
+                    ) : (
+                      <>
+                        <td className="py-3 px-2 lg:px-4 text-sm text-gray-600">{rep.totalHandled || 0}</td>
+                        <td className="py-3 px-2 lg:px-4 text-sm text-green-600 font-medium">{rep.closedWon || 0}</td>
+                        <td className="py-3 px-2 lg:px-4 text-sm text-red-600">{rep.disqualified || 0}</td>
+                        <td className="py-3 px-2 lg:px-4">
+                          <span className={`inline-flex items-center px-2 lg:px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                            (rep.conversionRate || 0) >= 30 ? 'bg-green-100 text-green-800' :
+                            (rep.conversionRate || 0) >= 20 ? 'bg-yellow-100 text-yellow-800' :
+                            'bg-red-100 text-red-800'
+                          }`}>
+                            {(rep.conversionRate || 0).toFixed(1)}%
+                          </span>
+                        </td>
+                      </>
+                    )}
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={metricType === 'responseTime' ? 4 : 5} className="py-6 text-center text-gray-500">
+                    <Users className="w-8 h-8 mx-auto mb-2 text-gray-400" />
+                    <p className="text-sm">No team performance data available</p>
+                    <p className="text-xs text-gray-400 mt-1">Data will appear as team members handle leads</p>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>
@@ -758,8 +782,7 @@ const MobileCard = ({ title, subtitle, onClick, children, showUpgradeHint, canAc
   );
 };
 
-// Mock data generator
-const generateModalMockData = (modalType) => {
+generateModalMockData = (modalType) => {
   if (modalType === 'awaitingAction') {
     return {
       queueOverview: {
@@ -769,9 +792,9 @@ const generateModalMockData = (modalType) => {
         criticalLeads: 5
       },
       awaitingList: [
-        { leadId: '1', name: 'John Smith', status: 'Voicemail Left', timeInQueue: '02:45', lastAttempt: '2024-01-15 10:30', assignedTo: 'Sarah J.' },
-        { leadId: '2', name: 'Jane Doe', status: 'No Answer', timeInQueue: '01:20', lastAttempt: '2024-01-15 11:45', assignedTo: 'Mike C.' },
-        { leadId: '3', name: 'Bob Wilson', status: 'Pending Acceptance', timeInQueue: '00:45', lastAttempt: '2024-01-15 12:15', assignedTo: 'Team A' }
+        { leadId: '1', name: 'John Smith', status: 'Voicemail Left', timeInQueue: '02:45', lastAttempt: '2024-01-15 10:30', assignedTo: 'Team Member' },
+        { leadId: '2', name: 'Jane Doe', status: 'No Answer', timeInQueue: '01:20', lastAttempt: '2024-01-15 11:45', assignedTo: 'Sales Team' },
+        { leadId: '3', name: 'Bob Wilson', status: 'Pending Acceptance', timeInQueue: '00:45', lastAttempt: '2024-01-15 12:15', assignedTo: 'Unassigned' }
       ],
       queueDistribution: [
         { type: 'Voicemail', count: 12 },
@@ -787,10 +810,11 @@ const generateModalMockData = (modalType) => {
         date: new Date(Date.now() - (29 - i) * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
         avgResponseMinutes: Math.floor(Math.random() * 20) + 5
       })),
+      // FIXED: Use generic names that can be replaced with real data
       performanceByRep: [
-        { name: 'Sarah Johnson', avgResponseMinutes: 8, leadsHandled: 45, slaCompliance: 95 },
-        { name: 'Mike Chen', avgResponseMinutes: 12, leadsHandled: 38, slaCompliance: 85 },
-        { name: 'Emily Davis', avgResponseMinutes: 18, leadsHandled: 32, slaCompliance: 72 }
+        { name: 'Team Member A', avgResponseMinutes: 8, leadsHandled: 45, slaCompliance: 95 },
+        { name: 'Team Member B', avgResponseMinutes: 12, leadsHandled: 38, slaCompliance: 85 },
+        { name: 'Team Member C', avgResponseMinutes: 18, leadsHandled: 32, slaCompliance: 72 }
       ],
       timeDistribution: [
         { bin: '0-5 min', count: 45 },
@@ -817,10 +841,11 @@ const generateModalMockData = (modalType) => {
           'Nurture': Math.floor(Math.random() * 2)
         }
       })),
+      // FIXED: Use generic names that can be replaced with real data
       performanceByRep: [
-        { name: 'Sarah Johnson', totalHandled: 28, closedWon: 12, disqualified: 8, conversionRate: 42.9 },
-        { name: 'Mike Chen', totalHandled: 24, closedWon: 8, disqualified: 10, conversionRate: 33.3 },
-        { name: 'Emily Davis', totalHandled: 22, closedWon: 5, disqualified: 12, conversionRate: 22.7 }
+        { name: 'Team Member A', totalHandled: 28, closedWon: 12, disqualified: 8, conversionRate: 42.9 },
+        { name: 'Team Member B', totalHandled: 24, closedWon: 8, disqualified: 10, conversionRate: 33.3 },
+        { name: 'Team Member C', totalHandled: 22, closedWon: 5, disqualified: 12, conversionRate: 22.7 }
       ],
       disqualificationReasons: [
         { reason: 'Not decision maker', count: 15 },
