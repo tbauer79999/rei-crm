@@ -9,7 +9,9 @@ import {
 } from 'lucide-react';
 
 // Edge Function URL
-const EDGE_FUNCTION_URL = 'https://wuuqrdlfgkasnwydyvgk.supabase.co/functions/v1/overview-analytics';
+const buildApiUrl = (component, tenantId, period = '30days') => {
+  return `https://wuuqrdlfgkasnwydyvgk.supabase.co/functions/v1/sync_sales_metrics?action=fetch&component=${component}&tenant_id=${tenantId}&period=${period}`;
+};
 
 // Modal configuration for each metric
 const MODAL_CONFIG = {
@@ -1538,7 +1540,7 @@ export default function OverviewMetrics() {
       
       // Call the edge function with the appropriate endpoint
       console.log(`🔍 Calling endpoint: ${EDGE_FUNCTION_URL}${endpoint}${params}`);
-      const data = await callEdgeFunction(`${EDGE_FUNCTION_URL}${endpoint}${params}`);
+      const data = await callEdgeFunction(buildApiUrl('overview', user.tenant_id, selectedPeriod));
       console.log(`📊 Data returned for ${metricType}:`, data);
       
       // Check for API errors
@@ -1633,8 +1635,9 @@ export default function OverviewMetrics() {
         setError(null);
         
         // Add debugging to see what the API actually returns
-        console.log('🔍 Fetching overview metrics from:', EDGE_FUNCTION_URL);
-        const data = await callEdgeFunction(EDGE_FUNCTION_URL);
+        const apiUrl = buildApiUrl('overview', user.tenant_id, '30days');
+        console.log('🔍 Fetching overview metrics from:', apiUrl);
+        const data = await callEdgeFunction(buildApiUrl('overview', user.tenant_id, '30days'));
         console.log('📊 Raw API Response:', data);
 
         // Check if we got the expected structure
