@@ -791,7 +791,7 @@ const MetricModalContent = ({ metricType, data, selectedPeriod, onPeriodChange }
       
       <div className="p-4 lg:p-6 space-y-4 lg:space-y-6 w-full min-w-0">
         {/* Existing features */}
-        {features.includes('trend') && (
+        {features.includes('trend') && data.trendData && (
           <TrendChart 
             data={data.trendData} 
             title="Trend Analysis" 
@@ -801,11 +801,11 @@ const MetricModalContent = ({ metricType, data, selectedPeriod, onPeriodChange }
         )}
 
         {/* Weekly Leads features */}
-        {features.includes('weeklyTrend') && (
+        {features.includes('weeklyTrend') && data.weeklyTrendData && (
           <WeeklyTrendChart data={data.weeklyTrendData} />
         )}
         
-        {features.includes('weeklySourceBreakdown') && (
+        {features.includes('weeklySourceBreakdown') && data.weeklySourceData && (
           <WeeklySourceBreakdown data={data.weeklySourceData} />
         )}
         
@@ -837,12 +837,12 @@ const MetricModalContent = ({ metricType, data, selectedPeriod, onPeriodChange }
         )}
 
         {/* Hot Lead Rate features */}
-        {features.includes('hotRateTrend') && (
+        {features.includes('hotRateTrend') && data.hotRateTrendData && (
           <HotRateTrendChart data={data.hotRateTrendData} targetRate={data.targetHotRate} />
         )}
 
         {/* Active Leads features */}
-        {features.includes('activeTrend') && (
+        {features.includes('activeTrend') && data.trendData && (
           <TrendChart 
             data={data.trendData} 
             title="Active Leads Trend" 
@@ -853,20 +853,22 @@ const MetricModalContent = ({ metricType, data, selectedPeriod, onPeriodChange }
         
         {features.includes('stageDistribution') && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
-            <SourceDistribution data={data.stageData} title="Active Leads by Stage" />
+            {data.stageData && (
+              <SourceDistribution data={data.stageData} title="Active Leads by Stage" />
+            )}
             
-            {features.includes('ownerDistribution') && (
+            {features.includes('ownerDistribution') && data.ownerData && (
               <SourceDistribution data={data.ownerData} title="Distribution by Owner" />
             )}
           </div>
         )}
         
-        {features.includes('stagnantLeads') && (
+        {features.includes('stagnantLeads') && data.stagnantLeads && (
           <StagnantLeadsTable data={data.stagnantLeads} />
         )}
 
         {/* Completed Leads features */}
-        {features.includes('completedTrend') && (
+        {features.includes('completedTrend') && data.trendData && (
           <TrendChart 
             data={data.trendData} 
             title="Completed Leads Trend" 
@@ -875,7 +877,7 @@ const MetricModalContent = ({ metricType, data, selectedPeriod, onPeriodChange }
           />
         )}
         
-        {features.includes('outcomeDistribution') && (
+        {features.includes('outcomeDistribution') && data.outcomeData && (
           <OutcomeDistribution data={data.outcomeData} />
         )}
         
@@ -893,7 +895,7 @@ const MetricModalContent = ({ metricType, data, selectedPeriod, onPeriodChange }
           </div>
         )}
         
-        {features.includes('avgCompletionTime') && (
+        {features.includes('avgCompletionTime') && data.avgCompletionTime && (
           <div className="bg-green-50 border border-green-200 rounded-xl p-4 lg:p-6 text-center w-full min-w-0">
             <h3 className="text-base lg:text-lg font-semibold text-green-900 mb-2 truncate">Average Time to Completion</h3>
             <p className="text-3xl lg:text-4xl font-bold text-green-700">{data.avgCompletionTime} days</p>
@@ -902,7 +904,7 @@ const MetricModalContent = ({ metricType, data, selectedPeriod, onPeriodChange }
         )}
 
         {/* Messages Sent/Received features */}
-        {features.includes('messageTrend') && (
+        {features.includes('messageTrend') && data.trendData && (
           <TrendChart 
             data={data.trendData} 
             title={metricType === 'messagesSent' ? 'Outbound Message Trend' : 'Inbound Message Trend'} 
@@ -911,15 +913,15 @@ const MetricModalContent = ({ metricType, data, selectedPeriod, onPeriodChange }
           />
         )}
         
-        {features.includes('messageTypeDistribution') && (
+        {features.includes('messageTypeDistribution') && data.messageTypeData && (
           <SourceDistribution data={data.messageTypeData} title="Message Type Distribution" />
         )}
         
-        {features.includes('deliveryStats') && (
+        {features.includes('deliveryStats') && data.deliveryStats && (
           <DeliveryStats data={data.deliveryStats} />
         )}
         
-        {features.includes('engagementByType') && (
+        {features.includes('engagementByType') && data.engagementData && (
           <div className="bg-white border border-gray-200 rounded-xl p-4 lg:p-6 w-full min-w-0">
             <h3 className="text-base lg:text-lg font-semibold text-gray-900 mb-4 truncate">Engagement Rate by Message Type</h3>
             <div className="space-y-3">
@@ -944,19 +946,19 @@ const MetricModalContent = ({ metricType, data, selectedPeriod, onPeriodChange }
         )}
         
         {/* Messages Received specific features */}
-        {features.includes('sourceDistribution') && (
+        {features.includes('sourceDistribution') && data.sourceData && (
           <SourceDistribution data={data.sourceData} title="Inbound Message Sources" />
         )}
         
-        {features.includes('topIntents') && (
+        {features.includes('topIntents') && data.topIntents && (
           <TopIntents data={data.topIntents} />
         )}
         
-        {features.includes('sentimentAnalysis') && (
+        {features.includes('sentimentAnalysis') && data.sentimentData && (
           <SentimentAnalysis data={data.sentimentData} />
         )}
         
-        {features.includes('unhandledMessages') && (
+        {features.includes('unhandledMessages') && data.unhandledMessages && (
           <div className="bg-white border border-gray-200 rounded-xl p-4 lg:p-6 w-full min-w-0">
             <h3 className="text-base lg:text-lg font-semibold text-gray-900 mb-4 flex items-center">
               <AlertTriangle className="w-4 lg:w-5 h-4 lg:h-5 mr-2 text-yellow-600" />
@@ -1002,11 +1004,11 @@ const MetricModalContent = ({ metricType, data, selectedPeriod, onPeriodChange }
             <TopSalespersons data={data.topSalespersons} />
           )}
           
-          {features.includes('hotRateByChannel') && (
+          {features.includes('hotRateByChannel') && data.hotRateByChannelData && (
             <HotRateByChannel data={data.hotRateByChannelData} />
           )}
           
-          {features.includes('timeToHot') && (
+          {features.includes('timeToHot') && data.timeToHotData && (
             <TimeToHotMetrics data={data.timeToHotData} />
           )}
         </div>
@@ -1025,7 +1027,7 @@ const MetricModalContent = ({ metricType, data, selectedPeriod, onPeriodChange }
           </div>
         )}
         
-        {features.includes('hotLeadFunnel') && (
+        {features.includes('hotLeadFunnel') && data.funnelData && (
           <HotLeadFunnel data={data.funnelData} />
         )}
         
@@ -1043,7 +1045,7 @@ const MetricModalContent = ({ metricType, data, selectedPeriod, onPeriodChange }
           </div>
         )}
 
-        {features.includes('recentSignups') && (
+        {features.includes('recentSignups') && data.recentSignups && (
           <div className="bg-white border border-gray-200 rounded-xl p-4 lg:p-6 w-full min-w-0">
             <h3 className="text-base lg:text-lg font-semibold text-gray-900 mb-4 flex items-center">
               <Calendar className="w-4 lg:w-5 h-4 lg:h-5 mr-2 text-purple-600" />
@@ -1535,8 +1537,16 @@ export default function OverviewMetrics() {
       }
       
       // Call the edge function with the appropriate endpoint
+      console.log(`🔍 Calling endpoint: ${EDGE_FUNCTION_URL}${endpoint}${params}`);
       const data = await callEdgeFunction(`${EDGE_FUNCTION_URL}${endpoint}${params}`);
-      console.log(`Data returned for ${metricType}:`, data);
+      console.log(`📊 Data returned for ${metricType}:`, data);
+      
+      // Check for API errors
+      if (data.error) {
+        console.error('API Error:', data.error);
+        throw new Error(data.error.details || data.error || 'API returned an error');
+      }
+      
       // Transform the data to match the expected format if needed
       setModalData(data);
       
@@ -1622,38 +1632,70 @@ export default function OverviewMetrics() {
         setLoading(true);
         setError(null);
         
+        // Add debugging to see what the API actually returns
+        console.log('🔍 Fetching overview metrics from:', EDGE_FUNCTION_URL);
         const data = await callEdgeFunction(EDGE_FUNCTION_URL);
+        console.log('📊 Raw API Response:', data);
 
-        const weeklyChange = (curr, prev) => {
-          if (prev === 0) return curr > 0 ? '+100%' : '+0%';
-          const change = ((curr - prev) / prev) * 100;
-          const sign = change >= 0 ? '+' : '-';
-          return `${sign}${Math.abs(change).toFixed(1)}%`;
+        // Check if we got the expected structure
+        if (!data || typeof data !== 'object') {
+          throw new Error('Invalid API response format');
+        }
+
+        // Check for API errors
+        if (data.error) {
+          throw new Error(data.error.details || data.error || 'API returned an error');
+        }
+
+        // Validate and safely extract values with defaults
+        const safeGetNumber = (value) => {
+          const num = Number(value);
+          return isNaN(num) ? 0 : num;
         };
 
+        const safeGetPercentage = (value) => {
+          const num = Number(value);
+          return isNaN(num) ? '0%' : `${num.toFixed(1)}%`;
+        };
+
+        const weeklyChange = (curr, prev) => {
+          const currentNum = safeGetNumber(curr);
+          const prevNum = safeGetNumber(prev);
+          
+          if (prevNum === 0) return currentNum > 0 ? '+100%' : '+0%';
+          const change = ((currentNum - prevNum) / prevNum) * 100;
+          const sign = change >= 0 ? '+' : '';
+          return `${sign}${change.toFixed(1)}%`;
+        };
+
+        // Build metrics object with safe defaults
         const newMetrics = {
-          totalLeads: data.totalLeads || 0,
-          weeklyLeads: data.weeklyLeads || 0,
-          hotLeadRate: data.hotLeadRate ? `${data.hotLeadRate.toFixed(1)}%` : '0%',
-          replyRate: data.replyRate ? `${data.replyRate.toFixed(1)}%` : '0%',
-          activeLeads: data.activeLeads || 0,
-          completedLeads: data.completedLeads || 0,
-          messagesSent: data.messagesSent || 0,
-          messagesReceived: data.messagesReceived || 0,
+          totalLeads: safeGetNumber(data.totalLeads),
+          weeklyLeads: safeGetNumber(data.weeklyLeads),
+          hotLeadRate: safeGetPercentage(data.hotLeadRate),
+          replyRate: safeGetPercentage(data.replyRate),
+          activeLeads: safeGetNumber(data.activeLeads),
+          completedLeads: safeGetNumber(data.completedLeads),
+          messagesSent: safeGetNumber(data.messagesSent),
+          messagesReceived: safeGetNumber(data.messagesReceived),
           trends: {
-            weeklyLeads: weeklyChange(data.weeklyLeads || 0, 25),
-            hotLeadRate: weeklyChange(data.hotLeadRate || 0, 12.0),
-            replyRate: weeklyChange(data.replyRate || 0, 35.0),
-            completedLeads: weeklyChange(data.completedLeads || 0, 7),
-            messagesSent: weeklyChange(data.messagesSent || 0, 210),
-            messagesReceived: weeklyChange(data.messagesReceived || 0, 110),
+            weeklyLeads: weeklyChange(data.weeklyLeads, 25),
+            hotLeadRate: weeklyChange(data.hotLeadRate, 12.0),
+            replyRate: weeklyChange(data.replyRate, 35.0),
+            completedLeads: weeklyChange(data.completedLeads, 7),
+            messagesSent: weeklyChange(data.messagesSent, 210),
+            messagesReceived: weeklyChange(data.messagesReceived, 110),
           },
         };
 
+        console.log('✅ Processed metrics:', newMetrics);
         setMetrics(newMetrics);
+        
       } catch (error) {
-        console.error('Error fetching overview metrics:', error);
+        console.error('❌ Error fetching overview metrics:', error);
         setError(error.message);
+        
+        // Set fallback metrics
         setMetrics({
           totalLeads: 0,
           weeklyLeads: 0,
@@ -1908,7 +1950,11 @@ export default function OverviewMetrics() {
             selectedPeriod={selectedPeriod}
             onPeriodChange={handlePeriodChange}
           />
-        ) : null}
+        ) : (
+          <div className="flex items-center justify-center h-64 text-gray-500">
+            <p>No data available</p>
+          </div>
+        )}
       </ModalWrapper>
     </div>
   );
