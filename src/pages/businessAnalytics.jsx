@@ -653,43 +653,65 @@ export default function BusinessAnalytics() {
   };
 
   // Load sales rep performance
-  const loadSalesRepPerformance = async () => {
-    try {
-      let salesTeamQuery = supabase
-        .from('sales_team')
-        .select(`
-          id,
-          total_leads_assigned,
-          total_conversions,
-          users_profile (
-            first_name,
-            last_name,
-            full_name
-          )
-        `);
-      
-      salesTeamQuery = applyTenantFilter(salesTeamQuery);
-      const salesTeam = await executeQuery(salesTeamQuery, []);
+const loadSalesRepPerformance = async () => {
+  try {
+    let salesTeamQuery = supabase
+      .from('sales_team')
+      .select(`
+        id,
+        first_name,
+        last_name,
+        email,
+        total_leads_assigned,
+        total_conversions,
+        users_profile (
+          first_name,
+          last_name,
+          full_name
+        )
+      `);
+    
+    salesTeamQuery = applyTenantFilter(salesTeamQuery);
+    const salesTeam = await executeQuery(salesTeamQuery, []);
 
-      return salesTeam.map(rep => ({
-        rep: rep.users_profile?.full_name || rep.users_profile?.first_name || 'Sales Team Member',
+    return salesTeam.map(rep => {
+      // Priority order: sales_team first_name + last_name, then users_profile, then email, then fallback
+      let displayName = 'Sales Team Member';
+      
+      if (rep.first_name && rep.last_name) {
+        displayName = `${rep.first_name} ${rep.last_name}`;
+      } else if (rep.first_name) {
+        displayName = rep.first_name;
+      } else if (rep.users_profile?.full_name) {
+        displayName = rep.users_profile.full_name;
+      } else if (rep.users_profile?.first_name && rep.users_profile?.last_name) {
+        displayName = `${rep.users_profile.first_name} ${rep.users_profile.last_name}`;
+      } else if (rep.users_profile?.first_name) {
+        displayName = rep.users_profile.first_name;
+      } else if (rep.email) {
+        displayName = rep.email;
+      }
+
+      return {
+        rep: displayName,
         totalLeadsAssigned: rep.total_leads_assigned || 0,
         hotLeadsGenerated: rep.total_conversions || 0,
         pipelineValue: (rep.total_conversions || 0) * 5000,
         conversionRate: rep.total_leads_assigned > 0 ? 
           parseFloat(((rep.total_conversions / rep.total_leads_assigned) * 100).toFixed(1)) : 0
-      }));
-    } catch (error) {
-      console.error('Error loading sales rep performance:', error);
-      return [{
-        rep: 'Sales Team',
-        totalLeadsAssigned: 0,
-        hotLeadsGenerated: 0,
-        pipelineValue: 0,
-        conversionRate: 0
-      }];
-    }
-  };
+      };
+    });
+  } catch (error) {
+    console.error('Error loading sales rep performance:', error);
+    return [{
+      rep: 'Sales Team',
+      totalLeadsAssigned: 0,
+      hotLeadsGenerated: 0,
+      pipelineValue: 0,
+      conversionRate: 0
+    }];
+  }
+};
 
   // Load historical trends (mock data for now)
   const loadHistoricalTrends = () => {
