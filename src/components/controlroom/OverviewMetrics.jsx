@@ -255,24 +255,36 @@ const TopSalespersons = ({ data }) => (
   <div className="bg-white border border-gray-200 rounded-xl p-4 lg:p-6 w-full min-w-0">
     <h3 className="text-base lg:text-lg font-semibold text-gray-900 mb-4 flex items-center">
       <Users className="w-4 lg:w-5 h-4 lg:h-5 mr-2 text-green-600" />
-      <span className="truncate">Top 5 Salespersons</span>
+      <span className="truncate">Top 5 Team Members</span>
     </h3>
     <div className="space-y-3">
-      {data.map((person, i) => (
-        <div key={person.id} className="flex items-center justify-between p-3 hover:bg-gray-50 rounded-lg transition-colors min-w-0">
-          <div className="flex items-center space-x-3 min-w-0 flex-1">
-            <span className="text-xl lg:text-2xl flex-shrink-0">{person.avatar}</span>
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium text-gray-900 truncate">{person.name}</p>
-              <p className="text-xs text-gray-500">Rank #{i + 1}</p>
+      {data && data.length > 0 ? (
+        data.map((person, i) => (
+          <div key={person.id || i} className="flex items-center justify-between p-3 hover:bg-gray-50 rounded-lg transition-colors min-w-0">
+            <div className="flex items-center space-x-3 min-w-0 flex-1">
+              <span className="text-xl lg:text-2xl flex-shrink-0">{person.avatar || '👤'}</span>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium text-gray-900 truncate">
+                  {person.name || 'Team Member'}
+                </p>
+                <p className="text-xs text-gray-500">Rank #{i + 1}</p>
+              </div>
+            </div>
+            <div className="text-right flex-shrink-0">
+              <p className="text-base lg:text-lg font-bold text-gray-900">
+                {person.totalLeads || 0}
+              </p>
+              <p className="text-xs text-gray-500">leads</p>
             </div>
           </div>
-          <div className="text-right flex-shrink-0">
-            <p className="text-base lg:text-lg font-bold text-gray-900">{person.totalLeads}</p>
-            <p className="text-xs text-gray-500">leads</p>
-          </div>
+        ))
+      ) : (
+        <div className="text-center py-6 text-gray-500">
+          <Users className="w-12 h-12 mx-auto mb-2 text-gray-400" />
+          <p className="text-sm">No team performance data available.</p>
+          <p className="text-xs text-gray-400 mt-1">Add team members to see rankings.</p>
         </div>
-      ))}
+      )}
     </div>
   </div>
 );
