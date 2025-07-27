@@ -19,7 +19,8 @@ import {
   Download,
   RefreshCw,
   Link,
-  X
+  X,
+  Phone
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { PERMISSIONS } from '../../lib/permissions';
@@ -31,6 +32,7 @@ export default function SalesTeamSettings() {
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteFirstName, setInviteFirstName] = useState('');
   const [inviteLastName, setInviteLastName] = useState('');
+  const [invitePhoneNumber, setInvitePhoneNumber] = useState('');
   const [inviteRole, setInviteRole] = useState('user');
   const [inviteLoading, setInviteLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -234,6 +236,15 @@ export default function SalesTeamSettings() {
       setError('Please enter a valid email address');
       return;
     }
+
+    // Basic phone number validation (optional field)
+    if (invitePhoneNumber.trim()) {
+      const phoneRegex = /^[\+]?[1-9][\d]{0,15}$/;
+      if (!phoneRegex.test(invitePhoneNumber.replace(/[\s\-\(\)]/g, ''))) {
+        setError('Please enter a valid phone number');
+        return;
+      }
+    }
     
     setInviteLoading(true);
     setError('');
@@ -246,7 +257,8 @@ export default function SalesTeamSettings() {
           email: inviteEmail,
           role: inviteRole,
           firstName: inviteFirstName,
-          lastName: inviteLastName
+          lastName: inviteLastName,
+          phoneNumber: invitePhoneNumber.trim() || null
         })
       });
       
@@ -254,6 +266,7 @@ export default function SalesTeamSettings() {
       setInviteEmail('');
       setInviteFirstName('');
       setInviteLastName('');
+      setInvitePhoneNumber('');
       setInviteRole('user');
       setShowInviteModal(false);
       
@@ -388,6 +401,16 @@ export default function SalesTeamSettings() {
     }
   };
 
+  const formatPhoneNumber = (phone) => {
+    if (!phone) return 'No phone';
+    // Basic formatting for US phone numbers
+    const cleaned = phone.replace(/\D/g, '');
+    if (cleaned.length === 10) {
+      return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6)}`;
+    }
+    return phone;
+  };
+
   const getRoleDisplay = (role) => {
     switch (role) {
       case 'business_admin':
@@ -403,7 +426,8 @@ export default function SalesTeamSettings() {
 
   const filteredMembers = teamMembers.filter(member => {
     const matchesSearch = (member.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         (member.email || '').toLowerCase().includes(searchTerm.toLowerCase());
+                         (member.email || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         (member.phone_number || '').toLowerCase().includes(searchTerm.toLowerCase());
     const matchesFilter = filterStatus === 'all' || member.status === filterStatus;
     return matchesSearch && matchesFilter;
   });
@@ -654,6 +678,9 @@ export default function SalesTeamSettings() {
                   Team Member
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Contact
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Role
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -688,6 +715,18 @@ export default function SalesTeamSettings() {
                       <div className="ml-4">
                         <div className="text-sm font-medium text-gray-900">{member.name || 'Unknown User'}</div>
                         <div className="text-sm text-gray-500">{member.email || 'No email'}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm text-gray-900">
+                      <div className="flex items-center mb-1">
+                        <Mail className="w-3 h-3 text-gray-400 mr-1" />
+                        {member.email || 'No email'}
+                      </div>
+                      <div className="flex items-center">
+                        <Phone className="w-3 h-3 text-gray-400 mr-1" />
+                        <span className="text-gray-500">{formatPhoneNumber(member.phone_number)}</span>
                       </div>
                     </div>
                   </td>
@@ -852,6 +891,18 @@ export default function SalesTeamSettings() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Phone Number
+                  </label>
+                  <input
+                    type="tel"
+                    placeholder="(555) 123-4567"
+                    value={invitePhoneNumber}
+                    onChange={(e) => setInvitePhoneNumber(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
                     Role
                   </label>
                   <select
@@ -881,6 +932,7 @@ export default function SalesTeamSettings() {
                   setInviteEmail('');
                   setInviteFirstName('');
                   setInviteLastName('');
+                  setInvitePhoneNumber('');
                 }}
                 className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
               >
@@ -888,7 +940,7 @@ export default function SalesTeamSettings() {
               </button>
               <button
                 onClick={handleSendInvite}
-                disabled={!inviteEmail.trim() || !inviteFirstName.trim() || !inviteLastName.trim() || inviteLoading}
+                disabled={!inviteEmail.trim() || !inviteFirstName.trim() || !inviteLastName.trim() || !invitePhoneNumber.trim() || inviteLoading}
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
               >
                 {inviteLoading ? (
