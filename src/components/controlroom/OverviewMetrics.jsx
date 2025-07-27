@@ -161,6 +161,8 @@ const TimePeriodSelector = ({ selectedPeriod, onPeriodChange, periods }) => {
 
 // Reusable Chart Components
 const TrendChart = ({ data, title, icon: Icon, iconColor }) => {
+  if (!data || data.length === 0) return null;
+  
   const maxValue = Math.max(...data.map(d => d.count));
   
   return (
@@ -213,6 +215,8 @@ const TrendChart = ({ data, title, icon: Icon, iconColor }) => {
 };
 
 const SourceDistribution = ({ data, title = "Lead Sources" }) => {
+  if (!data || data.length === 0) return null;
+  
   const total = data.reduce((sum, item) => sum + item.count, 0);
   
   return (
@@ -293,6 +297,8 @@ const TopSalespersons = ({ data }) => (
 
 // Weekly Trend Chart with comparison
 const WeeklyTrendChart = ({ data }) => {
+  if (!data || data.length === 0) return null;
+  
   const maxValue = Math.max(
     ...data.map(d => Math.max(d.currentWeekLeads, d.previousWeekLeads || 0))
   );
@@ -378,6 +384,8 @@ const WeeklyTrendChart = ({ data }) => {
 
 // Weekly Source Breakdown
 const WeeklySourceBreakdown = ({ data }) => {
+  if (!data || data.length === 0) return null;
+  
   const sourceColors = {
     'Website': '#3B82F6',
     'Paid Ads': '#10B981',
@@ -430,6 +438,8 @@ const WeeklySourceBreakdown = ({ data }) => {
 
 // Hot Lead Rate Trend with Target Line
 const HotRateTrendChart = ({ data, targetRate = 15 }) => {
+  if (!data || data.length === 0) return null;
+  
   const maxValue = Math.max(...data.map(d => d.hotRate), targetRate) * 1.1;
 
   return (
@@ -502,6 +512,8 @@ const HotRateTrendChart = ({ data, targetRate = 15 }) => {
 
 // Hot Rate by Channel
 const HotRateByChannel = ({ data }) => {
+  if (!data || data.length === 0) return null;
+  
   return (
     <div className="bg-white border border-gray-200 rounded-xl p-4 lg:p-6 w-full min-w-0">
       <h3 className="text-base lg:text-lg font-semibold text-gray-900 mb-4 truncate">Hot Rate by Channel</h3>
@@ -529,6 +541,8 @@ const HotRateByChannel = ({ data }) => {
 
 // Time to Hot Distribution
 const TimeToHotMetrics = ({ data }) => {
+  if (!data) return null;
+  
   return (
     <div className="bg-white border border-gray-200 rounded-xl p-4 lg:p-6 w-full min-w-0">
       <h3 className="text-base lg:text-lg font-semibold text-gray-900 mb-4 flex items-center">
@@ -568,6 +582,8 @@ const TimeToHotMetrics = ({ data }) => {
 
 // Hot Lead Funnel
 const HotLeadFunnel = ({ data }) => {
+  if (!data || data.length === 0) return null;
+  
   const maxCount = Math.max(...data.map(d => d.count));
   
   return (
@@ -596,47 +612,53 @@ const HotLeadFunnel = ({ data }) => {
 };
 
 // Stagnant Leads Table
-const StagnantLeadsTable = ({ data }) => (
-  <div className="bg-white border border-gray-200 rounded-xl p-4 lg:p-6 w-full min-w-0">
-    <h3 className="text-base lg:text-lg font-semibold text-gray-900 mb-4 flex items-center">
-      <AlertTriangle className="w-4 lg:w-5 h-4 lg:h-5 mr-2 text-yellow-600" />
-      <span className="truncate">Stagnant Leads Report</span>
-    </h3>
-    <div className="overflow-x-auto">
-      <table className="w-full">
-        <thead>
-          <tr className="border-b border-gray-200">
-            <th className="text-left py-3 px-2 lg:px-4 text-sm font-medium text-gray-700">Lead Name</th>
-            <th className="text-left py-3 px-2 lg:px-4 text-sm font-medium text-gray-700">Current Status</th>
-            <th className="text-left py-3 px-2 lg:px-4 text-sm font-medium text-gray-700">Assigned To</th>
-            <th className="text-left py-3 px-2 lg:px-4 text-sm font-medium text-gray-700">Last Interaction</th>
-            <th className="text-left py-3 px-2 lg:px-4 text-sm font-medium text-gray-700">Days Stagnant</th>
-          </tr>
-        </thead>
-        <tbody>
-          {data.map((lead) => (
-            <tr key={lead.leadId} className="border-b border-gray-100 hover:bg-gray-50">
-              <td className="py-3 px-2 lg:px-4 text-sm font-medium text-gray-900">{lead.name}</td>
-              <td className="py-3 px-2 lg:px-4 text-sm text-gray-600">{lead.currentStatus}</td>
-              <td className="py-3 px-2 lg:px-4 text-sm text-gray-600">{lead.assignedTo || 'AI'}</td>
-              <td className="py-3 px-2 lg:px-4 text-sm text-gray-600">{lead.lastInteraction}</td>
-              <td className="py-3 px-2 lg:px-4">
-                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                  lead.daysStagnant > 7 ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'
-                }`}>
-                  {lead.daysStagnant} days
-                </span>
-              </td>
+const StagnantLeadsTable = ({ data }) => {
+  if (!data || data.length === 0) return null;
+  
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-4 lg:p-6 w-full min-w-0">
+      <h3 className="text-base lg:text-lg font-semibold text-gray-900 mb-4 flex items-center">
+        <AlertTriangle className="w-4 lg:w-5 h-4 lg:h-5 mr-2 text-yellow-600" />
+        <span className="truncate">Stagnant Leads Report</span>
+      </h3>
+      <div className="overflow-x-auto">
+        <table className="w-full">
+          <thead>
+            <tr className="border-b border-gray-200">
+              <th className="text-left py-3 px-2 lg:px-4 text-sm font-medium text-gray-700">Lead Name</th>
+              <th className="text-left py-3 px-2 lg:px-4 text-sm font-medium text-gray-700">Current Status</th>
+              <th className="text-left py-3 px-2 lg:px-4 text-sm font-medium text-gray-700">Assigned To</th>
+              <th className="text-left py-3 px-2 lg:px-4 text-sm font-medium text-gray-700">Last Interaction</th>
+              <th className="text-left py-3 px-2 lg:px-4 text-sm font-medium text-gray-700">Days Stagnant</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {data.map((lead) => (
+              <tr key={lead.leadId} className="border-b border-gray-100 hover:bg-gray-50">
+                <td className="py-3 px-2 lg:px-4 text-sm font-medium text-gray-900">{lead.name}</td>
+                <td className="py-3 px-2 lg:px-4 text-sm text-gray-600">{lead.currentStatus}</td>
+                <td className="py-3 px-2 lg:px-4 text-sm text-gray-600">{lead.assignedTo || 'AI'}</td>
+                <td className="py-3 px-2 lg:px-4 text-sm text-gray-600">{lead.lastInteraction}</td>
+                <td className="py-3 px-2 lg:px-4">
+                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                    lead.daysStagnant > 7 ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'
+                  }`}>
+                    {lead.daysStagnant} days
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 // Outcome Distribution (for completed leads)
 const OutcomeDistribution = ({ data }) => {
+  if (!data || data.length === 0) return null;
+  
   const total = data.reduce((sum, item) => sum + item.count, 0);
   const getOutcomeColor = (status) => {
     const colors = {
@@ -683,25 +705,31 @@ const OutcomeDistribution = ({ data }) => {
 };
 
 // Delivery Stats Component
-const DeliveryStats = ({ data }) => (
-  <div className="bg-white border border-gray-200 rounded-xl p-4 lg:p-6 w-full min-w-0">
-    <h3 className="text-base lg:text-lg font-semibold text-gray-900 mb-4 truncate">Delivery & Open Rate Summary</h3>
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 lg:gap-4">
-      {data.map((stat, i) => (
-        <div key={i} className="text-center p-2 lg:p-3 bg-gray-50 rounded-lg">
-          <p className="text-lg lg:text-2xl font-bold text-gray-800 truncate">{stat.value}</p>
-          <p className="text-xs text-gray-600 mt-1 truncate">{stat.label}</p>
-          {stat.percentage && (
-            <p className="text-xs text-gray-500 mt-1">({stat.percentage}%)</p>
-          )}
-        </div>
-      ))}
+const DeliveryStats = ({ data }) => {
+  if (!data || data.length === 0) return null;
+  
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-4 lg:p-6 w-full min-w-0">
+      <h3 className="text-base lg:text-lg font-semibold text-gray-900 mb-4 truncate">Delivery & Open Rate Summary</h3>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 lg:gap-4">
+        {data.map((stat, i) => (
+          <div key={i} className="text-center p-2 lg:p-3 bg-gray-50 rounded-lg">
+            <p className="text-lg lg:text-2xl font-bold text-gray-800 truncate">{stat.value}</p>
+            <p className="text-xs text-gray-600 mt-1 truncate">{stat.label}</p>
+            {stat.percentage && (
+              <p className="text-xs text-gray-500 mt-1">({stat.percentage}%)</p>
+            )}
+          </div>
+        ))}
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 // Sentiment Analysis Component
 const SentimentAnalysis = ({ data }) => {
+  if (!data || data.length === 0) return null;
+  
   const total = data.reduce((sum, item) => sum + item.count, 0);
   const getSentimentColor = (sentiment) => {
     const colors = {
@@ -739,30 +767,34 @@ const SentimentAnalysis = ({ data }) => {
 };
 
 // Top Intents Component
-const TopIntents = ({ data }) => (
-  <div className="bg-white border border-gray-200 rounded-xl p-4 lg:p-6 w-full min-w-0">
-    <h3 className="text-base lg:text-lg font-semibold text-gray-900 mb-4 truncate">Top Inbound Intents/Topics</h3>
-    <div className="space-y-2">
-      {data.map((intent, i) => (
-        <div key={i} className="flex items-center justify-between p-2 lg:p-3 hover:bg-gray-50 rounded-lg min-w-0">
-          <div className="flex items-center space-x-2 lg:space-x-3 min-w-0 flex-1">
-            <span className="text-sm font-medium text-gray-800 flex-shrink-0">#{i + 1}</span>
-            <span className="text-sm text-gray-700 truncate">{intent.intent}</span>
-          </div>
-          <div className="flex items-center space-x-2 flex-shrink-0">
-            <div className="w-16 lg:w-24 bg-gray-200 rounded-full h-2">
-              <div
-                className="h-2 rounded-full bg-purple-500"
-                style={{ width: `${(intent.count / data[0].count) * 100}%` }}
-              />
+const TopIntents = ({ data }) => {
+  if (!data || data.length === 0) return null;
+  
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-4 lg:p-6 w-full min-w-0">
+      <h3 className="text-base lg:text-lg font-semibold text-gray-900 mb-4 truncate">Top Inbound Intents/Topics</h3>
+      <div className="space-y-2">
+        {data.map((intent, i) => (
+          <div key={i} className="flex items-center justify-between p-2 lg:p-3 hover:bg-gray-50 rounded-lg min-w-0">
+            <div className="flex items-center space-x-2 lg:space-x-3 min-w-0 flex-1">
+              <span className="text-sm font-medium text-gray-800 flex-shrink-0">#{i + 1}</span>
+              <span className="text-sm text-gray-700 truncate">{intent.intent}</span>
             </div>
-            <span className="text-sm text-gray-600 w-8 lg:w-12 text-right">{intent.count}</span>
+            <div className="flex items-center space-x-2 flex-shrink-0">
+              <div className="w-16 lg:w-24 bg-gray-200 rounded-full h-2">
+                <div
+                  className="h-2 rounded-full bg-purple-500"
+                  style={{ width: `${(intent.count / data[0].count) * 100}%` }}
+                />
+              </div>
+              <span className="text-sm text-gray-600 w-8 lg:w-12 text-right">{intent.count}</span>
+            </div>
           </div>
-        </div>
-      ))}
+        ))}
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 // Modal Content Components
 const MetricModalContent = ({ metricType, data, selectedPeriod, onPeriodChange }) => {
@@ -1084,6 +1116,11 @@ const MetricModalContent = ({ metricType, data, selectedPeriod, onPeriodChange }
             </div>
           </div>
         )}
+        
+        <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
+          <h3 className="font-semibold text-gray-900 mb-2">Raw Data (Debug)</h3>
+          <pre className="text-xs text-gray-600 overflow-auto">{JSON.stringify(data, null, 2)}</pre>
+        </div>
       </div>
     </>
   );
@@ -1447,7 +1484,7 @@ export default function OverviewMetrics() {
   const [activeModal, setActiveModal] = useState(null);
   const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
   const [upgradePromptMetric, setUpgradePromptMetric] = useState('');
-  const [selectedPeriod, setSelectedPeriod] = useState('7days');
+  const [selectedPeriod, setSelectedPeriod] = useState('30days');
   const [modalData, setModalData] = useState(null);
   const [loadingModal, setLoadingModal] = useState(false);
 
@@ -1485,76 +1522,21 @@ export default function OverviewMetrics() {
     setModalData(null);
     
     try {
-      let endpoint = '';
-      let params = '';
+      const detailUrl = buildApiUrl('overview', user.tenant_id, selectedPeriod);
+      console.log(`🔍 Calling detailed endpoint: ${detailUrl}`);
       
-      // Map metric types to their respective endpoints
-      switch (metricType) {
-        case 'totalLeads':
-          endpoint = '/details/total-leads';
-          params = `?period=${selectedPeriod === '7days' ? '7' : selectedPeriod === '30days' ? '30' : '90'}`;
-          break;
-          
-        case 'weeklyLeads':
-          endpoint = '/details/weekly-leads';
-          params = `?weeks=${selectedPeriod === '4weeks' ? '4' : selectedPeriod === '8weeks' ? '8' : '12'}`;
-          break;
-          
-        case 'hotLeadRate':
-          endpoint = '/details/hot-lead-rate';
-          params = `?period=${selectedPeriod === '7days' ? '7' : selectedPeriod === '30days' ? '30' : '90'}`;
-          break;
-          
-        case 'activeLeads':
-          endpoint = '/details/active-leads';
-          break;
-          
-        case 'completedLeads':
-          endpoint = '/details/completed-leads';
-          params = `?period=${selectedPeriod === '7days' ? '7' : selectedPeriod === '30days' ? '30' : '90'}`;
-          break;
-          
-        case 'messagesSent':
-          endpoint = '/details/messages';
-          params = `?type=sent&period=${selectedPeriod === '7days' ? '7' : selectedPeriod === '30days' ? '30' : '90'}`;
-          break;
-          
-        case 'messagesReceived':
-          endpoint = '/details/messages';
-          params = `?type=received&period=${selectedPeriod === '7days' ? '7' : selectedPeriod === '30days' ? '30' : '90'}`;
-          break;
-          
-        case 'replyRate':
-          // For reply rate, we'll use mock data for now as it doesn't have a dedicated endpoint
-          setTimeout(() => {
-            setModalData(generateMockData(metricType));
-            setLoadingModal(false);
-          }, 500);
-          return;
-          
-        default:
-          console.error('Unknown metric type:', metricType);
-          setLoadingModal(false);
-          return;
-      }
+      const data = await callEdgeFunction(detailUrl);
+      console.log(`📊 Detailed data returned for ${metricType}:`, data);
       
-      // Call the edge function with the appropriate endpoint
-      console.log(`🔍 Calling endpoint: ${EDGE_FUNCTION_URL}${endpoint}${params}`);
-      const data = await callEdgeFunction(buildApiUrl('overview', user.tenant_id, selectedPeriod));
-      console.log(`📊 Data returned for ${metricType}:`, data);
-      
-      // Check for API errors
       if (data.error) {
         console.error('API Error:', data.error);
         throw new Error(data.error.details || data.error || 'API returned an error');
       }
       
-      // Transform the data to match the expected format if needed
       setModalData(data);
       
     } catch (error) {
       console.error('Error fetching modal data:', error);
-      // Fall back to mock data on error
       setModalData(generateMockData(metricType));
     } finally {
       setLoadingModal(false);
@@ -1565,52 +1547,12 @@ export default function OverviewMetrics() {
   const handlePeriodChange = async (newPeriod) => {
     setSelectedPeriod(newPeriod);
     
-    // If modal is open, refetch data with new period
-    if (activeModal && activeModal !== 'replyRate') {
+    if (activeModal) {
       setLoadingModal(true);
       
       try {
-        let endpoint = '';
-        let params = '';
-        
-        // Map metric types to their respective endpoints
-        switch (activeModal) {
-          case 'totalLeads':
-            endpoint = '/details/total-leads';
-            params = `?period=${newPeriod === '7days' ? '7' : newPeriod === '30days' ? '30' : '90'}`;
-            break;
-            
-          case 'weeklyLeads':
-            endpoint = '/details/weekly-leads';
-            params = `?weeks=${newPeriod === '4weeks' ? '4' : newPeriod === '8weeks' ? '8' : '12'}`;
-            break;
-            
-          case 'hotLeadRate':
-            endpoint = '/details/hot-lead-rate';
-            params = `?period=${newPeriod === '7days' ? '7' : newPeriod === '30days' ? '30' : '90'}`;
-            break;
-            
-          case 'completedLeads':
-            endpoint = '/details/completed-leads';
-            params = `?period=${newPeriod === '7days' ? '7' : newPeriod === '30days' ? '30' : '90'}`;
-            break;
-            
-          case 'messagesSent':
-            endpoint = '/details/messages';
-            params = `?type=sent&period=${newPeriod === '7days' ? '7' : newPeriod === '30days' ? '30' : '90'}`;
-            break;
-            
-          case 'messagesReceived':
-            endpoint = '/details/messages';
-            params = `?type=received&period=${newPeriod === '7days' ? '7' : newPeriod === '30days' ? '30' : '90'}`;
-            break;
-            
-          default:
-            setLoadingModal(false);
-            return;
-        }
-        
-        const data = await callEdgeFunction(`${EDGE_FUNCTION_URL}${endpoint}${params}`);
+        const detailUrl = buildApiUrl('overview', user.tenant_id, newPeriod);
+        const data = await callEdgeFunction(detailUrl);
         setModalData(data);
         
       } catch (error) {
@@ -1637,7 +1579,7 @@ export default function OverviewMetrics() {
         // Add debugging to see what the API actually returns
         const apiUrl = buildApiUrl('overview', user.tenant_id, '30days');
         console.log('🔍 Fetching overview metrics from:', apiUrl);
-        const data = await callEdgeFunction(buildApiUrl('overview', user.tenant_id, '30days'));
+        const data = await callEdgeFunction(apiUrl);
         console.log('📊 Raw API Response:', data);
 
         // Check if we got the expected structure
