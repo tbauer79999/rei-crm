@@ -230,7 +230,7 @@ const QueueOverview = ({ data }) => {
   );
 };
 
-AwaitingActionList = ({ data }) => {
+const AwaitingActionList = ({ data }) => {
   return (
     <div className="bg-white border border-gray-200 rounded-xl p-4 lg:p-6 w-full min-w-0">
       <h3 className="text-base lg:text-lg font-semibold text-gray-900 mb-4 flex items-center">
@@ -782,7 +782,7 @@ const MobileCard = ({ title, subtitle, onClick, children, showUpgradeHint, canAc
   );
 };
 
-generateModalMockData = (modalType) => {
+const generateModalMockData = (modalType) => {
   if (modalType === 'awaitingAction') {
     return {
       queueOverview: {
