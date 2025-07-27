@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { getFeatureValue } from '../../lib/plans';
 import { callEdgeFunction } from '../../lib/edgeFunctionAuth';
 import {
   PieChart, Pie, Cell, Tooltip, ResponsiveContainer,
@@ -9,11 +10,13 @@ import {
 import { 
   X, TrendingUp, Users, Calendar, Clock, Filter, AlertTriangle,
   BarChart3, Activity, Target, ArrowRight, Upload, Shuffle,
-  MessageSquare, Brain, ThumbsDown, UserCheck, Zap
+  MessageSquare, Brain, ThumbsDown, UserCheck, Zap, Lock
 } from 'lucide-react';
 
-// Edge Function URL
-const EDGE_FUNCTION_URL = 'https://wuuqrdlfgkasnwydyvgk.supabase.co/functions/v1/AiOptimizationPanel';
+// Edge Function URL - Updated to use unified analytics endpoint
+const buildApiUrl = (component, tenantId, period = '30days') => {
+  return `https://wuuqrdlfgkasnwydyvgk.supabase.co/functions/v1/sync_sales_metrics?action=fetch&component=${component}&tenant_id=${tenantId}&period=${period}`;
+};
 
 const COLORS = ['#3b82f6', '#10b981', '#fbbf24', '#f97316', '#14b8a6', '#f43f5e', '#8b5cf6', '#ef4444'];
 
@@ -112,8 +115,8 @@ const ModalWrapper = ({ isOpen, onClose, title, subtitle, children }) => {
   );
 };
 
-// Time Period Selector
-const TimePeriodSelector = ({ selectedPeriod, onPeriodChange, customPeriods }) => {
+// Shared Time Period Selector
+const TimePeriodSelector = ({ selectedPeriod, onPeriodChange, periods }) => {
   const defaultPeriods = [
     { value: '7days', label: 'Last 7 Days' },
     { value: '30days', label: 'Last 30 Days' },
@@ -121,14 +124,14 @@ const TimePeriodSelector = ({ selectedPeriod, onPeriodChange, customPeriods }) =
     { value: 'custom', label: 'Custom Range' }
   ];
 
-  const periods = customPeriods || defaultPeriods;
+  const periodsToShow = periods || defaultPeriods;
 
   return (
     <div className="border-b border-gray-200 px-4 lg:px-6 py-3 bg-gray-50">
       <div className="flex flex-col lg:flex-row lg:items-center space-y-2 lg:space-y-0 lg:space-x-4">
         <span className="text-sm font-medium text-gray-700">Time Period:</span>
         <div className="flex flex-wrap gap-2">
-          {periods.map(period => (
+          {periodsToShow.map(period => (
             <button
               key={period.value}
               onClick={() => onPeriodChange(period.value)}
@@ -360,16 +363,16 @@ const AiOptimizationModalContent = ({ modalType, data, selectedPeriod, onPeriodC
       
       <div className="p-4 lg:p-6 space-y-4 lg:space-y-6 w-full min-w-0">
         {/* Sentiment Breakdown features */}
-        {features.includes('sentimentChart') && (
+        {features.includes('sentimentChart') && data.sentimentDistribution && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
             <SentimentChart data={data.sentimentDistribution} />
-            {features.includes('sentimentTrend') && (
+            {features.includes('sentimentTrend') && data.sentimentTrend && (
               <SentimentTrendChart data={data.sentimentTrend} />
             )}
           </div>
         )}
         
-        {features.includes('sentimentByTopic') && (
+        {features.includes('sentimentByTopic') && data.sentimentByTopic && (
           <div className="bg-white border border-gray-200 rounded-xl p-4 lg:p-6 w-full min-w-0">
             <h3 className="text-base lg:text-lg font-semibold text-gray-900 mb-4 truncate">Sentiment by Topic</h3>
             <ResponsiveContainer width="100%" height={250}>
@@ -385,16 +388,16 @@ const AiOptimizationModalContent = ({ modalType, data, selectedPeriod, onPeriodC
           </div>
         )}
         
-        {features.includes('negativeConversations') && (
+        {features.includes('negativeConversations') && data.negativeConversations && (
           <NegativeConversationsTable data={data.negativeConversations} />
         )}
         
         {/* Time to Hot features */}
-        {features.includes('efficiencyTrend') && (
+        {features.includes('efficiencyTrend') && data.efficiencyTrend && (
           <EfficiencyTrendChart data={data.efficiencyTrend} />
         )}
         
-        {features.includes('timeDistribution') && (
+        {features.includes('timeDistribution') && data.timeDistribution && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
             <div className="bg-white border border-gray-200 rounded-xl p-4 lg:p-6 w-full min-w-0">
               <h3 className="text-base lg:text-lg font-semibold text-gray-900 mb-4 truncate">Distribution of Time to Hot</h3>
@@ -408,7 +411,7 @@ const AiOptimizationModalContent = ({ modalType, data, selectedPeriod, onPeriodC
               </ResponsiveContainer>
             </div>
             
-            {features.includes('messageDistribution') && (
+            {features.includes('messageDistribution') && data.messageDistribution && (
               <div className="bg-white border border-gray-200 rounded-xl p-4 lg:p-6 w-full min-w-0">
                 <h3 className="text-base lg:text-lg font-semibold text-gray-900 mb-4 truncate">Distribution of Messages to Hot</h3>
                 <ResponsiveContainer width="100%" height={200}>
@@ -424,7 +427,7 @@ const AiOptimizationModalContent = ({ modalType, data, selectedPeriod, onPeriodC
           </div>
         )}
         
-        {features.includes('efficiencyByTopic') && (
+        {features.includes('efficiencyByTopic') && data.efficiencyByTopic && (
           <div className="bg-white border border-gray-200 rounded-xl p-4 lg:p-6 w-full min-w-0">
             <h3 className="text-base lg:text-lg font-semibold text-gray-900 mb-4 truncate">Qualification Efficiency by Topic</h3>
             <div className="overflow-x-auto">
@@ -459,7 +462,7 @@ const AiOptimizationModalContent = ({ modalType, data, selectedPeriod, onPeriodC
         )}
         
         {/* High Intent Keywords features */}
-        {features.includes('keywordCloud') && (
+        {features.includes('keywordCloud') && data.topKeywords && (
           <div className="bg-white border border-gray-200 rounded-xl p-4 lg:p-6 w-full min-w-0">
             <h3 className="text-base lg:text-lg font-semibold text-gray-900 mb-4 truncate">Top High Intent Keywords</h3>
             <ResponsiveContainer width="100%" height={250}>
@@ -473,11 +476,11 @@ const AiOptimizationModalContent = ({ modalType, data, selectedPeriod, onPeriodC
           </div>
         )}
         
-        {features.includes('keywordTrend') && (
+        {features.includes('keywordTrend') && data.keywordTrend && (
           <KeywordTrendChart data={data.keywordTrend} />
         )}
         
-        {features.includes('keywordConversion') && (
+        {features.includes('keywordConversion') && data.keywordConversion && (
           <div className="bg-white border border-gray-200 rounded-xl p-4 lg:p-6 w-full min-w-0">
             <h3 className="text-base lg:text-lg font-semibold text-gray-900 mb-4 truncate">Hot Lead Rate by Keyword</h3>
             <div className="overflow-x-auto">
@@ -518,7 +521,7 @@ const AiOptimizationModalContent = ({ modalType, data, selectedPeriod, onPeriodC
         )}
         
         {/* Hot Trigger Phrases features */}
-        {features.includes('phraseFrequency') && (
+        {features.includes('phraseFrequency') && data.topPhrases && (
           <div className="bg-white border border-gray-200 rounded-xl p-4 lg:p-6 w-full min-w-0">
             <h3 className="text-base lg:text-lg font-semibold text-gray-900 mb-4 truncate">Top Hot Trigger Phrases</h3>
             <ResponsiveContainer width="100%" height={250}>
@@ -532,7 +535,7 @@ const AiOptimizationModalContent = ({ modalType, data, selectedPeriod, onPeriodC
           </div>
         )}
         
-        {features.includes('phraseEffectiveness') && (
+        {features.includes('phraseEffectiveness') && data.phraseEffectiveness && (
           <div className="bg-white border border-gray-200 rounded-xl p-4 lg:p-6 w-full min-w-0">
             <h3 className="text-base lg:text-lg font-semibold text-gray-900 mb-4 truncate">Trigger Phrase Effectiveness</h3>
             <div className="overflow-x-auto">
@@ -563,7 +566,7 @@ const AiOptimizationModalContent = ({ modalType, data, selectedPeriod, onPeriodC
         )}
         
         {/* Opt-Out features */}
-        {features.includes('optOutDistribution') && (
+        {features.includes('optOutDistribution') && data.optOutReasons && (
           <div className="bg-white border border-gray-200 rounded-xl p-4 lg:p-6 w-full min-w-0">
             <h3 className="text-base lg:text-lg font-semibold text-gray-900 mb-4 truncate">Opt-Out Reasons Distribution</h3>
             <ResponsiveContainer width="100%" height={250}>
@@ -586,7 +589,7 @@ const AiOptimizationModalContent = ({ modalType, data, selectedPeriod, onPeriodC
           </div>
         )}
         
-        {features.includes('optOutTrend') && (
+        {features.includes('optOutTrend') && data.optOutTrend && (
           <div className="bg-white border border-gray-200 rounded-xl p-4 lg:p-6 w-full min-w-0">
             <h3 className="text-base lg:text-lg font-semibold text-gray-900 mb-4 truncate">Opt-Out Rate Trend</h3>
             <ResponsiveContainer width="100%" height={200}>
@@ -614,7 +617,7 @@ const AiOptimizationModalContent = ({ modalType, data, selectedPeriod, onPeriodC
         )}
         
         {/* Manual Overrides features */}
-        {features.includes('overrideTrend') && (
+        {features.includes('overrideTrend') && data.overrideTrend && (
           <div className="bg-white border border-gray-200 rounded-xl p-4 lg:p-6 w-full min-w-0">
             <h3 className="text-base lg:text-lg font-semibold text-gray-900 mb-4 truncate">Manual Overrides Trend</h3>
             <ResponsiveContainer width="100%" height={200}>
@@ -634,7 +637,7 @@ const AiOptimizationModalContent = ({ modalType, data, selectedPeriod, onPeriodC
           </div>
         )}
         
-        {features.includes('overrideTypes') && (
+        {features.includes('overrideTypes') && data.overrideTypes && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
             <div className="bg-white border border-gray-200 rounded-xl p-4 lg:p-6 w-full min-w-0">
               <h3 className="text-base lg:text-lg font-semibold text-gray-900 mb-4 truncate">Override Type Distribution</h3>
@@ -656,7 +659,7 @@ const AiOptimizationModalContent = ({ modalType, data, selectedPeriod, onPeriodC
               </ResponsiveContainer>
             </div>
             
-            {features.includes('overridesByUser') && (
+            {features.includes('overridesByUser') && data.overridesByUser && (
               <div className="bg-white border border-gray-200 rounded-xl p-4 lg:p-6 w-full min-w-0">
                 <h3 className="text-base lg:text-lg font-semibold text-gray-900 mb-4 truncate">Overrides by Salesperson</h3>
                 <ResponsiveContainer width="100%" height={200}>
@@ -672,38 +675,108 @@ const AiOptimizationModalContent = ({ modalType, data, selectedPeriod, onPeriodC
           </div>
         )}
         
-        {features.includes('overrideLog') && (
+        {features.includes('overrideLog') && data.overrideLog && (
           <OverrideLogTable data={data.overrideLog} />
         )}
+        
+        <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
+          <h3 className="font-semibold text-gray-900 mb-2">Raw Data (Debug)</h3>
+          <pre className="text-xs text-gray-600 overflow-auto">{JSON.stringify(data, null, 2)}</pre>
+        </div>
       </div>
     </>
   );
 };
 
-// Mobile Card Component
-const MobileCard = ({ title, subtitle, onClick, children, icon: Icon }) => {
+// Mobile Card Component - Updated to match OverviewMetrics style
+const MobileCard = ({ title, subtitle, onClick, children, icon: Icon, trend, canAccessDetailed = true }) => {
   return (
     <div 
-      className="bg-white p-3 rounded-xl shadow border cursor-pointer hover:shadow-lg transition-shadow w-full min-w-0"
+      className={`bg-white p-3 rounded-xl shadow border cursor-pointer hover:shadow-lg transition-shadow w-full min-w-0 relative ${
+        !canAccessDetailed ? 'opacity-90' : ''
+      }`}
       onClick={onClick}
     >
-      <h3 className="text-sm font-semibold mb-1 flex items-center">
-        {Icon && <Icon className="w-4 h-4 mr-2 text-blue-600" />}
-        <span className="truncate">{title}</span>
-      </h3>
-      <p className="text-xs text-gray-500 mb-3 line-clamp-2">{subtitle}</p>
-      
-      <div className="w-full min-w-0">
-        {children}
+      <div className="flex items-center justify-between mb-2">
+        {Icon && <Icon className="w-4 h-4 text-blue-600 flex-shrink-0" />}
+        {trend && (
+          <div className={`flex items-center text-xs ${
+            trend.startsWith('+') ? 'text-green-600' : 'text-red-500'
+          }`}>
+            <span className="mr-1">
+              {trend.startsWith('+') ? '▲' : '▼'}
+            </span>
+            <span className="truncate">{trend.replace(/^[+-]/, '')}</span>
+          </div>
+        )}
       </div>
       
-      <p className="text-xs text-gray-400 text-center mt-3 truncate">Click for detailed analysis</p>
+      <div className="space-y-1 mb-3">
+        <h3 className="text-xs text-gray-500 font-medium truncate">{title}</h3>
+        <div className="w-full min-w-0">
+          {children}
+        </div>
+      </div>
+      
+      <p className="text-xs text-gray-400 text-center truncate">{subtitle}</p>
+      
+      {/* Show lock icon for restricted users */}
+      {!canAccessDetailed && (
+        <div className="absolute top-2 right-2">
+          <Lock className="w-3 h-3 text-gray-400" />
+        </div>
+      )}
     </div>
   );
 };
 
+// Upgrade Prompt Component
+const UpgradePrompt = ({ metricName, onClose }) => (
+  <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div 
+      className="absolute inset-0 bg-black bg-opacity-50 backdrop-blur-sm"
+      onClick={onClose}
+    />
+    
+    <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md m-4 overflow-hidden">
+      <div className="p-6 text-center">
+        <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <Lock className="w-8 h-8 text-blue-600" />
+        </div>
+        <h3 className="text-xl font-semibold text-gray-900 mb-2">
+          Detailed {metricName} Analytics
+        </h3>
+        <p className="text-gray-600 mb-6">
+          Unlock detailed AI optimization insights, sentiment analysis, and conversation analytics with a plan upgrade.
+        </p>
+        <div className="space-y-2 text-sm text-gray-500 mb-6">
+          <p>✓ Advanced sentiment analysis</p>
+          <p>✓ Keyword performance tracking</p>
+          <p>✓ Hot trigger phrase analytics</p>
+          <p>✓ AI optimization insights</p>
+        </div>
+        <button 
+          onClick={onClose}
+          className="w-full bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium transition-colors mb-3"
+        >
+          Upgrade to Growth Plan
+        </button>
+        <p className="text-xs text-gray-500">
+          Starting at $397/month
+        </p>
+        <button 
+          onClick={onClose}
+          className="absolute top-4 right-4 p-2 hover:bg-gray-100 rounded-lg transition-colors"
+        >
+          <X className="w-5 h-5 text-gray-500" />
+        </button>
+      </div>
+    </div>
+  </div>
+);
+
 // Mock data generator
-const generateModalMockData = (modalType) => {
+const generateMockData = (modalType) => {
   if (modalType === 'sentimentBreakdown') {
     return {
       sentimentDistribution: [
@@ -858,7 +931,19 @@ const generateModalMockData = (modalType) => {
 };
 
 export default function AiOptimizationPanel() {
-  const { user } = useAuth();
+  const { user, currentPlan } = useAuth();
+  
+  // Get AI Control Room access level from plan
+  const controlRoomAccess = getFeatureValue(currentPlan, 'aiControlRoomAccess');
+  const canAccessDetailedAnalytics = controlRoomAccess === 'full' || controlRoomAccess === 'team_metrics';
+
+  console.log('🤖 AiOptimizationPanel Access:', {
+    currentPlan,
+    controlRoomAccess,
+    canAccessDetailedAnalytics
+  });
+
+  // State management
   const [aiData, setAiData] = useState({
     sentimentBreakdown: { positive: 65, neutral: 20, negative: 15 },
     timeToHot: { avgMessages: 0, avgTimeHours: 0, fastestMessages: 0, fastestTimeMinutes: 0 },
@@ -875,93 +960,136 @@ export default function AiOptimizationPanel() {
   const [selectedPeriod, setSelectedPeriod] = useState('30days');
   const [modalData, setModalData] = useState(null);
   const [loadingModal, setLoadingModal] = useState(false);
+  const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
+  const [upgradePromptMetric, setUpgradePromptMetric] = useState('');
 
-  useEffect(() => {
-    if (user?.tenant_id) {
-      fetchData();
-    }
-  }, [user]);
-
-  const fetchData = async () => {
-    if (!user?.tenant_id) {
-      console.error('No tenant_id available');
-      setLoading(false);
+  // Handle metric card click with plan gating
+  const handleCardClick = (modalType, metricName) => {
+    if (!canAccessDetailedAnalytics) {
+      setUpgradePromptMetric(metricName);
+      setShowUpgradePrompt(true);
       return;
     }
-
-    try {
-      setLoading(true);
-      setError(null);
-      console.log('Fetching AI optimization data for tenant:', user.tenant_id);
-
-      const data = await callEdgeFunction(EDGE_FUNCTION_URL);
-      console.log('AI optimization response:', data);
-      
-      setAiData({
-        sentimentBreakdown: data.sentimentBreakdown || { positive: 65, neutral: 20, negative: 15 },
-        timeToHot: data.hotSummary?.metrics || {
-          avgMessages: 0,
-          avgTimeHours: 0,
-          fastestMessages: 0,
-          fastestTimeMinutes: 0
-        },
-        keywords: data.keywords || [],
-        hotTriggerPhrases: data.hotSummary?.triggerPhrases || [],
-        optOutReasons: data.hotSummary?.optOutReasons || [],
-        manualOverrides: data.manualOverrides || { last7Days: 12, thisMonth: 43, allTime: 184 }
-      });
-
-    } catch (error) {
-      console.error('Error fetching AI optimization data:', error);
-      setError(error.message);
-      
-      // Set default data on error
-      setAiData({
-        sentimentBreakdown: { positive: 65, neutral: 20, negative: 15 },
-        timeToHot: { avgMessages: 0, avgTimeHours: 0, fastestMessages: 0, fastestTimeMinutes: 0 },
-        keywords: [],
-        hotTriggerPhrases: [],
-        optOutReasons: [],
-        manualOverrides: { last7Days: 12, thisMonth: 43, allTime: 184 }
-      });
-    } finally {
-      setLoading(false);
-    }
+    
+    openModal(modalType);
   };
 
   // Handle modal opening
   const openModal = async (modalType) => {
     setActiveModal(modalType);
     setLoadingModal(true);
+    setModalData(null);
     
-    // Simulate API call for modal data
-    setTimeout(() => {
-      setModalData(generateModalMockData(modalType));
+    try {
+      const detailUrl = buildApiUrl(`ai_${modalType}`, user.tenant_id, selectedPeriod);
+      console.log(`🔍 Calling detailed endpoint: ${detailUrl}`);
+      
+      const data = await callEdgeFunction(detailUrl);
+      console.log(`🤖 Detailed data returned for ${modalType}:`, data);
+      
+      if (data.error) {
+        console.error('API Error:', data.error);
+        throw new Error(data.error.details || data.error || 'API returned an error');
+      }
+      
+      setModalData(data);
+      
+    } catch (error) {
+      console.error('Error fetching modal data:', error);
+      setModalData(generateMockData(modalType));
+    } finally {
       setLoadingModal(false);
-    }, 500);
+    }
   };
+
+  // Handle period change in modal
+  const handlePeriodChange = async (newPeriod) => {
+    setSelectedPeriod(newPeriod);
+    
+    if (activeModal) {
+      setLoadingModal(true);
+      
+      try {
+        const detailUrl = buildApiUrl(`ai_${activeModal}`, user.tenant_id, newPeriod);
+        const data = await callEdgeFunction(detailUrl);
+        setModalData(data);
+        
+      } catch (error) {
+        console.error('Error fetching modal data:', error);
+        setModalData(generateMockData(activeModal));
+      } finally {
+        setLoadingModal(false);
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (!user || !user.tenant_id) { 
+      console.log('No active user or tenant_id found, skipping fetch for AiOptimizationPanel.');
+      setLoading(false);
+      return;
+    }
+
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        const apiUrl = buildApiUrl('ai_optimization', user.tenant_id, '30days');
+        console.log('🔍 Fetching AI optimization data from:', apiUrl);
+        const data = await callEdgeFunction(apiUrl);
+        console.log('🤖 Raw API Response:', data);
+
+        if (!data || typeof data !== 'object') {
+          throw new Error('Invalid API response format');
+        }
+
+        if (data.error) {
+          throw new Error(data.error.details || data.error || 'API returned an error');
+        }
+
+        setAiData({
+          sentimentBreakdown: data.sentimentBreakdown || { positive: 65, neutral: 20, negative: 15 },
+          timeToHot: data.hotSummary?.metrics || {
+            avgMessages: 0,
+            avgTimeHours: 0,
+            fastestMessages: 0,
+            fastestTimeMinutes: 0
+          },
+          keywords: data.keywords || [],
+          hotTriggerPhrases: data.hotSummary?.triggerPhrases || [],
+          optOutReasons: data.hotSummary?.optOutReasons || [],
+          manualOverrides: data.manualOverrides || { last7Days: 12, thisMonth: 43, allTime: 184 }
+        });
+
+      } catch (error) {
+        console.error('❌ Error fetching AI optimization data:', error);
+        setError(error.message);
+        
+        // Set default data on error
+        setAiData({
+          sentimentBreakdown: { positive: 65, neutral: 20, negative: 15 },
+          timeToHot: { avgMessages: 0, avgTimeHours: 0, fastestMessages: 0, fastestTimeMinutes: 0 },
+          keywords: [],
+          hotTriggerPhrases: [],
+          optOutReasons: [],
+          manualOverrides: { last7Days: 12, thisMonth: 43, allTime: 184 }
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [user]);
 
   // Show loading or auth state
   if (!user) {
     return (
       <div className="w-full min-w-0 space-y-4">
-        {/* Mobile Loading */}
-        <div className="lg:hidden space-y-3">
-          {[1, 2, 3, 4, 5, 6].map(i => (
-            <div key={i} className="bg-white p-3 rounded-xl shadow border min-w-0">
-              <div className="text-center text-gray-500">
-                Please log in to view AI optimization data
-              </div>
-            </div>
-          ))}
-        </div>
-        
-        {/* Desktop Loading */}
-        <div className="hidden lg:block">
-          <div className="bg-white p-6 rounded shadow">
-            <div className="text-center text-gray-500">
-              Please log in to view AI optimization data
-            </div>
+        <div className="bg-white p-6 rounded shadow">
+          <div className="text-center text-gray-500">
+            Please log in to view AI optimization data
           </div>
         </div>
       </div>
@@ -1006,7 +1134,7 @@ export default function AiOptimizationPanel() {
         <p className="text-red-600 font-medium">Failed to load AI optimization data</p>
         <p className="text-red-500 text-sm mt-1 break-words">{error}</p>
         <button 
-          onClick={fetchData} 
+          onClick={() => window.location.reload()} 
           className="mt-2 text-sm text-red-600 underline hover:text-red-700"
         >
           Retry
@@ -1034,8 +1162,9 @@ export default function AiOptimizationPanel() {
             <MobileCard
               title="Sentiment Breakdown"
               subtitle="Percentage of all AI conversations by tone"
-              onClick={() => openModal('sentimentBreakdown')}
+              onClick={() => handleCardClick('sentimentBreakdown', 'Sentiment Analysis')}
               icon={Brain}
+              canAccessDetailed={canAccessDetailedAnalytics}
             >
               <ResponsiveContainer width="100%" height={120}>
                 <PieChart>
@@ -1059,8 +1188,9 @@ export default function AiOptimizationPanel() {
             <MobileCard
               title="Time & Messages to Hot"
               subtitle="Average effort required to surface a hot lead"
-              onClick={() => openModal('timeToHot')}
+              onClick={() => handleCardClick('timeToHot', 'AI Qualification Efficiency')}
               icon={Clock}
+              canAccessDetailed={canAccessDetailedAnalytics}
             >
               <div className="text-sm space-y-1">
                 <div className="flex justify-between">
@@ -1092,8 +1222,9 @@ export default function AiOptimizationPanel() {
             <MobileCard
               title="High-Intent Keywords"
               subtitle="From inbound lead messages"
-              onClick={() => openModal('highIntentKeywords')}
+              onClick={() => handleCardClick('highIntentKeywords', 'High Intent Keywords')}
               icon={Zap}
+              canAccessDetailed={canAccessDetailedAnalytics}
             >
               <div className="flex flex-wrap gap-1">
                 {keywords.slice(0, 6).map((kw) => (
@@ -1114,8 +1245,9 @@ export default function AiOptimizationPanel() {
             <MobileCard
               title="Hot Trigger Phrases"
               subtitle="Most common phrases said just before becoming a hot lead"
-              onClick={() => openModal('hotTriggerPhrases')}
+              onClick={() => handleCardClick('hotTriggerPhrases', 'Hot Trigger Phrases')}
               icon={Target}
+              canAccessDetailed={canAccessDetailedAnalytics}
             >
               <div className="text-sm space-y-1">
                 {hotTriggerPhrases.slice(0, 3).map((phrase, idx) => (
@@ -1134,8 +1266,9 @@ export default function AiOptimizationPanel() {
             <MobileCard
               title="Opt-Out Reasons"
               subtitle="Top reasons leads stop engaging"
-              onClick={() => openModal('optOutReasons')}
+              onClick={() => handleCardClick('optOutReasons', 'Opt-Out Analysis')}
               icon={ThumbsDown}
+              canAccessDetailed={canAccessDetailedAnalytics}
             >
               <div className="text-sm space-y-1">
                 {optOutReasons.slice(0, 3).map((item, idx) => (
@@ -1157,8 +1290,9 @@ export default function AiOptimizationPanel() {
             <MobileCard
               title="Manual Overrides"
               subtitle="Total times a human stepped in or adjusted AI conversation"
-              onClick={() => openModal('manualOverrides')}
+              onClick={() => handleCardClick('manualOverrides', 'Manual Overrides')}
               icon={UserCheck}
+              canAccessDetailed={canAccessDetailedAnalytics}
             >
               <div className="text-sm space-y-1">
                 <div className="flex justify-between">
@@ -1184,8 +1318,10 @@ export default function AiOptimizationPanel() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {/* Sentiment Breakdown - Now Clickable */}
               <div 
-                className="bg-white p-4 rounded shadow cursor-pointer hover:shadow-lg transition-shadow"
-                onClick={() => openModal('sentimentBreakdown')}
+                className={`bg-white p-4 rounded shadow transition-shadow relative ${
+                  canAccessDetailedAnalytics ? 'cursor-pointer hover:shadow-lg' : 'opacity-90'
+                }`}
+                onClick={() => handleCardClick('sentimentBreakdown', 'Sentiment Analysis')}
               >
                 <h3 className="text-lg font-semibold mb-1">Sentiment Breakdown</h3>
                 <p className="text-sm text-gray-500 mb-4">Percentage of all AI conversations by tone</p>
@@ -1206,12 +1342,19 @@ export default function AiOptimizationPanel() {
                   </PieChart>
                 </ResponsiveContainer>
                 <p className="text-xs text-gray-400 text-center mt-2">Click for detailed analysis</p>
+                {!canAccessDetailedAnalytics && (
+                  <div className="absolute top-2 right-2">
+                    <Lock className="w-4 h-4 text-gray-400" />
+                  </div>
+                )}
               </div>
 
               {/* Time & Messages to Hot - Now Clickable */}
               <div 
-                className="bg-white p-4 rounded shadow cursor-pointer hover:shadow-lg transition-shadow"
-                onClick={() => openModal('timeToHot')}
+                className={`bg-white p-4 rounded shadow transition-shadow relative ${
+                  canAccessDetailedAnalytics ? 'cursor-pointer hover:shadow-lg' : 'opacity-90'
+                }`}
+                onClick={() => handleCardClick('timeToHot', 'AI Qualification Efficiency')}
               >
                 <h3 className="text-lg font-semibold mb-1">Time & Messages to Hot</h3>
                 <p className="text-sm text-gray-500 mb-4">Average effort required to surface a hot lead</p>
@@ -1231,12 +1374,19 @@ export default function AiOptimizationPanel() {
                   }</li>
                 </ul>
                 <p className="text-xs text-gray-400 text-center mt-4">Click for efficiency analysis</p>
+                {!canAccessDetailedAnalytics && (
+                  <div className="absolute top-2 right-2">
+                    <Lock className="w-4 h-4 text-gray-400" />
+                  </div>
+                )}
               </div>
 
               {/* High Intent Keywords - Now Clickable */}
               <div 
-                className="bg-white p-4 rounded shadow cursor-pointer hover:shadow-lg transition-shadow"
-                onClick={() => openModal('highIntentKeywords')}
+                className={`bg-white p-4 rounded shadow transition-shadow relative ${
+                  canAccessDetailedAnalytics ? 'cursor-pointer hover:shadow-lg' : 'opacity-90'
+                }`}
+                onClick={() => handleCardClick('highIntentKeywords', 'High Intent Keywords')}
               >
                 <h3 className="text-lg font-semibold mb-2 flex items-center">
                   <Zap className="w-4 h-4 mr-2 text-yellow-500" /> High-Intent Keywords
@@ -1256,14 +1406,21 @@ export default function AiOptimizationPanel() {
                   )}
                 </div>
                 <p className="text-xs text-gray-400 text-center mt-4">Click for keyword analysis</p>
+                {!canAccessDetailedAnalytics && (
+                  <div className="absolute top-2 right-2">
+                    <Lock className="w-4 h-4 text-gray-400" />
+                  </div>
+                )}
               </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {/* Hot Trigger Phrases - Now Clickable */}
               <div 
-                className="bg-white p-4 rounded shadow cursor-pointer hover:shadow-lg transition-shadow"
-                onClick={() => openModal('hotTriggerPhrases')}
+                className={`bg-white p-4 rounded shadow transition-shadow relative ${
+                  canAccessDetailedAnalytics ? 'cursor-pointer hover:shadow-lg' : 'opacity-90'
+                }`}
+                onClick={() => handleCardClick('hotTriggerPhrases', 'Hot Trigger Phrases')}
               >
                 <h3 className="text-lg font-semibold mb-2">Hot Trigger Phrases</h3>
                 <p className="text-sm text-gray-500 mb-3">Most common phrases said just before becoming a hot lead</p>
@@ -1279,12 +1436,19 @@ export default function AiOptimizationPanel() {
                   )}
                 </ul>
                 <p className="text-xs text-gray-400 text-center mt-4">Click for phrase performance</p>
+                {!canAccessDetailedAnalytics && (
+                  <div className="absolute top-2 right-2">
+                    <Lock className="w-4 h-4 text-gray-400" />
+                  </div>
+                )}
               </div>
 
               {/* Opt-Out Reasons - Now Clickable */}
               <div 
-                className="bg-white p-4 rounded shadow cursor-pointer hover:shadow-lg transition-shadow"
-                onClick={() => openModal('optOutReasons')}
+                className={`bg-white p-4 rounded shadow transition-shadow relative ${
+                  canAccessDetailedAnalytics ? 'cursor-pointer hover:shadow-lg' : 'opacity-90'
+                }`}
+                onClick={() => handleCardClick('optOutReasons', 'Opt-Out Analysis')}
               >
                 <h3 className="text-lg font-semibold mb-2">Opt-Out Reasons</h3>
                 <p className="text-sm text-gray-500 mb-3">Top reasons leads stop engaging</p>
@@ -1303,12 +1467,19 @@ export default function AiOptimizationPanel() {
                   )}
                 </ul>
                 <p className="text-xs text-gray-400 text-center mt-4">Click for opt-out analysis</p>
+                {!canAccessDetailedAnalytics && (
+                  <div className="absolute top-2 right-2">
+                    <Lock className="w-4 h-4 text-gray-400" />
+                  </div>
+                )}
               </div>
 
               {/* Manual Overrides - Now Clickable */}
               <div 
-                className="bg-white p-4 rounded shadow cursor-pointer hover:shadow-lg transition-shadow"
-                onClick={() => openModal('manualOverrides')}
+                className={`bg-white p-4 rounded shadow transition-shadow relative ${
+                  canAccessDetailedAnalytics ? 'cursor-pointer hover:shadow-lg' : 'opacity-90'
+                }`}
+                onClick={() => handleCardClick('manualOverrides', 'Manual Overrides')}
               >
                 <h3 className="text-lg font-semibold mb-2">Manual Overrides</h3>
                 <p className="text-sm text-gray-500 mb-3">Total times a human stepped in or adjusted AI conversation</p>
@@ -1318,11 +1489,24 @@ export default function AiOptimizationPanel() {
                   <li><strong>All-Time:</strong> {manualOverrides.allTime}</li>
                 </ul>
                 <p className="text-xs text-gray-400 text-center mt-4">Click for override log</p>
+                {!canAccessDetailedAnalytics && (
+                  <div className="absolute top-2 right-2">
+                    <Lock className="w-4 h-4 text-gray-400" />
+                  </div>
+                )}
               </div>
             </div>
           </div>
         </div>
       </div>
+
+      {/* Upgrade Prompt Modal for Basic Users */}
+      {showUpgradePrompt && (
+        <UpgradePrompt 
+          metricName={upgradePromptMetric}
+          onClose={() => setShowUpgradePrompt(false)}
+        />
+      )}
 
       {/* Analytics Modal */}
       <ModalWrapper 
@@ -1343,9 +1527,13 @@ export default function AiOptimizationPanel() {
             modalType={activeModal}
             data={modalData}
             selectedPeriod={selectedPeriod}
-            onPeriodChange={setSelectedPeriod}
+            onPeriodChange={handlePeriodChange}
           />
-        ) : null}
+        ) : (
+          <div className="flex items-center justify-center h-64 text-gray-500">
+            <p>No data available</p>
+          </div>
+        )}
       </ModalWrapper>
     </>
   );

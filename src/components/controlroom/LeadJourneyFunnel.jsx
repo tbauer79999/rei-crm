@@ -1,18 +1,22 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { getFeatureValue } from '../../lib/plans';
 import { callEdgeFunction } from '../../lib/edgeFunctionAuth';
 import {
   PieChart, Pie, Cell, Tooltip, ResponsiveContainer,
   BarChart, Bar, XAxis, YAxis, LineChart, Line, Legend,
-  Sankey, ComposedChart, Area
+  ComposedChart, Area
 } from 'recharts';
 import { 
   X, TrendingUp, Users, Calendar, Clock, Filter, AlertTriangle,
-  BarChart3, Activity, Target, ArrowRight, Upload, Shuffle
+  BarChart3, Activity, Target, ArrowRight, Upload, Shuffle,
+  Lock
 } from 'lucide-react';
 
-// Edge Function URL
-const EDGE_FUNCTION_URL = 'https://wuuqrdlfgkasnwydyvgk.supabase.co/functions/v1/LeadJourneyFunnel';
+// Edge Function URL - Updated to use unified analytics endpoint
+const buildApiUrl = (component, tenantId, period = '30days') => {
+  return `https://wuuqrdlfgkasnwydyvgk.supabase.co/functions/v1/sync_sales_metrics?action=fetch&component=${component}&tenant_id=${tenantId}&period=${period}`;
+};
 
 const COLORS = ['#3b82f6', '#10b981', '#fbbf24', '#f97316', '#14b8a6', '#f43f5e', '#8b5cf6', '#ef4444'];
 
@@ -97,8 +101,8 @@ const ModalWrapper = ({ isOpen, onClose, title, subtitle, children }) => {
   );
 };
 
-// Time Period Selector
-const TimePeriodSelector = ({ selectedPeriod, onPeriodChange, customPeriods }) => {
+// Shared Time Period Selector
+const TimePeriodSelector = ({ selectedPeriod, onPeriodChange, periods }) => {
   const defaultPeriods = [
     { value: '30days', label: 'Last 30 Days' },
     { value: '90days', label: 'Last 90 Days' },
@@ -106,14 +110,14 @@ const TimePeriodSelector = ({ selectedPeriod, onPeriodChange, customPeriods }) =
     { value: 'custom', label: 'Custom Range' }
   ];
 
-  const periods = customPeriods || defaultPeriods;
+  const periodsToShow = periods || defaultPeriods;
 
   return (
     <div className="border-b border-gray-200 px-4 lg:px-6 py-3 bg-gray-50">
       <div className="flex flex-col lg:flex-row lg:items-center space-y-2 lg:space-y-0 lg:space-x-4">
         <span className="text-sm font-medium text-gray-700">Time Period:</span>
         <div className="flex flex-wrap gap-2">
-          {periods.map(period => (
+          {periodsToShow.map(period => (
             <button
               key={period.value}
               onClick={() => onPeriodChange(period.value)}
@@ -245,7 +249,7 @@ const StuckLeadsTable = ({ data }) => {
 
 // Visual Funnel Component
 const VisualFunnel = ({ data }) => {
-  const maxValue = Math.max(...data.map(d => d.countEntered));
+  const maxValue = Math.max(...data.map(d => d.countEntered || d.count));
 
   return (
     <div className="bg-white border border-gray-200 rounded-xl p-4 lg:p-6 w-full min-w-0">
@@ -255,24 +259,27 @@ const VisualFunnel = ({ data }) => {
       </h3>
       <div className="space-y-4">
         {data.map((stage, index) => {
-          const width = (stage.countEntered / maxValue) * 100;
-          const dropOff = stage.countEntered - stage.countExited;
-          const dropOffPercent = ((dropOff / stage.countEntered) * 100).toFixed(1);
+          const count = stage.countEntered || stage.count;
+          const width = (count / maxValue) * 100;
+          const dropOff = stage.countEntered ? stage.countEntered - stage.countExited : 0;
+          const dropOffPercent = stage.countEntered ? ((dropOff / stage.countEntered) * 100).toFixed(1) : '0';
           
           return (
-            <div key={stage.fromStage} className="relative">
+            <div key={stage.fromStage || stage.stage} className="relative">
               <div className="flex items-center mb-2">
-                <span className="text-sm font-medium text-gray-700 w-20 lg:w-24 truncate">{stage.fromStage}</span>
+                <span className="text-sm font-medium text-gray-700 w-20 lg:w-24 truncate">
+                  {stage.fromStage || stage.stage}
+                </span>
                 <div className="flex-1 relative min-w-0">
                   <div className="bg-gray-200 rounded-full h-6 lg:h-8">
                     <div
                       className="bg-gradient-to-r from-green-500 to-green-400 h-6 lg:h-8 rounded-full flex items-center justify-end pr-2 lg:pr-3"
                       style={{ width: `${width}%` }}
                     >
-                      <span className="text-white text-xs font-bold">{stage.countEntered}</span>
+                      <span className="text-white text-xs font-bold">{count}</span>
                     </div>
                   </div>
-                  {index < data.length - 1 && (
+                  {index < data.length - 1 && stage.conversionRate && (
                     <div className="absolute -bottom-1 left-0 flex items-center text-xs text-gray-500">
                       <ArrowRight className="w-3 h-3 mr-1" />
                       <span className="truncate">{stage.conversionRate}% to next</span>
@@ -410,7 +417,7 @@ const SourceQualityTable = ({ data }) => {
   );
 };
 
-// Transition Flow Visualization (simplified Sankey alternative)
+// Transition Flow Visualization
 const TransitionFlow = ({ data }) => {
   return (
     <div className="bg-white border border-gray-200 rounded-xl p-4 lg:p-6 w-full min-w-0">
@@ -472,18 +479,18 @@ const JourneyModalContent = ({ modalType, data, selectedPeriod, onPeriodChange }
       <TimePeriodSelector 
         selectedPeriod={selectedPeriod} 
         onPeriodChange={onPeriodChange}
-        customPeriods={customPeriods}
+        periods={customPeriods}
       />
       
       <div className="p-4 lg:p-6 space-y-4 lg:space-y-6 w-full min-w-0">
         {/* Status Distribution features */}
-        {features.includes('statusChart') && (
+        {features.includes('statusChart') && data.statusDistribution && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
             <StatusChart 
               data={data.statusDistribution} 
               onStatusClick={setSelectedStatus}
             />
-            {features.includes('statusTrend') && (
+            {features.includes('statusTrend') && data.statusTrend && (
               <StatusTrendChart 
                 data={data.statusTrend} 
                 selectedStatus={selectedStatus}
@@ -492,7 +499,7 @@ const JourneyModalContent = ({ modalType, data, selectedPeriod, onPeriodChange }
           </div>
         )}
         
-        {features.includes('statusMetrics') && (
+        {features.includes('statusMetrics') && data.metrics && (
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 lg:gap-4">
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 lg:p-4 text-center">
               <p className="text-xl lg:text-2xl font-bold text-blue-700">{data.metrics.totalLeads}</p>
@@ -513,16 +520,16 @@ const JourneyModalContent = ({ modalType, data, selectedPeriod, onPeriodChange }
           </div>
         )}
         
-        {features.includes('stuckLeads') && (
+        {features.includes('stuckLeads') && data.stuckLeads && (
           <StuckLeadsTable data={data.stuckLeads} />
         )}
         
         {/* Progression Funnel features */}
-        {features.includes('visualFunnel') && (
+        {features.includes('visualFunnel') && data.funnelData && (
           <VisualFunnel data={data.funnelData} />
         )}
         
-        {features.includes('conversionTable') && (
+        {features.includes('conversionTable') && data.funnelData && (
           <div className="bg-white border border-gray-200 rounded-xl p-4 lg:p-6 w-full min-w-0">
             <h3 className="text-base lg:text-lg font-semibold text-gray-900 mb-4 truncate">Stage-by-Stage Conversion</h3>
             <div className="overflow-x-auto">
@@ -558,11 +565,11 @@ const JourneyModalContent = ({ modalType, data, selectedPeriod, onPeriodChange }
           </div>
         )}
         
-        {features.includes('timeInStage') && (
+        {features.includes('timeInStage') && data.timeInStage && (
           <TimeInStageChart data={data.timeInStage} />
         )}
         
-        {features.includes('dropoffReasons') && (
+        {features.includes('dropoffReasons') && data.dropoffReasons && (
           <div className="bg-white border border-gray-200 rounded-xl p-4 lg:p-6 w-full min-w-0">
             <h3 className="text-base lg:text-lg font-semibold text-gray-900 mb-4 truncate">Top Drop-off Reasons</h3>
             <div className="space-y-2">
@@ -585,7 +592,7 @@ const JourneyModalContent = ({ modalType, data, selectedPeriod, onPeriodChange }
         )}
         
         {/* Upload Trend features */}
-        {features.includes('volumeTrend') && (
+        {features.includes('volumeTrend') && data.volumeTrend && (
           <div>
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-base lg:text-lg font-semibold text-gray-900 truncate">Volume Analysis</h3>
@@ -603,7 +610,7 @@ const JourneyModalContent = ({ modalType, data, selectedPeriod, onPeriodChange }
           </div>
         )}
         
-        {features.includes('sourceBreakdown') && (
+        {features.includes('sourceBreakdown') && data.sourceBreakdown && (
           <div className="bg-white border border-gray-200 rounded-xl p-4 lg:p-6 w-full min-w-0">
             <h3 className="text-base lg:text-lg font-semibold text-gray-900 mb-4 truncate">Leads by Source</h3>
             <ResponsiveContainer width="100%" height={250}>
@@ -617,11 +624,11 @@ const JourneyModalContent = ({ modalType, data, selectedPeriod, onPeriodChange }
           </div>
         )}
         
-        {features.includes('qualityBySource') && (
+        {features.includes('qualityBySource') && data.qualityBySource && (
           <SourceQualityTable data={data.qualityBySource} />
         )}
         
-        {features.includes('recentUploads') && (
+        {features.includes('recentUploads') && data.recentUploads && (
           <div className="bg-white border border-gray-200 rounded-xl p-4 lg:p-6 w-full min-w-0">
             <h3 className="text-base lg:text-lg font-semibold text-gray-900 mb-4 truncate">Recent Lead Uploads</h3>
             <div className="overflow-x-auto">
@@ -653,7 +660,7 @@ const JourneyModalContent = ({ modalType, data, selectedPeriod, onPeriodChange }
           </div>
         )}
         
-        {features.includes('integrationStatus') && (
+        {features.includes('integrationStatus') && data.integrationStatus && (
           <div className="bg-white border border-gray-200 rounded-xl p-4 lg:p-6 w-full min-w-0">
             <h3 className="text-base lg:text-lg font-semibold text-gray-900 mb-4 truncate">Integration Status</h3>
             <div className="space-y-3">
@@ -675,11 +682,11 @@ const JourneyModalContent = ({ modalType, data, selectedPeriod, onPeriodChange }
         )}
         
         {/* Status Transitions features */}
-        {features.includes('transitionFlow') && (
+        {features.includes('transitionFlow') && data.transitionFlow && (
           <TransitionFlow data={data.transitionFlow} />
         )}
         
-        {features.includes('transitionMatrix') && (
+        {features.includes('transitionMatrix') && data.matrix && data.statuses && (
           <div className="bg-white border border-gray-200 rounded-xl p-4 lg:p-6 w-full min-w-0">
             <h3 className="text-base lg:text-lg font-semibold text-gray-900 mb-4 truncate">Transition Matrix</h3>
             <div className="overflow-x-auto">
@@ -720,7 +727,7 @@ const JourneyModalContent = ({ modalType, data, selectedPeriod, onPeriodChange }
           </div>
         )}
         
-        {features.includes('commonPaths') && (
+        {features.includes('commonPaths') && data.commonPaths && (
           <div className="bg-white border border-gray-200 rounded-xl p-4 lg:p-6 w-full min-w-0">
             <h3 className="text-base lg:text-lg font-semibold text-gray-900 mb-4 truncate">Common Lead Paths</h3>
             <div className="space-y-2">
@@ -737,7 +744,7 @@ const JourneyModalContent = ({ modalType, data, selectedPeriod, onPeriodChange }
           </div>
         )}
         
-        {features.includes('stuckTransitions') && (
+        {features.includes('stuckTransitions') && data.stuckTransitions && (
           <div className="bg-white border border-gray-200 rounded-xl p-4 lg:p-6 w-full min-w-0">
             <h3 className="text-base lg:text-lg font-semibold text-gray-900 mb-4 flex items-center">
               <AlertTriangle className="w-4 lg:w-5 h-4 lg:h-5 mr-2 text-yellow-600" />
@@ -769,16 +776,23 @@ const JourneyModalContent = ({ modalType, data, selectedPeriod, onPeriodChange }
             </div>
           </div>
         )}
+        
+        <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
+          <h3 className="font-semibold text-gray-900 mb-2">Raw Data (Debug)</h3>
+          <pre className="text-xs text-gray-600 overflow-auto">{JSON.stringify(data, null, 2)}</pre>
+        </div>
       </div>
     </>
   );
 };
 
 // Mobile Card Component - Updated to match OverviewMetrics style
-const MobileCard = ({ title, children, onClick, subtitle, icon: Icon, trend }) => {
+const MobileCard = ({ title, children, onClick, subtitle, icon: Icon, trend, canAccessDetailed = true }) => {
   return (
     <div 
-      className="bg-white p-3 rounded-xl shadow border cursor-pointer hover:shadow-lg transition-shadow w-full min-w-0"
+      className={`bg-white p-3 rounded-xl shadow border cursor-pointer hover:shadow-lg transition-shadow w-full min-w-0 relative ${
+        !canAccessDetailed ? 'opacity-90' : ''
+      }`}
       onClick={onClick}
     >
       <div className="flex items-center justify-between mb-2">
@@ -803,12 +817,64 @@ const MobileCard = ({ title, children, onClick, subtitle, icon: Icon, trend }) =
       </div>
       
       <p className="text-xs text-gray-400 text-center truncate">{subtitle}</p>
+      
+      {/* Show lock icon for restricted users */}
+      {!canAccessDetailed && (
+        <div className="absolute top-2 right-2">
+          <Lock className="w-3 h-3 text-gray-400" />
+        </div>
+      )}
     </div>
   );
 };
 
+// Upgrade Prompt Component
+const UpgradePrompt = ({ metricName, onClose }) => (
+  <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div 
+      className="absolute inset-0 bg-black bg-opacity-50 backdrop-blur-sm"
+      onClick={onClose}
+    />
+    
+    <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md m-4 overflow-hidden">
+      <div className="p-6 text-center">
+        <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <Lock className="w-8 h-8 text-blue-600" />
+        </div>
+        <h3 className="text-xl font-semibold text-gray-900 mb-2">
+          Detailed {metricName} Analytics
+        </h3>
+        <p className="text-gray-600 mb-6">
+          Unlock detailed breakdowns, interactive charts, and drill-down capabilities with a plan upgrade.
+        </p>
+        <div className="space-y-2 text-sm text-gray-500 mb-6">
+          <p>✓ Interactive journey analytics</p>
+          <p>✓ Detailed funnel analysis</p>
+          <p>✓ Status transition tracking</p>
+          <p>✓ Advanced filtering</p>
+        </div>
+        <button 
+          onClick={onClose}
+          className="w-full bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium transition-colors mb-3"
+        >
+          Upgrade to Growth Plan
+        </button>
+        <p className="text-xs text-gray-500">
+          Starting at $397/month
+        </p>
+        <button 
+          onClick={onClose}
+          className="absolute top-4 right-4 p-2 hover:bg-gray-100 rounded-lg transition-colors"
+        >
+          <X className="w-5 h-5 text-gray-500" />
+        </button>
+      </div>
+    </div>
+  </div>
+);
+
 // Mock data generator
-const generateModalMockData = (modalType) => {
+const generateMockData = (modalType) => {
   if (modalType === 'statusDistribution') {
     return {
       statusDistribution: [
@@ -930,11 +996,24 @@ const generateModalMockData = (modalType) => {
 };
 
 export default function LeadJourneyFunnel() {
-  const { user } = useAuth();
+  const { user, currentPlan } = useAuth();
+  
+  // Get AI Control Room access level from plan
+  const controlRoomAccess = getFeatureValue(currentPlan, 'aiControlRoomAccess');
+  const canAccessDetailedAnalytics = controlRoomAccess === 'full' || controlRoomAccess === 'team_metrics';
+
+  console.log('📊 LeadJourneyFunnel Access:', {
+    currentPlan,
+    controlRoomAccess,
+    canAccessDetailedAnalytics
+  });
+
+  // State management
   const [journeyData, setJourneyData] = useState({
     statusDistribution: [],
     funnelData: [],
-    transitionData: []
+    transitionData: [],
+    totalLeads: 0
   });
   const [trendData, setTrendData] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -946,98 +1025,123 @@ export default function LeadJourneyFunnel() {
   const [selectedPeriod, setSelectedPeriod] = useState('30days');
   const [modalData, setModalData] = useState(null);
   const [loadingModal, setLoadingModal] = useState(false);
+  const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
+  const [upgradePromptMetric, setUpgradePromptMetric] = useState('');
+
+  // Handle metric card click with plan gating
+  const handleCardClick = (modalType, metricName) => {
+    if (!canAccessDetailedAnalytics) {
+      setUpgradePromptMetric(metricName);
+      setShowUpgradePrompt(true);
+      return;
+    }
+    
+    openModal(modalType);
+  };
+
+  // Handle modal opening
+  const openModal = async (modalType) => {
+    setActiveModal(modalType);
+    setLoadingModal(true);
+    setModalData(null);
+    
+    try {
+      const detailUrl = buildApiUrl(`journey_${modalType}`, user.tenant_id, selectedPeriod);
+      console.log(`🔍 Calling detailed endpoint: ${detailUrl}`);
+      
+      const data = await callEdgeFunction(detailUrl);
+      console.log(`📊 Detailed data returned for ${modalType}:`, data);
+      
+      if (data.error) {
+        console.error('API Error:', data.error);
+        throw new Error(data.error.details || data.error || 'API returned an error');
+      }
+      
+      setModalData(data);
+      
+    } catch (error) {
+      console.error('Error fetching modal data:', error);
+      setModalData(generateMockData(modalType));
+    } finally {
+      setLoadingModal(false);
+    }
+  };
+
+  // Handle period change in modal
+  const handlePeriodChange = async (newPeriod) => {
+    setSelectedPeriod(newPeriod);
+    
+    if (activeModal) {
+      setLoadingModal(true);
+      
+      try {
+        const detailUrl = buildApiUrl(`journey_${activeModal}`, user.tenant_id, newPeriod);
+        const data = await callEdgeFunction(detailUrl);
+        setModalData(data);
+        
+      } catch (error) {
+        console.error('Error fetching modal data:', error);
+        setModalData(generateMockData(activeModal));
+      } finally {
+        setLoadingModal(false);
+      }
+    }
+  };
 
   useEffect(() => {
-    if (user?.tenant_id) {
-      fetchData();
-    }
-  }, [dateRange, user]);
-
-  const fetchData = async () => {
-    if (!user?.tenant_id) {
-      console.error('No tenant_id available');
+    if (!user || !user.tenant_id) { 
+      console.log('No active user or tenant_id found, skipping fetch for LeadJourneyFunnel.');
       setLoading(false);
       return;
     }
 
-    try {
-      setLoading(true);
-      setError(null);
-      console.log('Fetching lead journey data for tenant:', user.tenant_id);
-
-      const data = await callEdgeFunction(`${EDGE_FUNCTION_URL}?days=${dateRange}`);
-      console.log('Lead journey response:', data);
-      
-      setJourneyData({
-        statusDistribution: data.statusDistribution || [],
-        funnelData: data.funnelData || [],
-        transitionData: data.transitionData || [],
-        totalLeads: data.totalLeads || 0
-      });
-
-      setTrendData(data.trends || []);
-
-    } catch (error) {
-      console.error('Error fetching lead journey data:', error);
-      setError(error.message);
-      
-      setJourneyData({
-        statusDistribution: [],
-        funnelData: [],
-        transitionData: [],
-        totalLeads: 0
-      });
-      setTrendData([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Handle modal opening
-const openModal = async (modalType) => {
-  setActiveModal(modalType);
-  setLoadingModal(true);
-  setModalData(null);
-  
-  try {
-    let endpoint = '';
-    
-    switch (modalType) {
-      case 'statusDistribution':
-        endpoint = '/status-distribution';
-        break;
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        setError(null);
         
-      case 'progressionFunnel':
-        endpoint = '/progression-funnel';
-        break;
+        // Convert dateRange to period format
+        const period = `${dateRange}days`;
+        const apiUrl = buildApiUrl('lead_journey', user.tenant_id, period);
+        console.log('🔍 Fetching lead journey data from:', apiUrl);
+        const data = await callEdgeFunction(apiUrl);
+        console.log('📊 Raw API Response:', data);
+
+        if (!data || typeof data !== 'object') {
+          throw new Error('Invalid API response format');
+        }
+
+        if (data.error) {
+          throw new Error(data.error.details || data.error || 'API returned an error');
+        }
+
+        setJourneyData({
+          statusDistribution: data.statusDistribution || [],
+          funnelData: data.funnelData || [],
+          transitionData: data.transitionData || [],
+          totalLeads: data.totalLeads || 0
+        });
+
+        setTrendData(data.trends || data.trendData || []);
+
+      } catch (error) {
+        console.error('❌ Error fetching lead journey data:', error);
+        setError(error.message);
         
-      case 'uploadTrend':
-        endpoint = '/upload-trend';
-        break;
-        
-      case 'statusTransitions':
-        endpoint = '/status-transitions';
-        break;
-        
-      default:
-        console.error('Unknown modal type:', modalType);
-        setLoadingModal(false);
-        return;
-    }
-    
-    const params = `?period=${selectedPeriod}`;
-    const data = await callEdgeFunction(`${EDGE_FUNCTION_URL}${endpoint}${params}`);
-    
-    setModalData(data);
-    
-  } catch (error) {
-    console.error('Error fetching modal data:', error);
-    // Fall back to mock data on error
-    setModalData(generateModalMockData(modalType));
-  } finally {
-    setLoadingModal(false);
-  }
-};
+        setJourneyData({
+          statusDistribution: [],
+          funnelData: [],
+          transitionData: [],
+          totalLeads: 0
+        });
+        setTrendData([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [dateRange, user]);
 
   // Show loading or auth state
   if (!user) {
@@ -1088,7 +1192,7 @@ const openModal = async (modalType) => {
         <p className="text-red-600 font-medium">Failed to load lead journey data</p>
         <p className="text-red-500 text-sm mt-1 break-words">{error}</p>
         <button 
-          onClick={fetchData} 
+          onClick={() => window.location.reload()} 
           className="mt-2 text-sm text-red-600 underline hover:text-red-700"
         >
           Retry
@@ -1135,7 +1239,8 @@ const openModal = async (modalType) => {
               title="Lead Status Distribution"
               subtitle="Click for detailed breakdown"
               icon={BarChart3}
-              onClick={() => openModal('statusDistribution')}
+              onClick={() => handleCardClick('statusDistribution', 'Status Distribution')}
+              canAccessDetailed={canAccessDetailedAnalytics}
             >
               {statusDistribution.length > 0 ? (
                 <ResponsiveContainer width="100%" height={120}>
@@ -1170,28 +1275,30 @@ const openModal = async (modalType) => {
               title="Lead Progression Funnel"
               subtitle="Click for conversion analytics"
               icon={Target}
-              onClick={() => openModal('progressionFunnel')}
+              onClick={() => handleCardClick('progressionFunnel', 'Progression Funnel')}
+              canAccessDetailed={canAccessDetailedAnalytics}
             >
               {funnelData.length > 0 ? (
                 <div className="space-y-2">
                   {funnelData.slice(0, 3).map((item, index) => {
-                    const max = Math.max(...funnelData.map(i => i.count), 1);
+                    const max = Math.max(...funnelData.map(i => i.count || i.countEntered), 1);
+                    const count = item.count || item.countEntered;
                     const conversionRate = funnelData[0]?.count > 0 
-                      ? Math.round((item.count / funnelData[0].count) * 100) 
+                      ? Math.round((count / (funnelData[0].count || funnelData[0].countEntered)) * 100) 
                       : 0;
                     
                     return (
-                      <div key={item.stage}>
+                      <div key={item.stage || item.fromStage}>
                         <div className="flex justify-between text-xs mb-1">
-                          <span className="font-medium truncate">{item.stage}</span>
+                          <span className="font-medium truncate">{item.stage || item.fromStage}</span>
                           <span className="font-semibold text-blue-600 flex-shrink-0">
-                            {item.count} ({conversionRate}%)
+                            {count} ({conversionRate}%)
                           </span>
                         </div>
                         <div className="w-full bg-gray-200 rounded-full h-2">
                           <div
                             className="bg-gradient-to-r from-blue-500 to-indigo-600 h-2 rounded-full transition-all duration-700"
-                            style={{ width: `${(item.count / max) * 100}%` }}
+                            style={{ width: `${(count / max) * 100}%` }}
                           />
                         </div>
                       </div>
@@ -1218,7 +1325,8 @@ const openModal = async (modalType) => {
               title="Lead Upload Trend"
               subtitle="Click for acquisition analysis"
               icon={Upload}
-              onClick={() => openModal('uploadTrend')}
+              onClick={() => handleCardClick('uploadTrend', 'Upload Trend')}
+              canAccessDetailed={canAccessDetailedAnalytics}
             >
               {trendData.length > 0 ? (
                 <ResponsiveContainer width="100%" height={80}>
@@ -1261,7 +1369,8 @@ const openModal = async (modalType) => {
               title="Lead Status Transitions"
               subtitle="Click for flow analysis"
               icon={Shuffle}
-              onClick={() => openModal('statusTransitions')}
+              onClick={() => handleCardClick('statusTransitions', 'Status Transitions')}
+              canAccessDetailed={canAccessDetailedAnalytics}
             >
               {transitionData.length > 0 ? (
                 <div className="space-y-1">
@@ -1294,7 +1403,7 @@ const openModal = async (modalType) => {
           </div>
         </div>
 
-        {/* Desktop Layout - UNCHANGED */}
+        {/* Desktop Layout */}
         <div className="hidden lg:block w-full">
           <div className="space-y-6">
             {/* Date Range Selector */}
@@ -1325,8 +1434,10 @@ const openModal = async (modalType) => {
             <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-6">
               {/* Lead Status Distribution - Now Clickable */}
               <div 
-                className="bg-white p-4 rounded shadow lg:col-span-1 cursor-pointer hover:shadow-lg transition-shadow"
-                onClick={() => openModal('statusDistribution')}
+                className={`bg-white p-4 rounded shadow lg:col-span-1 transition-shadow relative ${
+                  canAccessDetailedAnalytics ? 'cursor-pointer hover:shadow-lg' : 'opacity-90'
+                }`}
+                onClick={() => handleCardClick('statusDistribution', 'Status Distribution')}
               >
                 <h3 className="text-lg font-semibold mb-2">Lead Status Distribution</h3>
                 {statusDistribution.length > 0 ? (
@@ -1357,37 +1468,45 @@ const openModal = async (modalType) => {
                   </div>
                 )}
                 <p className="text-xs text-gray-400 text-center mt-2">Click for detailed breakdown</p>
+                {!canAccessDetailedAnalytics && (
+                  <div className="absolute top-2 right-2">
+                    <Lock className="w-4 h-4 text-gray-400" />
+                  </div>
+                )}
               </div>
 
               {/* Funnel - Now Clickable */}
               <div 
-                className="bg-white p-4 rounded shadow lg:col-span-1 cursor-pointer hover:shadow-lg transition-shadow"
-                onClick={() => openModal('progressionFunnel')}
+                className={`bg-white p-4 rounded shadow lg:col-span-1 transition-shadow relative ${
+                  canAccessDetailedAnalytics ? 'cursor-pointer hover:shadow-lg' : 'opacity-90'
+                }`}
+                onClick={() => handleCardClick('progressionFunnel', 'Progression Funnel')}
               >
                 <h3 className="text-lg font-semibold mb-4">Lead Progression Funnel</h3>
                 {funnelData.length > 0 ? (
                   <div className="space-y-4">
                     {funnelData.map((item) => {
-                      const max = Math.max(...funnelData.map(i => i.count), 1);
-                      const conversionRate = funnelData[0]?.count > 0 
-                        ? Math.round((item.count / funnelData[0].count) * 100) 
+                      const max = Math.max(...funnelData.map(i => i.count || i.countEntered), 1);
+                      const count = item.count || item.countEntered;
+                      const conversionRate = funnelData[0]?.count || funnelData[0]?.countEntered > 0 
+                        ? Math.round((count / (funnelData[0].count || funnelData[0].countEntered)) * 100) 
                         : 0;
                       
                       return (
-                        <div key={item.stage}>
+                        <div key={item.stage || item.fromStage}>
                           <div className="flex justify-between text-sm mb-2">
-                            <span className="font-medium">{item.stage}</span>
+                            <span className="font-medium">{item.stage || item.fromStage}</span>
                             <span className="font-semibold text-blue-600">
-                              {item.count} ({conversionRate}%)
+                              {count} ({conversionRate}%)
                             </span>
                           </div>
                           <div className="w-full bg-gray-200 rounded-full h-4">
                             <div
                               className="bg-gradient-to-r from-blue-500 to-indigo-600 h-4 rounded-full transition-all duration-700 flex items-center justify-end pr-2"
-                              style={{ width: `${(item.count / max) * 100}%` }}
+                              style={{ width: `${(count / max) * 100}%` }}
                             >
-                              {item.count > 0 && (
-                                <span className="text-white text-xs font-bold">{item.count}</span>
+                              {count > 0 && (
+                                <span className="text-white text-xs font-bold">{count}</span>
                               )}
                             </div>
                           </div>
@@ -1405,12 +1524,19 @@ const openModal = async (modalType) => {
                   </div>
                 )}
                 <p className="text-xs text-gray-400 text-center mt-4">Click for conversion analytics</p>
+                {!canAccessDetailedAnalytics && (
+                  <div className="absolute top-2 right-2">
+                    <Lock className="w-4 h-4 text-gray-400" />
+                  </div>
+                )}
               </div>
 
               {/* Upload Trend - Now Clickable */}
               <div 
-                className="bg-white p-4 rounded shadow lg:col-span-2 xl:col-span-1 cursor-pointer hover:shadow-lg transition-shadow"
-                onClick={() => openModal('uploadTrend')}
+                className={`bg-white p-4 rounded shadow lg:col-span-2 xl:col-span-1 transition-shadow relative ${
+                  canAccessDetailedAnalytics ? 'cursor-pointer hover:shadow-lg' : 'opacity-90'
+                }`}
+                onClick={() => handleCardClick('uploadTrend', 'Upload Trend')}
               >
                 <h3 className="text-lg font-semibold mb-2">Lead Upload Trend</h3>
                 {trendData.length > 0 ? (
@@ -1451,12 +1577,19 @@ const openModal = async (modalType) => {
                   </div>
                 )}
                 <p className="text-xs text-gray-400 text-center mt-2">Click for acquisition analysis</p>
+                {!canAccessDetailedAnalytics && (
+                  <div className="absolute top-2 right-2">
+                    <Lock className="w-4 h-4 text-gray-400" />
+                  </div>
+                )}
               </div>
 
               {/* Status Transitions - Now Clickable */}
               <div 
-                className="bg-white p-4 rounded shadow lg:col-span-2 xl:col-span-1 cursor-pointer hover:shadow-lg transition-shadow"
-                onClick={() => openModal('statusTransitions')}
+                className={`bg-white p-4 rounded shadow lg:col-span-2 xl:col-span-1 transition-shadow relative ${
+                  canAccessDetailedAnalytics ? 'cursor-pointer hover:shadow-lg' : 'opacity-90'
+                }`}
+                onClick={() => handleCardClick('statusTransitions', 'Status Transitions')}
               >
                 <h3 className="text-lg font-semibold mb-4">Lead Status Transitions</h3>
                 {transitionData.length > 0 ? (
@@ -1495,11 +1628,24 @@ const openModal = async (modalType) => {
                   </div>
                 )}
                 <p className="text-xs text-gray-400 text-center mt-4">Click for flow analysis</p>
+                {!canAccessDetailedAnalytics && (
+                  <div className="absolute top-2 right-2">
+                    <Lock className="w-4 h-4 text-gray-400" />
+                  </div>
+                )}
               </div>
             </div>
           </div>
         </div>
       </div>
+
+      {/* Upgrade Prompt Modal for Basic Users */}
+      {showUpgradePrompt && (
+        <UpgradePrompt 
+          metricName={upgradePromptMetric}
+          onClose={() => setShowUpgradePrompt(false)}
+        />
+      )}
 
       {/* Analytics Modal */}
       <ModalWrapper 
@@ -1520,9 +1666,13 @@ const openModal = async (modalType) => {
             modalType={activeModal}
             data={modalData}
             selectedPeriod={selectedPeriod}
-            onPeriodChange={setSelectedPeriod}
+            onPeriodChange={handlePeriodChange}
           />
-        ) : null}
+        ) : (
+          <div className="flex items-center justify-center h-64 text-gray-500">
+            <p>No data available</p>
+          </div>
+        )}
       </ModalWrapper>
     </>
   );
