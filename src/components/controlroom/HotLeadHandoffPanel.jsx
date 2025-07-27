@@ -8,8 +8,10 @@ import {
   PhoneCall, PhoneOff, UserCheck, UserX, MessageSquare, Lock
 } from 'lucide-react';
 
-// Edge Function URL - Update this with your actual Supabase project URL
-const EDGE_FUNCTION_URL = 'https://wuuqrdlfgkasnwydyvgk.supabase.co/functions/v1/HotLeadHandoffPanel';
+// Edge Function URL - Update to use sync_sales_metrics
+const buildApiUrl = (component, tenantId, period = '30days', action = 'fetch') => {
+  return `https://wuuqrdlfgkasnwydyvgk.supabase.co/functions/v1/sync_sales_metrics?action=${action}&component=${component}&tenant_id=${tenantId}&period=${period}`;
+};
 
 // Modal configuration for each card
 const MODAL_CONFIG = {
@@ -108,11 +110,11 @@ const ModalWrapper = ({ isOpen, onClose, title, subtitle, children }) => {
       <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-6xl max-h-[90vh] m-2 lg:m-4 overflow-hidden">
         {/* Header */}
         <div className="border-b border-gray-200 px-4 lg:px-6 py-4">
-<div className="flex items-center justify-between w-full min-w-0">
-  <div className="min-w-0 flex-1 max-w-full overflow-hidden">
-    <h2 className="text-lg lg:text-2xl font-bold text-gray-900 truncate max-w-full">{title}</h2>
-    <p className="text-sm text-gray-500 mt-1 truncate max-w-full">{subtitle}</p>
-  </div>
+          <div className="flex items-center justify-between w-full min-w-0">
+            <div className="min-w-0 flex-1 max-w-full overflow-hidden">
+              <h2 className="text-lg lg:text-2xl font-bold text-gray-900 truncate max-w-full">{title}</h2>
+              <p className="text-sm text-gray-500 mt-1 truncate max-w-full">{subtitle}</p>
+            </div>
             <button
               onClick={onClose}
               className="p-2 hover:bg-gray-100 rounded-lg transition-colors flex-shrink-0 ml-2"
@@ -297,9 +299,10 @@ const AwaitingActionList = ({ data }) => {
   );
 };
 
-
 // Queue Distribution Chart
 const QueueDistribution = ({ data }) => {
+  if (!data || data.length === 0) return null;
+  
   const total = data.reduce((sum, item) => sum + item.count, 0);
   const colors = {
     'Voicemail': '#F59E0B',
@@ -320,8 +323,8 @@ const QueueDistribution = ({ data }) => {
               />
               <span className="text-sm font-medium text-gray-700 truncate">{item.type}</span>
             </div>
-<div className="flex items-center space-x-2 flex-shrink-0 max-w-full overflow-hidden">
-  <div className="w-20 lg:w-32 bg-gray-200 rounded-full h-2 flex-shrink-0">
+            <div className="flex items-center space-x-2 flex-shrink-0 max-w-full overflow-hidden">
+              <div className="w-20 lg:w-32 bg-gray-200 rounded-full h-2 flex-shrink-0">
                 <div
                   className="h-2 rounded-full transition-all duration-500"
                   style={{
@@ -521,6 +524,8 @@ const PerformanceByRep = ({ data, metricType = 'responseTime' }) => {
 
 // SLA Compliance Component
 const SLACompliance = ({ data }) => {
+  if (!data) return null;
+  
   const complianceRate = (data.slaSatisfied / data.totalHandoffs) * 100;
 
   return (
@@ -652,15 +657,15 @@ const HandoffModalContent = ({ modalType, data, selectedPeriod, onPeriodChange }
       
       <div className="p-4 lg:p-6 space-y-4 lg:space-y-6 w-full min-w-0">
         {/* Awaiting Action features */}
-{features.includes('queueOverview') && data && data.queueOverview && (
-  <QueueOverview data={data.queueOverview} />
-)}
+        {features.includes('queueOverview') && data && data.queueOverview && (
+          <QueueOverview data={data.queueOverview} />
+        )}
         
         {features.includes('awaitingList') && (
           <AwaitingActionList data={data.awaitingList} />
         )}
         
-        {features.includes('queueDistribution') && (
+        {features.includes('queueDistribution') && data && data.queueDistribution && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
             <QueueDistribution data={data.queueDistribution} />
             
@@ -678,9 +683,9 @@ const HandoffModalContent = ({ modalType, data, selectedPeriod, onPeriodChange }
           <ResponseTimeTrend data={data.responseTimeTrend} />
         )}
         
-{features.includes('performanceByRep') && modalType === 'timeLag' && data && data.performanceByRep && (
-  <PerformanceByRep data={data.performanceByRep} metricType="responseTime" />
-)}
+        {features.includes('performanceByRep') && modalType === 'timeLag' && data && data.performanceByRep && (
+          <PerformanceByRep data={data.performanceByRep} metricType="responseTime" />
+        )}
         
         {features.includes('timeDistribution') && data && data.timeDistribution && (
           <div className="bg-white border border-gray-200 rounded-xl p-4 lg:p-6 w-full min-w-0">
@@ -703,13 +708,13 @@ const HandoffModalContent = ({ modalType, data, selectedPeriod, onPeriodChange }
         )}
         
         {features.includes('slaCompliance') && data && data.slaCompliance && (
-  <SLACompliance data={data.slaCompliance} />
-)}
+          <SLACompliance data={data.slaCompliance} />
+        )}
         
         {/* Sales Outcomes features */}
         {features.includes('outcomesTrend') && data && data.outcomesTrend && (
-  <OutcomesTrend data={data.outcomesTrend} />
-)}
+          <OutcomesTrend data={data.outcomesTrend} />
+        )}
         
         {features.includes('outcomeDistribution') && (
           <div className="bg-white border border-gray-200 rounded-xl p-4 lg:p-6 w-full min-w-0">
@@ -718,11 +723,11 @@ const HandoffModalContent = ({ modalType, data, selectedPeriod, onPeriodChange }
           </div>
         )}
         
-        {features.includes('performanceByRep') && modalType === 'salesOutcomes' && (
+        {features.includes('performanceByRep') && modalType === 'salesOutcomes' && data && data.performanceByRep && (
           <PerformanceByRep data={data.performanceByRep} metricType="outcomes" />
         )}
         
-        {features.includes('disqualificationReasons') && (
+        {features.includes('disqualificationReasons') && data && data.disqualificationReasons && (
           <div className="bg-white border border-gray-200 rounded-xl p-4 lg:p-6 w-full min-w-0">
             <h3 className="text-base lg:text-lg font-semibold text-gray-900 mb-4 truncate">Top Disqualification Reasons</h3>
             <div className="space-y-2">
@@ -736,7 +741,7 @@ const HandoffModalContent = ({ modalType, data, selectedPeriod, onPeriodChange }
           </div>
         )}
         
-        {features.includes('conversionRate') && (
+        {features.includes('conversionRate') && data && (
           <div className="bg-green-50 border border-green-200 rounded-xl p-4 lg:p-6 text-center w-full min-w-0">
             <h3 className="text-base lg:text-lg font-semibold text-green-900 mb-2 truncate">Hot Lead to Deal Conversion Rate</h3>
             <p className="text-4xl lg:text-5xl font-bold text-green-700">{data.conversionRate.toFixed(1)}%</p>
@@ -921,8 +926,9 @@ const HotLeadHandoffPanel = () => {
       setError(null);
       console.log('Fetching hot leads data for tenant:', user.tenant_id);
 
-      // Single call to get all hot lead data
-      const data = await callEdgeFunction(EDGE_FUNCTION_URL);
+      // Single call to get all hot lead data using sync_sales_metrics
+      const apiUrl = buildApiUrl('hotleads', user.tenant_id, '30days');
+      const data = await callEdgeFunction(apiUrl);
       console.log('Hot leads response:', data);
       
       setHotLeads(data.hotLeads || []);
@@ -939,117 +945,118 @@ const HotLeadHandoffPanel = () => {
     }
   };
 
-const handleCallLead = async (leadId) => {
-  if (!user?.tenant_id) {
-    console.error('No tenant_id available for call logging');
-    return;
-  }
-
-  try {
-    console.log('Preparing to call lead:', leadId);
-    
-    // DON'T log the call yet - just show the outcome modal
-    const lead = hotLeads.find(l => l.id === leadId);
-    setSelectedLead(lead);
-    setShowOutcomeModal(true);
-    // Reset state when opening modal
-    setSelectedOutcome(null);
-    setPipelineValue('');
-
-    console.log('Showing outcome modal for lead:', leadId);
-
-  } catch (error) {
-    console.error('Error preparing call:', error);
-    alert('Failed to prepare call. Please try again.');
-  }
-};
-
-
-const handleOutcomeSelection = async (outcome, pipelineValue = null) => {
-  console.log('handleOutcomeSelection called with:', { outcome, pipelineValue });
-  
-  if (!selectedLead || !user?.tenant_id) return;
-
-  // If selecting qualified, show the value input
-  if (outcome === 'qualified' && !pipelineValue) {
-    setSelectedOutcome('qualified');
-    return; // Don't submit yet
-  }
-
-  try {
-    // FIRST log the call
-    console.log('Logging call for lead:', selectedLead.id);
-    
-    const logResponse = await callEdgeFunction(`${EDGE_FUNCTION_URL}?action=log-call`, {
-      method: 'POST',
-      body: {
-        lead_id: selectedLead.id
-      }
-    });
-
-    if (!logResponse.success) {
-      throw new Error('Failed to log call');
+  const handleCallLead = async (leadId) => {
+    if (!user?.tenant_id) {
+      console.error('No tenant_id available for call logging');
+      return;
     }
 
-    // THEN update the outcome
-    const outcomeData = {
-      lead_id: selectedLead.id,
-      outcome: outcome
-    };
-    
-    // Add pipeline value if this is a qualified lead
-    if (outcome === 'qualified' && pipelineValue) {
-      // Ensure we're sending a valid number
-      const cleanValue = pipelineValue.toString().replace(/,/g, '');
-      const numericValue = parseFloat(cleanValue);
+    try {
+      console.log('Preparing to call lead:', leadId);
       
-      if (!isNaN(numericValue) && numericValue > 0) {
-        outcomeData.estimated_pipeline_value = numericValue;
-      } else {
-        console.error('Invalid pipeline value:', pipelineValue);
-        throw new Error('Invalid pipeline value');
-      }
-    }
-    
-    console.log('Sending outcome data:', outcomeData);
-    
-    const outcomeResponse = await callEdgeFunction(`${EDGE_FUNCTION_URL}?action=update-outcome`, {
-      method: 'POST',
-      body: outcomeData
-    });
-
-    if (outcomeResponse.success) {
-      console.log('Call logged and outcome updated successfully!');
-      setShowOutcomeModal(false);
-      setSelectedLead(null);
+      // DON'T log the call yet - just show the outcome modal
+      const lead = hotLeads.find(l => l.id === leadId);
+      setSelectedLead(lead);
+      setShowOutcomeModal(true);
+      // Reset state when opening modal
       setSelectedOutcome(null);
       setPipelineValue('');
-      
-      // Refresh data to get updated stats
-      fetchData();
+
+      console.log('Showing outcome modal for lead:', leadId);
+
+    } catch (error) {
+      console.error('Error preparing call:', error);
+      alert('Failed to prepare call. Please try again.');
+    }
+  };
+
+  const handleOutcomeSelection = async (outcome, pipelineValue = null) => {
+    console.log('handleOutcomeSelection called with:', { outcome, pipelineValue });
+    
+    if (!selectedLead || !user?.tenant_id) return;
+
+    // If selecting qualified, show the value input
+    if (outcome === 'qualified' && !pipelineValue) {
+      setSelectedOutcome('qualified');
+      return; // Don't submit yet
     }
 
-  } catch (error) {
-    console.error('Error updating call outcome:', error);
-    alert('Failed to log call. Please try again.');
-  }
-};
+    try {
+      // FIRST log the call using sync_sales_metrics
+      console.log('Logging call for lead:', selectedLead.id);
+      
+      const logCallUrl = buildApiUrl('hotleads', user.tenant_id, '30days', 'log-call');
+      const logResponse = await callEdgeFunction(logCallUrl, {
+        method: 'POST',
+        body: {
+          lead_id: selectedLead.id
+        }
+      });
 
-const handleQualifiedSubmit = async () => {
-  console.log('handleQualifiedSubmit called with pipelineValue:', pipelineValue);
-  
-  // Remove commas before parsing
-  const cleanValue = pipelineValue.replace(/,/g, '');
-  const numericValue = parseFloat(cleanValue);
-  
-  if (!cleanValue || numericValue <= 0 || isNaN(numericValue)) {
-    alert('Please enter a valid pipeline value');
-    return;
-  }
-  
-  // Pass the pipeline value to handleOutcomeSelection
-  await handleOutcomeSelection('qualified', numericValue);
-};
+      if (!logResponse.success) {
+        throw new Error('Failed to log call');
+      }
+
+      // THEN update the outcome using sync_sales_metrics
+      const outcomeData = {
+        lead_id: selectedLead.id,
+        outcome: outcome
+      };
+      
+      // Add pipeline value if this is a qualified lead
+      if (outcome === 'qualified' && pipelineValue) {
+        // Ensure we're sending a valid number
+        const cleanValue = pipelineValue.toString().replace(/,/g, '');
+        const numericValue = parseFloat(cleanValue);
+        
+        if (!isNaN(numericValue) && numericValue > 0) {
+          outcomeData.estimated_pipeline_value = numericValue;
+        } else {
+          console.error('Invalid pipeline value:', pipelineValue);
+          throw new Error('Invalid pipeline value');
+        }
+      }
+      
+      console.log('Sending outcome data:', outcomeData);
+      
+      const updateOutcomeUrl = buildApiUrl('hotleads', user.tenant_id, '30days', 'update-outcome');
+      const outcomeResponse = await callEdgeFunction(updateOutcomeUrl, {
+        method: 'POST',
+        body: outcomeData
+      });
+
+      if (outcomeResponse.success) {
+        console.log('Call logged and outcome updated successfully!');
+        setShowOutcomeModal(false);
+        setSelectedLead(null);
+        setSelectedOutcome(null);
+        setPipelineValue('');
+        
+        // Refresh data to get updated stats
+        fetchData();
+      }
+
+    } catch (error) {
+      console.error('Error updating call outcome:', error);
+      alert('Failed to log call. Please try again.');
+    }
+  };
+
+  const handleQualifiedSubmit = async () => {
+    console.log('handleQualifiedSubmit called with pipelineValue:', pipelineValue);
+    
+    // Remove commas before parsing
+    const cleanValue = pipelineValue.replace(/,/g, '');
+    const numericValue = parseFloat(cleanValue);
+    
+    if (!cleanValue || numericValue <= 0 || isNaN(numericValue)) {
+      alert('Please enter a valid pipeline value');
+      return;
+    }
+    
+    // Pass the pipeline value to handleOutcomeSelection
+    await handleOutcomeSelection('qualified', numericValue);
+  };
 
   const handleViewChat = (leadId) => {
     // Navigate to the lead's chat/messages view
@@ -1058,67 +1065,67 @@ const handleQualifiedSubmit = async () => {
   };
 
   // Handle modal opening
-// Replace the openModal function (around line 515)
-const openModal = async (modalType) => {
-  setActiveModal(modalType);
-  setLoadingModal(true);
-  setModalData(null);
-  
-  try {
-    let endpoint = '';
-    
-    switch (modalType) {
-      case 'awaitingAction':
-        endpoint = '/awaiting-action';
-        break;
-        
-      case 'timeLag':
-        endpoint = '/time-lag';
-        break;
-        
-      case 'salesOutcomes':
-        endpoint = '/sales-outcomes';
-        break;
-        
-      default:
-        console.error('Unknown modal type:', modalType);
-        setLoadingModal(false);
-        return;
-    }
-    
-    const params = modalType !== 'awaitingAction' ? `?period=${selectedPeriod}` : '';
-    const data = await callEdgeFunction(`${EDGE_FUNCTION_URL}${endpoint}${params}`);
-    
-    setModalData(data);
-    
-  } catch (error) {
-    console.error('Error fetching modal data:', error);
-    setModalData(generateModalMockData(modalType));
-  } finally {
-    setLoadingModal(false);
-  }
-};
-
-// Add this after the openModal function
-const handlePeriodChange = async (newPeriod) => {
-  setSelectedPeriod(newPeriod);
-  
-  // If modal is open and not awaitingAction, refetch data with new period
-  if (activeModal && activeModal !== 'awaitingAction') {
+  const openModal = async (modalType) => {
+    setActiveModal(modalType);
     setLoadingModal(true);
+    setModalData(null);
     
     try {
-      const endpoint = activeModal === 'timeLag' ? '/time-lag' : '/sales-outcomes';
-      const data = await callEdgeFunction(`${EDGE_FUNCTION_URL}${endpoint}?period=${newPeriod}`);
+      let component = '';
+      
+      switch (modalType) {
+        case 'awaitingAction':
+          component = 'hotleads-awaiting';
+          break;
+          
+        case 'timeLag':
+          component = 'hotleads-timelag';
+          break;
+          
+        case 'salesOutcomes':
+          component = 'hotleads-outcomes';
+          break;
+          
+        default:
+          console.error('Unknown modal type:', modalType);
+          setLoadingModal(false);
+          return;
+      }
+      
+      const apiUrl = buildApiUrl(component, user.tenant_id, selectedPeriod);
+      const data = await callEdgeFunction(apiUrl);
+      
       setModalData(data);
+      
     } catch (error) {
       console.error('Error fetching modal data:', error);
-      setModalData(generateModalMockData(activeModal));
+      setModalData(generateModalMockData(modalType));
     } finally {
       setLoadingModal(false);
     }
-  }
-};
+  };
+
+  // Add this after the openModal function
+  const handlePeriodChange = async (newPeriod) => {
+    setSelectedPeriod(newPeriod);
+    
+    // If modal is open and not awaitingAction, refetch data with new period
+    if (activeModal && activeModal !== 'awaitingAction') {
+      setLoadingModal(true);
+      
+      try {
+        const component = activeModal === 'timeLag' ? 'hotleads-timelag' : 'hotleads-outcomes';
+        const apiUrl = buildApiUrl(component, user.tenant_id, newPeriod);
+        const data = await callEdgeFunction(apiUrl);
+        setModalData(data);
+      } catch (error) {
+        console.error('Error fetching modal data:', error);
+        setModalData(generateModalMockData(activeModal));
+      } finally {
+        setLoadingModal(false);
+      }
+    }
+  };
 
   // Show loading or auth state
   if (!user) {
@@ -1227,9 +1234,9 @@ const handlePeriodChange = async (newPeriod) => {
                   <div className="text-sm">No hot leads awaiting calls!</div>
                 </div>
               ) : (
-<div className="space-y-3 w-full max-w-full overflow-hidden">
-  {previewLeads.map((lead) => (
-    <div key={lead.id} className="border-t pt-3 w-full min-w-0">
+                <div className="space-y-3 w-full max-w-full overflow-hidden">
+                  {previewLeads.map((lead) => (
+                    <div key={lead.id} className="border-t pt-3 w-full min-w-0">
                       <div className="font-medium text-sm truncate">
                         {lead.name} - Marked Hot: {lead.marked_hot_time_ago}
                       </div>
@@ -1514,176 +1521,176 @@ const handlePeriodChange = async (newPeriod) => {
       )}
 
       {/* Call Outcome Modal */}
-{showOutcomeModal && selectedLead && (
-  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-    <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-2 lg:mx-4">
-      {/* Modal Header */}
-      <div className="border-b border-gray-200 px-4 lg:px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div className="min-w-0 flex-1">
-            <h3 className="text-lg font-semibold text-gray-900 truncate">
-              Log Call Outcome
-            </h3>
-            <div className="flex items-center mt-1">
-              <p className="text-sm text-gray-500 truncate">
-                {selectedLead.name}
+      {showOutcomeModal && selectedLead && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-2 lg:mx-4">
+            {/* Modal Header */}
+            <div className="border-b border-gray-200 px-4 lg:px-6 py-4">
+              <div className="flex items-center justify-between">
+                <div className="min-w-0 flex-1">
+                  <h3 className="text-lg font-semibold text-gray-900 truncate">
+                    Log Call Outcome
+                  </h3>
+                  <div className="flex items-center mt-1">
+                    <p className="text-sm text-gray-500 truncate">
+                      {selectedLead.name}
+                    </p>
+                    {selectedLead.requires_immediate_attention && (
+                      <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800 flex-shrink-0">
+                        CRITICAL
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowOutcomeModal(false);
+                    setSelectedLead(null);
+                    setSelectedOutcome(null);
+                    setPipelineValue('');
+                  }}
+                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors flex-shrink-0 ml-2"
+                >
+                  <X className="w-5 h-5 text-gray-500" />
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-4 lg:p-6 max-h-[80vh] overflow-y-auto w-full max-w-full overflow-x-hidden">
+              <p className="text-sm font-medium text-gray-700 mb-4">
+                Select call outcome <span className="text-red-500">*</span>
               </p>
-              {selectedLead.requires_immediate_attention && (
-                <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800 flex-shrink-0">
-                  CRITICAL
-                </span>
+              
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 w-full max-w-full overflow-hidden">
+                {/* Voicemail */}
+                <button 
+                  onClick={() => handleOutcomeSelection('voicemail')}
+                  className="flex items-start p-3 lg:p-4 border-2 border-gray-200 rounded-lg hover:border-yellow-500 hover:bg-yellow-50 transition-all group"
+                >
+                  <MessageSquare className="w-5 h-5 text-yellow-600 mt-0.5 mr-3 flex-shrink-0" />
+                  <div className="text-left min-w-0">
+                    <p className="font-medium text-gray-900 group-hover:text-yellow-700 truncate">Left Voicemail</p>
+                    <p className="text-xs text-gray-500 mt-0.5">Left a message</p>
+                  </div>
+                </button>
+
+                {/* No Answer */}
+                <button 
+                  onClick={() => handleOutcomeSelection('no_answer')}
+                  className="flex items-start p-3 lg:p-4 border-2 border-gray-200 rounded-lg hover:border-gray-500 hover:bg-gray-50 transition-all group"
+                >
+                  <PhoneOff className="w-5 h-5 text-gray-600 mt-0.5 mr-3 flex-shrink-0" />
+                  <div className="text-left min-w-0">
+                    <p className="font-medium text-gray-900 group-hover:text-gray-700 truncate">No Answer</p>
+                    <p className="text-xs text-gray-500 mt-0.5">No response</p>
+                  </div>
+                </button>
+
+                {/* Not Qualified */}
+                <button 
+                  onClick={() => handleOutcomeSelection('not_fit')}
+                  className="flex items-start p-3 lg:p-4 border-2 border-gray-200 rounded-lg hover:border-red-500 hover:bg-red-50 transition-all group"
+                >
+                  <UserX className="w-5 h-5 text-red-600 mt-0.5 mr-3 flex-shrink-0" />
+                  <div className="text-left min-w-0">
+                    <p className="font-medium text-gray-900 group-hover:text-red-700 truncate">Not Qualified</p>
+                    <p className="text-xs text-gray-500 mt-0.5">Not a good fit</p>
+                  </div>
+                </button>
+
+                {/* Qualified */}
+                <button 
+                  onClick={() => handleOutcomeSelection('qualified')}
+                  className={`flex items-start p-3 lg:p-4 border-2 rounded-lg transition-all group ${
+                    selectedOutcome === 'qualified' 
+                      ? 'border-blue-500 bg-blue-50' 
+                      : 'border-gray-200 hover:border-blue-500 hover:bg-blue-50'
+                  }`}
+                >
+                  <UserCheck className="w-5 h-5 text-blue-600 mt-0.5 mr-3 flex-shrink-0" />
+                  <div className="text-left min-w-0">
+                    <p className={`font-medium truncate ${
+                      selectedOutcome === 'qualified' ? 'text-blue-700' : 'text-gray-900 group-hover:text-blue-700'
+                    }`}>Qualified Lead</p>
+                    <p className="text-xs text-gray-500 mt-0.5">Ready to proceed</p>
+                  </div>
+                </button>
+              </div>
+
+              {/* Pipeline Value Input - Shows when Qualified is selected */}
+              {selectedOutcome === 'qualified' && (
+                <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg w-full max-w-full overflow-hidden">
+                  <div className="mb-3">
+                    <p className="text-sm font-medium text-gray-900 mb-1">
+                      💰 What's this lead worth to you if closed? <span className="text-red-500">*</span>
+                    </p>
+                    <p className="text-xs text-gray-600 italic">
+                      We use this to track ROI on AI-surfaced leads.
+                    </p>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <span className="text-lg font-medium text-gray-700 flex-shrink-0">$</span>
+                    <input
+                      type="text"
+                      value={pipelineValue}
+                      onChange={(e) => {
+                        // Allow only numbers, commas, and decimals
+                        const value = e.target.value.replace(/[^0-9.,]/g, '');
+                        setPipelineValue(value);
+                      }}
+                      placeholder="0.00"
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 min-w-0"
+                      required
+                    />
+                  </div>
+                  <button
+                    onClick={handleQualifiedSubmit}
+                    disabled={!pipelineValue || parseFloat(pipelineValue.replace(/,/g, '')) <= 0}
+                    className={`mt-3 w-full py-2 px-4 rounded-md font-medium transition-colors ${
+                      pipelineValue && parseFloat(pipelineValue.replace(/,/g, '')) > 0
+                        ? 'bg-blue-600 text-white hover:bg-blue-700'
+                        : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                    }`}
+                  >
+                    Submit Qualified Lead
+                  </button>
+                </div>
+              )}
+
+              {/* Future enhancement area */}
+              {!selectedOutcome && (
+                <div className="mt-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                  <p className="text-xs text-gray-600 break-words">
+                    <span className="font-medium">Coming soon:</span> Call notes, follow-up scheduling, and disposition codes
+                  </p>
+                </div>
               )}
             </div>
+
+            {/* Modal Footer */}
+            <div className="border-t border-gray-200 px-4 lg:px-6 py-4 bg-gray-50">
+              <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-3 lg:space-y-0">
+                <p className="text-xs text-gray-500 flex items-center">
+                  <Clock className="w-3 h-3 mr-1 flex-shrink-0" />
+                  <span className="truncate">Lead marked {selectedLead.requires_immediate_attention ? 'critical' : 'hot'}: {selectedLead.marked_hot_time_ago}</span>
+                </p>
+                <button 
+                  onClick={() => {
+                    setShowOutcomeModal(false);
+                    setSelectedLead(null);
+                    setSelectedOutcome(null);
+                    setPipelineValue('');
+                  }}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  Cancel - I didn't call yet
+                </button>
+              </div>
+            </div>
           </div>
-          <button
-            onClick={() => {
-              setShowOutcomeModal(false);
-              setSelectedLead(null);
-              setSelectedOutcome(null);
-              setPipelineValue('');
-            }}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors flex-shrink-0 ml-2"
-          >
-            <X className="w-5 h-5 text-gray-500" />
-          </button>
         </div>
-      </div>
-
-      {/* Modal Body */}
-      <div className="p-4 lg:p-6 max-h-[80vh] overflow-y-auto w-full max-w-full overflow-x-hidden">
-        <p className="text-sm font-medium text-gray-700 mb-4">
-          Select call outcome <span className="text-red-500">*</span>
-        </p>
-        
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 w-full max-w-full overflow-hidden">
-          {/* Voicemail */}
-          <button 
-            onClick={() => handleOutcomeSelection('voicemail')}
-            className="flex items-start p-3 lg:p-4 border-2 border-gray-200 rounded-lg hover:border-yellow-500 hover:bg-yellow-50 transition-all group"
-          >
-            <MessageSquare className="w-5 h-5 text-yellow-600 mt-0.5 mr-3 flex-shrink-0" />
-            <div className="text-left min-w-0">
-              <p className="font-medium text-gray-900 group-hover:text-yellow-700 truncate">Left Voicemail</p>
-              <p className="text-xs text-gray-500 mt-0.5">Left a message</p>
-            </div>
-          </button>
-
-          {/* No Answer */}
-          <button 
-            onClick={() => handleOutcomeSelection('no_answer')}
-            className="flex items-start p-3 lg:p-4 border-2 border-gray-200 rounded-lg hover:border-gray-500 hover:bg-gray-50 transition-all group"
-          >
-            <PhoneOff className="w-5 h-5 text-gray-600 mt-0.5 mr-3 flex-shrink-0" />
-            <div className="text-left min-w-0">
-              <p className="font-medium text-gray-900 group-hover:text-gray-700 truncate">No Answer</p>
-              <p className="text-xs text-gray-500 mt-0.5">No response</p>
-            </div>
-          </button>
-
-          {/* Not Qualified */}
-          <button 
-            onClick={() => handleOutcomeSelection('not_fit')}
-            className="flex items-start p-3 lg:p-4 border-2 border-gray-200 rounded-lg hover:border-red-500 hover:bg-red-50 transition-all group"
-          >
-            <UserX className="w-5 h-5 text-red-600 mt-0.5 mr-3 flex-shrink-0" />
-            <div className="text-left min-w-0">
-              <p className="font-medium text-gray-900 group-hover:text-red-700 truncate">Not Qualified</p>
-              <p className="text-xs text-gray-500 mt-0.5">Not a good fit</p>
-            </div>
-          </button>
-
-          {/* Qualified */}
-          <button 
-            onClick={() => handleOutcomeSelection('qualified')}
-            className={`flex items-start p-3 lg:p-4 border-2 rounded-lg transition-all group ${
-              selectedOutcome === 'qualified' 
-                ? 'border-blue-500 bg-blue-50' 
-                : 'border-gray-200 hover:border-blue-500 hover:bg-blue-50'
-            }`}
-          >
-            <UserCheck className="w-5 h-5 text-blue-600 mt-0.5 mr-3 flex-shrink-0" />
-            <div className="text-left min-w-0">
-              <p className={`font-medium truncate ${
-                selectedOutcome === 'qualified' ? 'text-blue-700' : 'text-gray-900 group-hover:text-blue-700'
-              }`}>Qualified Lead</p>
-              <p className="text-xs text-gray-500 mt-0.5">Ready to proceed</p>
-            </div>
-          </button>
-        </div>
-
-        {/* Pipeline Value Input - Shows when Qualified is selected */}
-        {selectedOutcome === 'qualified' && (
-          <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg w-full max-w-full overflow-hidden">
-            <div className="mb-3">
-              <p className="text-sm font-medium text-gray-900 mb-1">
-                💰 What's this lead worth to you if closed? <span className="text-red-500">*</span>
-              </p>
-              <p className="text-xs text-gray-600 italic">
-                We use this to track ROI on AI-surfaced leads.
-              </p>
-            </div>
-            <div className="flex items-center space-x-2">
-              <span className="text-lg font-medium text-gray-700 flex-shrink-0">$</span>
-              <input
-                type="text"
-                value={pipelineValue}
-                onChange={(e) => {
-                  // Allow only numbers, commas, and decimals
-                  const value = e.target.value.replace(/[^0-9.,]/g, '');
-                  setPipelineValue(value);
-                }}
-                placeholder="0.00"
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 min-w-0"
-                required
-              />
-            </div>
-            <button
-              onClick={handleQualifiedSubmit}
-              disabled={!pipelineValue || parseFloat(pipelineValue.replace(/,/g, '')) <= 0}
-              className={`mt-3 w-full py-2 px-4 rounded-md font-medium transition-colors ${
-                pipelineValue && parseFloat(pipelineValue.replace(/,/g, '')) > 0
-                  ? 'bg-blue-600 text-white hover:bg-blue-700'
-                  : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-              }`}
-            >
-              Submit Qualified Lead
-            </button>
-          </div>
-        )}
-
-        {/* Future enhancement area */}
-        {!selectedOutcome && (
-          <div className="mt-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
-            <p className="text-xs text-gray-600 break-words">
-              <span className="font-medium">Coming soon:</span> Call notes, follow-up scheduling, and disposition codes
-            </p>
-          </div>
-        )}
-      </div>
-
-      {/* Modal Footer */}
-      <div className="border-t border-gray-200 px-4 lg:px-6 py-4 bg-gray-50">
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-3 lg:space-y-0">
-          <p className="text-xs text-gray-500 flex items-center">
-            <Clock className="w-3 h-3 mr-1 flex-shrink-0" />
-            <span className="truncate">Lead marked {selectedLead.requires_immediate_attention ? 'critical' : 'hot'}: {selectedLead.marked_hot_time_ago}</span>
-          </p>
-          <button 
-            onClick={() => {
-              setShowOutcomeModal(false);
-              setSelectedLead(null);
-              setSelectedOutcome(null);
-              setPipelineValue('');
-            }}
-            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-          >
-            Cancel - I didn't call yet
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
-)}
+      )}
 
       {/* Analytics Modal */}
       <ModalWrapper 
