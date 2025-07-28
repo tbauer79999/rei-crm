@@ -1086,17 +1086,45 @@ const HotLeadHandoffPanel = () => {
 
       console.log('Updating conversation with outcome:', updateData);
 
-      const { error: updateError } = await supabase
-        .from('conversation_analytics')
-        .update(updateData)
-        .eq('conversation_id', selectedLead.id)
-        .eq('tenant_id', user.tenant_id);
+// 2. Trigger analytics recalculation
+const { error: syncError } = await supabase.functions.invoke('sync_sales_metrics', {
+  body: { action: 'sync' }
+});
 
-      if (updateError) {
-        throw new Error('Failed to log call outcome: ' + updateError.message);
+if (syncError) {
+  console.error('❌ Failed to sync analytics:', syncError);
+}
+
+console.log('Call logged and outcome updated successfully!');
+
+      // ✅ NEW: Also log to sales_activities table
+      const activityNotes = outcome === 'voicemail' ? 'Left voicemail for hot lead' : 
+                           outcome === 'qualified' ? `Qualified lead - Pipeline value: $${pipelineValue || 'Not specified'}` :
+                           outcome === 'no_answer' ? 'Called - no answer' :
+                           outcome === 'not_fit' ? 'Called - determined not qualified' :
+                           `Call outcome: ${outcome}`;
+
+      const { error: activityError } = await supabase
+        .from('sales_activities')
+        .insert({
+          tenant_id: user.tenant_id,
+          lead_id: selectedLead.id,
+          activity_type: 'call',
+          outcome: outcome,
+          notes: activityNotes,
+          attempted_at: new Date().toISOString(),
+          created_by: user.id,
+          metadata: { 
+            pipeline_value: outcome === 'qualified' && pipelineValue ? parseFloat(pipelineValue.toString().replace(/,/g, '')) : null,
+            source: 'hot_lead_panel',
+            lead_score: 'hot'
+          }
+        });
+
+      if (activityError) {
+        console.error('❌ Failed to log sales activity:', activityError);
       }
 
-      console.log('Call logged and outcome updated successfully!');
       setShowOutcomeModal(false);
       setSelectedLead(null);
       setSelectedOutcome(null);
@@ -1111,6 +1139,8 @@ const HotLeadHandoffPanel = () => {
     }
   };
   
+
+
   const handleQualifiedSubmit = async () => {
     console.log('handleQualifiedSubmit called with pipelineValue:', pipelineValue);
     
