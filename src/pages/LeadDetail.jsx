@@ -2258,8 +2258,34 @@ export default function LeadDetail() {
         )}
       </div>
     </div>
-  );
+);
 })
+            )}
+
+            {/* Message Input for Mobile */}
+            {canSendMessages && (
+              <div className="fixed bottom-20 left-0 right-0 p-4 bg-white border-t border-gray-200">
+                <div className="flex gap-3">
+                  <input
+                    type="text"
+                    value={newMessage}
+                    onChange={(e) => setNewMessage(e.target.value)}
+                    placeholder="Send a message..."
+                    className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+                    onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+                  />
+                  <button
+                    onClick={handleSendMessage}
+                    disabled={!newMessage.trim() || sendingMessage}
+                    className="flex items-center gap-2 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    <Send size={16} />
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Analytics Tab */}
         {activeTab === 'analytics' && (
