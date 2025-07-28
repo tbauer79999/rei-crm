@@ -238,84 +238,84 @@ export default function LeadDetail() {
         }
 
         // Load messages if user has permission
-       if (canViewMessages) {
-  try {
-    // Fetch messages
-    let messageQuery = supabase
-      .from('messages')
-      .select(`
-        *,
-        sentiment_score,
-        sentiment_magnitude,
-        openai_qualification_score,
-        hesitation_score,
-        urgency_score,
-        weighted_score,
-        response_score,
-        status,
-        error_code,
-        retry_eligible,
-        retry_count,
-        original_message_id
-      `)
-      .eq('lead_id', id)
-      .order('timestamp', { ascending: true });
+        if (canViewMessages) {
+          try {
+            // Fetch messages
+            let messageQuery = supabase
+              .from('messages')
+              .select(`
+                *,
+                sentiment_score,
+                sentiment_magnitude,
+                openai_qualification_score,
+                hesitation_score,
+                urgency_score,
+                weighted_score,
+                response_score,
+                status,
+                error_code,
+                retry_eligible,
+                retry_count,
+                original_message_id
+              `)
+              .eq('lead_id', id)
+              .order('timestamp', { ascending: true });
 
-    // Apply tenant filtering for messages if needed
-    if (!isGlobalAdmin && user?.tenant_id) {
-      messageQuery = messageQuery.eq('tenant_id', user.tenant_id);
-    }
+            // Apply tenant filtering for messages if needed
+            if (!isGlobalAdmin && user?.tenant_id) {
+              messageQuery = messageQuery.eq('tenant_id', user.tenant_id);
+            }
 
-    const { data: msgData, error: msgError } = await messageQuery;
+            const { data: msgData, error: msgError } = await messageQuery;
 
-    // Fetch sales activities
-    let activitiesQuery = supabase
-      .from('sales_activities')
-      .select(`
-        id, activity_type, outcome, duration_seconds, notes,
-        attempted_at, created_by, phone_number_used, metadata,
-        created_at
-      `)
-      .eq('lead_id', id)
-      .order('attempted_at', { ascending: true });
+            // Fetch sales activities
+            let activitiesQuery = supabase
+              .from('sales_activities')
+              .select(`
+                id, activity_type, outcome, duration_seconds, notes,
+                attempted_at, created_by, phone_number_used, metadata,
+                created_at
+              `)
+              .eq('lead_id', id)
+              .order('attempted_at', { ascending: true });
 
-    // Apply tenant filtering for activities if needed
-    if (!isGlobalAdmin && user?.tenant_id) {
-      activitiesQuery = activitiesQuery.eq('tenant_id', user.tenant_id);
-    }
+            // Apply tenant filtering for activities if needed
+            if (!isGlobalAdmin && user?.tenant_id) {
+              activitiesQuery = activitiesQuery.eq('tenant_id', user.tenant_id);
+            }
 
-    const { data: activitiesData, error: activitiesError } = await activitiesQuery;
+            const { data: activitiesData, error: activitiesError } = await activitiesQuery;
 
-    if (msgError) {
-      console.error('Error loading messages:', msgError);
-      setMessages([]); // Don't fail completely, just show no messages
-    } else if (activitiesError) {
-      console.error('Error loading sales activities:', activitiesError);
-      setMessages(msgData || []); // Show messages only
-    } else {
-      // Merge and sort both data sources
-      const allTimelineItems = [
-        ...(msgData || []).map(msg => ({
-          ...msg,
-          type: 'message',
-          timeline_timestamp: msg.timestamp
-        })),
-        ...(activitiesData || []).map(activity => ({
-          ...activity,
-          type: 'activity',
-          timeline_timestamp: activity.attempted_at
-        }))
-      ].sort((a, b) => new Date(a.timeline_timestamp) - new Date(b.timeline_timestamp));
+            if (msgError) {
+              console.error('Error loading messages:', msgError);
+              setMessages([]); // Don't fail completely, just show no messages
+            } else if (activitiesError) {
+              console.error('Error loading sales activities:', activitiesError);
+              setMessages(msgData || []); // Show messages only
+            } else {
+              // Merge and sort both data sources
+              const allTimelineItems = [
+                ...(msgData || []).map(msg => ({
+                  ...msg,
+                  type: 'message',
+                  timeline_timestamp: msg.timestamp
+                })),
+                ...(activitiesData || []).map(activity => ({
+                  ...activity,
+                  type: 'activity',
+                  timeline_timestamp: activity.attempted_at
+                }))
+              ].sort((a, b) => new Date(a.timeline_timestamp) - new Date(b.timeline_timestamp));
 
-      setMessages(allTimelineItems);
-    }
-  } catch (msgError) {
-    console.log('Messages/activities not accessible:', msgError);
-    setMessages([]);
-  }
-} else {
-  setMessages([]);
-}
+              setMessages(allTimelineItems);
+            }
+          } catch (msgError) {
+            console.log('Messages/activities not accessible:', msgError);
+            setMessages([]);
+          }
+        } else {
+          setMessages([]);
+        }
 
       } catch (err) {
         console.error('Error loading lead:', err.message);
@@ -325,7 +325,7 @@ export default function LeadDetail() {
     };
 
     fetchLeadAndMessages();
-}, [id, user?.id, user?.tenant_id, user?.role, user?.user_metadata?.role, canViewLeads, canViewMessages]);
+  }, [id, user?.id, user?.tenant_id, user?.role, user?.user_metadata?.role, canViewLeads, canViewMessages]);
 
   useEffect(() => {
     // Smart refresh - only when user is actively viewing this page and has permissions
@@ -997,38 +997,38 @@ export default function LeadDetail() {
   const aiInsights = useMemo(() => calculateAIInsights(), [messages]);
   const retryStats = useMemo(() => calculateRetryStats(), [messages]);
   const groupedMessages = useMemo(() => {
-  // Separate messages from activities
-  const messageItems = messages.filter(item => item.type === 'message');
-  const activityItems = messages.filter(item => item.type === 'activity');
-  
-  // Group messages with retries as before
-  const groupedMessageItems = groupMessagesWithRetries(messageItems);
-  
-  // Insert activities into the timeline
-  const timelineItems = [];
-  let messageIndex = 0;
-  let activityIndex = 0;
-  
-  while (messageIndex < groupedMessageItems.length || activityIndex < activityItems.length) {
-    const nextMessage = groupedMessageItems[messageIndex];
-    const nextActivity = activityItems[activityIndex];
+    // Separate messages from activities
+    const messageItems = messages.filter(item => item.type === 'message');
+    const activityItems = messages.filter(item => item.type === 'activity');
     
-    const messageTime = nextMessage ? new Date(nextMessage.original.timestamp) : null;
-    const activityTime = nextActivity ? new Date(nextActivity.timeline_timestamp) : null;
+    // Group messages with retries as before
+    const groupedMessageItems = groupMessagesWithRetries(messageItems);
     
-    if (!activityTime || (messageTime && messageTime <= activityTime)) {
-      // Add message group
-      timelineItems.push({ type: 'message_group', data: nextMessage });
-      messageIndex++;
-    } else {
-      // Add activity
-      timelineItems.push({ type: 'activity', data: nextActivity });
-      activityIndex++;
+    // Insert activities into the timeline
+    const timelineItems = [];
+    let messageIndex = 0;
+    let activityIndex = 0;
+    
+    while (messageIndex < groupedMessageItems.length || activityIndex < activityItems.length) {
+      const nextMessage = groupedMessageItems[messageIndex];
+      const nextActivity = activityItems[activityIndex];
+      
+      const messageTime = nextMessage ? new Date(nextMessage.original.timestamp) : null;
+      const activityTime = nextActivity ? new Date(nextActivity.timeline_timestamp) : null;
+      
+      if (!activityTime || (messageTime && messageTime <= activityTime)) {
+        // Add message group
+        timelineItems.push({ type: 'message_group', data: nextMessage });
+        messageIndex++;
+      } else {
+        // Add activity
+        timelineItems.push({ type: 'activity', data: nextActivity });
+        activityIndex++;
+      }
     }
-  }
-  
-  return timelineItems;
-}, [messages]);
+    
+    return timelineItems;
+  }, [messages]);
 
   // Permission check - show access denied if user can't view leads
   if (!canViewLeads) {
@@ -1508,237 +1508,238 @@ export default function LeadDetail() {
               </div>
             ) : (
               groupedMessages.map((timelineItem, itemIndex) => {
-  // Handle activity items
-  if (timelineItem.type === 'activity') {
-    const activity = timelineItem.data;
-    const showTimestamp = itemIndex === 0 || 
-      new Date(activity.timeline_timestamp) - new Date(
-        groupedMessages[itemIndex - 1].type === 'activity' 
-          ? groupedMessages[itemIndex - 1].data.timeline_timestamp
-          : groupedMessages[itemIndex - 1].data.original.timestamp
-      ) > 5 * 60 * 1000;
+                // Handle activity items
+                if (timelineItem.type === 'activity') {
+                  const activity = timelineItem.data;
+                  const showTimestamp = itemIndex === 0 || 
+                    new Date(activity.timeline_timestamp) - new Date(
+                      groupedMessages[itemIndex - 1].type === 'activity' 
+                        ? groupedMessages[itemIndex - 1].data.timeline_timestamp
+                        : groupedMessages[itemIndex - 1].data.original.timestamp
+                    ) > 5 * 60 * 1000;
 
-    return (
-      <div key={`activity-${activity.id}`}>
-        {showTimestamp && (
-          <div className="text-center my-4">
-            <span className="px-3 py-1 bg-gray-100 text-gray-500 text-xs rounded-full">
-              {formatDate(activity.timeline_timestamp)}
-            </span>
-          </div>
-        )}
-
-        {/* Activity Timeline Item */}
-        <div className="flex justify-center items-center my-4">
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 max-w-md">
-            <div className="flex items-center gap-2 mb-2">
-              <Phone size={16} className="text-yellow-600" />
-              <span className="text-sm font-medium text-yellow-900">
-                {activity.activity_type === 'call' ? 'Phone Call' :
-                 activity.activity_type === 'email' ? 'Email Sent' :
-                 activity.activity_type === 'meeting' ? 'Meeting' :
-                 activity.activity_type || 'Sales Activity'}
-              </span>
-            </div>
-            
-            <div className="text-xs text-gray-600 space-y-1">
-              {activity.outcome && (
-                <div><strong>Outcome:</strong> {activity.outcome}</div>
-              )}
-              {activity.duration_seconds && (
-                <div><strong>Duration:</strong> {Math.round(activity.duration_seconds / 60)} minutes</div>
-              )}
-              {activity.notes && (
-                <div><strong>Notes:</strong> {activity.notes}</div>
-              )}
-              {activity.created_by && (
-                <div><strong>By:</strong> {activity.created_by}</div>
-              )}
-            </div>
-            
-            <div className="text-xs text-gray-400 mt-2">
-              {formatTime(activity.timeline_timestamp)}
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-  
-  // Handle message group items
-  const messageGroup = timelineItem.data;
-  const { original, retries } = messageGroup;
-  const isInbound = original.direction?.toLowerCase() === 'inbound';
-  const isAI = !isInbound;
-  const showTimestamp = itemIndex === 0 ||
-    new Date(original.timestamp) - new Date(
-      groupedMessages[itemIndex - 1].type === 'activity' 
-        ? groupedMessages[itemIndex - 1].data.timeline_timestamp
-        : groupedMessages[itemIndex - 1].data.original.timestamp
-    ) > 5 * 60 * 1000;
-
-  return (
-    <div key={original.id}>
-      {showTimestamp && (
-        <div className="text-center my-4">
-          <span className="px-3 py-1 bg-gray-100 text-gray-500 text-xs rounded-full">
-            {formatDate(original.timestamp)}
-          </span>
-        </div>
-      )}
-
-      {/* Original Message */}
-      <div
-        className={`flex ${isInbound ? 'justify-start' : 'justify-end'} items-start gap-3`}
-      >
-        {isInbound && (
-          <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center flex-shrink-0">
-            <User size={16} className="text-gray-600" />
-          </div>
-        )}
-
-        <div className={`max-w-md ${isInbound ? 'mr-12' : 'ml-12'}`}>
-          <div
-            className={`px-4 py-3 rounded-2xl ${
-              isInbound
-                ? 'bg-gray-100 text-gray-900'
-                : 'bg-gradient-to-r from-blue-600 to-blue-700 text-white'
-            }`}
-          >
-            <p className="text-sm leading-relaxed">{original.message_body || '—'}</p>
-          </div>
-
-          <div
-            className={`flex items-center gap-2 mt-1 text-xs text-gray-500 ${
-              isInbound ? 'justify-start' : 'justify-end'
-            }`}
-          >
-            <span>{formatTime(original.timestamp)}</span>
-            {isAI && (
-              <>
-                <span>•</span>
-                <div className="flex items-center gap-1">
-                  <Sparkles size={12} />
-                  <span>{original.sender === 'Manual' ? 'Manual' : 'AI'}</span>
-                </div>
-              </>
-            )}
-            {/* Show scoring info for inbound messages with scores */}
-            {original.direction === 'inbound' && original.weighted_score && (
-              <>
-                <span>•</span>
-                <span className="text-xs text-gray-400">
-                  Score: {original.weighted_score}
-                </span>
-              </>
-            )}
-          </div>
-
-          {/* Status Pill for Outbound Messages */}
-          {original.direction === 'outbound' && (
-            <div className={`mt-2 ${isInbound ? 'text-left' : 'text-right'}`}>
-              {original.status === 'failed' && (
-                <StatusPill 
-                  type="error" 
-                  label="Failed" 
-                  tooltip={`Error Code: ${original.error_code || 'Unknown'}`} 
-                />
-              )}
-              {original.status === 'sent' && (
-                <StatusPill type="warning" label="Sent" tooltip="Delivered to carrier" />
-              )}
-              {original.status === 'queued' && (
-                <StatusPill type="warning" label="Queued" />
-              )}
-              {original.status === 'delivered' && (
-                <StatusPill type="success" label="Delivered" tooltip="Delivered to recipient" />
-              )}
-            </div>
-          )}
-          
-          {/* Show if this message triggered an alert */}
-          {lead.alert_details?.last_message && 
-           original.message_body?.toLowerCase().includes(lead.alert_details.last_message.toLowerCase()) && (
-            <div className="mt-2 flex items-center gap-2 text-xs text-orange-600">
-              <AlertCircle size={12} />
-              <span>This message triggered an alert</span>
-            </div>
-          )}
-
-          {/* Retry Messages Section */}
-          {retries.length > 0 && (
-            <div className="mt-3 space-y-2">
-              <button
-                onClick={() => toggleRetryExpansion(original.id)}
-                className="flex items-center gap-2 text-xs text-gray-500 hover:text-gray-700 transition-colors"
-              >
-                {expandedRetries.has(original.id) ? (
-                  <ChevronDown size={14} />
-                ) : (
-                  <ChevronRight size={14} />
-                )}
-                <span>{retries.length} retry attempt{retries.length > 1 ? 's' : ''}</span>
-                <span className="text-gray-400">
-                  (Last: {formatTime(retries[retries.length - 1].timestamp)})
-                </span>
-              </button>
-
-              {/* Expanded Retry Messages */}
-              {expandedRetries.has(original.id) && (
-                <div className="ml-4 space-y-3 border-l-2 border-gray-200 pl-4">
-                  {retries.map((retry, retryIndex) => (
-                    <div key={retry.id} className="space-y-1">
-                      <div className="px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg text-sm">
-                        <p className="text-gray-900">{retry.message_body}</p>
-                      </div>
-                      
-                      <div className="flex items-center justify-between text-xs text-gray-500">
-                        <div className="flex items-center gap-2">
-                          <span>Retry #{retryIndex + 1}</span>
-                          <span>•</span>
-                          <span>{formatTime(retry.timestamp)}</span>
+                  return (
+                    <div key={`activity-${activity.id}`}>
+                      {showTimestamp && (
+                        <div className="text-center my-4">
+                          <span className="px-3 py-1 bg-gray-100 text-gray-500 text-xs rounded-full">
+                            {formatDate(activity.timeline_timestamp)}
+                          </span>
                         </div>
-                        
-                        <div>
-                          {retry.status === 'failed' && (
-                            <StatusPill 
-                              type="error" 
-                              label="Failed" 
-                              tooltip={`Error Code: ${retry.error_code || 'Unknown'}`} 
-                            />
-                          )}
-                          {retry.status === 'sent' && (
-                            <StatusPill type="warning" label="Sent" tooltip="Delivered to carrier" />
-                          )}
-                          {retry.status === 'queued' && (
-                            <StatusPill type="warning" label="Queued" />
-                          )}
-                          {retry.status === 'delivered' && (
-                            <StatusPill type="success" label="Delivered" tooltip="Delivered to recipient" />
-                          )}
+                      )}
+
+                      {/* Activity Timeline Item */}
+                      <div className="flex justify-center items-center my-4">
+                        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 max-w-md">
+                          <div className="flex items-center gap-2 mb-2">
+                            <Phone size={16} className="text-yellow-600" />
+                            <span className="text-sm font-medium text-yellow-900">
+                              {activity.activity_type === 'call' ? 'Phone Call' :
+                               activity.activity_type === 'email' ? 'Email Sent' :
+                               activity.activity_type === 'meeting' ? 'Meeting' :
+                               activity.activity_type || 'Sales Activity'}
+                            </span>
+                          </div>
+                          
+                          <div className="text-xs text-gray-600 space-y-1">
+                            {activity.outcome && (
+                              <div><strong>Outcome:</strong> {activity.outcome}</div>
+                            )}
+                            {activity.duration_seconds && (
+                              <div><strong>Duration:</strong> {Math.round(activity.duration_seconds / 60)} minutes</div>
+                            )}
+                            {activity.notes && (
+                              <div><strong>Notes:</strong> {activity.notes}</div>
+                            )}
+                            {activity.created_by && (
+                              <div><strong>By:</strong> {activity.created_by}</div>
+                            )}
+                          </div>
+                          
+                          <div className="text-xs text-gray-400 mt-2">
+                            {formatTime(activity.timeline_timestamp)}
+                          </div>
                         </div>
                       </div>
                     </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
+                  );
+                }
+                
+                // Handle message group items
+                const messageGroup = timelineItem.data;
+                const { original, retries } = messageGroup;
+                const isInbound = original.direction?.toLowerCase() === 'inbound';
+                const isAI = !isInbound;
+                const showTimestamp = itemIndex === 0 ||
+                  new Date(original.timestamp) - new Date(
+                    groupedMessages[itemIndex - 1].type === 'activity' 
+                      ? groupedMessages[itemIndex - 1].data.timeline_timestamp
+                      : groupedMessages[itemIndex - 1].data.original.timestamp
+                  ) > 5 * 60 * 1000;
 
-        {!isInbound && (
-          <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center flex-shrink-0">
-            <Bot size={16} className="text-white" />
-          </div>
-        )}
-      </div>
-    </div>
-  );
-})
+                return (
+                  <div key={original.id}>
+                    {showTimestamp && (
+                      <div className="text-center my-4">
+                        <span className="px-3 py-1 bg-gray-100 text-gray-500 text-xs rounded-full">
+                          {formatDate(original.timestamp)}
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Original Message */}
+                    <div
+                      className={`flex ${isInbound ? 'justify-start' : 'justify-end'} items-start gap-3`}
+                    >
+                      {isInbound && (
+                        <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center flex-shrink-0">
+                          <User size={16} className="text-gray-600" />
+                        </div>
+                      )}
+
+                      <div className={`max-w-md ${isInbound ? 'mr-12' : 'ml-12'}`}>
+                        <div
+                          className={`px-4 py-3 rounded-2xl ${
+                            isInbound
+                              ? 'bg-gray-100 text-gray-900'
+                              : 'bg-gradient-to-r from-blue-600 to-blue-700 text-white'
+                          }`}
+                        >
+                          <p className="text-sm leading-relaxed">{original.message_body || '—'}</p>
+                        </div>
+
+                        <div
+                          className={`flex items-center gap-2 mt-1 text-xs text-gray-500 ${
+                            isInbound ? 'justify-start' : 'justify-end'
+                          }`}
+                        >
+                          <span>{formatTime(original.timestamp)}</span>
+                          {isAI && (
+                            <>
+                              <span>•</span>
+                              <div className="flex items-center gap-1">
+                                <Sparkles size={12} />
+                                <span>{original.sender === 'Manual' ? 'Manual' : 'AI'}</span>
+                              </div>
+                            </>
+                          )}
+                          {/* Show scoring info for inbound messages with scores */}
+                          {original.direction === 'inbound' && original.weighted_score && (
+                            <>
+                              <span>•</span>
+                              <span className="text-xs text-gray-400">
+                                Score: {original.weighted_score}
+                              </span>
+                            </>
+                          )}
+                        </div>
+
+                        {/* Status Pill for Outbound Messages */}
+                        {original.direction === 'outbound' && (
+                          <div className={`mt-2 ${isInbound ? 'text-left' : 'text-right'}`}>
+                            {original.status === 'failed' && (
+                              <StatusPill 
+                                type="error" 
+                                label="Failed" 
+                                tooltip={`Error Code: ${original.error_code || 'Unknown'}`} 
+                              />
+                            )}
+                            {original.status === 'sent' && (
+                              <StatusPill type="warning" label="Sent" tooltip="Delivered to carrier" />
+                            )}
+                            {original.status === 'queued' && (
+                              <StatusPill type="warning" label="Queued" />
+                            )}
+                            {original.status === 'delivered' && (
+                              <StatusPill type="success" label="Delivered" tooltip="Delivered to recipient" />
+                            )}
+                          </div>
+                        )}
+                        
+                        {/* Show if this message triggered an alert */}
+                        {lead.alert_details?.last_message && 
+                         original.message_body?.toLowerCase().includes(lead.alert_details.last_message.toLowerCase()) && (
+                          <div className="mt-2 flex items-center gap-2 text-xs text-orange-600">
+                            <AlertCircle size={12} />
+                            <span>This message triggered an alert</span>
+                          </div>
+                        )}
+
+                        {/* Retry Messages Section */}
+                        {retries.length > 0 && (
+                          <div className="mt-3 space-y-2">
+                            <button
+                              onClick={() => toggleRetryExpansion(original.id)}
+                              className="flex items-center gap-2 text-xs text-gray-500 hover:text-gray-700 transition-colors"
+                            >
+                              {expandedRetries.has(original.id) ? (
+                                <ChevronDown size={14} />
+                              ) : (
+                                <ChevronRight size={14} />
+                              )}
+                              <span>{retries.length} retry attempt{retries.length > 1 ? 's' : ''}</span>
+                              <span className="text-gray-400">
+                                (Last: {formatTime(retries[retries.length - 1].timestamp)})
+                              </span>
+                            </button>
+
+                            {/* Expanded Retry Messages */}
+                            {expandedRetries.has(original.id) && (
+                              <div className="ml-4 space-y-3 border-l-2 border-gray-200 pl-4">
+                                {retries.map((retry, retryIndex) => (
+                                  <div key={retry.id} className="space-y-1">
+                                    <div className="px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg text-sm">
+                                      <p className="text-gray-900">{retry.message_body}</p>
+                                    </div>
+                                    
+                                    <div className="flex items-center justify-between text-xs text-gray-500">
+                                      <div className="flex items-center gap-2">
+                                        <span>Retry #{retryIndex + 1}</span>
+                                        <span>•</span>
+                                        <span>{formatTime(retry.timestamp)}</span>
+                                      </div>
+                                      
+                                      <div>
+                                        {retry.status === 'failed' && (
+                                          <StatusPill 
+                                            type="error" 
+                                            label="Failed" 
+                                            tooltip={`Error Code: ${retry.error_code || 'Unknown'}`} 
+                                          />
+                                        )}
+                                        {retry.status === 'sent' && (
+                                          <StatusPill type="warning" label="Sent" tooltip="Delivered to carrier" />
+                                        )}
+                                        {retry.status === 'queued' && (
+                                          <StatusPill type="warning" label="Queued" />
+                                        )}
+                                        {retry.status === 'delivered' && (
+                                          <StatusPill type="success" label="Delivered" tooltip="Delivered to recipient" />
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      {!isInbound && (
+                        <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center flex-shrink-0">
+                          <Bot size={16} className="text-white" />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })
             )}
+          </div>
 
-            {/* Message Input for Desktop */}
-            {canSendMessages && (
+          {/* Message Input for Desktop */}
+          {canSendMessages && (
             <div className="p-6 border-t border-gray-200 bg-gray-50">
               <div className="flex gap-3">
                 <input
@@ -2053,237 +2054,238 @@ export default function LeadDetail() {
                 </div>
               ) : (
                 groupedMessages.map((timelineItem, itemIndex) => {
-  // Handle activity items
-  if (timelineItem.type === 'activity') {
-    const activity = timelineItem.data;
-    const showTimestamp = itemIndex === 0 || 
-      new Date(activity.timeline_timestamp) - new Date(
-        groupedMessages[itemIndex - 1].type === 'activity' 
-          ? groupedMessages[itemIndex - 1].data.timeline_timestamp
-          : groupedMessages[itemIndex - 1].data.original.timestamp
-      ) > 5 * 60 * 1000;
+                  // Handle activity items
+                  if (timelineItem.type === 'activity') {
+                    const activity = timelineItem.data;
+                    const showTimestamp = itemIndex === 0 || 
+                      new Date(activity.timeline_timestamp) - new Date(
+                        groupedMessages[itemIndex - 1].type === 'activity' 
+                          ? groupedMessages[itemIndex - 1].data.timeline_timestamp
+                          : groupedMessages[itemIndex - 1].data.original.timestamp
+                      ) > 5 * 60 * 1000;
 
-    return (
-      <div key={`activity-${activity.id}`}>
-        {showTimestamp && (
-          <div className="text-center my-4">
-            <span className="px-3 py-1 bg-gray-100 text-gray-500 text-xs rounded-full">
-              {formatDate(activity.timeline_timestamp)}
-            </span>
-          </div>
-        )}
+                    return (
+                      <div key={`activity-${activity.id}`}>
+                        {showTimestamp && (
+                          <div className="text-center my-4">
+                            <span className="px-3 py-1 bg-gray-100 text-gray-500 text-xs rounded-full">
+                              {formatDate(activity.timeline_timestamp)}
+                            </span>
+                          </div>
+                        )}
 
-        {/* Activity Timeline Item - Mobile */}
-        <div className="flex justify-center items-center my-4">
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 max-w-[85%]">
-            <div className="flex items-center gap-2 mb-2">
-              <Phone size={14} className="text-yellow-600" />
-              <span className="text-sm font-medium text-yellow-900">
-                {activity.activity_type === 'call' ? 'Phone Call' :
-                 activity.activity_type === 'email' ? 'Email Sent' :
-                 activity.activity_type === 'meeting' ? 'Meeting' :
-                 activity.activity_type || 'Sales Activity'}
-              </span>
-            </div>
-            
-            <div className="text-xs text-gray-600 space-y-1">
-              {activity.outcome && (
-                <div><strong>Outcome:</strong> {activity.outcome}</div>
-              )}
-              {activity.duration_seconds && (
-                <div><strong>Duration:</strong> {Math.round(activity.duration_seconds / 60)} minutes</div>
-              )}
-              {activity.notes && (
-                <div><strong>Notes:</strong> {activity.notes}</div>
-              )}
-              {activity.created_by && (
-                <div><strong>By:</strong> {activity.created_by}</div>
-              )}
-            </div>
-            
-            <div className="text-xs text-gray-400 mt-2">
-              {formatTime(activity.timeline_timestamp)}
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-  
-  // Handle message group items
-  const messageGroup = timelineItem.data;
-  const { original, retries } = messageGroup;
-  const isInbound = original.direction?.toLowerCase() === 'inbound';
-  const showTimestamp = itemIndex === 0 || 
-    new Date(original.timestamp) - new Date(
-      groupedMessages[itemIndex - 1].type === 'activity' 
-        ? groupedMessages[itemIndex - 1].data.timeline_timestamp
-        : groupedMessages[itemIndex - 1].data.original.timestamp
-    ) > 5 * 60 * 1000;
-
-  return (
-    <div key={original.id}>
-      {showTimestamp && (
-        <div className="text-center my-4">
-          <span className="px-3 py-1 bg-gray-100 text-gray-500 text-xs rounded-full">
-            {formatDate(original.timestamp)}
-          </span>
-        </div>
-      )}
-
-      <div className={`flex ${isInbound ? 'justify-start' : 'justify-end'} items-start gap-2`}>
-        {isInbound && (
-          <div className="w-7 h-7 bg-gray-200 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
-            <User size={14} className="text-gray-600" />
-          </div>
-        )}
-
-        <div className={`max-w-[85%] ${isInbound ? '' : 'ml-8'}`}>
-          <div
-            className={`px-3 py-2 rounded-2xl ${
-              isInbound
-                ? 'bg-gray-100 text-gray-900'
-                : 'bg-gradient-to-r from-blue-600 to-blue-700 text-white'
-            }`}
-          >
-            <p className="text-sm leading-relaxed">{original.message_body || '—'}</p>
-          </div>
-
-          <div className={`flex items-center gap-1 mt-1 text-xs text-gray-500 ${
-            isInbound ? 'justify-start' : 'justify-end'
-          }`}>
-            <span>{formatTime(original.timestamp)}</span>
-            {!isInbound && (
-              <>
-                <span>•</span>
-                <Sparkles size={10} />
-                <span>{original.sender === 'Manual' ? 'Manual' : 'AI'}</span>
-              </>
-            )}
-            {/* Show scoring info for inbound messages with scores */}
-            {original.direction === 'inbound' && original.weighted_score && (
-              <>
-                <span>•</span>
-                <span className="text-xs text-gray-400">
-                  Score: {original.weighted_score}
-                </span>
-              </>
-            )}
-          </div>
-
-          {/* Status for outbound messages */}
-          {original.direction === 'outbound' && (
-            <div className={`mt-1 ${isInbound ? 'text-left' : 'text-right'}`}>
-              {original.status === 'failed' && <StatusPill type="error" label="Failed" tooltip={`Error Code: ${original.error_code || 'Unknown'}`} />}
-              {original.status === 'sent' && <StatusPill type="warning" label="Sent" tooltip="Delivered to carrier" />}
-              {original.status === 'queued' && <StatusPill type="warning" label="Queued" />}
-              {original.status === 'delivered' && <StatusPill type="success" label="Delivered" tooltip="Delivered to recipient" />}
-            </div>
-          )}
-
-          {/* Show if this message triggered an alert */}
-          {lead.alert_details?.last_message && 
-           original.message_body?.toLowerCase().includes(lead.alert_details.last_message.toLowerCase()) && (
-            <div className="mt-2 flex items-center gap-2 text-xs text-orange-600">
-              <AlertCircle size={12} />
-              <span>This message triggered an alert</span>
-            </div>
-          )}
-
-          {/* Retry Messages Section */}
-          {retries.length > 0 && (
-            <div className="mt-3 space-y-2">
-              <button
-                onClick={() => toggleRetryExpansion(original.id)}
-                className="flex items-center gap-2 text-xs text-gray-500 hover:text-gray-700 transition-colors"
-              >
-                {expandedRetries.has(original.id) ? (
-                  <ChevronDown size={14} />
-                ) : (
-                  <ChevronRight size={14} />
-                )}
-                <span>{retries.length} retry attempt{retries.length > 1 ? 's' : ''}</span>
-                <span className="text-gray-400">
-                  (Last: {formatTime(retries[retries.length - 1].timestamp)})
-                </span>
-              </button>
-
-              {/* Expanded Retry Messages */}
-              {expandedRetries.has(original.id) && (
-                <div className="ml-4 space-y-3 border-l-2 border-gray-200 pl-4">
-                  {retries.map((retry, retryIndex) => (
-                    <div key={retry.id} className="space-y-1">
-                      <div className="px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg text-sm">
-                        <p className="text-gray-900">{retry.message_body}</p>
+                        {/* Activity Timeline Item - Mobile */}
+                        <div className="flex justify-center items-center my-4">
+                          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 max-w-[85%]">
+                            <div className="flex items-center gap-2 mb-2">
+                              <Phone size={14} className="text-yellow-600" />
+                              <span className="text-sm font-medium text-yellow-900">
+                                {activity.activity_type === 'call' ? 'Phone Call' :
+                                 activity.activity_type === 'email' ? 'Email Sent' :
+                                 activity.activity_type === 'meeting' ? 'Meeting' :
+                                 activity.activity_type || 'Sales Activity'}
+                              </span>
+                            </div>
+                            
+                            <div className="text-xs text-gray-600 space-y-1">
+                              {activity.outcome && (
+                                <div><strong>Outcome:</strong> {activity.outcome}</div>
+                              )}
+                              {activity.duration_seconds && (
+                                <div><strong>Duration:</strong> {Math.round(activity.duration_seconds / 60)} minutes</div>
+                              )}
+                              {activity.notes && (
+                                <div><strong>Notes:</strong> {activity.notes}</div>
+                              )}
+                              {activity.created_by && (
+                                <div><strong>By:</strong> {activity.created_by}</div>
+                              )}
+                            </div>
+                            
+                            <div className="text-xs text-gray-400 mt-2">
+                              {formatTime(activity.timeline_timestamp)}
+                            </div>
+                          </div>
+                        </div>
                       </div>
-                      
-                      <div className="flex items-center justify-between text-xs text-gray-500">
-                        <div className="flex items-center gap-2">
-                          <span>Retry #{retryIndex + 1}</span>
-                          <span>•</span>
-                          <span>{formatTime(retry.timestamp)}</span>
+                    );
+                  }
+                  
+                  // Handle message group items
+                  const messageGroup = timelineItem.data;
+                  const { original, retries } = messageGroup;
+                  const isInbound = original.direction?.toLowerCase() === 'inbound';
+                  const showTimestamp = itemIndex === 0 || 
+                    new Date(original.timestamp) - new Date(
+                      groupedMessages[itemIndex - 1].type === 'activity' 
+                        ? groupedMessages[itemIndex - 1].data.timeline_timestamp
+                        : groupedMessages[itemIndex - 1].data.original.timestamp
+                    ) > 5 * 60 * 1000;
+
+                  return (
+                    <div key={original.id}>
+                      {showTimestamp && (
+                        <div className="text-center my-4">
+                          <span className="px-3 py-1 bg-gray-100 text-gray-500 text-xs rounded-full">
+                            {formatDate(original.timestamp)}
+                          </span>
                         </div>
-                        
-                        <div>
-                          {retry.status === 'failed' && (
-                            <StatusPill 
-                              type="error" 
-                              label="Failed" 
-                              tooltip={`Error Code: ${retry.error_code || 'Unknown'}`} 
-                            />
+                      )}
+
+                      <div className={`flex ${isInbound ? 'justify-start' : 'justify-end'} items-start gap-2`}>
+                        {isInbound && (
+                          <div className="w-7 h-7 bg-gray-200 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
+                            <User size={14} className="text-gray-600" />
+                          </div>
+                        )}
+
+                        <div className={`max-w-[85%] ${isInbound ? '' : 'ml-8'}`}>
+                          <div
+                            className={`px-3 py-2 rounded-2xl ${
+                              isInbound
+                                ? 'bg-gray-100 text-gray-900'
+                                : 'bg-gradient-to-r from-blue-600 to-blue-700 text-white'
+                            }`}
+                          >
+                            <p className="text-sm leading-relaxed">{original.message_body || '—'}</p>
+                          </div>
+
+                          <div className={`flex items-center gap-1 mt-1 text-xs text-gray-500 ${
+                            isInbound ? 'justify-start' : 'justify-end'
+                          }`}>
+                            <span>{formatTime(original.timestamp)}</span>
+                            {!isInbound && (
+                              <>
+                                <span>•</span>
+                                <Sparkles size={10} />
+                                <span>{original.sender === 'Manual' ? 'Manual' : 'AI'}</span>
+                              </>
+                            )}
+                            {/* Show scoring info for inbound messages with scores */}
+                            {original.direction === 'inbound' && original.weighted_score && (
+                              <>
+                                <span>•</span>
+                                <span className="text-xs text-gray-400">
+                                  Score: {original.weighted_score}
+                                </span>
+                              </>
+                            )}
+                          </div>
+
+                          {/* Status for outbound messages */}
+                          {original.direction === 'outbound' && (
+                            <div className={`mt-1 ${isInbound ? 'text-left' : 'text-right'}`}>
+                              {original.status === 'failed' && <StatusPill type="error" label="Failed" tooltip={`Error Code: ${original.error_code || 'Unknown'}`} />}
+                              {original.status === 'sent' && <StatusPill type="warning" label="Sent" tooltip="Delivered to carrier" />}
+                              {original.status === 'queued' && <StatusPill type="warning" label="Queued" />}
+                              {original.status === 'delivered' && <StatusPill type="success" label="Delivered" tooltip="Delivered to recipient" />}
+                            </div>
                           )}
-                          {retry.status === 'sent' && (
-                            <StatusPill type="warning" label="Sent" tooltip="Delivered to carrier" />
+
+                          {/* Show if this message triggered an alert */}
+                          {lead.alert_details?.last_message && 
+                           original.message_body?.toLowerCase().includes(lead.alert_details.last_message.toLowerCase()) && (
+                            <div className="mt-2 flex items-center gap-2 text-xs text-orange-600">
+                              <AlertCircle size={12} />
+                              <span>This message triggered an alert</span>
+                            </div>
                           )}
-                          {retry.status === 'queued' && (
-                            <StatusPill type="warning" label="Queued" />
-                          )}
-                          {retry.status === 'delivered' && (
-                            <StatusPill type="success" label="Delivered" tooltip="Delivered to recipient" />
+
+                          {/* Retry Messages Section */}
+                          {retries.length > 0 && (
+                            <div className="mt-3 space-y-2">
+                              <button
+                                onClick={() => toggleRetryExpansion(original.id)}
+                                className="flex items-center gap-2 text-xs text-gray-500 hover:text-gray-700 transition-colors"
+                              >
+                                {expandedRetries.has(original.id) ? (
+                                  <ChevronDown size={14} />
+                                ) : (
+                                  <ChevronRight size={14} />
+                                )}
+                                <span>{retries.length} retry attempt{retries.length > 1 ? 's' : ''}</span>
+                                <span className="text-gray-400">
+                                  (Last: {formatTime(retries[retries.length - 1].timestamp)})
+                                </span>
+                              </button>
+
+                              {/* Expanded Retry Messages */}
+                              {expandedRetries.has(original.id) && (
+                                <div className="ml-4 space-y-3 border-l-2 border-gray-200 pl-4">
+                                  {retries.map((retry, retryIndex) => (
+                                    <div key={retry.id} className="space-y-1">
+                                      <div className="px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg text-sm">
+                                        <p className="text-gray-900">{retry.message_body}</p>
+                                      </div>
+                                      
+                                      <div className="flex items-center justify-between text-xs text-gray-500">
+                                        <div className="flex items-center gap-2">
+                                          <span>Retry #{retryIndex + 1}</span>
+                                          <span>•</span>
+                                          <span>{formatTime(retry.timestamp)}</span>
+                                        </div>
+                                        
+                                        <div>
+                                          {retry.status === 'failed' && (
+                                            <StatusPill 
+                                              type="error" 
+                                              label="Failed" 
+                                              tooltip={`Error Code: ${retry.error_code || 'Unknown'}`} 
+                                            />
+                                          )}
+                                          {retry.status === 'sent' && (
+                                            <StatusPill type="warning" label="Sent" tooltip="Delivered to carrier" />
+                                          )}
+                                          {retry.status === 'queued' && (
+                                            <StatusPill type="warning" label="Queued" />
+                                          )}
+                                          {retry.status === 'delivered' && (
+                                            <StatusPill type="success" label="Delivered" tooltip="Delivered to recipient" />
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
                           )}
                         </div>
+
+                        {!isInbound && (
+                          <div className="w-7 h-7 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
+                            <Bot size={14} className="text-white" />
+                          </div>
+                        )}
                       </div>
                     </div>
-                  ))}
+                  );
+                })
+              )}
+
+              {/* Message Input for Mobile */}
+              {canSendMessages && (
+                <div className="fixed bottom-20 left-0 right-0 p-4 bg-white border-t border-gray-200">
+                  <div className="flex gap-3">
+                    <input
+                      type="text"
+                      value={newMessage}
+                      onChange={(e) => setNewMessage(e.target.value)}
+                      placeholder="Send a message..."
+                      className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+                      onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+                    />
+                    <button
+                      onClick={handleSendMessage}
+                      disabled={!newMessage.trim() || sendingMessage}
+                      className="flex items-center gap-2 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      <Send size={16} />
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
-          )}
-        </div>
-
-        {!isInbound && (
-          <div className="w-7 h-7 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
-            <Bot size={14} className="text-white" />
-          </div>
-        )}
-      </div>
-    </div>
-);
-})
-            )}
-
-            {/* Message Input for Mobile */}
-            {canSendMessages && (
-              <div className="fixed bottom-20 left-0 right-0 p-4 bg-white border-t border-gray-200">
-                <div className="flex gap-3">
-                  <input
-                    type="text"
-                    value={newMessage}
-                    onChange={(e) => setNewMessage(e.target.value)}
-                    placeholder="Send a message..."
-                    className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
-                    onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
-                  />
-                  <button
-                    onClick={handleSendMessage}
-                    disabled={!newMessage.trim() || sendingMessage}
-                    className="flex items-center gap-2 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  >
-                    <Send size={16} />
-                  </button>
-                </div>
-              </div>
-            )}
           </div>
         )}
 
@@ -2732,4 +2734,4 @@ export default function LeadDetail() {
       </div>
     </div>
   );
-};
+}
