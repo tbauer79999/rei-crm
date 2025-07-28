@@ -998,7 +998,7 @@ export default function LeadDetail() {
   const retryStats = useMemo(() => calculateRetryStats(), [messages]);
   const groupedMessages = useMemo(() => {
   // Separate messages from activities
-  const messageItems = messages.filter(item => item.type === 'message' || !item.type);
+  const messageItems = messages.filter(item => item.type === 'message');
   const activityItems = messages.filter(item => item.type === 'activity');
   
   // Group messages with retries as before
@@ -1734,7 +1734,7 @@ export default function LeadDetail() {
       </div>
     </div>
   );
-})
+)}
        
           {canSendMessages && (
             <div className="p-6 border-t border-gray-200 bg-gray-50">
