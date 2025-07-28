@@ -1,16 +1,74 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { getFeatureValue } from '../../lib/plans';
-import { callEdgeFunction } from '../../lib/edgeFunctionAuth';
 import { 
   X, TrendingUp, Users, Calendar, Clock, CheckCircle, Phone, 
   AlertTriangle, BarChart3, Activity, Timer, Target, XCircle,
   PhoneCall, PhoneOff, UserCheck, UserX, MessageSquare, Lock
 } from 'lucide-react';
 
+const supabase = require('../../lib/supabaseClient');
+
 // Edge Function URL - Update to use sync_sales_metrics
-const buildApiUrl = (component, tenantId, period = '30days', action = 'fetch') => {
-  return `https://wuuqrdlfgkasnwydyvgk.supabase.co/functions/v1/sync_sales_metrics?action=${action}&component=${component}&tenant_id=${tenantId}&period=${period}`;
+// Database query functions for hot lead data
+const fetchHotLeadData = async (tenantId) => {
+  const { data: salesMetrics, error: salesError } = await supabase
+    .from('sales_metrics')
+    .select('*')
+    .eq('tenant_id', tenantId)
+    .order('metric_date', { ascending: false })
+    .limit(1);
+
+  if (salesError) throw salesError;
+
+  const { data: conversations, error: convError } = await supabase
+    .from('conversation_analytics')
+    .select('*')
+    .eq('tenant_id', tenantId)
+    .eq('call_logged', false)
+    .gte('analyzed_at', new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString())
+    .order('analyzed_at', { ascending: false });
+
+  if (convError) throw convError;
+
+  const latestMetrics = salesMetrics[0] || {};
+  
+  return {
+    hotLeads: conversations.map(conv => ({
+      id: conv.conversation_id,
+      name: conv.lead_id || 'Unknown Lead',
+      snippet: conv.content_analysis?.summary || 'No summary available',
+      campaign: conv.campaign_id || 'Unknown',
+      marked_hot_time_ago: formatTimeAgo(conv.marked_hot_at || conv.analyzed_at),
+      call_logged: conv.call_logged,
+      requires_immediate_attention: conv.requires_immediate_attention
+    })),
+    hotSummary: {
+      avg_response: formatDuration(latestMetrics.avg_response_time_minutes),
+      fastest_response: formatDuration(latestMetrics.fastest_response_time_minutes),
+      slowest_response: formatDuration(latestMetrics.slowest_response_time_minutes),
+      connected: latestMetrics.calls_connected || 0,
+      voicemail: latestMetrics.calls_voicemail || 0,
+      no_answer: latestMetrics.calls_no_answer || 0,
+      not_fit: latestMetrics.calls_not_fit || 0,
+      qualified: latestMetrics.calls_qualified || 0
+    }
+  };
+};
+
+const formatTimeAgo = (timestamp) => {
+  if (!timestamp) return 'Unknown';
+  const diff = Date.now() - new Date(timestamp).getTime();
+  const hours = Math.floor(diff / (1000 * 60 * 60));
+  const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+  return hours > 0 ? `${hours}h ${minutes}m ago` : `${minutes}m ago`;
+};
+
+const formatDuration = (minutes) => {
+  if (!minutes || minutes === 0) return '—';
+  const hours = Math.floor(minutes / 60);
+  const mins = Math.floor(minutes % 60);
+  return hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
 };
 
 // Modal configuration for each card
@@ -924,12 +982,10 @@ const HotLeadHandoffPanel = () => {
     try {
       setLoading(true);
       setError(null);
-      console.log('Fetching hot leads data for tenant:', user.tenant_id);
+      console.log('Fetching hot leads data from database for tenant:', user.tenant_id);
 
-      // Single call to get all hot lead data using sync_sales_metrics
-      const apiUrl = buildApiUrl('hotleads', user.tenant_id, '30days');
-      const data = await callEdgeFunction(apiUrl);
-      console.log('Hot leads response:', data);
+      const data = await fetchHotLeadData(user.tenant_id);
+      console.log('Hot leads database response:', data);
       
       setHotLeads(data.hotLeads || []);
       setStats(data.hotSummary || {});
@@ -982,59 +1038,45 @@ const HotLeadHandoffPanel = () => {
     }
 
     try {
-      // FIRST log the call using sync_sales_metrics
-      console.log('Logging call for lead:', selectedLead.id);
-      
-      const logCallUrl = buildApiUrl('hotleads', user.tenant_id, '30days', 'log-call');
-      const logResponse = await callEdgeFunction(logCallUrl, {
-        method: 'POST',
-        body: {
-          lead_id: selectedLead.id
-        }
-      });
+      // Update conversation_analytics to log the call
+const updateData = {
+  call_logged: true,
+  call_outcome: outcome
+};
 
-      if (!logResponse.success) {
-        throw new Error('Failed to log call');
-      }
+// Add pipeline value if this is a qualified lead
+if (outcome === 'qualified' && pipelineValue) {
+  const cleanValue = pipelineValue.toString().replace(/,/g, '');
+  const numericValue = parseFloat(cleanValue);
+  
+  if (!isNaN(numericValue) && numericValue > 0) {
+    updateData.pipeline_value = numericValue;
+  } else {
+    console.error('Invalid pipeline value:', pipelineValue);
+    throw new Error('Invalid pipeline value');
+  }
+}
 
-      // THEN update the outcome using sync_sales_metrics
-      const outcomeData = {
-        lead_id: selectedLead.id,
-        outcome: outcome
-      };
-      
-      // Add pipeline value if this is a qualified lead
-      if (outcome === 'qualified' && pipelineValue) {
-        // Ensure we're sending a valid number
-        const cleanValue = pipelineValue.toString().replace(/,/g, '');
-        const numericValue = parseFloat(cleanValue);
-        
-        if (!isNaN(numericValue) && numericValue > 0) {
-          outcomeData.estimated_pipeline_value = numericValue;
-        } else {
-          console.error('Invalid pipeline value:', pipelineValue);
-          throw new Error('Invalid pipeline value');
-        }
-      }
-      
-      console.log('Sending outcome data:', outcomeData);
-      
-      const updateOutcomeUrl = buildApiUrl('hotleads', user.tenant_id, '30days', 'update-outcome');
-      const outcomeResponse = await callEdgeFunction(updateOutcomeUrl, {
-        method: 'POST',
-        body: outcomeData
-      });
+console.log('Updating conversation with outcome:', updateData);
 
-      if (outcomeResponse.success) {
-        console.log('Call logged and outcome updated successfully!');
-        setShowOutcomeModal(false);
-        setSelectedLead(null);
-        setSelectedOutcome(null);
-        setPipelineValue('');
-        
-        // Refresh data to get updated stats
-        fetchData();
-      }
+const { error: updateError } = await supabase
+  .from('conversation_analytics')
+  .update(updateData)
+  .eq('conversation_id', selectedLead.id)
+  .eq('tenant_id', user.tenant_id);
+
+if (updateError) {
+  throw new Error('Failed to log call outcome');
+}
+
+console.log('Call logged and outcome updated successfully!');
+setShowOutcomeModal(false);
+setSelectedLead(null);
+setSelectedOutcome(null);
+setPipelineValue('');
+
+// Refresh data to get updated stats
+fetchData();
 
     } catch (error) {
       console.error('Error updating call outcome:', error);
