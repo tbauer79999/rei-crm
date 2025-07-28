@@ -11,17 +11,26 @@ const supabase = require('../../lib/supabaseClient');
 
 
 // Database query functions (ONLY CHANGE - replacing edge function calls)
-const fetchOverviewMetrics = async (tenantId, period = '30days') => {
+const fetchOverviewMetrics = async (tenantId, userId = null, period = '30days') => {
   const daysBack = period === '7days' ? 7 : period === '90days' ? 90 : 30;
   const startDate = new Date();
   startDate.setDate(startDate.getDate() - daysBack);
 
-  const { data: salesMetrics, error } = await supabase
+let query = supabase
     .from('sales_metrics')
     .select('*')
     .eq('tenant_id', tenantId)
     .gte('metric_date', startDate.toISOString().split('T')[0])
     .order('metric_date', { ascending: false });
+
+  // If userId is provided, filter for that specific user, otherwise get tenant-level data
+  if (userId) {
+    query = query.eq('user_profile_id', userId);
+  } else {
+    query = query.is('user_profile_id', null);
+  }
+
+  const { data: salesMetrics, error } = await query;
 
   if (error) throw error;
 
@@ -71,18 +80,26 @@ const fetchOverviewMetrics = async (tenantId, period = '30days') => {
   };
 };
 
-const fetchDetailedMetrics = async (tenantId, metricType, period = '30days') => {
+const fetchDetailedMetrics = async (tenantId, userId = null, metricType, period = '30days') => {
   const daysBack = period === '7days' ? 7 : period === '90days' ? 90 : 30;
   const startDate = new Date();
   startDate.setDate(startDate.getDate() - daysBack);
 
   // Fetch real data from both tables
-  const { data: salesMetrics, error: salesError } = await supabase
+let salesQuery = supabase
     .from('sales_metrics')
     .select('*')
     .eq('tenant_id', tenantId)
     .gte('metric_date', startDate.toISOString().split('T')[0])
     .order('metric_date', { ascending: true });
+
+  if (userId) {
+    salesQuery = salesQuery.eq('user_profile_id', userId);
+  } else {
+    salesQuery = salesQuery.is('user_profile_id', null);
+  }
+
+  const { data: salesMetrics, error: salesError } = await salesQuery;
 
   if (salesError) throw salesError;
 
@@ -209,8 +226,13 @@ function extractSourceData(salesMetrics) {
   let colorIndex = 0;
 
   salesMetrics.forEach(row => {
-    if (row.custom_metrics && row.custom_metrics.lead_sources) {
-      Object.entries(row.custom_metrics.lead_sources).forEach(([source, count]) => {
+    if (row.lead_sources) {
+      try {
+        const leadSources = typeof row.lead_sources === 'string' 
+          ? JSON.parse(row.lead_sources) 
+          : row.lead_sources;
+        
+        Object.entries(leadSources).forEach(([source, count]) => {
         if (!sourceMap[source]) {
           sourceMap[source] = {
             source,
@@ -227,11 +249,69 @@ function extractSourceData(salesMetrics) {
   return Object.values(sourceMap);
 }
 
+// FIND THIS FUNCTION:
 function generateTopSalespersons(salesMetrics) {
   // Since we don't have individual salesperson data, create a placeholder
   return [
     { id: '1', name: 'AI Agent', totalLeads: salesMetrics.reduce((sum, row) => sum + (row.total_leads_assigned || 0), 0), avatar: '🤖' }
   ];
+}
+
+// REPLACE WITH THIS:
+async function getTopSalespersons(tenantId, startDate) {
+  // Get individual user metrics (not tenant-level)
+  const { data: userMetrics, error } = await supabase
+    .from('sales_metrics')
+    .select('user_profile_id, total_leads_assigned, hot_leads, conversion_count')
+    .eq('tenant_id', tenantId)
+    .not('user_profile_id', 'is', null) // Only individual user metrics
+    .gte('metric_date', startDate)
+    .order('total_leads_assigned', { ascending: false });
+  
+  if (error || !userMetrics) return [];
+
+  // Get user profile information
+  const userIds = [...new Set(userMetrics.map(m => m.user_profile_id))];
+  if (userIds.length === 0) return [];
+  
+  const { data: userProfiles } = await supabase
+    .from('user_profiles') // or whatever your users table is called
+    .select('id, name, email, avatar')
+    .in('id', userIds);
+
+  // Aggregate metrics by user and combine with profile data
+  const userAggregates = {};
+  userMetrics.forEach(metric => {
+    const userId = metric.user_profile_id;
+    if (!userAggregates[userId]) {
+      userAggregates[userId] = {
+        totalLeads: 0,
+        hotLeads: 0,
+        conversions: 0
+      };
+    }
+    userAggregates[userId].totalLeads += metric.total_leads_assigned || 0;
+    userAggregates[userId].hotLeads += metric.hot_leads || 0;
+    userAggregates[userId].conversions += metric.conversion_count || 0;
+  });
+
+  // Create top salespeople list
+  const topSalespersons = Object.entries(userAggregates)
+    .map(([userId, metrics]: [string, any]) => {
+      const profile = userProfiles?.find(p => p.id === userId);
+      return {
+        id: userId,
+        name: profile?.name || profile?.email || 'Unknown User',
+        totalLeads: metrics.totalLeads,
+        hotLeads: metrics.hotLeads,
+        conversions: metrics.conversions,
+        avatar: profile?.avatar || '👤'
+      };
+    })
+    .sort((a, b) => b.totalLeads - a.totalLeads)
+    .slice(0, 5);
+
+  return topSalespersons;
 }
 
 function generateWeeklyTrend(salesMetrics) {
@@ -1785,7 +1865,7 @@ const generateMockData = (metricType) => {
 };
 
 // Main Component
-export default function OverviewMetrics() {
+export default function OverviewMetrics({ userId = null }) {
   const { user, currentPlan } = useAuth();
   
   // Get AI Control Room access level from plan
@@ -1861,7 +1941,7 @@ export default function OverviewMetrics() {
       setLoadingModal(true);
       
       try {
-        const data = await fetchDetailedMetrics(user.tenant_id, activeModal, newPeriod);
+        const data = await fetchDetailedMetrics(user.tenant_id, userId, activeModal, newPeriod);
         setModalData(data);
         
       } catch (error) {
@@ -1886,7 +1966,7 @@ export default function OverviewMetrics() {
         setError(null);
         
         console.log('🔍 Fetching overview metrics from database for tenant:', user.tenant_id);
-        const data = await fetchOverviewMetrics(user.tenant_id, '30days');
+        const data = await fetchOverviewMetrics(user.tenant_id, userId, '30days');
         console.log('📊 Database Response:', data);
 
         setMetrics(data);
@@ -1913,7 +1993,7 @@ export default function OverviewMetrics() {
     };
 
     fetchData();
-  }, [user]);
+  }, [user, userId]);
 
   if (loading) {
     return (
