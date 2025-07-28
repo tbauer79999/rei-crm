@@ -94,9 +94,6 @@ const fetchDetailedMetrics = async (tenantId, metricType, period = '30days') => 
     .order('sales_metric_date', { ascending: true });
 
   if (convError) throw convError;
-
-  // Return mock data for now - keeping all original mock generation logic
-  return generateMockData(metricType);
 };
 
 // Modal configuration for each metric
