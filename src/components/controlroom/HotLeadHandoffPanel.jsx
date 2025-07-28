@@ -1053,19 +1053,6 @@ const HotLeadHandoffPanel = () => {
   };
 
   const handleOutcomeSelection = async (outcome, pipelineValue = null) => {
-    console.log('handleOutcomeSelection called with:', { outcome, pipelineValue });
-    
-    if (!selectedLead || !user?.tenant_id) return;
-
-    // If selecting qualified, show the value input
-    if (outcome === 'qualified' && !pipelineValue) {
-      setSelectedOutcome('qualified');
-      return; // Don't submit yet
-    }
-
-    try {
-      // Update conversation_analytics to log the call
-const handleOutcomeSelection = async (outcome, pipelineValue = null) => {
   console.log('handleOutcomeSelection called with:', { outcome, pipelineValue });
   
   if (!selectedLead || !user?.tenant_id) return;
@@ -1108,6 +1095,21 @@ const handleOutcomeSelection = async (outcome, pipelineValue = null) => {
     if (updateError) {
       throw new Error('Failed to log call outcome: ' + updateError.message);
     }
+
+    console.log('Call logged and outcome updated successfully!');
+    setShowOutcomeModal(false);
+    setSelectedLead(null);
+    setSelectedOutcome(null);
+    setPipelineValue('');
+
+    // Refresh data to get updated stats
+    fetchData();
+
+  } catch (error) {
+    console.error('Error updating call outcome:', error);
+    alert('Failed to log call. Please try again.');
+  }
+};
 
     console.log('Call logged and outcome updated successfully!');
     setShowOutcomeModal(false);
