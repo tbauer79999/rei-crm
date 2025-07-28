@@ -233,16 +233,19 @@ function extractSourceData(salesMetrics) {
           : row.lead_sources;
         
         Object.entries(leadSources).forEach(([source, count]) => {
-        if (!sourceMap[source]) {
-          sourceMap[source] = {
-            source,
-            count: 0,
-            color: colors[colorIndex % colors.length]
-          };
-          colorIndex++;
-        }
-        sourceMap[source].count += count;
-      });
+          if (!sourceMap[source]) {
+            sourceMap[source] = {
+              source,
+              count: 0,
+              color: colors[colorIndex % colors.length]
+            };
+            colorIndex++;
+          }
+          sourceMap[source].count += count;
+        });
+      } catch (e) {
+        console.warn('Error parsing lead_sources JSON:', e);
+      }
     }
   });
 
