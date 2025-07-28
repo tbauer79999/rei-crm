@@ -1,13 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { getFeatureValue } from '../../lib/plans';
-const supabase = require('../../lib/supabaseClient');
 import { 
   X, TrendingUp, Users, Calendar, Mail, BarChart3, Target, 
   MessageSquare, Activity, Clock, CheckCircle, Send, Inbox,
   AlertTriangle, Lock
 } from 'lucide-react';
-console.log("hello")
+
+const supabase = require('../../lib/supabaseClient');
+
+
 // Database query functions (ONLY CHANGE - replacing edge function calls)
 const fetchOverviewMetrics = async (tenantId, period = '30days') => {
   const daysBack = period === '7days' ? 7 : period === '90days' ? 90 : 30;
