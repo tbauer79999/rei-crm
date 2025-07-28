@@ -10,11 +10,41 @@ import {
 } from 'recharts';
 import { useAuth } from '../../context/AuthContext';
 import { getFeatureValue } from '../../lib/plans';
-import { callEdgeFunction } from '../../lib/edgeFunctionAuth';
+import { supabase } from '../../lib/supabaseClient';
 import { X, TrendingUp, DollarSign, Target, Lock } from 'lucide-react';
 
 // Edge Function URL - Update this with your actual Supabase project URL
-const EDGE_FUNCTION_URL = 'https://wuuqrdlfgkasnwydyvgk.supabase.co/functions/v1/overview-analytics/analytics-trend-cost';
+// Database query function for trend and cost data
+const fetchTrendAndCostData = async (tenantId) => {
+  const { data: salesMetrics, error } = await supabase
+    .from('sales_metrics')
+    .select('*')
+    .eq('tenant_id', tenantId)
+    .gte('metric_date', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0])
+    .order('metric_date', { ascending: true });
+
+  if (error) throw error;
+
+  // Calculate aggregated data
+  const totalMessagesSent = salesMetrics.reduce((sum, row) => sum + (row.messages_sent_count || 0), 0);
+  const totalHotLeads = salesMetrics.reduce((sum, row) => sum + (row.hot_leads || 0), 0);
+  const previousMessagesSent = salesMetrics.reduce((sum, row) => sum + (row.previous_period_messages_sent || 0), 0);
+  const previousHotLeads = salesMetrics.reduce((sum, row) => sum + (row.previous_period_hot_leads || 0), 0);
+
+  // Generate trend data for hot lead rate
+  const trend = salesMetrics.map(row => ({
+    date: row.metric_date,
+    hotRate: row.total_leads_assigned > 0 ? ((row.hot_leads || 0) / row.total_leads_assigned) * 100 : 0
+  }));
+
+  return {
+    trend,
+    totalMessagesSent,
+    totalHotLeads,
+    previousMessagesSent,
+    previousHotLeads
+  };
+};
 
 // Modal configuration for detailed analytics
 const MODAL_CONFIG = {
@@ -687,9 +717,8 @@ export default function OverviewTrendAndCost() {
   };
 
   useEffect(() => {
-    // Ensure there's an active user before trying to fetch data
-    if (!user) {
-      console.log('No active user found, skipping fetch for OverviewTrendAndCost.');
+    if (!user || !user.tenant_id) {
+      console.log('No active user or tenant_id found, skipping fetch for OverviewTrendAndCost.');
       setLoading(false);
       return;
     }
@@ -699,7 +728,9 @@ export default function OverviewTrendAndCost() {
         setLoading(true);
         setError(null);
         
-        const data = await callEdgeFunction(EDGE_FUNCTION_URL);
+        console.log('🔍 Fetching trend and cost data from database for tenant:', user.tenant_id);
+        const data = await fetchTrendAndCostData(user.tenant_id);
+        console.log('📊 Database Response:', data);
         
         const {
           trend,
