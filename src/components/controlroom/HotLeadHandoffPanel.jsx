@@ -1052,7 +1052,10 @@ const HotLeadHandoffPanel = () => {
     }
   };
 
-  const handleOutcomeSelection = async (outcome, pipelineValue = null) => {
+  // The issue is in the handleOutcomeSelection function around line 1123
+// There's a duplicate/malformed function block. Here's the corrected version:
+
+const handleOutcomeSelection = async (outcome, pipelineValue = null) => {
   console.log('handleOutcomeSelection called with:', { outcome, pipelineValue });
   
   if (!selectedLead || !user?.tenant_id) return;
