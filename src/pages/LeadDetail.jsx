@@ -1734,9 +1734,11 @@ export default function LeadDetail() {
       </div>
     </div>
   );
-)}
-       
-          {canSendMessages && (
+})
+            )}
+
+            {/* Message Input for Desktop */}
+            {canSendMessages && (
             <div className="p-6 border-t border-gray-200 bg-gray-50">
               <div className="flex gap-3">
                 <input
