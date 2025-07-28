@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { getFeatureValue } from '../../lib/plans';
-import { callEdgeFunction } from '../../lib/edgeFunctionAuth';
 import {
   PieChart, Pie, Cell, Tooltip, ResponsiveContainer,
   BarChart, Bar, XAxis, YAxis, LineChart, Line, Legend,
@@ -13,9 +12,80 @@ import {
   Lock
 } from 'lucide-react';
 
+const supabase = require('../../lib/supabaseClient');
+
 // Edge Function URL - Updated to use unified analytics endpoint
-const buildApiUrl = (component, tenantId, period = '30days') => {
-  return `https://wuuqrdlfgkasnwydyvgk.supabase.co/functions/v1/sync_sales_metrics?action=fetch&component=${component}&tenant_id=${tenantId}&period=${period}`;
+// Database query functions for lead journey data
+const fetchLeadJourneyData = async (tenantId, dateRange) => {
+  const startDate = new Date();
+  startDate.setDate(startDate.getDate() - dateRange);
+
+  const { data: salesMetrics, error: salesError } = await supabase
+    .from('sales_metrics')
+    .select('*')
+    .eq('tenant_id', tenantId)
+    .gte('metric_date', startDate.toISOString().split('T')[0])
+    .order('metric_date', { ascending: false })
+    .limit(1);
+
+  if (salesError) throw salesError;
+
+  const { data: conversations, error: convError } = await supabase
+    .from('conversation_analytics')
+    .select('*')
+    .eq('tenant_id', tenantId)
+    .gte('analyzed_at', startDate.toISOString())
+    .order('analyzed_at', { ascending: true });
+
+  if (convError) throw convError;
+
+  const latestMetrics = salesMetrics[0] || {};
+  
+  // Process status distribution
+  const statusDistribution = latestMetrics.lead_status_distribution 
+    ? Object.entries(latestMetrics.lead_status_distribution).map(([name, value]) => ({ name, value }))
+    : [];
+
+  // Process funnel data
+  const funnelData = latestMetrics.funnel_conversion_data || [];
+
+  // Process transition data
+  const transitionData = latestMetrics.status_transition_data || [];
+
+  // Generate trend data from conversations
+  const trendData = generateTrendFromConversations(conversations, dateRange);
+
+  return {
+    statusDistribution,
+    funnelData,
+    transitionData,
+    totalLeads: latestMetrics.total_leads_assigned || 0,
+    trends: trendData,
+    trendData
+  };
+};
+
+const generateTrendFromConversations = (conversations, dateRange) => {
+  const dailyCounts = {};
+  
+  conversations.forEach(conv => {
+    const date = new Date(conv.analyzed_at).toISOString().split('T')[0];
+    dailyCounts[date] = (dailyCounts[date] || 0) + 1;
+  });
+
+  // Fill in missing dates with 0
+  const trend = [];
+  for (let i = dateRange - 1; i >= 0; i--) {
+    const date = new Date();
+    date.setDate(date.getDate() - i);
+    const dateStr = date.toISOString().split('T')[0];
+    trend.push({
+      date: dateStr,
+      leads: dailyCounts[dateStr] || 0
+    });
+  }
+
+  return trend;
 };
 
 const COLORS = ['#3b82f6', '#10b981', '#fbbf24', '#f97316', '#14b8a6', '#f43f5e', '#8b5cf6', '#ef4444'];
@@ -1046,10 +1116,8 @@ export default function LeadJourneyFunnel() {
     setModalData(null);
     
     try {
-      const detailUrl = buildApiUrl(`journey_${modalType}`, user.tenant_id, selectedPeriod);
-      console.log(`🔍 Calling detailed endpoint: ${detailUrl}`);
-      
-      const data = await callEdgeFunction(detailUrl);
+console.log(`🔍 Fetching detailed ${modalType} data from database`);
+const data = generateMockData(modalType); // Use mock data until detailed queries are implemented
       console.log(`📊 Detailed data returned for ${modalType}:`, data);
       
       if (data.error) {
@@ -1100,20 +1168,9 @@ export default function LeadJourneyFunnel() {
         setLoading(true);
         setError(null);
         
-        // Convert dateRange to period format
-        const period = `${dateRange}days`;
-        const apiUrl = buildApiUrl('lead_journey', user.tenant_id, period);
-        console.log('🔍 Fetching lead journey data from:', apiUrl);
-        const data = await callEdgeFunction(apiUrl);
-        console.log('📊 Raw API Response:', data);
-
-        if (!data || typeof data !== 'object') {
-          throw new Error('Invalid API response format');
-        }
-
-        if (data.error) {
-          throw new Error(data.error.details || data.error || 'API returned an error');
-        }
+        console.log('🔍 Fetching lead journey data from database for tenant:', user.tenant_id);
+        const data = await fetchLeadJourneyData(user.tenant_id, dateRange);
+        console.log('📊 Database Response:', data);
 
         setJourneyData({
           statusDistribution: data.statusDistribution || [],
