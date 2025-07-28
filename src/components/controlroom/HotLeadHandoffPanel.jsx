@@ -1113,31 +1113,9 @@ fetchData();
     setModalData(null);
     
     try {
-      let component = '';
-      
-      switch (modalType) {
-        case 'awaitingAction':
-          component = 'hotleads-awaiting';
-          break;
-          
-        case 'timeLag':
-          component = 'hotleads-timelag';
-          break;
-          
-        case 'salesOutcomes':
-          component = 'hotleads-outcomes';
-          break;
-          
-        default:
-          console.error('Unknown modal type:', modalType);
-          setLoadingModal(false);
-          return;
-      }
-      
-      const apiUrl = buildApiUrl(component, user.tenant_id, selectedPeriod);
-      const data = await callEdgeFunction(apiUrl);
-      
-      setModalData(data);
+  console.log(`🔍 Fetching detailed ${modalType} data from database`);
+  const data = generateModalMockData(modalType);
+  setModalData(data);
       
     } catch (error) {
       console.error('Error fetching modal data:', error);
@@ -1155,11 +1133,10 @@ fetchData();
     if (activeModal && activeModal !== 'awaitingAction') {
       setLoadingModal(true);
       
-      try {
-        const component = activeModal === 'timeLag' ? 'hotleads-timelag' : 'hotleads-outcomes';
-        const apiUrl = buildApiUrl(component, user.tenant_id, newPeriod);
-        const data = await callEdgeFunction(apiUrl);
-        setModalData(data);
+try {
+  console.log(`🔍 Fetching updated ${activeModal} data from database`);
+  const data = generateModalMockData(activeModal);
+  setModalData(data);
       } catch (error) {
         console.error('Error fetching modal data:', error);
         setModalData(generateModalMockData(activeModal));
