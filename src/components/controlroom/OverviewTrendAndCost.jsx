@@ -16,21 +16,56 @@ const supabase = require('../../lib/supabaseClient');
 
 // Edge Function URL - Update this with your actual Supabase project URL
 // Database query function for trend and cost data
-const fetchTrendAndCostData = async (tenantId) => {
-  const { data: salesMetrics, error } = await supabase
+const fetchTrendAndCostData = async (tenantId, userId = null, period = '30days') => {
+  const daysBack = period === '7days' ? 7 : period === '90days' ? 90 : 30;
+  const startDate = new Date();
+  startDate.setDate(startDate.getDate() - daysBack);
+
+  let query = supabase
     .from('sales_metrics')
     .select('*')
     .eq('tenant_id', tenantId)
-    .gte('metric_date', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0])
+    .gte('metric_date', startDate.toISOString().split('T')[0])
     .order('metric_date', { ascending: true });
+
+  // If userId is provided, filter for that specific user, otherwise get tenant-level data
+  if (userId) {
+    query = query.eq('user_profile_id', userId);
+  } else {
+    query = query.is('user_profile_id', null);
+  }
+
+  const { data: salesMetrics, error } = await query;
 
   if (error) throw error;
 
-  // Calculate aggregated data
+  // Calculate aggregated data from sales_metrics
   const totalMessagesSent = salesMetrics.reduce((sum, row) => sum + (row.messages_sent_count || 0), 0);
   const totalHotLeads = salesMetrics.reduce((sum, row) => sum + (row.hot_leads || 0), 0);
-  const previousMessagesSent = salesMetrics.reduce((sum, row) => sum + (row.previous_period_messages_sent || 0), 0);
-  const previousHotLeads = salesMetrics.reduce((sum, row) => sum + (row.previous_period_hot_leads || 0), 0);
+  
+  // For previous period comparison, get data from 60 days ago to 30 days ago
+  const previousStartDate = new Date();
+  previousStartDate.setDate(previousStartDate.getDate() - (daysBack * 2));
+  const previousEndDate = new Date();
+  previousEndDate.setDate(previousEndDate.getDate() - daysBack);
+
+  let previousQuery = supabase
+    .from('sales_metrics')
+    .select('*')
+    .eq('tenant_id', tenantId)
+    .gte('metric_date', previousStartDate.toISOString().split('T')[0])
+    .lt('metric_date', previousEndDate.toISOString().split('T')[0]);
+
+  if (userId) {
+    previousQuery = previousQuery.eq('user_profile_id', userId);
+  } else {
+    previousQuery = previousQuery.is('user_profile_id', null);
+  }
+
+  const { data: previousMetrics } = await previousQuery;
+
+  const previousMessagesSent = (previousMetrics || []).reduce((sum, row) => sum + (row.messages_sent_count || 0), 0);
+  const previousHotLeads = (previousMetrics || []).reduce((sum, row) => sum + (row.hot_leads || 0), 0);
 
   // Generate trend data for hot lead rate
   const trend = salesMetrics.map(row => ({
@@ -729,8 +764,8 @@ export default function OverviewTrendAndCost() {
         setLoading(true);
         setError(null);
         
-        console.log('🔍 Fetching trend and cost data from database for tenant:', user.tenant_id);
-        const data = await fetchTrendAndCostData(user.tenant_id);
+console.log('🔍 Fetching trend and cost data from database for tenant:', user.tenant_id);
+const data = await fetchTrendAndCostData(user.tenant_id, null, '30days');
         console.log('📊 Database Response:', data);
         
         const {
@@ -741,7 +776,7 @@ export default function OverviewTrendAndCost() {
           previousHotLeads,
         } = data;
 
-        setHotLeadTrend(trend || []);
+        setHotLeadTrend(Array.isArray(trend) ? trend : []);
         setMessagesSent(totalMessagesSent || 0);
         setHotLeadCount(totalHotLeads || 0);
         setPreviousMessageCount(previousMessagesSent || 0);

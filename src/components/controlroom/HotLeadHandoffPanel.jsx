@@ -11,37 +11,47 @@ const supabase = require('../../lib/supabaseClient');
 
 // Edge Function URL - Update to use sync_sales_metrics
 // Database query functions for hot lead data
-const fetchHotLeadData = async (tenantId) => {
-  const { data: salesMetrics, error: salesError } = await supabase
+const fetchHotLeadData = async (tenantId, userId = null) => {
+  // Get latest sales metrics for summary stats
+  let salesQuery = supabase
     .from('sales_metrics')
     .select('*')
     .eq('tenant_id', tenantId)
     .order('metric_date', { ascending: false })
     .limit(1);
 
+  if (userId) {
+    salesQuery = salesQuery.eq('user_profile_id', userId);
+  } else {
+    salesQuery = salesQuery.is('user_profile_id', null);
+  }
+
+  const { data: salesMetrics, error: salesError } = await salesQuery;
   if (salesError) throw salesError;
 
+  // Get hot leads from conversation_analytics that haven't been called yet
   const { data: conversations, error: convError } = await supabase
     .from('conversation_analytics')
     .select('*')
     .eq('tenant_id', tenantId)
     .eq('call_logged', false)
+    .not('marked_hot_at', 'is', null)
     .gte('analyzed_at', new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString())
-    .order('analyzed_at', { ascending: false });
+    .order('marked_hot_at', { ascending: false });
 
   if (convError) throw convError;
 
   const latestMetrics = salesMetrics[0] || {};
   
   return {
-    hotLeads: conversations.map(conv => ({
+    hotLeads: (conversations || []).map(conv => ({
       id: conv.conversation_id,
       name: conv.lead_id || 'Unknown Lead',
-      snippet: conv.content_analysis?.summary || 'No summary available',
+      snippet: extractContentSummary(conv.content_analysis),
       campaign: conv.campaign_id || 'Unknown',
-      marked_hot_time_ago: formatTimeAgo(conv.marked_hot_at || conv.analyzed_at),
-      call_logged: conv.call_logged,
-      requires_immediate_attention: conv.requires_immediate_attention
+      marked_hot_time_ago: formatTimeAgo(conv.marked_hot_at),
+      call_logged: conv.call_logged || false,
+      requires_immediate_attention: conv.requires_immediate_attention || false
     })),
     hotSummary: {
       avg_response: formatDuration(latestMetrics.avg_response_time_minutes),
@@ -56,12 +66,28 @@ const fetchHotLeadData = async (tenantId) => {
   };
 };
 
+// Helper function to extract content summary
+const extractContentSummary = (contentAnalysis) => {
+  if (!contentAnalysis) return 'No summary available';
+  
+  try {
+    const parsed = typeof contentAnalysis === 'string' ? JSON.parse(contentAnalysis) : contentAnalysis;
+    return parsed.summary || parsed.keywords?.join(', ') || 'Lead conversation available';
+  } catch (e) {
+    return 'Lead conversation available';
+  }
+};
+
 const formatTimeAgo = (timestamp) => {
   if (!timestamp) return 'Unknown';
-  const diff = Date.now() - new Date(timestamp).getTime();
-  const hours = Math.floor(diff / (1000 * 60 * 60));
-  const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-  return hours > 0 ? `${hours}h ${minutes}m ago` : `${minutes}m ago`;
+  try {
+    const diff = Date.now() - new Date(timestamp).getTime();
+    const hours = Math.floor(diff / (1000 * 60 * 60));
+    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+    return hours > 0 ? `${hours}h ${minutes}m ago` : `${minutes}m ago`;
+  } catch (e) {
+    return 'Recently';
+  }
 };
 
 const formatDuration = (minutes) => {
@@ -984,7 +1010,7 @@ const HotLeadHandoffPanel = () => {
       setError(null);
       console.log('Fetching hot leads data from database for tenant:', user.tenant_id);
 
-      const data = await fetchHotLeadData(user.tenant_id);
+      const data = await fetchHotLeadData(user.tenant_id, null);
       console.log('Hot leads database response:', data);
       
       setHotLeads(data.hotLeads || []);
@@ -1039,9 +1065,63 @@ const HotLeadHandoffPanel = () => {
 
     try {
       // Update conversation_analytics to log the call
-const updateData = {
-  call_logged: true,
-  call_outcome: outcome
+const handleOutcomeSelection = async (outcome, pipelineValue = null) => {
+  console.log('handleOutcomeSelection called with:', { outcome, pipelineValue });
+  
+  if (!selectedLead || !user?.tenant_id) return;
+
+  // If selecting qualified, show the value input
+  if (outcome === 'qualified' && !pipelineValue) {
+    setSelectedOutcome('qualified');
+    return; // Don't submit yet
+  }
+
+  try {
+    // Update conversation_analytics to log the call
+    const updateData = {
+      call_logged: true,
+      call_outcome: outcome,
+      analyzed_at: new Date().toISOString() // Update timestamp
+    };
+
+    // Add pipeline value if this is a qualified lead
+    if (outcome === 'qualified' && pipelineValue) {
+      const cleanValue = pipelineValue.toString().replace(/,/g, '');
+      const numericValue = parseFloat(cleanValue);
+      
+      if (!isNaN(numericValue) && numericValue > 0) {
+        updateData.pipeline_value = numericValue;
+      } else {
+        console.error('Invalid pipeline value:', pipelineValue);
+        throw new Error('Invalid pipeline value');
+      }
+    }
+
+    console.log('Updating conversation with outcome:', updateData);
+
+    const { error: updateError } = await supabase
+      .from('conversation_analytics')
+      .update(updateData)
+      .eq('conversation_id', selectedLead.id)
+      .eq('tenant_id', user.tenant_id);
+
+    if (updateError) {
+      throw new Error('Failed to log call outcome: ' + updateError.message);
+    }
+
+    console.log('Call logged and outcome updated successfully!');
+    setShowOutcomeModal(false);
+    setSelectedLead(null);
+    setSelectedOutcome(null);
+    setPipelineValue('');
+
+    // Refresh data to get updated stats
+    fetchData();
+
+  } catch (error) {
+    console.error('Error updating call outcome:', error);
+    alert('Failed to log call. Please try again.');
+  }
 };
 
 // Add pipeline value if this is a qualified lead

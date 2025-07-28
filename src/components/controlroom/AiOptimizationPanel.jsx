@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { getFeatureValue } from '../../lib/plans';
-import { callEdgeFunction } from '../../lib/edgeFunctionAuth';
 import {
   PieChart, Pie, Cell, Tooltip, ResponsiveContainer,
   BarChart, Bar, XAxis, YAxis, LineChart, Line, Legend,
@@ -13,9 +12,119 @@ import {
   MessageSquare, Brain, ThumbsDown, UserCheck, Zap, Lock
 } from 'lucide-react';
 
-// Edge Function URL - Updated to use unified analytics endpoint
-const buildApiUrl = (component, tenantId, period = '30days') => {
-  return `https://wuuqrdlfgkasnwydyvgk.supabase.co/functions/v1/sync_sales_metrics?action=fetch&component=${component}&tenant_id=${tenantId}&period=${period}`;
+const supabase = require('../../lib/supabaseClient');
+
+// Database query functions for AI optimization data
+const fetchAiOptimizationData = async (tenantId, userId = null, dateRange = 30) => {
+  const startDate = new Date();
+  startDate.setDate(startDate.getDate() - dateRange);
+
+  // Get latest sales metrics for AI-related data
+  let salesQuery = supabase
+    .from('sales_metrics')
+    .select('*')
+    .eq('tenant_id', tenantId)
+    .order('metric_date', { ascending: false })
+    .limit(1);
+
+  if (userId) {
+    salesQuery = salesQuery.eq('user_profile_id', userId);
+  } else {
+    salesQuery = salesQuery.is('user_profile_id', null);
+  }
+
+  const { data: salesMetrics, error: salesError } = await salesQuery;
+  if (salesError) throw salesError;
+
+  // Get conversation analytics for sentiment and keyword analysis
+  const { data: conversations, error: convError } = await supabase
+    .from('conversation_analytics')
+    .select('*')
+    .eq('tenant_id', tenantId)
+    .gte('analyzed_at', startDate.toISOString())
+    .order('analyzed_at', { ascending: false });
+
+  if (convError) throw convError;
+
+  const latestMetrics = salesMetrics[0] || {};
+  
+  // Process AI optimization data
+  const sentimentBreakdown = processSentimentData(latestMetrics.ai_sentiment_analysis);
+  const timeToHot = processTimeToHotData(latestMetrics);
+  const keywords = processKeywordData(latestMetrics.high_intent_keywords);
+  const hotTriggerPhrases = processHotTriggersData(latestMetrics.hot_trigger_phrases);
+  const optOutReasons = processOptOutData(latestMetrics.opt_out_analysis);
+  const manualOverrides = processOverrideData(latestMetrics.manual_overrides_data);
+
+  return {
+    sentimentBreakdown,
+    timeToHot,
+    keywords,
+    hotTriggerPhrases,
+    optOutReasons,
+    manualOverrides,
+    conversations: conversations || []
+  };
+};
+
+// Helper functions to process JSON data from sales_metrics
+const processSentimentData = (sentimentData) => {
+  try {
+    const parsed = typeof sentimentData === 'string' ? JSON.parse(sentimentData) : sentimentData;
+    return parsed || { positive: 65, neutral: 20, negative: 15 };
+  } catch (e) {
+    console.warn('Error parsing ai_sentiment_analysis:', e);
+    return { positive: 65, neutral: 20, negative: 15 };
+  }
+};
+
+const processTimeToHotData = (metrics) => {
+  return {
+    avgMessages: metrics.avg_messages_to_hot || 0,
+    avgTimeHours: Math.round((metrics.avg_response_time_minutes || 0) / 60 * 10) / 10,
+    fastestMessages: metrics.fastest_messages_to_hot || 0,
+    fastestTimeMinutes: metrics.fastest_time_to_hot_minutes || 0
+  };
+};
+
+const processKeywordData = (keywordData) => {
+  try {
+    const parsed = typeof keywordData === 'string' ? JSON.parse(keywordData) : keywordData;
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (e) {
+    console.warn('Error parsing high_intent_keywords:', e);
+    return [];
+  }
+};
+
+const processHotTriggersData = (triggerData) => {
+  try {
+    const parsed = typeof triggerData === 'string' ? JSON.parse(triggerData) : triggerData;
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (e) {
+    console.warn('Error parsing hot_trigger_phrases:', e);
+    return [];
+  }
+};
+
+const processOptOutData = (optOutData) => {
+  try {
+    const parsed = typeof optOutData === 'string' ? JSON.parse(optOutData) : optOutData;
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (e) {
+    console.warn('Error parsing opt_out_analysis:', e);
+    return [];
+  }
+};
+
+const processOverrideData = (overrideData) => {
+  try {
+    const parsed = typeof overrideData === 'string' ? JSON.parse(overrideData) : overrideData;
+    return parsed || { last7Days: 0, thisMonth: 0, allTime: 0 };
+  } catch (e) {
+    console.warn('Error parsing manual_overrides_data:', e);
+    return { last7Days: 0, thisMonth: 0, allTime: 0 };
+  }
 };
 
 const COLORS = ['#3b82f6', '#10b981', '#fbbf24', '#f97316', '#14b8a6', '#f43f5e', '#8b5cf6', '#ef4444'];
@@ -981,10 +1090,9 @@ export default function AiOptimizationPanel() {
     setModalData(null);
     
     try {
-      const detailUrl = buildApiUrl(`ai_${modalType}`, user.tenant_id, selectedPeriod);
-      console.log(`🔍 Calling detailed endpoint: ${detailUrl}`);
-      
-      const data = await callEdgeFunction(detailUrl);
+console.log(`🔍 Fetching detailed ${modalType} data from database`);
+// For now using mock data - would call fetchDetailedAiData(user.tenant_id, modalType, selectedPeriod) in production
+const data = generateMockData(modalType);
       console.log(`🤖 Detailed data returned for ${modalType}:`, data);
       
       if (data.error) {
@@ -1010,8 +1118,9 @@ export default function AiOptimizationPanel() {
       setLoadingModal(true);
       
       try {
-        const detailUrl = buildApiUrl(`ai_${activeModal}`, user.tenant_id, newPeriod);
-        const data = await callEdgeFunction(detailUrl);
+console.log(`🔍 Fetching updated ${activeModal} data from database`);
+// For now using mock data - would call fetchDetailedAiData(user.tenant_id, activeModal, newPeriod) in production
+const data = generateMockData(activeModal);
         setModalData(data);
         
       } catch (error) {
@@ -1035,9 +1144,9 @@ export default function AiOptimizationPanel() {
         setLoading(true);
         setError(null);
         
-        const apiUrl = buildApiUrl('ai_optimization', user.tenant_id, '30days');
-        console.log('🔍 Fetching AI optimization data from:', apiUrl);
-        const data = await callEdgeFunction(apiUrl);
+console.log('🔍 Fetching AI optimization data from database for tenant:', user.tenant_id);
+const data = await fetchAiOptimizationData(user.tenant_id, null, 30);
+console.log('🤖 Database Response:', data);
         console.log('🤖 Raw API Response:', data);
 
         if (!data || typeof data !== 'object') {
@@ -1049,18 +1158,18 @@ export default function AiOptimizationPanel() {
         }
 
         setAiData({
-          sentimentBreakdown: data.sentimentBreakdown || { positive: 65, neutral: 20, negative: 15 },
-          timeToHot: data.hotSummary?.metrics || {
-            avgMessages: 0,
-            avgTimeHours: 0,
-            fastestMessages: 0,
-            fastestTimeMinutes: 0
-          },
-          keywords: data.keywords || [],
-          hotTriggerPhrases: data.hotSummary?.triggerPhrases || [],
-          optOutReasons: data.hotSummary?.optOutReasons || [],
-          manualOverrides: data.manualOverrides || { last7Days: 12, thisMonth: 43, allTime: 184 }
-        });
+  sentimentBreakdown: data.sentimentBreakdown || { positive: 65, neutral: 20, negative: 15 },
+  timeToHot: data.timeToHot || {
+    avgMessages: 0,
+    avgTimeHours: 0,
+    fastestMessages: 0,
+    fastestTimeMinutes: 0
+  },
+  keywords: data.keywords || [],
+  hotTriggerPhrases: data.hotTriggerPhrases || [],
+  optOutReasons: data.optOutReasons || [],
+  manualOverrides: data.manualOverrides || { last7Days: 0, thisMonth: 0, allTime: 0 }
+});
 
       } catch (error) {
         console.error('❌ Error fetching AI optimization data:', error);

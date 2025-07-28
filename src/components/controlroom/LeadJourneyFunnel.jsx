@@ -16,20 +16,28 @@ const supabase = require('../../lib/supabaseClient');
 
 // Edge Function URL - Updated to use unified analytics endpoint
 // Database query functions for lead journey data
-const fetchLeadJourneyData = async (tenantId, dateRange) => {
+const fetchLeadJourneyData = async (tenantId, userId = null, dateRange = 30) => {
   const startDate = new Date();
   startDate.setDate(startDate.getDate() - dateRange);
 
-  const { data: salesMetrics, error: salesError } = await supabase
+  // Get latest sales metrics for status distribution and funnel data
+  let salesQuery = supabase
     .from('sales_metrics')
     .select('*')
     .eq('tenant_id', tenantId)
-    .gte('metric_date', startDate.toISOString().split('T')[0])
     .order('metric_date', { ascending: false })
     .limit(1);
 
+  if (userId) {
+    salesQuery = salesQuery.eq('user_profile_id', userId);
+  } else {
+    salesQuery = salesQuery.is('user_profile_id', null);
+  }
+
+  const { data: salesMetrics, error: salesError } = await salesQuery;
   if (salesError) throw salesError;
 
+  // Get conversation analytics for trend data
   const { data: conversations, error: convError } = await supabase
     .from('conversation_analytics')
     .select('*')
@@ -41,19 +49,23 @@ const fetchLeadJourneyData = async (tenantId, dateRange) => {
 
   const latestMetrics = salesMetrics[0] || {};
   
-  // Process status distribution
+  // Process status distribution from lead_status_distribution
   const statusDistribution = latestMetrics.lead_status_distribution 
-    ? Object.entries(latestMetrics.lead_status_distribution).map(([name, value]) => ({ name, value }))
+    ? processStatusDistribution(latestMetrics.lead_status_distribution)
     : [];
 
-  // Process funnel data
-  const funnelData = latestMetrics.funnel_conversion_data || [];
+  // Process funnel data from funnel_conversion_data
+  const funnelData = latestMetrics.funnel_conversion_data 
+    ? processFunnelData(latestMetrics.funnel_conversion_data)
+    : [];
 
-  // Process transition data
-  const transitionData = latestMetrics.status_transition_data || [];
+  // Process transition data from status_transition_data
+  const transitionData = latestMetrics.status_transition_data 
+    ? processTransitionData(latestMetrics.status_transition_data)
+    : [];
 
   // Generate trend data from conversations
-  const trendData = generateTrendFromConversations(conversations, dateRange);
+  const trendData = generateTrendFromConversations(conversations || [], dateRange);
 
   return {
     statusDistribution,
@@ -65,9 +77,41 @@ const fetchLeadJourneyData = async (tenantId, dateRange) => {
   };
 };
 
+// Helper functions to process JSON data from sales_metrics
+const processStatusDistribution = (statusData) => {
+  try {
+    const parsed = typeof statusData === 'string' ? JSON.parse(statusData) : statusData;
+    return Object.entries(parsed).map(([name, value]) => ({ name, value }));
+  } catch (e) {
+    console.warn('Error parsing lead_status_distribution:', e);
+    return [];
+  }
+};
+
+const processFunnelData = (funnelData) => {
+  try {
+    const parsed = typeof funnelData === 'string' ? JSON.parse(funnelData) : funnelData;
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (e) {
+    console.warn('Error parsing funnel_conversion_data:', e);
+    return [];
+  }
+};
+
+const processTransitionData = (transitionData) => {
+  try {
+    const parsed = typeof transitionData === 'string' ? JSON.parse(transitionData) : transitionData;
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (e) {
+    console.warn('Error parsing status_transition_data:', e);
+    return [];
+  }
+};
+
 const generateTrendFromConversations = (conversations, dateRange) => {
   const dailyCounts = {};
   
+  // Count conversations by date
   conversations.forEach(conv => {
     const date = new Date(conv.analyzed_at).toISOString().split('T')[0];
     dailyCounts[date] = (dailyCounts[date] || 0) + 1;
@@ -1117,7 +1161,8 @@ export default function LeadJourneyFunnel() {
     
     try {
 console.log(`🔍 Fetching detailed ${modalType} data from database`);
-const data = generateMockData(modalType); // Use mock data until detailed queries are implemented
+// For now using mock data - would call fetchDetailedJourneyData(user.tenant_id, modalType, selectedPeriod) in production
+const data = generateMockData(modalType);
       console.log(`📊 Detailed data returned for ${modalType}:`, data);
       
       if (data.error) {
@@ -1143,8 +1188,9 @@ const handlePeriodChange = async (newPeriod) => {
     setLoadingModal(true);
     
     try {
-      console.log(`🔍 Fetching updated ${activeModal} data from database`);
-      const data = generateMockData(activeModal);
+console.log(`🔍 Fetching updated ${activeModal} data from database`);
+// For now using mock data - would call fetchDetailedJourneyData(user.tenant_id, activeModal, newPeriod) in production
+const data = generateMockData(activeModal);
       setModalData(data);
       
     } catch (error) {
@@ -1169,7 +1215,7 @@ const handlePeriodChange = async (newPeriod) => {
         setError(null);
         
         console.log('🔍 Fetching lead journey data from database for tenant:', user.tenant_id);
-        const data = await fetchLeadJourneyData(user.tenant_id, dateRange);
+        const data = await fetchLeadJourneyData(user.tenant_id, null, dateRange);
         console.log('📊 Database Response:', data);
 
         setJourneyData({
