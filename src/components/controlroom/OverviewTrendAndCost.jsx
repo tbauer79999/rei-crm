@@ -10,8 +10,9 @@ import {
 } from 'recharts';
 import { useAuth } from '../../context/AuthContext';
 import { getFeatureValue } from '../../lib/plans';
-import { supabase } from '../../lib/supabaseClient';
 import { X, TrendingUp, DollarSign, Target, Lock } from 'lucide-react';
+
+const supabase = require('../../lib/supabaseClient');
 
 // Edge Function URL - Update this with your actual Supabase project URL
 // Database query function for trend and cost data
