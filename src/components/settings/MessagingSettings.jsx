@@ -39,6 +39,8 @@ export default function MessagingSettings() {
   const [templates, setTemplates] = useState([]);
   const [templatesLoading, setTemplatesLoading] = useState(false);
   const [tcpaEnabled, setTcpaEnabled] = useState(false);
+  const [tcpaCustomText, setTcpaCustomText] = useState('');
+  const [tcpaMode, setTcpaMode] = useState('standard'); // 'standard' or 'custom'
   const [previewTemplate, setPreviewTemplate] = useState(null);
 
   const replyOptions = [
@@ -150,7 +152,7 @@ export default function MessagingSettings() {
     setTemplatesLoading(true);
     try {
       const { data, error } = await supabase
-        .from('initial_message_templates')
+        .from('smstemplates')
         .select('*')
         .eq('tenant_id', user.tenant_id)
         .order('created_at', { ascending: true });
@@ -175,7 +177,7 @@ export default function MessagingSettings() {
 
     try {
       const { data, error } = await supabase
-        .from('initial_message_templates')
+        .from('smstemplates')
         .insert([{
           message: '',
           tenant_id: user.tenant_id,
@@ -197,7 +199,7 @@ export default function MessagingSettings() {
   const updateTemplate = async (id, message) => {
     try {
       const { error } = await supabase
-        .from('initial_message_templates')
+        .from('smstemplates')
         .update({ message })
         .eq('id', id);
 
@@ -216,7 +218,7 @@ export default function MessagingSettings() {
   const deleteTemplate = async (id) => {
     try {
       const { error } = await supabase
-        .from('initial_message_templates')
+        .from('smstemplates')
         .delete()
         .eq('id', id);
 
@@ -287,6 +289,8 @@ export default function MessagingSettings() {
         setReplyMode(settings['ai_reply_mode']?.value || 'paced');
         setHourlyLimit(settings['ai_hourly_throttle_limit']?.value || '30');
         setTcpaEnabled(settings['tcpa_compliance_enabled']?.value === 'true' || false);
+        setTcpaCustomText(settings['tcpa_custom_text']?.value || '');
+        setTcpaMode(settings['tcpa_custom_text']?.value ? 'custom' : 'standard');
       } catch (err) {
         console.error('Error loading messaging settings:', err.message);
         setError(`Failed to load settings: ${err.message}`);
@@ -341,6 +345,9 @@ export default function MessagingSettings() {
     if (canEditMessagingSettings) {
       settingsPayload.ai_hourly_throttle_limit = { value: hourlyLimit };
       settingsPayload.tcpa_compliance_enabled = { value: tcpaEnabled.toString() };
+      if (tcpaMode === 'custom') {
+        settingsPayload.tcpa_custom_text = { value: tcpaCustomText };
+      }
     }
 
     try {
@@ -729,10 +736,10 @@ export default function MessagingSettings() {
 
               {/* TCPA Compliance */}
               <div className="border-t border-gray-200 pt-6">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between mb-4">
                   <div>
                     <h4 className="text-lg font-semibold text-gray-900">TCPA Compliance</h4>
-                    <p className="text-gray-600 text-sm">Automatically include required opt-out language in initial messages</p>
+                    <p className="text-gray-600 text-sm">Include required opt-out language in initial messages</p>
                   </div>
                   <label className="flex items-center">
                     <input
@@ -745,10 +752,97 @@ export default function MessagingSettings() {
                     <span className="ml-2 text-sm text-gray-700">Enable TCPA compliance text</span>
                   </label>
                 </div>
+
                 {tcpaEnabled && (
-                  <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                    <div className="text-sm text-yellow-800">
-                      <strong>Auto-appended text:</strong> "Reply STOP to opt out of future messages. Msg & data rates may apply."
+                  <div className="space-y-4">
+                    {/* TCPA Mode Selection */}
+                    <div className="space-y-3">
+                      <label className="flex items-start space-x-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50">
+                        <input
+                          type="radio"
+                          name="tcpaMode"
+                          value="standard"
+                          checked={tcpaMode === 'standard'}
+                          onChange={(e) => setTcpaMode(e.target.value)}
+                          disabled={!canEditMessagingSettings}
+                          className="mt-1 h-4 w-4 text-blue-600 disabled:cursor-not-allowed"
+                        />
+                        <div className="flex-1">
+                          <div className="font-medium text-gray-900">Standard TCPA Text</div>
+                          <div className="text-sm text-gray-600 mt-1">
+                            Use the standard compliant opt-out language
+                          </div>
+                          <div className="text-sm text-gray-500 mt-2 italic">
+                            "Reply STOP to opt out of future messages. Msg & data rates may apply."
+                          </div>
+                        </div>
+                      </label>
+
+                      <label className="flex items-start space-x-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50">
+                        <input
+                          type="radio"
+                          name="tcpaMode"
+                          value="custom"
+                          checked={tcpaMode === 'custom'}
+                          onChange={(e) => setTcpaMode(e.target.value)}
+                          disabled={!canEditMessagingSettings}
+                          className="mt-1 h-4 w-4 text-blue-600 disabled:cursor-not-allowed"
+                        />
+                        <div className="flex-1">
+                          <div className="font-medium text-gray-900">Custom TCPA Text</div>
+                          <div className="text-sm text-gray-600 mt-1">
+                            Create your own opt-out message
+                          </div>
+                        </div>
+                      </label>
+                    </div>
+
+                    {/* Custom Text Input */}
+                    {tcpaMode === 'custom' && (
+                      <div className="space-y-3">
+                        <Label htmlFor="customTcpaText">Custom Opt-Out Message</Label>
+                        <textarea
+                          id="customTcpaText"
+                          value={tcpaCustomText}
+                          onChange={(e) => setTcpaCustomText(e.target.value)}
+                          disabled={!canEditMessagingSettings}
+                          placeholder="Enter your custom TCPA compliance message..."
+                          className="w-full h-20 border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed resize-none"
+                        />
+                        
+                        {/* Educational Blurb */}
+                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                          <div className="text-sm text-blue-800">
+                            <strong>Required Elements:</strong> Your custom message must include:
+                            <ul className="mt-2 ml-4 list-disc space-y-1">
+                              <li>Clear opt-out instructions (e.g., "Reply STOP" or "Text STOP")</li>
+                              <li>Reference to future messages or communications</li>
+                              <li>Notice about message and data rates (recommended)</li>
+                            </ul>
+                            <div className="mt-2">
+                              <strong>Example:</strong> "Text STOP to unsubscribe from our updates. Standard messaging rates apply."
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Character Count */}
+                        <div className="text-right">
+                          <span className="text-xs text-gray-500">
+                            {tcpaCustomText.length} characters
+                          </span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Current Preview */}
+                    <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                      <div className="text-xs text-gray-500 mb-2">Text that will be appended to messages:</div>
+                      <div className="text-sm text-gray-700 font-mono">
+                        {tcpaMode === 'standard' 
+                          ? "Reply STOP to opt out of future messages. Msg & data rates may apply."
+                          : tcpaCustomText || "Enter custom text above..."
+                        }
+                      </div>
                     </div>
                   </div>
                 )}
