@@ -26,8 +26,8 @@ const fetchOverviewMetrics = async (tenantId, period = '30days') => {
   if (error) throw error;
 
   // Aggregate the data
-  const totalLeads = salesMetrics.reduce((sum, row) => sum + (row.total_leads_assigned || 0), 0);
-  const hotLeads = salesMetrics.reduce((sum, row) => sum + (row.hot_leads || 0), 0);
+const totalLeads = latestMetric?.total_leads_assigned || 0;
+const hotLeads = latestMetric?.hot_leads || 0;
   const messagesSent = salesMetrics.reduce((sum, row) => sum + (row.messages_sent_count || 0), 0);
   const messagesReceived = salesMetrics.reduce((sum, row) => sum + (row.messages_received_count || 0), 0);
   const conversions = salesMetrics.reduce((sum, row) => sum + (row.conversion_count || 0), 0);
