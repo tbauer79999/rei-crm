@@ -1052,123 +1052,65 @@ const HotLeadHandoffPanel = () => {
     }
   };
 
-  // The issue is in the handleOutcomeSelection function around line 1123
-// There's a duplicate/malformed function block. Here's the corrected version:
+  const handleOutcomeSelection = async (outcome, pipelineValue = null) => {
+    console.log('handleOutcomeSelection called with:', { outcome, pipelineValue });
+    
+    if (!selectedLead || !user?.tenant_id) return;
 
-const handleOutcomeSelection = async (outcome, pipelineValue = null) => {
-  console.log('handleOutcomeSelection called with:', { outcome, pipelineValue });
-  
-  if (!selectedLead || !user?.tenant_id) return;
+    // If selecting qualified, show the value input
+    if (outcome === 'qualified' && !pipelineValue) {
+      setSelectedOutcome('qualified');
+      return; // Don't submit yet
+    }
 
-  // If selecting qualified, show the value input
-  if (outcome === 'qualified' && !pipelineValue) {
-    setSelectedOutcome('qualified');
-    return; // Don't submit yet
-  }
+    try {
+      // Update conversation_analytics to log the call
+      const updateData = {
+        call_logged: true,
+        call_outcome: outcome,
+        analyzed_at: new Date().toISOString() // Update timestamp
+      };
 
-  try {
-    // Update conversation_analytics to log the call
-    const updateData = {
-      call_logged: true,
-      call_outcome: outcome,
-      analyzed_at: new Date().toISOString() // Update timestamp
-    };
-
-    // Add pipeline value if this is a qualified lead
-    if (outcome === 'qualified' && pipelineValue) {
-      const cleanValue = pipelineValue.toString().replace(/,/g, '');
-      const numericValue = parseFloat(cleanValue);
-      
-      if (!isNaN(numericValue) && numericValue > 0) {
-        updateData.pipeline_value = numericValue;
-      } else {
-        console.error('Invalid pipeline value:', pipelineValue);
-        throw new Error('Invalid pipeline value');
+      // Add pipeline value if this is a qualified lead
+      if (outcome === 'qualified' && pipelineValue) {
+        const cleanValue = pipelineValue.toString().replace(/,/g, '');
+        const numericValue = parseFloat(cleanValue);
+        
+        if (!isNaN(numericValue) && numericValue > 0) {
+          updateData.pipeline_value = numericValue;
+        } else {
+          console.error('Invalid pipeline value:', pipelineValue);
+          throw new Error('Invalid pipeline value');
+        }
       }
-    }
 
-    console.log('Updating conversation with outcome:', updateData);
+      console.log('Updating conversation with outcome:', updateData);
 
-    const { error: updateError } = await supabase
-      .from('conversation_analytics')
-      .update(updateData)
-      .eq('conversation_id', selectedLead.id)
-      .eq('tenant_id', user.tenant_id);
+      const { error: updateError } = await supabase
+        .from('conversation_analytics')
+        .update(updateData)
+        .eq('conversation_id', selectedLead.id)
+        .eq('tenant_id', user.tenant_id);
 
-    if (updateError) {
-      throw new Error('Failed to log call outcome: ' + updateError.message);
-    }
+      if (updateError) {
+        throw new Error('Failed to log call outcome: ' + updateError.message);
+      }
 
-    console.log('Call logged and outcome updated successfully!');
-    setShowOutcomeModal(false);
-    setSelectedLead(null);
-    setSelectedOutcome(null);
-    setPipelineValue('');
+      console.log('Call logged and outcome updated successfully!');
+      setShowOutcomeModal(false);
+      setSelectedLead(null);
+      setSelectedOutcome(null);
+      setPipelineValue('');
 
-    // Refresh data to get updated stats
-    fetchData();
-
-  } catch (error) {
-    console.error('Error updating call outcome:', error);
-    alert('Failed to log call. Please try again.');
-  }
-};
-
-    console.log('Call logged and outcome updated successfully!');
-    setShowOutcomeModal(false);
-    setSelectedLead(null);
-    setSelectedOutcome(null);
-    setPipelineValue('');
-
-    // Refresh data to get updated stats
-    fetchData();
-
-  } catch (error) {
-    console.error('Error updating call outcome:', error);
-    alert('Failed to log call. Please try again.');
-  }
-};
-
-// Add pipeline value if this is a qualified lead
-if (outcome === 'qualified' && pipelineValue) {
-  const cleanValue = pipelineValue.toString().replace(/,/g, '');
-  const numericValue = parseFloat(cleanValue);
-  
-  if (!isNaN(numericValue) && numericValue > 0) {
-    updateData.pipeline_value = numericValue;
-  } else {
-    console.error('Invalid pipeline value:', pipelineValue);
-    throw new Error('Invalid pipeline value');
-  }
-}
-
-console.log('Updating conversation with outcome:', updateData);
-
-const { error: updateError } = await supabase
-  .from('conversation_analytics')
-  .update(updateData)
-  .eq('conversation_id', selectedLead.id)
-  .eq('tenant_id', user.tenant_id);
-
-if (updateError) {
-  throw new Error('Failed to log call outcome');
-}
-
-console.log('Call logged and outcome updated successfully!');
-setShowOutcomeModal(false);
-setSelectedLead(null);
-setSelectedOutcome(null);
-setPipelineValue('');
-
-// Refresh data to get updated stats
-fetchData();
+      // Refresh data to get updated stats
+      fetchData();
 
     } catch (error) {
       console.error('Error updating call outcome:', error);
       alert('Failed to log call. Please try again.');
     }
   };
-
+  
   const handleQualifiedSubmit = async () => {
     console.log('handleQualifiedSubmit called with pipelineValue:', pipelineValue);
     
