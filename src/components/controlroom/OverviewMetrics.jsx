@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { getFeatureValue } from '../../lib/plans';
-import { supabase } from '../../lib/supabaseClient';
+const supabase = require('../../lib/supabaseClient');
 import { 
   X, TrendingUp, Users, Calendar, Mail, BarChart3, Target, 
   MessageSquare, Activity, Clock, CheckCircle, Send, Inbox,
