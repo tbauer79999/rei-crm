@@ -110,12 +110,11 @@ function processRealData(salesMetrics, conversationData, metricType) {
   const sourceData = extractSourceData(salesMetrics);
 
   // Create basic structure that all metrics need
-  const baseData = {
-    trendData: trendData.length > 0 ? trendData : generateEmptyTrend(),
-    sourceData: sourceData.length > 0 ? sourceData : generateDefaultSources(),
-    topSalespersons: generateTopSalespersons(salesMetrics),
-    recentSignups: generateRecentSignups(salesMetrics)
-  };
+const baseData = {
+  trendData: trendData.length > 0 ? trendData : generateEmptyTrend(),
+  sourceData: sourceData.length > 0 ? sourceData : generateDefaultSources(),
+  topSalespersons: generateTopSalespersons(salesMetrics)
+};
 
   // Add metric-specific data
   switch (metricType) {
@@ -233,18 +232,6 @@ function generateTopSalespersons(salesMetrics) {
   return [
     { id: '1', name: 'AI Agent', totalLeads: salesMetrics.reduce((sum, row) => sum + (row.total_leads_assigned || 0), 0), avatar: '🤖' }
   ];
-}
-
-function generateRecentSignups(salesMetrics) {
-  // Generate based on recent metrics
-  const recentMetrics = salesMetrics.slice(-5);
-  return recentMetrics.map((metric, i) => ({
-    id: `recent-${i}`,
-    name: `Lead ${i + 1}`,
-    email: `lead${i + 1}@example.com`,
-    signupDate: metric.metric_date,
-    source: 'Direct'
-  }));
 }
 
 function generateWeeklyTrend(salesMetrics) {
@@ -391,7 +378,7 @@ const MODAL_CONFIG = {
     subtitle: 'Comprehensive insights into your lead generation performance',
     icon: BarChart3,
     iconColor: 'text-blue-600',
-    features: ['trend', 'sources', 'topSales', 'recentSignups']
+    features: ['trend', 'sources', 'topSales']
   },
   weeklyLeads: {
     title: 'Weekly Leads Performance & Trends',
