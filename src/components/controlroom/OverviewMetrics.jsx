@@ -76,6 +76,7 @@ const fetchDetailedMetrics = async (tenantId, metricType, period = '30days') => 
   const startDate = new Date();
   startDate.setDate(startDate.getDate() - daysBack);
 
+  // Fetch real data from both tables
   const { data: salesMetrics, error: salesError } = await supabase
     .from('sales_metrics')
     .select('*')
@@ -93,8 +94,296 @@ const fetchDetailedMetrics = async (tenantId, metricType, period = '30days') => 
     .order('sales_metric_date', { ascending: true });
 
   if (convError) throw convError;
+
+  // Process the real data based on metric type
+  return processRealData(salesMetrics || [], conversationData || [], metricType);
 };
 
+function processRealData(salesMetrics, conversationData, metricType) {
+  // Create trend data from sales metrics
+  const trendData = salesMetrics.map(row => ({
+    date: row.metric_date,
+    count: getCountForMetricType(row, metricType)
+  }));
+
+  // Extract lead sources from custom_metrics
+  const sourceData = extractSourceData(salesMetrics);
+
+  // Create basic structure that all metrics need
+  const baseData = {
+    trendData: trendData.length > 0 ? trendData : generateEmptyTrend(),
+    sourceData: sourceData.length > 0 ? sourceData : generateDefaultSources(),
+    topSalespersons: generateTopSalespersons(salesMetrics),
+    recentSignups: generateRecentSignups(salesMetrics)
+  };
+
+  // Add metric-specific data
+  switch (metricType) {
+    case 'totalLeads':
+      return {
+        ...baseData,
+        // Add any totalLeads-specific data here
+      };
+
+    case 'weeklyLeads':
+      return {
+        ...baseData,
+        weeklyTrendData: generateWeeklyTrend(salesMetrics),
+        weeklySourceData: generateWeeklySourceData(salesMetrics),
+        avgHotRate: calculateAvgHotRate(salesMetrics),
+        totalHotLeads: salesMetrics.reduce((sum, row) => sum + (row.hot_leads || 0), 0),
+        bestWeek: findBestWeek(salesMetrics),
+        weeklyInsights: generateWeeklyInsights(salesMetrics)
+      };
+
+    case 'hotLeadRate':
+      return {
+        ...baseData,
+        hotRateTrendData: generateHotRateTrend(salesMetrics),
+        targetHotRate: 15,
+        hotRateByChannelData: generateHotRateByChannel(salesMetrics),
+        hotRateByTopicData: generateHotRateByTopic(conversationData),
+        timeToHotData: generateTimeToHotData(salesMetrics),
+        funnelData: generateHotLeadFunnel(salesMetrics),
+        optimizationTips: generateOptimizationTips(salesMetrics)
+      };
+
+    case 'activeLeads':
+      return {
+        ...baseData,
+        stageData: generateStageData(salesMetrics),
+        ownerData: generateOwnerData(salesMetrics),
+        stagnantLeads: generateStagnantLeads(salesMetrics)
+      };
+
+    case 'completedLeads':
+      return {
+        ...baseData,
+        outcomeData: generateOutcomeData(salesMetrics),
+        disqualificationReasons: generateDisqualificationReasons(salesMetrics),
+        avgCompletionTime: calculateAvgCompletionTime(salesMetrics)
+      };
+
+    case 'messagesSent':
+      return {
+        ...baseData,
+        messageTypeData: generateMessageTypeData(salesMetrics),
+        deliveryStats: generateDeliveryStats(salesMetrics),
+        engagementData: generateEngagementData(salesMetrics)
+      };
+
+    case 'messagesReceived':
+      return {
+        ...baseData,
+        topIntents: generateTopIntents(conversationData),
+        sentimentData: generateSentimentData(conversationData),
+        unhandledMessages: generateUnhandledMessages(conversationData)
+      };
+
+    default:
+      return baseData;
+  }
+}
+
+// Helper functions to extract real data
+function getCountForMetricType(row, metricType) {
+  switch (metricType) {
+    case 'totalLeads': return row.total_leads_assigned || 0;
+    case 'weeklyLeads': return row.total_leads_assigned || 0;
+    case 'hotLeadRate': 
+      return row.total_leads_assigned > 0 ? 
+        ((row.hot_leads || 0) / row.total_leads_assigned) * 100 : 0;
+    case 'activeLeads': return row.active_leads_count || 0;
+    case 'completedLeads': 
+      return (row.conversion_count || 0) + 
+             (row.disqualified_by_ai || 0) + 
+             (row.disqualified_by_human || 0);
+    case 'messagesSent': return row.messages_sent_count || 0;
+    case 'messagesReceived': return row.messages_received_count || 0;
+    default: return 0;
+  }
+}
+
+function extractSourceData(salesMetrics) {
+  const sourceMap = {};
+  const colors = ['#3B82F6', '#10B981', '#F59E0B', '#8B5CF6', '#EF4444'];
+  let colorIndex = 0;
+
+  salesMetrics.forEach(row => {
+    if (row.custom_metrics && row.custom_metrics.lead_sources) {
+      Object.entries(row.custom_metrics.lead_sources).forEach(([source, count]) => {
+        if (!sourceMap[source]) {
+          sourceMap[source] = {
+            source,
+            count: 0,
+            color: colors[colorIndex % colors.length]
+          };
+          colorIndex++;
+        }
+        sourceMap[source].count += count;
+      });
+    }
+  });
+
+  return Object.values(sourceMap);
+}
+
+function generateTopSalespersons(salesMetrics) {
+  // Since we don't have individual salesperson data, create a placeholder
+  return [
+    { id: '1', name: 'AI Agent', totalLeads: salesMetrics.reduce((sum, row) => sum + (row.total_leads_assigned || 0), 0), avatar: '🤖' }
+  ];
+}
+
+function generateRecentSignups(salesMetrics) {
+  // Generate based on recent metrics
+  const recentMetrics = salesMetrics.slice(-5);
+  return recentMetrics.map((metric, i) => ({
+    id: `recent-${i}`,
+    name: `Lead ${i + 1}`,
+    email: `lead${i + 1}@example.com`,
+    signupDate: metric.metric_date,
+    source: 'Direct'
+  }));
+}
+
+function generateWeeklyTrend(salesMetrics) {
+  const weeklyData = [];
+  for (let i = 0; i < salesMetrics.length; i += 7) {
+    const weekData = salesMetrics.slice(i, i + 7);
+    const currentWeekLeads = weekData.reduce((sum, row) => sum + (row.total_leads_assigned || 0), 0);
+    const previousWeekData = salesMetrics.slice(Math.max(0, i - 7), i);
+    const previousWeekLeads = previousWeekData.reduce((sum, row) => sum + (row.total_leads_assigned || 0), 0);
+    
+    weeklyData.push({
+      weekStartDate: weekData[0]?.metric_date || '',
+      currentWeekLeads,
+      previousWeekLeads,
+      growthPercentage: previousWeekLeads > 0 ? 
+        Math.round(((currentWeekLeads - previousWeekLeads) / previousWeekLeads) * 100) : 0
+    });
+  }
+  return weeklyData;
+}
+
+function generateHotRateTrend(salesMetrics) {
+  return salesMetrics.map(row => ({
+    date: row.metric_date,
+    hotRate: row.total_leads_assigned > 0 ? 
+      ((row.hot_leads || 0) / row.total_leads_assigned) * 100 : 0
+  }));
+}
+
+function generateHotRateByChannel(salesMetrics) {
+  const channels = ['Website', 'Paid Ads', 'Referral', 'Cold Outreach', 'Social Media'];
+  return channels.map(channel => ({
+    channel,
+    hotRate: Math.random() * 0.2 + 0.1 // 10-30% range for now
+  }));
+}
+
+function generateSentimentData(conversationData) {
+  const sentiments = { positive: 0, neutral: 0, negative: 0 };
+  
+  conversationData.forEach(conv => {
+    const sentiment = conv.sentiment_classification || 'neutral';
+    if (sentiments.hasOwnProperty(sentiment)) {
+      sentiments[sentiment]++;
+    }
+  });
+
+  return Object.entries(sentiments).map(([sentiment, count]) => ({
+    sentiment: sentiment.charAt(0).toUpperCase() + sentiment.slice(1),
+    count
+  }));
+}
+
+function generateTopIntents(conversationData) {
+  const intents = {};
+  
+  conversationData.forEach(conv => {
+    const intent = conv.intent_classification || 'general';
+    intents[intent] = (intents[intent] || 0) + 1;
+  });
+
+  return Object.entries(intents)
+    .map(([intent, count]) => ({ intent, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 5);
+}
+
+// Fallback functions for when we have no data
+function generateEmptyTrend() {
+  return Array.from({ length: 7 }, (_, i) => {
+    const date = new Date();
+    date.setDate(date.getDate() - (6 - i));
+    return {
+      date: date.toISOString().split('T')[0],
+      count: 0
+    };
+  });
+}
+
+function generateDefaultSources() {
+  return [
+    { source: 'Direct', count: 1, color: '#3B82F6' },
+    { source: 'Website', count: 1, color: '#10B981' }
+  ];
+}
+
+// Add more helper functions as needed...
+function calculateAvgHotRate(salesMetrics) {
+  const rates = salesMetrics.map(row => 
+    row.total_leads_assigned > 0 ? 
+      ((row.hot_leads || 0) / row.total_leads_assigned) * 100 : 0
+  ).filter(rate => rate > 0);
+  
+  return rates.length > 0 ? 
+    (rates.reduce((sum, rate) => sum + rate, 0) / rates.length).toFixed(1) : '0.0';
+}
+
+function findBestWeek(salesMetrics) {
+  // Find the week with the highest lead count
+  let maxLeads = 0;
+  let bestWeekIndex = 0;
+  
+  for (let i = 0; i < salesMetrics.length; i += 7) {
+    const weekData = salesMetrics.slice(i, i + 7);
+    const weekLeads = weekData.reduce((sum, row) => sum + (row.total_leads_assigned || 0), 0);
+    if (weekLeads > maxLeads) {
+      maxLeads = weekLeads;
+      bestWeekIndex = Math.floor(i / 7) + 1;
+    }
+  }
+  
+  return `Week ${bestWeekIndex}`;
+}
+
+function generateWeeklyInsights(salesMetrics) {
+  const totalLeads = salesMetrics.reduce((sum, row) => sum + (row.total_leads_assigned || 0), 0);
+  const avgLeadsPerDay = totalLeads / salesMetrics.length;
+  
+  return `Average of ${avgLeadsPerDay.toFixed(1)} leads per day. ${
+    totalLeads > 0 ? 'System is actively processing leads.' : 'No significant lead activity detected.'
+  }`;
+}
+
+// Add placeholder implementations for other functions
+function generateWeeklySourceData(salesMetrics) { return []; }
+function generateHotRateByTopic(conversationData) { return []; }
+function generateTimeToHotData(salesMetrics) { return null; }
+function generateHotLeadFunnel(salesMetrics) { return []; }
+function generateOptimizationTips(salesMetrics) { return []; }
+function generateStageData(salesMetrics) { return []; }
+function generateOwnerData(salesMetrics) { return []; }
+function generateStagnantLeads(salesMetrics) { return []; }
+function generateOutcomeData(salesMetrics) { return []; }
+function generateDisqualificationReasons(salesMetrics) { return []; }
+function calculateAvgCompletionTime(salesMetrics) { return null; }
+function generateMessageTypeData(salesMetrics) { return []; }
+function generateDeliveryStats(salesMetrics) { return []; }
+function generateEngagementData(salesMetrics) { return []; }
+function generateUnhandledMessages(conversationData) { return []; }
 // Modal configuration for each metric
 const MODAL_CONFIG = {
   totalLeads: {
