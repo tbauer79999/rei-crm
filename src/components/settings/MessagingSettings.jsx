@@ -41,6 +41,8 @@ export default function MessagingSettings() {
   const [tcpaEnabled, setTcpaEnabled] = useState(false);
   const [tcpaCustomText, setTcpaCustomText] = useState('');
   const [tcpaMode, setTcpaMode] = useState('standard'); // 'standard' or 'custom'
+  const [tcpaFrequencyMode, setTcpaFrequencyMode] = useState('initial'); // 'initial', 'every', 'count', 'days'
+  const [tcpaFrequencyValue, setTcpaFrequencyValue] = useState('5');
   const [previewTemplate, setPreviewTemplate] = useState(null);
 
   const replyOptions = [
@@ -291,6 +293,8 @@ export default function MessagingSettings() {
         setTcpaEnabled(settings['tcpa_compliance_enabled']?.value === 'true' || false);
         setTcpaCustomText(settings['tcpa_custom_text']?.value || '');
         setTcpaMode(settings['tcpa_custom_text']?.value ? 'custom' : 'standard');
+        setTcpaFrequencyMode(settings['tcpa_frequency_mode']?.value || 'initial');
+        setTcpaFrequencyValue(settings['tcpa_frequency_value']?.value || '5');
       } catch (err) {
         console.error('Error loading messaging settings:', err.message);
         setError(`Failed to load settings: ${err.message}`);
@@ -345,6 +349,8 @@ export default function MessagingSettings() {
     if (canEditMessagingSettings) {
       settingsPayload.ai_hourly_throttle_limit = { value: hourlyLimit };
       settingsPayload.tcpa_compliance_enabled = { value: tcpaEnabled.toString() };
+      settingsPayload.tcpa_frequency_mode = { value: tcpaFrequencyMode };
+      settingsPayload.tcpa_frequency_value = { value: tcpaFrequencyValue };
       if (tcpaMode === 'custom') {
         settingsPayload.tcpa_custom_text = { value: tcpaCustomText };
       }
@@ -739,7 +745,7 @@ export default function MessagingSettings() {
                 <div className="flex items-center justify-between mb-4">
                   <div>
                     <h4 className="text-lg font-semibold text-gray-900">TCPA Compliance</h4>
-                    <p className="text-gray-600 text-sm">Include required opt-out language in initial messages</p>
+                    <p className="text-gray-600 text-sm">Configure required opt-out language for your messaging campaigns</p>
                   </div>
                   <label className="flex items-center">
                     <input
@@ -834,14 +840,133 @@ export default function MessagingSettings() {
                       </div>
                     )}
 
-                    {/* Current Preview */}
+                    {/* TCPA Frequency Settings */}
+                    <div className="space-y-3">
+                      <Label>TCPA Frequency</Label>
+                      <div className="space-y-3">
+                        <label className="flex items-center space-x-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50">
+                          <input
+                            type="radio"
+                            name="tcpaFrequency"
+                            value="initial"
+                            checked={tcpaFrequencyMode === 'initial'}
+                            onChange={(e) => setTcpaFrequencyMode(e.target.value)}
+                            disabled={!canEditMessagingSettings}
+                            className="h-4 w-4 text-blue-600 disabled:cursor-not-allowed"
+                          />
+                          <div className="flex-1">
+                            <div className="font-medium text-gray-900">Initial Message Only</div>
+                            <div className="text-sm text-gray-600">TCPA text appears only in the first message</div>
+                          </div>
+                        </label>
+
+                        <label className="flex items-center space-x-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50">
+                          <input
+                            type="radio"
+                            name="tcpaFrequency"
+                            value="every"
+                            checked={tcpaFrequencyMode === 'every'}
+                            onChange={(e) => setTcpaFrequencyMode(e.target.value)}
+                            disabled={!canEditMessagingSettings}
+                            className="h-4 w-4 text-blue-600 disabled:cursor-not-allowed"
+                          />
+                          <div className="flex-1">
+                            <div className="font-medium text-gray-900">Every Message</div>
+                            <div className="text-sm text-gray-600">TCPA text appears in all messages (safest option)</div>
+                          </div>
+                        </label>
+
+                        <label className="flex items-start space-x-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50">
+                          <input
+                            type="radio"
+                            name="tcpaFrequency"
+                            value="count"
+                            checked={tcpaFrequencyMode === 'count'}
+                            onChange={(e) => setTcpaFrequencyMode(e.target.value)}
+                            disabled={!canEditMessagingSettings}
+                            className="mt-1 h-4 w-4 text-blue-600 disabled:cursor-not-allowed"
+                          />
+                          <div className="flex-1">
+                            <div className="font-medium text-gray-900">Every X Messages</div>
+                            <div className="text-sm text-gray-600 mb-2">TCPA text appears after every specified number of messages</div>
+                            {tcpaFrequencyMode === 'count' && (
+                              <div className="flex items-center space-x-2">
+                                <span className="text-sm text-gray-700">Every</span>
+                                <input
+                                  type="number"
+                                  min="1"
+                                  max="50"
+                                  value={tcpaFrequencyValue}
+                                  onChange={(e) => setTcpaFrequencyValue(e.target.value)}
+                                  disabled={!canEditMessagingSettings}
+                                  className="w-16 border border-gray-300 rounded px-2 py-1 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100"
+                                />
+                                <span className="text-sm text-gray-700">messages</span>
+                              </div>
+                            )}
+                          </div>
+                        </label>
+
+                        <label className="flex items-start space-x-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50">
+                          <input
+                            type="radio"
+                            name="tcpaFrequency"
+                            value="days"
+                            checked={tcpaFrequencyMode === 'days'}
+                            onChange={(e) => setTcpaFrequencyMode(e.target.value)}
+                            disabled={!canEditMessagingSettings}
+                            className="mt-1 h-4 w-4 text-blue-600 disabled:cursor-not-allowed"
+                          />
+                          <div className="flex-1">
+                            <div className="font-medium text-gray-900">Every X Days</div>
+                            <div className="text-sm text-gray-600 mb-2">TCPA text appears at regular time intervals</div>
+                            {tcpaFrequencyMode === 'days' && (
+                              <div className="flex items-center space-x-2">
+                                <span className="text-sm text-gray-700">Every</span>
+                                <input
+                                  type="number"
+                                  min="1"
+                                  max="90"
+                                  value={tcpaFrequencyValue}
+                                  onChange={(e) => setTcpaFrequencyValue(e.target.value)}
+                                  disabled={!canEditMessagingSettings}
+                                  className="w-16 border border-gray-300 rounded px-2 py-1 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100"
+                                />
+                                <span className="text-sm text-gray-700">days</span>
+                              </div>
+                            )}
+                          </div>
+                        </label>
+                      </div>
+
+                      {/* Frequency Info */}
+                      <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                        <div className="text-sm text-amber-800">
+                          <strong>Legal Note:</strong> TCPA compliance requirements vary by industry and campaign type. 
+                          Consult your legal counsel to determine the appropriate frequency for your business. 
+                          More frequent opt-out reminders provide better legal protection.
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Current Configuration Preview */}
                     <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
-                      <div className="text-xs text-gray-500 mb-2">Text that will be appended to messages:</div>
-                      <div className="text-sm text-gray-700 font-mono">
-                        {tcpaMode === 'standard' 
-                          ? "Reply STOP to opt out of future messages. Msg & data rates may apply."
-                          : tcpaCustomText || "Enter custom text above..."
-                        }
+                      <div className="text-xs text-gray-500 mb-2">Current TCPA Configuration:</div>
+                      <div className="space-y-1">
+                        <div className="text-sm text-gray-700">
+                          <strong>Text:</strong> {tcpaMode === 'standard' 
+                            ? "Reply STOP to opt out of future messages. Msg & data rates may apply."
+                            : tcpaCustomText || "Enter custom text above..."
+                          }
+                        </div>
+                        <div className="text-sm text-gray-700">
+                          <strong>Frequency:</strong> {
+                            tcpaFrequencyMode === 'initial' ? 'Initial message only' :
+                            tcpaFrequencyMode === 'every' ? 'Every message' :
+                            tcpaFrequencyMode === 'count' ? `Every ${tcpaFrequencyValue} messages` :
+                            tcpaFrequencyMode === 'days' ? `Every ${tcpaFrequencyValue} days` : ''
+                          }
+                        </div>
                       </div>
                     </div>
                   </div>
