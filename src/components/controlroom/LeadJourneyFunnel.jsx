@@ -1135,26 +1135,26 @@ const data = generateMockData(modalType); // Use mock data until detailed querie
     }
   };
 
-  // Handle period change in modal
-  const handlePeriodChange = async (newPeriod) => {
-    setSelectedPeriod(newPeriod);
+// Handle period change in modal
+const handlePeriodChange = async (newPeriod) => {
+  setSelectedPeriod(newPeriod);
+  
+  if (activeModal) {
+    setLoadingModal(true);
     
-    if (activeModal) {
-      setLoadingModal(true);
+    try {
+      console.log(`🔍 Fetching updated ${activeModal} data from database`);
+      const data = generateMockData(activeModal);
+      setModalData(data);
       
-      try {
-        const detailUrl = buildApiUrl(`journey_${activeModal}`, user.tenant_id, newPeriod);
-        const data = await callEdgeFunction(detailUrl);
-        setModalData(data);
-        
-      } catch (error) {
-        console.error('Error fetching modal data:', error);
-        setModalData(generateMockData(activeModal));
-      } finally {
-        setLoadingModal(false);
-      }
+    } catch (error) {
+      console.error('Error fetching modal data:', error);
+      setModalData(generateMockData(activeModal));
+    } finally {
+      setLoadingModal(false);
     }
-  };
+  }
+};
 
   useEffect(() => {
     if (!user || !user.tenant_id) { 
