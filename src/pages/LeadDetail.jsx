@@ -2732,4 +2732,4 @@ export default function LeadDetail() {
       </div>
     </div>
   );
-}
+};
