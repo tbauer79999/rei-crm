@@ -6,13 +6,17 @@ import {
   Bell, Search, HelpCircle, ChevronDown, ChevronUp, User
 } from 'lucide-react';
 import ProductTour from './ProductTour';
-import { useAuth } from '../context/AuthContext';
+import { useAuth, useSessionTracking } from '../context/AuthContext';
 import supabase from '../lib/supabaseClient';
 
 export default function Layout({ children }) {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, canAccessEnterprise, role } = useAuth();
+  
+  // Add session tracking here
+  useSessionTracking();
+  
   const isControlRoom = location.pathname === '/control-room';
   const [showMobileSearch, setShowMobileSearch] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
@@ -24,11 +28,10 @@ export default function Layout({ children }) {
   const [isSearching, setIsSearching] = useState(false);
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [companyInfo, setCompanyInfo] = useState({
-    name: 'REI-CRM',
-    industry: 'real estate',
+    name: 'SurFox',
+    industry: 'sales',
     loading: true
   });
-
   // Notification state
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
