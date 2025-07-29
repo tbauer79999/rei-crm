@@ -595,12 +595,13 @@ const useSessionTracking = () => {
   useEffect(() => {
     if (!user?.id || !isEnabled) return;
     
-    // Get current session with better error handling
-    const getCurrentSession = async () => {
+    // Get current session OR create new one
+    const initializeSession = async () => {
       try {
         console.log('🔍 Checking for existing session for user:', user.id);
         
-        const { data, error } = await supabase
+        // First check for existing active session
+        const { data: existingSessions, error: queryError } = await supabase
           .from('user_sessions')
           .select('id')
           .eq('user_id', user.id)
@@ -608,25 +609,52 @@ const useSessionTracking = () => {
           .order('session_start', { ascending: false })
           .limit(1);
         
-        if (error) {
-          console.error('❌ Session query error:', error);
+        if (queryError) {
+          console.error('❌ Session query error:', queryError);
           setIsEnabled(false);
           return;
         }
         
-        // Check if we got an array (expected) vs single object
-        const session = Array.isArray(data) ? data[0] : data;
-        console.log('📍 Found session:', session);
+        const existingSession = existingSessions?.[0];
         
-        setSessionId(session?.id || null);
+        if (existingSession) {
+          console.log('✅ Found existing session:', existingSession.id);
+          setSessionId(existingSession.id);
+        } else {
+          // No active session found, create a new one
+          console.log('🆕 Creating new session for user:', user.id);
+          
+          const { data: newSession, error: createError } = await supabase
+            .from('user_sessions')
+            .insert({
+              user_id: user.id,
+              tenant_id: user.tenant_id,
+              login_method: 'email', // could be improved to detect actual method
+              user_agent: navigator.userAgent,
+              device_type: /Mobile|Android|iPhone|iPad/.test(navigator.userAgent) ? 'mobile' : 'desktop',
+              pages_visited: 1,
+              actions_performed: 0
+            })
+            .select('id')
+            .single();
+            
+          if (createError) {
+            console.error('❌ Session creation error:', createError);
+            setIsEnabled(false);
+            return;
+          }
+          
+          console.log('✅ Created new session:', newSession.id);
+          setSessionId(newSession.id);
+        }
         
       } catch (error) {
-        console.error('❌ Session tracking error:', error);
+        console.error('❌ Session initialization error:', error);
         setIsEnabled(false);
       }
     };
     
-    getCurrentSession();
+    initializeSession();
     
     // Track activity with better error handling
     const trackActivity = async () => {
@@ -652,11 +680,11 @@ const useSessionTracking = () => {
       }
     };
     
-    // Track every 2 minutes to be less aggressive
+    // Track every 2 minutes
     const activityInterval = setInterval(trackActivity, 2 * 60 * 1000);
     
     return () => clearInterval(activityInterval);
-  }, [user?.id, sessionId, isEnabled]);
+  }, [user?.id, user?.tenant_id, sessionId, isEnabled]);
   
   return { sessionId, isEnabled };
 };
