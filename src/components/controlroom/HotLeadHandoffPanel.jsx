@@ -1064,79 +1064,64 @@ const HotLeadHandoffPanel = () => {
     }
 
     try {
-      // Update conversation_analytics to log the call
-      const updateData = {
-        call_logged: true,
-        call_outcome: outcome,
-        analyzed_at: new Date().toISOString() // Update timestamp
-      };
+  // ✅ Log call outcome to raw activities table only
+  const activityNotes = outcome === 'voicemail' ? 'Left voicemail for hot lead' : 
+                       outcome === 'qualified' ? `Qualified lead - Pipeline value: $${pipelineValue || 'Not specified'}` :
+                       outcome === 'no_answer' ? 'Called - no answer' :
+                       outcome === 'not_fit' ? 'Called - determined not qualified' :
+                       `Call outcome: ${outcome}`;
 
-      // Add pipeline value if this is a qualified lead
-      if (outcome === 'qualified' && pipelineValue) {
-        const cleanValue = pipelineValue.toString().replace(/,/g, '');
-        const numericValue = parseFloat(cleanValue);
-        
-        if (!isNaN(numericValue) && numericValue > 0) {
-          updateData.pipeline_value = numericValue;
-        } else {
-          console.error('Invalid pipeline value:', pipelineValue);
-          throw new Error('Invalid pipeline value');
-        }
+  const { error: activityError } = await supabase
+    .from('sales_activities')
+    .insert({
+      tenant_id: user.tenant_id,
+      lead_id: selectedLead.id,
+      activity_type: 'call',
+      outcome: outcome,
+      notes: activityNotes,
+      attempted_at: new Date().toISOString(),
+      completed_at: new Date().toISOString(),
+      created_by: user.id,
+      activity_source: 'hot_lead_panel',
+      metadata: { 
+        pipeline_value: outcome === 'qualified' && pipelineValue ? parseFloat(pipelineValue.toString().replace(/,/g, '')) : null,
+        source: 'hot_lead_panel',
+        lead_score: 'hot',
+        conversation_id: selectedLead.id
       }
+    });
 
-      console.log('Updating conversation with outcome:', updateData);
+  if (activityError) {
+    console.error('❌ Failed to log sales activity:', activityError);
+    throw activityError;
+  }
 
-// 2. Trigger analytics recalculation
-const { error: syncError } = await supabase.functions.invoke('sync_sales_metrics', {
-  body: { action: 'sync' }
-});
-
-if (syncError) {
-  console.error('❌ Failed to sync analytics:', syncError);
-}
-
-console.log('Call logged and outcome updated successfully!');
-
-      // ✅ NEW: Also log to sales_activities table
-      const activityNotes = outcome === 'voicemail' ? 'Left voicemail for hot lead' : 
-                           outcome === 'qualified' ? `Qualified lead - Pipeline value: $${pipelineValue || 'Not specified'}` :
-                           outcome === 'no_answer' ? 'Called - no answer' :
-                           outcome === 'not_fit' ? 'Called - determined not qualified' :
-                           `Call outcome: ${outcome}`;
-
-      const { error: activityError } = await supabase
-        .from('sales_activities')
-        .insert({
-          tenant_id: user.tenant_id,
-          lead_id: selectedLead.id,
-          activity_type: 'call',
-          outcome: outcome,
-          notes: activityNotes,
-          attempted_at: new Date().toISOString(),
-          created_by: user.id,
-          metadata: { 
-            pipeline_value: outcome === 'qualified' && pipelineValue ? parseFloat(pipelineValue.toString().replace(/,/g, '')) : null,
-            source: 'hot_lead_panel',
-            lead_score: 'hot'
-          }
-        });
-
-      if (activityError) {
-        console.error('❌ Failed to log sales activity:', activityError);
-      }
-
-      setShowOutcomeModal(false);
-      setSelectedLead(null);
-      setSelectedOutcome(null);
-      setPipelineValue('');
-
-      // Refresh data to get updated stats
-      fetchData();
-
-    } catch (error) {
-      console.error('Error updating call outcome:', error);
-      alert('Failed to log call. Please try again.');
+  // Trigger analytics recalculation (edge function will update conversation_analytics)
+  const { error: syncError } = await supabase.functions.invoke('sync_sales_metrics', {
+    body: { 
+      action: 'sync',
+      tenant_id: user.tenant_id
     }
+  });
+
+  if (syncError) {
+    console.error('❌ Failed to sync analytics:', syncError);
+  }
+
+  console.log('✅ Call logged to activities table and analytics sync triggered');
+
+  setShowOutcomeModal(false);
+  setSelectedLead(null);
+  setSelectedOutcome(null);
+  setPipelineValue('');
+
+  // Refresh data to get updated stats
+  fetchData();
+
+} catch (error) {
+  console.error('Error updating call outcome:', error);
+  alert('Failed to log call. Please try again.');
+}
   };
   
 
