@@ -590,45 +590,75 @@ const useAuth = () => {
 const useSessionTracking = () => {
   const { user } = useAuth();
   const [sessionId, setSessionId] = useState(null);
+  const [isEnabled, setIsEnabled] = useState(true);
   
   useEffect(() => {
-    if (!user) return;
+    if (!user?.id || !isEnabled) return;
     
-    // Get current session
+    // Get current session with better error handling
     const getCurrentSession = async () => {
-      const { data } = await supabase
-        .from('user_sessions')
-        .select('id')
-        .eq('user_id', user.id)
-        .is('session_end', null)
-        .order('session_start', { ascending: false })
-        .limit(1)
-        .single();
+      try {
+        console.log('🔍 Checking for existing session for user:', user.id);
         
-      setSessionId(data?.id);
+        const { data, error } = await supabase
+          .from('user_sessions')
+          .select('id')
+          .eq('user_id', user.id)
+          .is('session_end', null)
+          .order('session_start', { ascending: false })
+          .limit(1);
+        
+        if (error) {
+          console.error('❌ Session query error:', error);
+          setIsEnabled(false);
+          return;
+        }
+        
+        // Check if we got an array (expected) vs single object
+        const session = Array.isArray(data) ? data[0] : data;
+        console.log('📍 Found session:', session);
+        
+        setSessionId(session?.id || null);
+        
+      } catch (error) {
+        console.error('❌ Session tracking error:', error);
+        setIsEnabled(false);
+      }
     };
     
     getCurrentSession();
     
-    // Track page visits and activity
+    // Track activity with better error handling
     const trackActivity = async () => {
-      if (!sessionId) return;
+      if (!sessionId || !isEnabled) return;
       
-      await supabase.from('user_sessions')
-        .update({
-          last_activity: new Date().toISOString(),
-          pages_visited: window.location.pathname
-        })
-        .eq('id', sessionId);
+      try {
+        console.log('📊 Updating activity for session:', sessionId);
+        const { error } = await supabase
+          .from('user_sessions')
+          .update({
+            last_activity: new Date().toISOString(),
+            pages_visited: window.location.pathname
+          })
+          .eq('id', sessionId);
+          
+        if (error) {
+          console.error('❌ Activity update error:', error);
+          setIsEnabled(false);
+        }
+      } catch (error) {
+        console.error('❌ Activity tracking error:', error);
+        setIsEnabled(false);
+      }
     };
     
-    // Track every 30 seconds
-    const activityInterval = setInterval(trackActivity, 30000);
+    // Track every 2 minutes to be less aggressive
+    const activityInterval = setInterval(trackActivity, 2 * 60 * 1000);
     
     return () => clearInterval(activityInterval);
-  }, [user, sessionId]);
+  }, [user?.id, sessionId, isEnabled]);
   
-  return { sessionId };
+  return { sessionId, isEnabled };
 };
 
 export { AuthProvider, useAuth, useSessionTracking };
