@@ -586,4 +586,49 @@ const useAuth = () => {
   return context;
 };
 
-export { AuthProvider, useAuth };
+// Create useSessionTracking hook
+const useSessionTracking = () => {
+  const { user } = useAuth();
+  const [sessionId, setSessionId] = useState(null);
+  
+  useEffect(() => {
+    if (!user) return;
+    
+    // Get current session
+    const getCurrentSession = async () => {
+      const { data } = await supabase
+        .from('user_sessions')
+        .select('id')
+        .eq('user_id', user.id)
+        .is('session_end', null)
+        .order('session_start', { ascending: false })
+        .limit(1)
+        .single();
+        
+      setSessionId(data?.id);
+    };
+    
+    getCurrentSession();
+    
+    // Track page visits and activity
+    const trackActivity = async () => {
+      if (!sessionId) return;
+      
+      await supabase.from('user_sessions')
+        .update({
+          last_activity: new Date().toISOString(),
+          pages_visited: window.location.pathname
+        })
+        .eq('id', sessionId);
+    };
+    
+    // Track every 30 seconds
+    const activityInterval = setInterval(trackActivity, 30000);
+    
+    return () => clearInterval(activityInterval);
+  }, [user, sessionId]);
+  
+  return { sessionId };
+};
+
+export { AuthProvider, useAuth, useSessionTracking };
