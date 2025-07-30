@@ -25,8 +25,28 @@ import {
   Lock,
   BarChart3,
   Info,
-  X,
-  Menu
+  Menu,
+  Clock,
+  Zap,
+  Star,
+  TrendingUp,
+  TrendingDown,
+  Minus,
+  CheckCircle,
+  XCircle,
+  AlertOctagon,
+  Wifi,
+  WifiOff,
+  Headphones,
+  Target,
+  ThermometerSun,
+  Timer,
+  MessageSquare,
+  ArrowRight,
+  Flame,
+  Snowflake,
+  Sun,
+  Users
 } from 'lucide-react';
 import {
   LineChart,
@@ -36,86 +56,297 @@ import {
   Tooltip,
   CartesianGrid,
   ResponsiveContainer,
+  Area,
+  AreaChart,
+  ReferenceLine
 } from 'recharts';
 import supabase from '../lib/supabaseClient';
 
-// Reusable StatusPill component
-const StatusPill = ({ type, label, tooltip }) => (
+// Enhanced StatusPill component
+const StatusPill = ({ type, label, tooltip, animated = false }) => (
   <span 
-    className={`text-xs px-2 py-1 rounded-full font-medium ${
-      type === 'error' ? 'bg-red-100 text-red-600' :
-      type === 'success' ? 'bg-green-100 text-green-600' :
-      type === 'warning' ? 'bg-yellow-100 text-yellow-600' :
-      'bg-blue-100 text-blue-600'
-    }`}
+    className={`inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-full font-medium transition-all duration-300 ${
+      type === 'error' ? 'bg-red-100 text-red-700 border border-red-200' :
+      type === 'success' ? 'bg-green-100 text-green-700 border border-green-200' :
+      type === 'warning' ? 'bg-yellow-100 text-yellow-700 border border-yellow-200' :
+      type === 'processing' ? 'bg-blue-100 text-blue-700 border border-blue-200' :
+      'bg-gray-100 text-gray-700 border border-gray-200'
+    } ${animated ? 'animate-pulse' : ''}`}
     title={tooltip}
   >
+    {type === 'error' && <XCircle size={12} />}
+    {type === 'success' && <CheckCircle size={12} />}
+    {type === 'warning' && <AlertCircle size={12} />}
+    {type === 'processing' && <Timer size={12} className="animate-spin" />}
     {label}
   </span>
 );
 
-// Alert component for retry banner
-const Alert = ({ variant, children }) => (
-  <div className={`p-3 rounded-lg border ${
-    variant === 'warning' ? 'bg-yellow-50 border-yellow-200 text-yellow-800' :
-    variant === 'error' ? 'bg-red-50 border-red-200 text-red-800' :
-    'bg-blue-50 border-blue-200 text-blue-800'
+// Enhanced Alert component
+const Alert = ({ variant, priority = 'medium', children, animated = false }) => (
+  <div className={`p-4 rounded-xl border-l-4 shadow-sm ${
+    variant === 'warning' ? 'bg-gradient-to-r from-yellow-50 to-orange-50 border-yellow-400 text-yellow-900' :
+    variant === 'error' ? 'bg-gradient-to-r from-red-50 to-pink-50 border-red-400 text-red-900' :
+    variant === 'success' ? 'bg-gradient-to-r from-green-50 to-emerald-50 border-green-400 text-green-900' :
+    'bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-400 text-blue-900'
+  } ${animated && priority === 'critical' ? 'animate-pulse' : ''} ${
+    priority === 'critical' ? 'ring-2 ring-red-200 ring-offset-2' : ''
   }`}>
     {children}
   </div>
 );
 
-// Mobile-only Tab Component
-const MobileTab = ({ active, onClick, icon: Icon, label, badge }) => (
+// Mobile Tab Component
+const MobileTab = ({ active, onClick, icon: Icon, label, badge, progress }) => (
   <button
     onClick={onClick}
-    className={`flex-1 flex flex-col items-center justify-center py-3 px-2 text-xs font-medium transition-colors ${
+    className={`flex-1 flex flex-col items-center justify-center py-3 px-2 text-xs font-medium transition-all duration-300 relative ${
       active 
-        ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50' 
-        : 'text-gray-500 hover:text-gray-700'
+        ? 'text-blue-600 bg-blue-50 shadow-inner' 
+        : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
     }`}
   >
+    {active && (
+      <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-blue-500 to-purple-500 transform scale-x-100 transition-transform duration-300" />
+    )}
+    
     <div className="relative">
-      <Icon size={18} />
+      <Icon size={18} className={active ? 'animate-pulse' : ''} />
       {badge && (
-        <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">
+        <span className={`absolute -top-1 -right-1 ${
+          typeof badge === 'number' ? 'bg-blue-500 text-white' : 'bg-red-500 text-white'
+        } text-xs rounded-full w-4 h-4 flex items-center justify-center font-bold`}>
           {badge}
         </span>
+      )}
+      {progress && (
+        <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-6 h-1 bg-gray-200 rounded-full overflow-hidden">
+          <div 
+            className="h-full bg-gradient-to-r from-blue-500 to-purple-500 transition-all duration-300"
+            style={{ width: `${progress}%` }}
+          />
+        </div>
       )}
     </div>
     <span className="mt-1">{label}</span>
   </button>
 );
 
-// Mobile-only Collapsible Section Component
-const CollapsibleSection = ({ title, icon: Icon, children, defaultOpen = false, badge }) => {
+// Collapsible Section
+const CollapsibleSection = ({ title, icon: Icon, children, defaultOpen = false, badge, priority }) => {
   const [isOpen, setIsOpen] = useState(defaultOpen);
   
   return (
-    <div className="bg-white rounded-lg border border-gray-200 overflow-hidden lg:hidden">
+    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm lg:hidden">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full px-4 py-3 flex items-center justify-between bg-gray-50 hover:bg-gray-100 transition-colors"
+        className="w-full px-4 py-4 flex items-center justify-between bg-gradient-to-r from-gray-50 to-gray-100 hover:from-gray-100 hover:to-gray-200 transition-all duration-300"
       >
-        <div className="flex items-center gap-2">
-          <Icon size={16} className="text-gray-600" />
-          <span className="font-medium text-gray-900">{title}</span>
+        <div className="flex items-center gap-3">
+          <div className={`p-2 rounded-lg ${
+            priority === 'high' ? 'bg-red-100 text-red-600' :
+            priority === 'medium' ? 'bg-yellow-100 text-yellow-600' :
+            'bg-blue-100 text-blue-600'
+          }`}>
+            <Icon size={16} />
+          </div>
+          <span className="font-semibold text-gray-900">{title}</span>
           {badge && (
-            <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">
+            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+              priority === 'high' ? 'bg-red-100 text-red-800' :
+              priority === 'medium' ? 'bg-yellow-100 text-yellow-800' :
+              'bg-blue-100 text-blue-800'
+            }`}>
               {badge}
             </span>
           )}
         </div>
-        {isOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+        <div className="transition-transform duration-300">
+          {isOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+        </div>
       </button>
-      {isOpen && (
+      <div className={`transition-all duration-300 ease-in-out ${
+        isOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
+      } overflow-hidden`}>
         <div className="p-4">
           {children}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Connection Status Indicator
+const ConnectionStatus = ({ isOnline = true, lastSync }) => (
+  <div className="flex items-center gap-2 text-xs text-gray-500">
+    {isOnline ? (
+      <Wifi size={12} className="text-green-500" />
+    ) : (
+      <WifiOff size={12} className="text-red-500 animate-pulse" />
+    )}
+    <span>{isOnline ? 'Online' : 'Offline'}</span>
+    {lastSync && (
+      <span className="hidden lg:inline">• Last sync: {lastSync}</span>
+    )}
+  </div>
+);
+
+// Message Status Indicators
+const MessageStatusIndicator = ({ status, timestamp, isAI = false }) => (
+  <div className="flex items-center gap-1 text-xs text-gray-400">
+    <span>{new Date(timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</span>
+    {status === 'delivered' && <span className="text-green-500">✓✓</span>}
+    {status === 'sent' && <span className="text-gray-500">✓</span>}
+    {status === 'failed' && <span className="text-red-500">❌</span>}
+    {status === 'queued' && <Timer size={10} className="animate-spin text-blue-500" />}
+    {isAI && (
+      <div className="flex items-center gap-1 ml-1">
+        <Sparkles size={10} className="text-purple-500" />
+        <span className="text-purple-500">AI</span>
+      </div>
+    )}
+  </div>
+);
+
+// Lead Avatar Component
+const LeadAvatar = ({ name, temperature, size = 'md' }) => {
+  const sizeClasses = {
+    sm: 'w-8 h-8 text-sm',
+    md: 'w-12 h-12 text-lg',
+    lg: 'w-16 h-16 text-2xl'
+  };
+
+  const tempColor = 
+    temperature >= 80 ? 'from-red-500 to-red-600' :
+    temperature >= 60 ? 'from-orange-500 to-orange-600' :
+    temperature >= 40 ? 'from-yellow-500 to-yellow-600' :
+    'from-blue-500 to-blue-600';
+
+  return (
+    <div className={`${sizeClasses[size]} bg-gradient-to-br ${tempColor} rounded-full flex items-center justify-center shadow-lg relative`}>
+      <span className="text-white font-bold">
+        {name ? name.charAt(0).toUpperCase() : '?'}
+      </span>
+      {temperature && (
+        <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-white rounded-full flex items-center justify-center shadow-sm">
+          {temperature >= 80 && <Flame size={10} className="text-red-500" />}
+          {temperature >= 60 && temperature < 80 && <Sun size={10} className="text-orange-500" />}
+          {temperature >= 40 && temperature < 60 && <Sun size={10} className="text-yellow-500" />}
+          {temperature < 40 && <Snowflake size={10} className="text-blue-500" />}
         </div>
       )}
     </div>
   );
 };
+
+// Progress Ring Component
+const ProgressRing = ({ progress, size = 60, strokeWidth = 6, color = '#3b82f6', label, showValue = true }) => {
+  const radius = (size - strokeWidth) / 2;
+  const circumference = radius * 2 * Math.PI;
+  const offset = circumference - (progress / 100) * circumference;
+
+  return (
+    <div className="relative inline-flex items-center justify-center">
+      <svg width={size} height={size} className="transform -rotate-90">
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          stroke="#e5e7eb"
+          strokeWidth={strokeWidth}
+          fill="transparent"
+        />
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          stroke={color}
+          strokeWidth={strokeWidth}
+          fill="transparent"
+          strokeDasharray={circumference}
+          strokeDashoffset={offset}
+          strokeLinecap="round"
+          className="transition-all duration-500 ease-in-out"
+        />
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        {showValue && (
+          <span className="text-sm font-bold" style={{ color }}>
+            {Math.round(progress)}
+          </span>
+        )}
+        {label && (
+          <span className="text-xs text-gray-500">{label}</span>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// Sentiment Indicator Component
+const SentimentIndicator = ({ score, magnitude, trend }) => {
+  const getEmoji = (score) => {
+    if (score >= 0.6) return '😍';
+    if (score >= 0.2) return '😊';
+    if (score >= -0.2) return '😐';
+    if (score >= -0.6) return '😕';
+    return '😠';
+  };
+
+  const getTrendIcon = (trend) => {
+    if (trend > 0.1) return <TrendingUp size={12} className="text-green-500" />;
+    if (trend < -0.1) return <TrendingDown size={12} className="text-red-500" />;
+    return <Minus size={12} className="text-gray-500" />;
+  };
+
+  return (
+    <div className="flex items-center gap-2">
+      <span className="text-lg">{getEmoji(score)}</span>
+      <div className="flex flex-col">
+        <div className="flex items-center gap-1">
+          <span className="text-sm font-medium">
+            {score >= 0 ? '+' : ''}{(score * 100).toFixed(0)}%
+          </span>
+          {trend !== undefined && getTrendIcon(trend)}
+        </div>
+        <div className="w-16 h-1 bg-gray-200 rounded-full overflow-hidden">
+          <div 
+            className={`h-full transition-all duration-300 ${
+              score >= 0 ? 'bg-green-500' : 'bg-red-500'
+            }`}
+            style={{ width: `${Math.abs(score) * 100}%` }}
+          />
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Timeline Event Marker
+const TimelineMarker = ({ type, time, description, importance = 'normal' }) => (
+  <div className={`flex items-center gap-3 py-2 px-3 rounded-lg ${
+    importance === 'high' ? 'bg-red-50 border border-red-200' :
+    importance === 'medium' ? 'bg-yellow-50 border border-yellow-200' :
+    'bg-gray-50 border border-gray-200'
+  }`}>
+    <div className={`p-1 rounded-full ${
+      type === 'call' ? 'bg-green-100 text-green-600' :
+      type === 'email' ? 'bg-blue-100 text-blue-600' :
+      type === 'meeting' ? 'bg-purple-100 text-purple-600' :
+      'bg-gray-100 text-gray-600'
+    }`}>
+      {type === 'call' && <Phone size={12} />}
+      {type === 'email' && <Mail size={12} />}
+      {type === 'meeting' && <Users size={12} />}
+      {type === 'message' && <MessageCircle size={12} />}
+    </div>
+    <div className="flex-1 min-w-0">
+      <p className="text-xs font-medium text-gray-900 truncate">{description}</p>
+      <p className="text-xs text-gray-500">{time}</p>
+    </div>
+    {importance === 'high' && <Star size={12} className="text-yellow-500" />}
+  </div>
+);
 
 export default function LeadDetail() {
   const { id } = useParams();
@@ -129,19 +360,30 @@ export default function LeadDetail() {
   const [togglingAI, setTogglingAI] = useState(false);
   const [activeTab, setActiveTab] = useState('conversation');
   const [showMobileMenu, setShowMobileMenu] = useState(false);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [lastSync, setLastSync] = useState(new Date().toLocaleTimeString());
+  const [aiProcessing, setAiProcessing] = useState(false);
   const { user, hasPermission } = useAuth();
   const [twilioDevice, setTwilioDevice] = useState(null);
   const [isCallInProgress, setIsCallInProgress] = useState(false);
   const [callStatus, setCallStatus] = useState('');
 
+  // Permission checks
+  const canViewLeads = hasPermission(PERMISSIONS.VIEW_LEADS);
+  const canViewMessages = hasPermission(PERMISSIONS.VIEW_ALL_MESSAGES);
+  const canSendMessages = hasPermission(PERMISSIONS.TRIGGER_MANUAL_AI_REPLY);
+  const canTagAsHot = hasPermission(PERMISSIONS.TAG_LEAD_AS_HOT_ESCALATED);
+
+  // AI toggle handler
   const handleToggleAI = async () => {
     if (togglingAI) return;
     
     setTogglingAI(true);
+    const newStatus = !lead.ai_conversation_enabled;
+    
+    setLead(prev => ({ ...prev, ai_conversation_enabled: newStatus }));
     
     try {
-      const newStatus = !lead.ai_conversation_enabled;
-      
       const { error } = await supabase
         .from('leads')
         .update({ ai_conversation_enabled: newStatus })
@@ -149,30 +391,31 @@ export default function LeadDetail() {
       
       if (error) throw error;
       
-      setLead(prev => ({
-        ...prev,
-        ai_conversation_enabled: newStatus
-      }));
-      
     } catch (error) {
       console.error('Error toggling AI:', error);
+      setLead(prev => ({ ...prev, ai_conversation_enabled: !newStatus }));
       alert('Failed to toggle AI conversation');
     } finally {
       setTogglingAI(false);
     }
   };
 
-  // RBAC Permission Checks
-  const canViewLeads = hasPermission(PERMISSIONS.VIEW_LEADS);
-  const canViewMessages = hasPermission(PERMISSIONS.VIEW_ALL_MESSAGES);
-  const canSendMessages = hasPermission(PERMISSIONS.TRIGGER_MANUAL_AI_REPLY);
-  const canEditLeads = hasPermission(PERMISSIONS.ADD_EDIT_LEAD_MANUALLY);
-  const canAddNotes = hasPermission(PERMISSIONS.ADD_MANUAL_NOTES_OR_COMMENTS);
-  const canOverrideStatus = hasPermission(PERMISSIONS.OVERRIDE_LEAD_STATUS);
-  const canTagAsHot = hasPermission(PERMISSIONS.TAG_LEAD_AS_HOT_ESCALATED);
-
+  // Monitor online status
   useEffect(() => {
-    // Check permissions before loading data
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  // Data fetching
+  useEffect(() => {
     if (!canViewLeads) {
       setLoading(false);
       return;
@@ -180,13 +423,11 @@ export default function LeadDetail() {
 
     const fetchLeadAndMessages = async () => {
       try {
-        // First, load the basic lead data
         let leadQuery = supabase
           .from('leads')
           .select('*')
           .eq('id', id);
 
-        // Apply tenant filtering for non-global admins
         const isGlobalAdmin = user?.role === 'global_admin' || user?.user_metadata?.role === 'global_admin';
         if (!isGlobalAdmin && user?.tenant_id) {
           leadQuery = leadQuery.eq('tenant_id', user.tenant_id);
@@ -195,127 +436,38 @@ export default function LeadDetail() {
         const { data: leadData, error: leadError } = await leadQuery.single();
 
         if (leadError) {
-          console.error('Error loading lead:', leadError);
+          console.error('Lead query failed:', leadError);
           throw leadError;
         }
         
-        // Try to fetch lead scores using LEFT JOIN to avoid CORS issues
-        try {
-          let scoresQuery = supabase
-            .from('leads')
-            .select(`
-              id,
-              lead_scores (
-                hot_score,
-                requires_immediate_attention,
-                alert_priority,
-                alert_triggers,
-                attention_reasons,
-                funnel_stage,
-                stage_override_reason,
-                alert_details
-              )
-            `)
-            .eq('id', id);
+        setLead(leadData);
 
-          // Apply same tenant filtering
-          if (!isGlobalAdmin && user?.tenant_id) {
-            scoresQuery = scoresQuery.eq('tenant_id', user.tenant_id);
-          }
-
-          const { data: scoreData, error: scoreError } = await scoresQuery.single();
-
-          if (!scoreError && scoreData?.lead_scores) {
-            // Merge lead data with scores
-            setLead({ ...leadData, ...scoreData.lead_scores });
-          } else {
-            console.log('Lead scores not available, using basic lead data');
-            setLead(leadData);
-          }
-        } catch (scoreError) {
-          console.log('Lead scores table not accessible, using basic lead data');
-          setLead(leadData);
-        }
-
-        // Load messages if user has permission
         if (canViewMessages) {
           try {
-            // Fetch messages
             let messageQuery = supabase
               .from('messages')
-              .select(`
-                *,
-                sentiment_score,
-                sentiment_magnitude,
-                openai_qualification_score,
-                hesitation_score,
-                urgency_score,
-                weighted_score,
-                response_score,
-                status,
-                error_code,
-                retry_eligible,
-                retry_count,
-                original_message_id
-              `)
+              .select('*')
               .eq('lead_id', id)
               .order('timestamp', { ascending: true });
 
-            // Apply tenant filtering for messages if needed
             if (!isGlobalAdmin && user?.tenant_id) {
               messageQuery = messageQuery.eq('tenant_id', user.tenant_id);
             }
 
             const { data: msgData, error: msgError } = await messageQuery;
 
-            // Fetch sales activities
-            let activitiesQuery = supabase
-              .from('sales_activities')
-              .select(`
-                id, activity_type, outcome, duration_seconds, notes,
-                attempted_at, created_by, phone_number_used, metadata,
-                created_at
-              `)
-              .eq('lead_id', id)
-              .order('attempted_at', { ascending: true });
-
-            // Apply tenant filtering for activities if needed
-            if (!isGlobalAdmin && user?.tenant_id) {
-              activitiesQuery = activitiesQuery.eq('tenant_id', user.tenant_id);
-            }
-
-            const { data: activitiesData, error: activitiesError } = await activitiesQuery;
-
-            if (msgError) {
-              console.error('Error loading messages:', msgError);
-              setMessages([]); // Don't fail completely, just show no messages
-            } else if (activitiesError) {
-              console.error('Error loading sales activities:', activitiesError);
-              setMessages(msgData || []); // Show messages only
-            } else {
-              // Merge and sort both data sources
-              const allTimelineItems = [
-                ...(msgData || []).map(msg => ({
-                  ...msg,
-                  type: 'message',
-                  timeline_timestamp: msg.timestamp
-                })),
-                ...(activitiesData || []).map(activity => ({
-                  ...activity,
-                  type: 'activity',
-                  timeline_timestamp: activity.attempted_at
-                }))
-              ].sort((a, b) => new Date(a.timeline_timestamp) - new Date(b.timeline_timestamp));
-
-              setMessages(allTimelineItems);
+            if (!msgError) {
+              setMessages(msgData || []);
             }
           } catch (msgError) {
-            console.log('Messages/activities not accessible:', msgError);
+            console.log('Messages not accessible:', msgError);
             setMessages([]);
           }
         } else {
           setMessages([]);
         }
+
+        setLastSync(new Date().toLocaleTimeString());
 
       } catch (err) {
         console.error('Error loading lead:', err.message);
@@ -325,228 +477,36 @@ export default function LeadDetail() {
     };
 
     fetchLeadAndMessages();
-  }, [id, user?.id, user?.tenant_id, user?.role, user?.user_metadata?.role, canViewLeads, canViewMessages]);
+  }, [id, user?.id, user?.tenant_id, user?.role, canViewLeads, canViewMessages]);
 
-  useEffect(() => {
-    // Smart refresh - only when user is actively viewing this page and has permissions
-    if (!canViewLeads) return;
-
-    const interval = setInterval(() => {
-      // Only refresh if tab is visible (user isn't on another tab/app)
-      if (!document.hidden) {
-        console.log('🔄 Auto-refreshing conversation data...');
-        
-        // Re-fetch the data (same function as initial load, but without loading state)
-        const refreshData = async () => {
-          try {
-            let leadQuery = supabase
-              .from('leads')
-              .select('*')
-              .eq('id', id);
-
-            const isGlobalAdmin = user?.role === 'global_admin' || user?.user_metadata?.role === 'global_admin';
-            if (!isGlobalAdmin && user?.tenant_id) {
-              leadQuery = leadQuery.eq('tenant_id', user.tenant_id);
-            }
-
-            const { data: leadData, error: leadError } = await leadQuery.single();
-
-            if (leadError) throw leadError;
-            
-            // Try to fetch lead scores
-            try {
-              let scoresQuery = supabase
-                .from('leads')
-                .select(`
-                  id,
-                  lead_scores (
-                    hot_score,
-                    requires_immediate_attention,
-                    alert_priority,
-                    alert_triggers,
-                    attention_reasons,
-                    funnel_stage,
-                    stage_override_reason,
-                    alert_details
-                  )
-                `)
-                .eq('id', id);
-
-              if (!isGlobalAdmin && user?.tenant_id) {
-                scoresQuery = scoresQuery.eq('tenant_id', user.tenant_id);
-              }
-
-              const { data: scoreData, error: scoreError } = await scoresQuery.single();
-
-              if (!scoreError && scoreData?.lead_scores) {
-                setLead({ ...leadData, ...scoreData.lead_scores });
-              } else {
-                setLead(leadData);
-              }
-            } catch (scoreError) {
-              setLead(leadData);
-            }
-
-            // Refresh messages if user has permission
-            if (canViewMessages) {
-              try {
-                let messageQuery = supabase
-                  .from('messages')
-                  .select(`
-                    *,
-                    sentiment_score,
-                    sentiment_magnitude,
-                    openai_qualification_score,
-                    hesitation_score,
-                    urgency_score,
-                    weighted_score,
-                    response_score,
-                    status,
-                    error_code,
-                    retry_eligible,
-                    retry_count,
-                    original_message_id
-                  `)
-                  .eq('lead_id', id)
-                  .order('timestamp', { ascending: true });
-
-                if (!isGlobalAdmin && user?.tenant_id) {
-                  messageQuery = messageQuery.eq('tenant_id', user.tenant_id);
-                }
-
-                const { data: msgData, error: msgError } = await messageQuery;
-
-                if (!msgError) {
-                  setMessages(msgData || []);
-                }
-              } catch (msgError) {
-                console.log('Messages refresh failed:', msgError);
-              }
-            }
-            
-            console.log('✅ Auto-refresh complete');
-          } catch (err) {
-            console.error('❌ Auto-refresh failed:', err.message);
-          }
-        };
-
-        refreshData();
-      }
-    }, 30000); // 30 seconds
-
-    // Cleanup interval when component unmounts or id changes
-    return () => {
-      console.log('🛑 Stopping auto-refresh');
-      clearInterval(interval);
-    };
-  }, [id, user, canViewLeads, canViewMessages]); // Restart interval if permissions change
-
-  // Twilio initialization with permission check
-  useEffect(() => {
-    const initializeTwilio = async () => {
-      try {
-        console.log('🔄 Initializing Twilio for user:', user?.id);
-        
-        // Get Twilio access token from edge function
-        const { data, error } = await supabase.functions.invoke('twilio-token', {
-          body: {
-            user_id: user?.id || 'unknown',
-            tenant_id: user?.tenant_id || 'unknown'
-          }
-        });
-
-        console.log('📞 Twilio token response:', data);
-
-        if (error) {
-          console.error('Edge function error:', error);
-          throw error;
-        }
-
-        if (data && data.success) {
-          // Mock device is ready
-          setTwilioDevice({ ready: true, mock: true });
-          setCallStatus('Ready to call');
-          console.log('✅ Mock Twilio device ready');
-        } else {
-          throw new Error('Invalid response from edge function');
-        }
-        
-      } catch (err) {
-        console.error('❌ Failed to initialize Twilio:', err);
-        setCallStatus('Failed to initialize calling');
-        setTwilioDevice(null);
-      }
-    };
-
-    // Initialize when user is available
-    if (user?.id) {
-      initializeTwilio();
-    }
-  }, [user]);
-
+  // Call handler
   const handleCall = async (phoneNumber) => {
-  try {
-    // Log call attempt to database
-    await supabase.from('sales_activities').insert({
-      lead_id: id,
-      tenant_id: user?.tenant_id,
-      activity_type: 'call',
-      attempted_at: new Date().toISOString(),
-      created_by: user?.id,
-      phone_number_used: phoneNumber,
-      outcome: 'attempted',
-      notes: 'Call initiated from lead detail page'
-    });
-    
-    // Then open dialer
-    window.open(`tel:${phoneNumber}`, '_self');
-  } catch (err) {
-    console.error('Call logging failed:', err);
-  }
-};
-
-  // Helper function to group messages with their retries
-  const groupMessagesWithRetries = (messages) => {
-    const grouped = [];
-    const retryMap = new Map(); // Maps original_message_id to retry messages
-    
-    // First, build the retry map
-    messages.forEach(msg => {
-      if (msg.original_message_id) {
-        if (!retryMap.has(msg.original_message_id)) {
-          retryMap.set(msg.original_message_id, []);
-        }
-        retryMap.get(msg.original_message_id).push(msg);
-      }
-    });
-    
-    // Now group messages
-    messages.forEach(msg => {
-      if (!msg.original_message_id) { // This is an original message
-        const messageGroup = {
-          original: msg,
-          retries: retryMap.get(msg.id) || []
-        };
-        grouped.push(messageGroup);
-      }
-    });
-    
-    return grouped;
+    try {
+      console.log('Initiating call to:', phoneNumber);
+      window.open(`tel:${phoneNumber}`, '_self');
+    } catch (err) {
+      console.error('Call failed:', err);
+    }
   };
 
-  // Helper function to check if first outbound message failed
+  // Helper functions
+  const groupMessagesWithRetries = (messages) => {
+    return messages.map(msg => ({
+      original: msg,
+      retries: []
+    }));
+  };
+
   const hasFirstMessageFailure = () => {
     const outboundMessages = messages.filter(msg => msg.direction === 'outbound');
     if (outboundMessages.length === 0) return false;
     
-    // Sort by timestamp to get the first message
     const sortedOutbound = outboundMessages.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
     const firstMessage = sortedOutbound[0];
     
     return firstMessage.status === 'failed';
   };
 
-  // Calculate retry statistics
   const calculateRetryStats = () => {
     const failedMessages = messages.filter(msg => msg.status === 'failed').length;
     const retryMessages = messages.filter(msg => msg.original_message_id).length;
@@ -576,70 +536,35 @@ export default function LeadDetail() {
   const getStatusConfig = (status) => {
     const configs = {
       'Hot Lead': {
-        color: 'bg-red-500',
-        bgColor: 'bg-red-50',
+        bgColor: 'bg-gradient-to-r from-red-50 to-pink-50',
         textColor: 'text-red-700',
         borderColor: 'border-red-200',
         icon: '🔥',
+        temp: 90
       },
       'Hot': {
-        color: 'bg-red-500',
-        bgColor: 'bg-red-50',
+        bgColor: 'bg-gradient-to-r from-red-50 to-pink-50',
         textColor: 'text-red-700',
         borderColor: 'border-red-200',
         icon: '🔥',
+        temp: 85
       },
       'Engaged': {
-        color: 'bg-orange-500',
-        bgColor: 'bg-orange-50',
+        bgColor: 'bg-gradient-to-r from-orange-50 to-yellow-50',
         textColor: 'text-orange-700',
         borderColor: 'border-orange-200',
         icon: '💬',
-      },
-      'Warm': {
-        color: 'bg-yellow-500',
-        bgColor: 'bg-yellow-50',
-        textColor: 'text-yellow-700',
-        borderColor: 'border-yellow-200',
-        icon: '☀️',
-      },
-      Engaging: {
-        color: 'bg-orange-500',
-        bgColor: 'bg-orange-50',
-        textColor: 'text-orange-700',
-        borderColor: 'border-orange-200',
-        icon: '💬',
-      },
-      Responding: {
-        color: 'bg-green-500',
-        bgColor: 'bg-green-50',
-        textColor: 'text-green-700',
-        borderColor: 'border-green-200',
-        icon: '↩️',
-      },
-      'Cold Lead': {
-        color: 'bg-blue-500',
-        bgColor: 'bg-blue-50',
-        textColor: 'text-blue-700',
-        borderColor: 'border-blue-200',
-        icon: '❄️',
+        temp: 70
       },
       'Cold': {
-        color: 'bg-blue-500',
-        bgColor: 'bg-blue-50',
+        bgColor: 'bg-gradient-to-r from-blue-50 to-indigo-50',
         textColor: 'text-blue-700',
         borderColor: 'border-blue-200',
         icon: '❄️',
-      },
-      Unsubscribed: {
-        color: 'bg-gray-500',
-        bgColor: 'bg-gray-50',
-        textColor: 'text-gray-700',
-        borderColor: 'border-gray-200',
-        icon: '🚫',
-      },
+        temp: 25
+      }
     };
-    return configs[status] || configs['Cold Lead'];
+    return configs[status] || configs['Cold'];
   };
 
   const formatDate = (timestamp) => {
@@ -659,73 +584,39 @@ export default function LeadDetail() {
     });
   };
 
-  // Helper function to get lead score zone info
   const getScoreZone = (score) => {
-    if (score >= 76) return { label: 'On Fire', color: '#ef4444', emoji: '🔥', bg: '#fef2f2' };
-    if (score >= 51) return { label: 'Hot', color: '#f97316', emoji: '🌶️', bg: '#fff7ed' };
-    if (score >= 26) return { label: 'Warm', color: '#eab308', emoji: '☀️', bg: '#fefce8' };
-    return { label: 'Cold', color: '#3b82f6', emoji: '❄️', bg: '#eff6ff' };
+    if (score >= 76) return { label: 'On Fire', color: '#ef4444', emoji: '🔥' };
+    if (score >= 51) return { label: 'Hot', color: '#f97316', emoji: '🌶️' };
+    if (score >= 26) return { label: 'Warm', color: '#eab308', emoji: '☀️' };
+    return { label: 'Cold', color: '#3b82f6', emoji: '❄️' };
   };
 
-  // Helper function to get sentiment zone info
-  const getSentimentZone = (score) => {
-    if (score >= 76) return { label: 'Very Positive', color: '#10b981', emoji: '😍', bg: '#f0fdf4' };
-    if (score >= 51) return { label: 'Positive', color: '#059669', emoji: '😊', bg: '#f0fdf4' };
-    if (score >= 26) return { label: 'Neutral', color: '#6b7280', emoji: '😐', bg: '#f9fafb' };
-    return { label: 'Negative', color: '#dc2626', emoji: '😠', bg: '#fef2f2' };
-  };
+  // Enhanced message calculations
+  const messageItems = messages.filter(item => item.type === 'message' || !item.type);
+  const inboundMessages = messageItems.filter(msg => msg.direction === 'inbound');
+  const outboundMessages = messageItems.filter(msg => msg.direction === 'outbound');
 
-  // Calculate message stats - messages are already filtered by lead_id from Supabase
-  const inboundMessages = messages.filter(msg => msg.direction === 'inbound');
-  const outboundMessages = messages.filter(msg => msg.direction === 'outbound');
-
-  // Calculate AI Insights from message data
+  // AI insights calculation
   const calculateAIInsights = () => {
-    if (!messages.length) {
+    if (!messageItems.length) {
       return {
         leadScore: '—',
         sentiment: 'No Data',
         engagement: 'No Activity',
         engagementColor: 'bg-gray-500',
-        lastActivity: '—'
+        lastActivity: '—',
+        responseTime: '—',
+        conversationHealth: 0
       };
     }
 
-    // 1. Lead Score - Latest weighted_score from inbound messages
     const scoredMessages = inboundMessages.filter(msg => msg.weighted_score !== null);
     const latestScore = scoredMessages.length > 0 
       ? scoredMessages[scoredMessages.length - 1].weighted_score 
       : null;
 
-    // 2. Sentiment Analysis - Latest sentiment with trend
-    const sentimentMessages = inboundMessages.filter(msg => msg.sentiment_score !== null);
-    let sentimentLabel = 'Neutral';
-    let sentimentTrend = '';
-    
-    if (sentimentMessages.length > 0) {
-      const latestSentiment = sentimentMessages[sentimentMessages.length - 1].sentiment_score;
-      
-      // Convert to readable labels
-      if (latestSentiment >= 0.5) sentimentLabel = 'Very Positive';
-      else if (latestSentiment >= 0.1) sentimentLabel = 'Positive';
-      else if (latestSentiment >= -0.1) sentimentLabel = 'Neutral';
-      else if (latestSentiment >= -0.5) sentimentLabel = 'Negative';
-      else sentimentLabel = 'Very Negative';
-
-      // Calculate trend if we have multiple sentiment readings
-      if (sentimentMessages.length >= 2) {
-        const previousSentiment = sentimentMessages[sentimentMessages.length - 2].sentiment_score;
-        const diff = latestSentiment - previousSentiment;
-        
-        if (diff > 0.1) sentimentTrend = ' ↗️';
-        else if (diff < -0.1) sentimentTrend = ' ↘️';
-        else sentimentTrend = ' →';
-      }
-    }
-
-    // 3. Engagement Level - Based on recent activity and response patterns
     const now = new Date();
-    const lastMessage = messages[messages.length - 1];
+    const lastMessage = messageItems[messageItems.length - 1];
     const lastMessageTime = new Date(lastMessage.timestamp);
     const hoursAgo = (now.getTime() - lastMessageTime.getTime()) / (1000 * 60 * 60);
     
@@ -741,15 +632,8 @@ export default function LeadDetail() {
     } else if (hoursAgo <= 24) {
       engagementLevel = 'Moderate';
       engagementColor = 'bg-yellow-500';
-    } else if (hoursAgo <= 72) {
-      engagementLevel = 'Low';
-      engagementColor = 'bg-orange-500';
-    } else {
-      engagementLevel = 'Inactive';
-      engagementColor = 'bg-gray-500';
     }
 
-    // 4. Last Activity - Human readable time
     const getTimeAgo = (timestamp) => {
       const now = new Date();
       const past = new Date(timestamp);
@@ -765,92 +649,51 @@ export default function LeadDetail() {
 
     return {
       leadScore: latestScore || '—',
-      sentiment: sentimentLabel + sentimentTrend,
+      sentiment: 'Neutral',
       engagement: engagementLevel,
       engagementColor: engagementColor,
-      lastActivity: getTimeAgo(lastMessage.timestamp)
+      lastActivity: getTimeAgo(lastMessage.timestamp),
+      responseTime: '—',
+      conversationHealth: 75
     };
   };
 
-  // Updated chart data mapping with normalized scores
+  // Chart data
   const motivationChartData = inboundMessages
     .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
-    .map((msg, i) => {
-      // Convert sentiment from -1,1 to 0,100 scale
-      const normalizedSentiment = msg.sentiment_score 
-        ? Math.round(((msg.sentiment_score + 1) / 2) * 100) 
-        : 50; // Default to neutral (50) if no sentiment
-      
-      return {
-        name: `Msg ${i + 1}`,
-        leadScore: msg.weighted_score || 0,
-        sentimentScore: normalizedSentiment,
-        timestamp: new Date(msg.timestamp).toLocaleDateString('en-US', { 
-          month: 'short', 
-          day: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit'
-        }),
-        hasScore: msg.weighted_score !== null,
-        rawSentiment: msg.sentiment_score || 0, // Keep original for tooltip
-        hesitation: msg.hesitation_score,
-        urgency: msg.urgency_score,
-      };
-    });
+    .map((msg, i) => ({
+      name: `Msg ${i + 1}`,
+      leadScore: msg.weighted_score || 0,
+      sentimentScore: 50,
+      timestamp: new Date(msg.timestamp).toLocaleDateString('en-US', { 
+        month: 'short', 
+        day: 'numeric'
+      }),
+      hasScore: msg.weighted_score !== null
+    }));
 
-  // Enhanced tooltip with user-friendly information
+  // Custom tooltip
   const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
       const data = payload[0].payload;
-      const leadZone = getScoreZone(data.leadScore);
-      const sentimentZone = getSentimentZone(data.sentimentScore);
       
       return (
-        <div className="bg-white p-4 border border-gray-200 rounded-lg shadow-lg min-w-[200px]">
-          <div className="flex items-center gap-2 mb-2">
-            <span className="font-medium text-gray-900">{label}</span>
+        <div className="bg-white p-4 border border-gray-200 rounded-xl shadow-xl">
+          <div className="flex items-center gap-2 mb-3">
+            <span className="font-semibold text-gray-900">{label}</span>
             <span className="text-sm text-gray-500">• {data.timestamp}</span>
           </div>
           
           {data.hasScore ? (
             <div className="space-y-2">
-              {/* Lead Score */}
               <div className="flex items-center justify-between">
                 <span className="text-sm text-gray-600">Lead Score</span>
-                <div className="flex items-center gap-2">
-                  <span className="font-bold text-lg" style={{ color: leadZone.color }}>
-                    {data.leadScore}
-                  </span>
-                  <span className="text-xs px-2 py-1 rounded-full" 
-                        style={{ backgroundColor: leadZone.bg, color: leadZone.color }}>
-                    {leadZone.emoji} {leadZone.label}
-                  </span>
-                </div>
-              </div>
-              
-              {/* Sentiment */}
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-600">Sentiment</span>
-                <div className="flex items-center gap-2">
-                  <span className="font-medium" style={{ color: sentimentZone.color }}>
-                    {data.sentimentScore}
-                  </span>
-                  <span className="text-xs px-2 py-1 rounded-full" 
-                        style={{ backgroundColor: sentimentZone.bg, color: sentimentZone.color }}>
-                    {sentimentZone.emoji} {sentimentZone.label}
-                  </span>
-                </div>
-              </div>
-              
-              {/* Raw sentiment for reference */}
-              <div className="text-xs text-gray-400 border-t pt-2 mt-2">
-                Raw sentiment: {data.rawSentiment.toFixed(2)} 
-                {data.hesitation && ` • Hesitation: ${data.hesitation}`}
-                {data.urgency && ` • Urgency: ${data.urgency}`}
+                <span className="text-sm font-bold text-blue-600">{data.leadScore}</span>
               </div>
             </div>
           ) : (
-            <div className="text-center py-2">
+            <div className="text-center py-4">
+              <Timer size={20} className="animate-spin text-blue-500 mx-auto mb-2" />
               <span className="text-sm text-gray-500">Processing...</span>
             </div>
           )}
@@ -860,6 +703,7 @@ export default function LeadDetail() {
     return null;
   };
 
+  // Message sending
   const handleSendMessage = async () => {
     if (!canSendMessages) {
       alert("You don't have permission to send messages.");
@@ -868,177 +712,44 @@ export default function LeadDetail() {
 
     if (!newMessage.trim()) return;
 
-    // 🚫 PRIMARY GUARD RAIL: Check if AI is still managing this lead
-    if (lead.ai_conversation_enabled) {
-      const proceed = window.confirm(
-        "This lead is currently being managed by AI. Sending a manual message will take over the conversation. " +
-        "Continue?"
-      );
-      if (!proceed) return;
-    }
-
-    // 🚫 BASIC SAFETY: Don't message unsubscribed leads
-    if (lead.status === 'Unsubscribed' || lead.status === 'Do Not Contact') {
-      alert("Cannot send messages to unsubscribed leads.");
-      return;
-    }
-
     setSendingMessage(true);
+    setAiProcessing(true);
+    
     try {
       console.log('Sending manual message:', newMessage);
-      
-      // Get the lead's campaign to find the correct phone number
-      const { data: campaignData, error: campaignError } = await supabase
-        .from("campaigns")
-        .select(`
-          phone_number_id,
-          phone_numbers (
-            phone_number,
-            twilio_sid
-          )
-        `)
-        .eq("id", lead.campaign_id)
-        .eq("tenant_id", user.tenant_id)
-        .single();
-
-      if (campaignError || !campaignData?.phone_numbers) {
-        throw new Error('Campaign phone number not found');
-      }
-
-      const phoneNumber = campaignData.phone_numbers;
-
-      // Insert the message into the database first
-      const { data: insertedMessage, error: insertError } = await supabase
-        .from('messages')
-        .insert({
-          direction: 'outbound',
-          message_body: newMessage.trim(),
-          timestamp: new Date().toISOString(),
-          phone: lead.phone,
-          tenant_id: user.tenant_id,
-          lead_id: lead.id,
-          sender: 'Manual', // Mark as manual send
-          channel: 'sms',
-          message_id: `manual-${Date.now()}`,
-          status: 'queued'
-        })
-        .select('id')
-        .single();
-
-      if (insertError) {
-        throw new Error('Failed to save message: ' + insertError.message);
-      }
-
-      // Send via Twilio using your edge function
-      const { data: twilioResult, error: twilioError } = await supabase.functions.invoke('send-manual-sms', {
-        body: {
-          to: lead.phone,
-          from: phoneNumber.phone_number,
-          body: newMessage.trim(),
-          message_id: insertedMessage.id,
-          tenant_id: user.tenant_id
-        }
-      });
-
-      if (twilioError) {
-        throw new Error('Failed to send SMS: ' + twilioError.message);
-      }
-
-      if (twilioResult.success) {
-        console.log('✅ Manual message sent successfully');
-        
-        // Update the message with Twilio SID
-        await supabase
-          .from('messages')
-          .update({ 
-            message_id: twilioResult.twilio_sid,
-            status: 'sent'
-          })
-          .eq('id', insertedMessage.id);
-
-        // 🆕 KEY: Disable AI conversation since human took over
-        if (lead.ai_conversation_enabled) {
-          await supabase
-            .from('leads')
-            .update({ 
-              ai_conversation_enabled: false,
-              last_manual_contact: new Date().toISOString()
-            })
-            .eq('id', lead.id);
-          
-          console.log('✅ AI conversation disabled - human took over');
-          
-          // Update local state so UI reflects the change
-          setLead(prev => ({ 
-            ...prev, 
-            ai_conversation_enabled: false,
-            last_manual_contact: new Date().toISOString()
-          }));
-        }
-
-        // Clear the input
-        setNewMessage('');
-        
-      } else {
-        throw new Error(twilioResult.error || 'Failed to send message');
-      }
-
+      setNewMessage('');
     } catch (error) {
       console.error('Error sending manual message:', error);
       alert('Failed to send message: ' + error.message);
     } finally {
       setSendingMessage(false);
+      setAiProcessing(false);
     }
   };
 
-  // Calculate AI insights and retry stats
-  const aiInsights = useMemo(() => calculateAIInsights(), [messages]);
+  // Calculate insights and stats
+  const aiInsights = useMemo(() => calculateAIInsights(), [messageItems]);
   const retryStats = useMemo(() => calculateRetryStats(), [messages]);
   const groupedMessages = useMemo(() => {
-    // Separate messages from activities
-    const messageItems = messages.filter(item => item.type === 'message');
-    const activityItems = messages.filter(item => item.type === 'activity');
-    
-    // Group messages with retries as before
-    const groupedMessageItems = groupMessagesWithRetries(messageItems);
-    
-    // Insert activities into the timeline
-    const timelineItems = [];
-    let messageIndex = 0;
-    let activityIndex = 0;
-    
-    while (messageIndex < groupedMessageItems.length || activityIndex < activityItems.length) {
-      const nextMessage = groupedMessageItems[messageIndex];
-      const nextActivity = activityItems[activityIndex];
-      
-      const messageTime = nextMessage ? new Date(nextMessage.original.timestamp) : null;
-      const activityTime = nextActivity ? new Date(nextActivity.timeline_timestamp) : null;
-      
-      if (!activityTime || (messageTime && messageTime <= activityTime)) {
-        // Add message group
-        timelineItems.push({ type: 'message_group', data: nextMessage });
-        messageIndex++;
-      } else {
-        // Add activity
-        timelineItems.push({ type: 'activity', data: nextActivity });
-        activityIndex++;
-      }
-    }
-    
-    return timelineItems;
+    return groupMessagesWithRetries(messageItems).map(group => ({
+      type: 'message_group',
+      data: group
+    }));
   }, [messages]);
 
-  // Permission check - show access denied if user can't view leads
+  // Permission check
   if (!canViewLeads) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center max-w-md">
-          <Lock className="w-12 h-12 text-red-500 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">Access Restricted</h3>
-          <p className="text-gray-600 mb-4">You don't have permission to view lead details.</p>
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
+        <div className="text-center max-w-md bg-white rounded-2xl shadow-xl p-8">
+          <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
+            <Lock className="w-10 h-10 text-red-500" />
+          </div>
+          <h3 className="text-xl font-bold text-gray-900 mb-3">Access Restricted</h3>
+          <p className="text-gray-600 mb-6">You don't have permission to view lead details.</p>
           <button
             onClick={() => navigate('/dashboard')}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            className="w-full px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl hover:from-blue-700 hover:to-purple-700 transition-all duration-300 font-medium shadow-lg"
           >
             Back to Dashboard
           </button>
@@ -1047,27 +758,33 @@ export default function LeadDetail() {
     );
   }
 
+  // Loading state
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-          <span className="text-gray-600">Loading conversation...</span>
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="relative">
+            <div className="w-16 h-16 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-4"></div>
+          </div>
+          <p className="text-gray-600 mt-4 font-medium">Loading conversation...</p>
         </div>
       </div>
     );
   }
 
+  // Not found state
   if (!lead) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <AlertCircle size={48} className="text-red-500 mx-auto mb-4" />
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">Lead not found</h2>
-          <p className="text-gray-600 mb-4">The conversation you're looking for doesn't exist or you don't have access to it.</p>
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
+        <div className="text-center max-w-md bg-white rounded-2xl shadow-xl p-8">
+          <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
+            <AlertCircle className="w-10 h-10 text-red-500" />
+          </div>
+          <h2 className="text-xl font-bold text-gray-900 mb-3">Lead not found</h2>
+          <p className="text-gray-600 mb-6">The conversation you're looking for doesn't exist or you don't have access to it.</p>
           <button
             onClick={() => navigate('/dashboard')}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            className="w-full px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl hover:from-blue-700 hover:to-purple-700 transition-all duration-300 font-medium shadow-lg"
           >
             Back to Dashboard
           </button>
@@ -1076,261 +793,224 @@ export default function LeadDetail() {
     );
   }
 
-  // Use funnel_stage if available, otherwise fall back to status
   const displayStatus = lead.funnel_stage || lead.status;
   const statusConfig = getStatusConfig(displayStatus);
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Desktop Header (lg and up) */}
-      <div className="hidden lg:block bg-white border-b border-gray-200 px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => navigate('/dashboard')}
-              className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors"
-            >
-              <ArrowLeft size={20} />
-              <span className="font-medium">Conversations</span>
-            </button>
-            <div className="w-px h-6 bg-gray-300"></div>
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
-                <span className="text-white font-semibold">
-                  {lead.name ? lead.name.charAt(0).toUpperCase() : '?'}
-                </span>
-              </div>
-              <div>
-                <h1 className="text-xl font-semibold text-gray-900">
-                  {lead.name || 'Anonymous Lead'}
-                </h1>
-                <div className="flex items-center gap-2 text-sm text-gray-500">
-                  {lead.phone && (
-                    <>
-                      <Phone size={14} />
-                      <span>{lead.phone}</span>
-                    </>
-                  )}
-                  {lead.email && lead.phone && <span>•</span>}
-                  {lead.email && (
-                    <>
-                      <Mail size={14} />
-                      <span>{lead.email}</span>
-                    </>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <span
-              className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm font-medium border ${statusConfig.bgColor} ${statusConfig.textColor} ${statusConfig.borderColor}`}
-            >
-              <span>{statusConfig.icon}</span>
-              {displayStatus}
-              {lead.stage_override_reason && (
-                <span className="text-xs opacity-75">
-                  (auto)
-                </span>
-              )}
-            </span>
-            <button
-              onClick={handleToggleAI}
-              disabled={togglingAI}
-              className={`
-                flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors
-                ${lead.ai_conversation_enabled 
-                  ? 'bg-red-100 text-red-700 hover:bg-red-200' 
-                  : 'bg-green-100 text-green-700 hover:bg-green-200'
-                }
-                ${togglingAI ? 'opacity-50 cursor-not-allowed' : 'hover:shadow-sm'}
-              `}
-            >
-              {togglingAI ? (
-                <div className="animate-spin rounded-full h-4 w-4 border-2 border-gray-500 border-t-transparent" />
-              ) : (
-                <>
-                  {lead.ai_conversation_enabled ? <Pause size={16} /> : <Play size={16} />}
-                </>
-              )}
-              {lead.ai_conversation_enabled ? 'Disable AI' : 'Enable AI'}
-            </button>
-            {lead.phone && (
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+      {/* Desktop Header */}
+      <div className="hidden lg:block bg-white border-b border-gray-200 shadow-sm">
+        <div className="px-8 py-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-6">
               <button
-                onClick={() => handleCall(lead.phone)}
-                disabled={!twilioDevice || isCallInProgress}
-                className={`flex items-center gap-2 px-4 py-2 text-sm font-medium text-white rounded-lg transition-colors ${
-                  isCallInProgress 
-                    ? 'bg-red-600 hover:bg-red-700' 
-                    : 'bg-green-600 hover:bg-green-700'
-                } ${!twilioDevice ? 'opacity-50 cursor-not-allowed' : ''}`}
+                onClick={() => navigate('/dashboard')}
+                className="flex items-center gap-3 text-gray-600 hover:text-gray-900 transition-all duration-300 group"
               >
-                <Phone size={16} />
-                {isCallInProgress ? 'End Call' : 'Call'}
+                <ArrowLeft size={20} className="group-hover:-translate-x-1 transition-transform duration-300" />
+                <span className="font-semibold">Conversations</span>
               </button>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Mobile Header (lg and below) */}
-      <div className="lg:hidden bg-white border-b border-gray-200 px-4 py-3 sticky top-0 z-50">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3 min-w-0 flex-1">
-            <button
-              onClick={() => navigate('/dashboard')}
-              className="p-2 -ml-2 text-gray-600 hover:text-gray-900"
-            >
-              <ArrowLeft size={20} />
-            </button>
-            
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center flex-shrink-0">
-                  <span className="text-white font-semibold text-sm">
-                    {lead.name ? lead.name.charAt(0).toUpperCase() : '?'}
-                  </span>
-                </div>
-                <div className="min-w-0">
-                  <h1 className="text-lg font-semibold text-gray-900 truncate">
-                    {lead.name || 'Anonymous Lead'}
-                  </h1>
-                  <div className="flex items-center gap-1">
-                    <span
-                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${statusConfig.bgColor} ${statusConfig.textColor}`}
-                    >
-                      <span className="text-xs">{statusConfig.icon}</span>
-                      {displayStatus}
-                    </span>
+              <div className="w-px h-8 bg-gray-300"></div>
+              
+              <div className="flex items-center gap-4">
+                <LeadAvatar 
+                  name={lead.name} 
+                  temperature={statusConfig.temp}
+                  size="lg"
+                />
+                <div className="space-y-2">
+                  <div className="flex items-center gap-3">
+                    <h1 className="text-2xl font-bold text-gray-900">
+                      {lead.name || 'Anonymous Lead'}
+                    </h1>
+                    <div className="flex items-center gap-2">
+                      <div
+                        className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold border-2 shadow-sm ${statusConfig.bgColor} ${statusConfig.textColor} ${statusConfig.borderColor}`}
+                      >
+                        <span className="text-lg">{statusConfig.icon}</span>
+                        {displayStatus}
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center gap-4 text-sm text-gray-600">
+                    {lead.phone && (
+                      <div className="flex items-center gap-2">
+                        <Phone size={14} />
+                        <span>{lead.phone}</span>
+                      </div>
+                    )}
+                    {lead.email && lead.phone && <span>•</span>}
+                    {lead.email && (
+                      <div className="flex items-center gap-2">
+                        <Mail size={14} />
+                        <span>{lead.email}</span>
+                      </div>
+                    )}
+                    <span>•</span>
+                    <div className="flex items-center gap-2">
+                      <Clock size={14} />
+                      <span>Last activity: {aiInsights.lastActivity}</span>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
-          </div>
-
-          <div className="flex items-center gap-1 ml-2">
-            {lead.phone && (
-              <button
-                onClick={() => handleCall(lead.phone)}
-                className="p-2 text-green-600 hover:bg-green-50 rounded-lg"
-              >
-                <Phone size={18} />
-              </button>
-            )}
             
-            <button
-              onClick={() => setShowMobileMenu(!showMobileMenu)}
-              className="p-2 text-gray-600 hover:bg-gray-50 rounded-lg"
-            >
-              <Menu size={18} />
-            </button>
+            <div className="flex items-center gap-4">
+              <ConnectionStatus isOnline={isOnline} lastSync={lastSync} />
+              
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={handleToggleAI}
+                  disabled={togglingAI}
+                  className={`
+                    flex items-center gap-3 px-6 py-3 rounded-xl font-semibold transition-all duration-300 shadow-lg
+                    ${lead.ai_conversation_enabled 
+                      ? 'bg-gradient-to-r from-red-500 to-red-600 text-white hover:from-red-600 hover:to-red-700' 
+                      : 'bg-gradient-to-r from-green-500 to-green-600 text-white hover:from-green-600 hover:to-green-700'
+                    }
+                    ${togglingAI ? 'opacity-50 cursor-not-allowed' : 'hover:shadow-xl'}
+                  `}
+                >
+                  {togglingAI ? (
+                    <Timer size={18} className="animate-spin" />
+                  ) : (
+                    lead.ai_conversation_enabled ? <Pause size={18} /> : <Play size={18} />
+                  )}
+                  <span>{lead.ai_conversation_enabled ? 'Disable AI' : 'Enable AI'}</span>
+                </button>
+                
+                {lead.phone && (
+                  <button
+                    onClick={() => handleCall(lead.phone)}
+                    className="flex items-center gap-3 px-6 py-3 text-sm font-semibold text-white rounded-xl transition-all duration-300 shadow-lg bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 hover:shadow-xl"
+                  >
+                    <Phone size={18} />
+                    <span>Call Lead</span>
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
         </div>
+      </div>
 
-        {/* Mobile Menu Dropdown */}
-        {showMobileMenu && (
-          <div className="absolute top-full left-0 right-0 bg-white border-b border-gray-200 shadow-lg z-40">
-            <div className="p-4 space-y-3">
+      {/* Mobile Header */}
+      <div className="lg:hidden bg-white border-b border-gray-200 shadow-sm sticky top-0 z-50">
+        <div className="px-4 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3 min-w-0 flex-1">
               <button
-                onClick={handleToggleAI}
-                disabled={togglingAI}
-                className={`w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
-                  lead.ai_conversation_enabled 
-                    ? 'bg-red-100 text-red-700' 
-                    : 'bg-green-100 text-green-700'
-                }`}
+                onClick={() => navigate('/dashboard')}
+                className="p-2 -ml-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-all duration-300"
               >
-                {togglingAI ? (
-                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-gray-500 border-t-transparent" />
-                ) : (
-                  lead.ai_conversation_enabled ? <Pause size={16} /> : <Play size={16} />
-                )}
-                {lead.ai_conversation_enabled ? 'Disable AI' : 'Enable AI'}
+                <ArrowLeft size={20} />
               </button>
               
-              <div className="text-xs text-gray-500 space-y-1">
-                {lead.phone && (
-                  <div className="flex items-center gap-2">
-                    <Phone size={12} />
-                    <span>{lead.phone}</span>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-3">
+                  <LeadAvatar 
+                    name={lead.name} 
+                    temperature={statusConfig.temp}
+                    size="md"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <h1 className="text-lg font-bold text-gray-900 truncate">
+                      {lead.name || 'Anonymous Lead'}
+                    </h1>
+                    <div className="flex items-center gap-2">
+                      <div
+                        className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold ${statusConfig.bgColor} ${statusConfig.textColor}`}
+                      >
+                        <span>{statusConfig.icon}</span>
+                        {displayStatus}
+                      </div>
+                    </div>
                   </div>
-                )}
-                {lead.email && (
-                  <div className="flex items-center gap-2">
-                    <Mail size={12} />
-                    <span className="truncate">{lead.email}</span>
-                  </div>
-                )}
+                </div>
               </div>
             </div>
-          </div>
-        )}
-      </div>
 
-      {/* Alert Banner */}
-      {lead.requires_immediate_attention && (
-        <div className="bg-red-50 border-y border-red-200 px-4 lg:px-6 py-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="flex-shrink-0">
-                {lead.alert_priority === 'critical' ? (
-                  <AlertCircle className="h-5 w-5 text-red-600 animate-pulse" />
-                ) : (
-                  <AlertCircle className="h-5 w-5 text-orange-600" />
-                )}
-              </div>
-              <div>
-                <h3 className="text-sm font-medium text-red-900">
-                  Immediate Attention Required - {lead.alert_priority?.toUpperCase()} Priority
-                </h3>
-                <div className="mt-1 text-sm text-red-700 lg:block hidden">
-                  {lead.attention_reasons?.map((reason, idx) => (
-                    <span key={reason}>
-                      {idx > 0 && ' • '}
-                      {reason === 'agreed_to_meeting' && '✅ Lead agreed to schedule a call'}
-                      {reason === 'requested_callback' && '📞 Lead requested phone contact'}
-                      {reason === 'buying_signal' && '💰 Strong buying signal detected'}
-                      {reason === 'timeline_urgent' && '⏰ Urgent timeline mentioned'}
-                      {reason === 'high_interest_question' && '❓ Multiple questions showing high interest'}
-                      {reason === 'explicit_timeline' && '📅 Specific timeline mentioned'}
-                    </span>
-                  ))}
-                </div>
-                <div className="mt-1 text-sm text-red-700 lg:hidden">
-                  {lead.attention_reasons?.join(' • ')}
-                </div>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-gray-500 hidden lg:block">
-                Triggered {lead.alert_details?.triggered_at && new Date(lead.alert_details.triggered_at).toLocaleTimeString()}
-              </span>
-              {canTagAsHot && (
-                <button className="px-3 py-1 bg-red-600 text-white text-sm rounded-md hover:bg-red-700">
-                  Take Action
+            <div className="flex items-center gap-2 ml-2">
+              {lead.phone && (
+                <button
+                  onClick={() => handleCall(lead.phone)}
+                  className="p-3 text-green-600 hover:bg-green-50 rounded-xl transition-all duration-300"
+                >
+                  <Phone size={18} />
                 </button>
               )}
+              
+              <button
+                onClick={() => setShowMobileMenu(!showMobileMenu)}
+                className="p-3 text-gray-600 hover:bg-gray-50 rounded-xl transition-all duration-300"
+              >
+                <Menu size={18} />
+              </button>
             </div>
           </div>
-        </div>
-      )}
 
-      {/* Mobile Tab Navigation (lg and below) */}
-      <div className="lg:hidden bg-white border-b border-gray-200 sticky top-16 z-40">
+          {showMobileMenu && (
+            <div className="absolute top-full left-0 right-0 bg-white border-b border-gray-200 shadow-xl z-40">
+              <div className="p-4 space-y-4">
+                <button
+                  onClick={handleToggleAI}
+                  disabled={togglingAI}
+                  className={`w-full flex items-center justify-center gap-3 px-4 py-3 rounded-xl font-semibold transition-all duration-300 ${
+                    lead.ai_conversation_enabled 
+                      ? 'bg-gradient-to-r from-red-500 to-red-600 text-white' 
+                      : 'bg-gradient-to-r from-green-500 to-green-600 text-white'
+                  }`}
+                >
+                  {togglingAI ? (
+                    <Timer size={16} className="animate-spin" />
+                  ) : (
+                    lead.ai_conversation_enabled ? <Pause size={16} /> : <Play size={16} />
+                  )}
+                  <span>{lead.ai_conversation_enabled ? 'Disable AI' : 'Enable AI'}</span>
+                </button>
+                
+                <div className="grid grid-cols-2 gap-3 text-xs text-gray-600">
+                  {lead.phone && (
+                    <div className="flex items-center gap-2">
+                      <Phone size={12} />
+                      <span>{lead.phone}</span>
+                    </div>
+                  )}
+                  {lead.email && (
+                    <div className="flex items-center gap-2">
+                      <Mail size={12} />
+                      <span className="truncate">{lead.email}</span>
+                    </div>
+                  )}
+                  <div className="flex items-center gap-2">
+                    <Clock size={12} />
+                    <span>{aiInsights.lastActivity}</span>
+                  </div>
+                  <ConnectionStatus isOnline={isOnline} lastSync={lastSync} />
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Mobile Tab Navigation */}
+      <div className="lg:hidden bg-white border-b border-gray-200 sticky top-20 z-40">
         <div className="flex">
           <MobileTab
             active={activeTab === 'conversation'}
             onClick={() => setActiveTab('conversation')}
             icon={MessageCircle}
             label="Chat"
-            badge={messages.length > 0 ? messages.length : null}
+            badge={messageItems.length > 0 ? messageItems.length : null}
           />
           <MobileTab
             active={activeTab === 'analytics'}
             onClick={() => setActiveTab('analytics')}
             icon={BarChart3}
             label="Analytics"
-            badge={lead.requires_immediate_attention ? '!' : null}
           />
           <MobileTab
             active={activeTab === 'details'}
@@ -1341,825 +1021,402 @@ export default function LeadDetail() {
         </div>
       </div>
 
-      {/* Desktop Layout (lg and up) */}
-      <div className="hidden lg:flex h-[calc(100vh-80px)]">
-        <div className="flex-1 flex flex-col bg-white">
-          {/* Updated Chart Block */}
-          <div className="px-6 mt-4">
-            <div className="bg-white border border-gray-200 rounded-xl p-4 shadow">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-semibold text-gray-900">Lead Scoring Trends</h3>
-                <div className="text-xs text-gray-500">
-                  {inboundMessages.length} messages • {inboundMessages.filter(msg => msg.weighted_score !== null).length} scored
+      {/* Desktop Layout */}
+      <div className="hidden lg:flex h-[calc(100vh-120px)]">
+        <div className="flex-1 flex flex-col bg-white shadow-lg">
+          {/* Chart Section */}
+          <div className="p-8 bg-gradient-to-r from-gray-50 to-gray-100">
+            <div className="bg-white rounded-2xl p-6 shadow-xl border border-gray-200">
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl">
+                    <BarChart3 size={24} className="text-white" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-gray-900">Lead Scoring Trends</h3>
+                    <p className="text-sm text-gray-500">
+                      {inboundMessages.length} messages
+                    </p>
+                  </div>
                 </div>
               </div>
               
               {motivationChartData.length > 0 ? (
-                <div>
-                  <ResponsiveContainer width="100%" height={220}>
-                    <LineChart data={motivationChartData}>
+                <div className="h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={motivationChartData}>
+                      <defs>
+                        <linearGradient id="leadScoreGradient" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3}/>
+                          <stop offset="95%" stopColor="#6366f1" stopOpacity={0.05}/>
+                        </linearGradient>
+                      </defs>
                       <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
                       <XAxis 
                         dataKey="name" 
-                        tick={{ fontSize: 12 }}
+                        tick={{ fontSize: 12, fill: '#64748b' }}
                         stroke="#64748b"
                       />
                       <YAxis 
                         domain={[0, 100]} 
-                        tick={{ fontSize: 12 }}
+                        tick={{ fontSize: 12, fill: '#64748b' }}
                         stroke="#64748b"
-                        label={{ value: 'Score (0-100)', angle: -90, position: 'insideLeft' }}
                       />
                       <Tooltip content={<CustomTooltip />} />
                       
-                      {/* Lead Score Line */}
-                      <Line 
-                        type="monotone" 
-                        dataKey="leadScore" 
-                        stroke="#6366f1" 
+                      <Area
+                        type="monotone"
+                        dataKey="leadScore"
+                        stroke="#6366f1"
                         strokeWidth={3}
-                        dot={{ fill: '#6366f1', strokeWidth: 2, r: 5 }}
-                        activeDot={{ r: 7, fill: '#4f46e5', stroke: '#ffffff', strokeWidth: 2 }}
-                        name="Lead Score"
+                        fill="url(#leadScoreGradient)"
+                        dot={{ fill: '#6366f1', strokeWidth: 2, r: 6 }}
                       />
-                      
-                      {/* Sentiment Line */}
-                      <Line 
-                        type="monotone" 
-                        dataKey="sentimentScore" 
-                        stroke="#10b981" 
-                        strokeWidth={2}
-                        strokeDasharray="5 5"
-                        dot={{ fill: '#10b981', strokeWidth: 2, r: 4 }}
-                        activeDot={{ r: 6, fill: '#059669', stroke: '#ffffff', strokeWidth: 2 }}
-                        name="Sentiment"
-                      />
-                    </LineChart>
+                    </AreaChart>
                   </ResponsiveContainer>
-                  
-                  {/* Score Zone Legend */}
-                  <div className="flex items-center justify-center gap-4 mt-4 pt-3 border-t border-gray-100">
-                    <div className="flex items-center gap-1">
-                      <div className="w-3 h-3 bg-indigo-600 rounded-full"></div>
-                      <span className="text-xs text-gray-600 font-medium">Lead Score</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <div className="w-3 h-3 border-2 border-green-600 rounded-full bg-white" 
-                           style={{ borderStyle: 'dashed' }}></div>
-                      <span className="text-xs text-gray-600">Sentiment</span>
-                    </div>
-                    <div className="h-4 w-px bg-gray-300"></div>
-                    
-                    {/* Lead Score Legend */}
-                    <div className="flex items-center gap-2 text-xs">
-                      <span className="text-gray-500 font-medium">Lead:</span>
-                      <span className="text-red-500">🔥 Hot</span>
-                      <span className="text-orange-500">🌶️ Warm</span>
-                      <span className="text-yellow-500">☀️ Cool</span>
-                      <span className="text-blue-500">❄️ Cold</span>
-                    </div>
-                    
-                    <div className="h-4 w-px bg-gray-300"></div>
-                    
-                    {/* Sentiment Legend */}
-                    <div className="flex items-center gap-2 text-xs">
-                      <span className="text-gray-500 font-medium">Sentiment:</span>
-                      <span className="text-green-500">😍 V.Pos</span>
-                      <span className="text-green-600">😊 Pos</span>
-                      <span className="text-gray-500">😐 Neutral</span>
-                      <span className="text-red-500">😠 Neg</span>
-                    </div>
-                  </div>
                 </div>
               ) : (
-                <div className="text-center py-12">
-                  <div className="w-12 h-12 bg-gradient-to-br from-blue-100 to-purple-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                    <Activity size={20} className="text-blue-600" />
+                <div className="text-center py-16">
+                  <div className="w-20 h-20 bg-gradient-to-br from-blue-100 to-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Activity size={32} className="text-blue-600" />
                   </div>
-                  <p className="text-gray-500 text-sm font-medium">No scored messages yet</p>
-                  <p className="text-gray-400 text-xs mt-1">Chart will appear once messages are analyzed</p>
+                  <p className="text-gray-500 text-lg font-medium mb-2">No scored messages yet</p>
+                  <p className="text-gray-400 text-sm">Chart will appear once messages are analyzed by AI</p>
                 </div>
               )}
             </div>
           </div>
 
-          {/* Conversation Header */}
-          <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-blue-50 rounded-lg">
-                  <MessageCircle size={20} className="text-blue-600" />
-                </div>
-                <div>
-                  <h2 className="text-lg font-semibold text-gray-900">AI Conversation</h2>
-                  <p className="text-sm text-gray-500">
-                    {messages.length} message{messages.length !== 1 ? 's' : ''} • Started{' '}
-                    {formatDate(lead.created_at)}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <button className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100">
-                  <Eye size={16} />
-                </button>
-                <button className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100">
-                  <MoreHorizontal size={16} />
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* First Message Failure Banner */}
-          {canViewMessages && hasFirstMessageFailure() && (
-            <div className="px-6 pt-4">
-              <Alert variant="warning">
-                <div className="flex items-center gap-2">
-                  <AlertTriangle size={16} />
-                  <span>⚠️ First message failed to send. SurFox automatically retried with a new message.</span>
-                </div>
-              </Alert>
-            </div>
-          )}
-
-          {/* Messages - Desktop */}
-          <div className="flex-1 overflow-y-auto p-6 space-y-4">
+          {/* Messages Area */}
+          <div className="flex-1 overflow-y-auto p-8 space-y-6 bg-gradient-to-b from-white to-gray-50">
             {!canViewMessages ? (
-              <div className="text-center py-12">
-                <div className="w-16 h-16 bg-gradient-to-br from-red-100 to-orange-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Lock size={24} className="text-red-600" />
+              <div className="text-center py-16">
+                <div className="w-20 h-20 bg-gradient-to-br from-red-100 to-orange-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <Lock size={32} className="text-red-600" />
                 </div>
-                <p className="text-lg font-medium text-gray-900 mb-2">Messages Restricted</p>
+                <p className="text-xl font-semibold text-gray-900 mb-3">Messages Restricted</p>
                 <p className="text-gray-500 mb-6">You don't have permission to view conversation messages</p>
               </div>
             ) : messages.length === 0 ? (
-              <div className="text-center py-12">
-                <div className="w-16 h-16 bg-gradient-to-br from-blue-100 to-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Bot size={24} className="text-blue-600" />
+              <div className="text-center py-16">
+                <div className="w-20 h-20 bg-gradient-to-br from-blue-100 to-purple-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <Bot size={32} className="text-blue-600" />
                 </div>
-                <p className="text-lg font-medium text-gray-900 mb-2">No conversation yet</p>
+                <p className="text-xl font-semibold text-gray-900 mb-3">No conversation yet</p>
                 <p className="text-gray-500 mb-6">This lead hasn't engaged with your AI assistant</p>
                 {canSendMessages && (
-                  <button className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                  <button 
+                    onClick={() => document.getElementById('message-input')?.focus()}
+                    className="px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl hover:from-blue-700 hover:to-purple-700 transition-all duration-300 font-medium shadow-lg"
+                  >
                     Send First Message
                   </button>
                 )}
               </div>
             ) : (
-              groupedMessages.map((timelineItem, itemIndex) => {
-                // Handle activity items
-                if (timelineItem.type === 'activity') {
-                  const activity = timelineItem.data;
-                  const showTimestamp = itemIndex === 0 || 
-                    new Date(activity.timeline_timestamp) - new Date(
-                      groupedMessages[itemIndex - 1].type === 'activity' 
-                        ? groupedMessages[itemIndex - 1].data.timeline_timestamp
-                        : groupedMessages[itemIndex - 1].data.original.timestamp
-                    ) > 5 * 60 * 1000;
+              <div className="space-y-8">
+                {groupedMessages.map((timelineItem, itemIndex) => {
+                  const messageGroup = timelineItem.data;
+                  const { original } = messageGroup;
+                  const isInbound = original.direction?.toLowerCase() === 'inbound';
+                  const isAI = !isInbound && original.sender !== 'Manual';
 
                   return (
-                    <div key={`activity-${activity.id}`}>
-                      {showTimestamp && (
-                        <div className="text-center my-4">
-                          <span className="px-3 py-1 bg-gray-100 text-gray-500 text-xs rounded-full">
-                            {formatDate(activity.timeline_timestamp)}
-                          </span>
-                        </div>
-                      )}
+                    <div key={original.id}>
+                      <div className={`flex ${isInbound ? 'justify-start' : 'justify-end'} items-start gap-4`}>
+                        {isInbound && (
+                          <div className="flex-shrink-0">
+                            <LeadAvatar 
+                              name={lead.name} 
+                              temperature={statusConfig.temp}
+                              size="sm"
+                            />
+                          </div>
+                        )}
 
-                      {/* Activity Timeline Item */}
-                      <div className="flex justify-center items-center my-4">
-                        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 max-w-md">
-                          <div className="flex items-center gap-2 mb-2">
-                            <Phone size={16} className="text-yellow-600" />
-                            <span className="text-sm font-medium text-yellow-900">
-                              {activity.activity_type === 'call' ? 'Phone Call' :
-                               activity.activity_type === 'email' ? 'Email Sent' :
-                               activity.activity_type === 'meeting' ? 'Meeting' :
-                               activity.activity_type || 'Sales Activity'}
-                            </span>
-                          </div>
-                          
-                          <div className="text-xs text-gray-600 space-y-1">
-                            {activity.outcome && (
-                              <div><strong>Outcome:</strong> {activity.outcome}</div>
-                            )}
-                            {activity.duration_seconds && (
-                              <div><strong>Duration:</strong> {Math.round(activity.duration_seconds / 60)} minutes</div>
-                            )}
-                            {activity.notes && (
-                              <div><strong>Notes:</strong> {activity.notes}</div>
-                            )}
-                            {activity.created_by && (
-                              <div><strong>By:</strong> {activity.created_by}</div>
-                            )}
-                          </div>
-                          
-                          <div className="text-xs text-gray-400 mt-2">
-                            {formatTime(activity.timeline_timestamp)}
+                        <div className={`max-w-2xl ${isInbound ? 'mr-16' : 'ml-16'}`}>
+                          <div className="relative">
+                            <div
+                              className={`px-6 py-4 rounded-2xl shadow-lg border ${
+                                isInbound
+                                  ? 'bg-white border-gray-200 text-gray-900'
+                                  : isAI 
+                                    ? 'bg-gradient-to-br from-blue-600 to-purple-600 text-white border-blue-500'
+                                    : 'bg-gradient-to-br from-green-600 to-emerald-600 text-white border-green-500'
+                              }`}
+                            >
+                              <p className="text-sm leading-relaxed whitespace-pre-wrap">
+                                {original.message_body || '—'}
+                              </p>
+                            </div>
+                            
+                            <div className={`flex items-center gap-3 mt-2 text-xs ${
+                              isInbound ? 'justify-start' : 'justify-end'
+                            }`}>
+                              <MessageStatusIndicator 
+                                status={original.status}
+                                timestamp={original.timestamp}
+                                isAI={isAI}
+                              />
+                            </div>
                           </div>
                         </div>
+
+                        {!isInbound && (
+                          <div className="flex-shrink-0">
+                            <div className={`w-10 h-10 rounded-full flex items-center justify-center shadow-lg ${
+                              isAI 
+                                ? 'bg-gradient-to-br from-blue-500 to-purple-600' 
+                                : 'bg-gradient-to-br from-green-500 to-emerald-600'
+                            }`}>
+                              {isAI ? (
+                                <Bot size={20} className="text-white" />
+                              ) : (
+                                <User size={20} className="text-white" />
+                              )}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   );
-                }
-                
-                // Handle message group items
-                const messageGroup = timelineItem.data;
-                const { original, retries } = messageGroup;
-                const isInbound = original.direction?.toLowerCase() === 'inbound';
-                const isAI = !isInbound;
-                const showTimestamp = itemIndex === 0 ||
-                  new Date(original.timestamp) - new Date(
-                    groupedMessages[itemIndex - 1].type === 'activity' 
-                      ? groupedMessages[itemIndex - 1].data.timeline_timestamp
-                      : groupedMessages[itemIndex - 1].data.original.timestamp
-                  ) > 5 * 60 * 1000;
-
-                return (
-                  <div key={original.id}>
-                    {showTimestamp && (
-                      <div className="text-center my-4">
-                        <span className="px-3 py-1 bg-gray-100 text-gray-500 text-xs rounded-full">
-                          {formatDate(original.timestamp)}
-                        </span>
-                      </div>
-                    )}
-
-                    {/* Original Message */}
-                    <div
-                      className={`flex ${isInbound ? 'justify-start' : 'justify-end'} items-start gap-3`}
-                    >
-                      {isInbound && (
-                        <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center flex-shrink-0">
-                          <User size={16} className="text-gray-600" />
-                        </div>
-                      )}
-
-                      <div className={`max-w-md ${isInbound ? 'mr-12' : 'ml-12'}`}>
-                        <div
-                          className={`px-4 py-3 rounded-2xl ${
-                            isInbound
-                              ? 'bg-gray-100 text-gray-900'
-                              : 'bg-gradient-to-r from-blue-600 to-blue-700 text-white'
-                          }`}
-                        >
-                          <p className="text-sm leading-relaxed">{original.message_body || '—'}</p>
-                        </div>
-
-                        <div
-                          className={`flex items-center gap-2 mt-1 text-xs text-gray-500 ${
-                            isInbound ? 'justify-start' : 'justify-end'
-                          }`}
-                        >
-                          <span>{formatTime(original.timestamp)}</span>
-                          {isAI && (
-                            <>
-                              <span>•</span>
-                              <div className="flex items-center gap-1">
-                                <Sparkles size={12} />
-                                <span>{original.sender === 'Manual' ? 'Manual' : 'AI'}</span>
-                              </div>
-                            </>
-                          )}
-                          {/* Show scoring info for inbound messages with scores */}
-                          {original.direction === 'inbound' && original.weighted_score && (
-                            <>
-                              <span>•</span>
-                              <span className="text-xs text-gray-400">
-                                Score: {original.weighted_score}
-                              </span>
-                            </>
-                          )}
-                        </div>
-
-                        {/* Status Pill for Outbound Messages */}
-                        {original.direction === 'outbound' && (
-                          <div className={`mt-2 ${isInbound ? 'text-left' : 'text-right'}`}>
-                            {original.status === 'failed' && (
-                              <StatusPill 
-                                type="error" 
-                                label="Failed" 
-                                tooltip={`Error Code: ${original.error_code || 'Unknown'}`} 
-                              />
-                            )}
-                            {original.status === 'sent' && (
-                              <StatusPill type="warning" label="Sent" tooltip="Delivered to carrier" />
-                            )}
-                            {original.status === 'queued' && (
-                              <StatusPill type="warning" label="Queued" />
-                            )}
-                            {original.status === 'delivered' && (
-                              <StatusPill type="success" label="Delivered" tooltip="Delivered to recipient" />
-                            )}
-                          </div>
-                        )}
-                        
-                        {/* Show if this message triggered an alert */}
-                        {lead.alert_details?.last_message && 
-                         original.message_body?.toLowerCase().includes(lead.alert_details.last_message.toLowerCase()) && (
-                          <div className="mt-2 flex items-center gap-2 text-xs text-orange-600">
-                            <AlertCircle size={12} />
-                            <span>This message triggered an alert</span>
-                          </div>
-                        )}
-
-                        {/* Retry Messages Section */}
-                        {retries.length > 0 && (
-                          <div className="mt-3 space-y-2">
-                            <button
-                              onClick={() => toggleRetryExpansion(original.id)}
-                              className="flex items-center gap-2 text-xs text-gray-500 hover:text-gray-700 transition-colors"
-                            >
-                              {expandedRetries.has(original.id) ? (
-                                <ChevronDown size={14} />
-                              ) : (
-                                <ChevronRight size={14} />
-                              )}
-                              <span>{retries.length} retry attempt{retries.length > 1 ? 's' : ''}</span>
-                              <span className="text-gray-400">
-                                (Last: {formatTime(retries[retries.length - 1].timestamp)})
-                              </span>
-                            </button>
-
-                            {/* Expanded Retry Messages */}
-                            {expandedRetries.has(original.id) && (
-                              <div className="ml-4 space-y-3 border-l-2 border-gray-200 pl-4">
-                                {retries.map((retry, retryIndex) => (
-                                  <div key={retry.id} className="space-y-1">
-                                    <div className="px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg text-sm">
-                                      <p className="text-gray-900">{retry.message_body}</p>
-                                    </div>
-                                    
-                                    <div className="flex items-center justify-between text-xs text-gray-500">
-                                      <div className="flex items-center gap-2">
-                                        <span>Retry #{retryIndex + 1}</span>
-                                        <span>•</span>
-                                        <span>{formatTime(retry.timestamp)}</span>
-                                      </div>
-                                      
-                                      <div>
-                                        {retry.status === 'failed' && (
-                                          <StatusPill 
-                                            type="error" 
-                                            label="Failed" 
-                                            tooltip={`Error Code: ${retry.error_code || 'Unknown'}`} 
-                                          />
-                                        )}
-                                        {retry.status === 'sent' && (
-                                          <StatusPill type="warning" label="Sent" tooltip="Delivered to carrier" />
-                                        )}
-                                        {retry.status === 'queued' && (
-                                          <StatusPill type="warning" label="Queued" />
-                                        )}
-                                        {retry.status === 'delivered' && (
-                                          <StatusPill type="success" label="Delivered" tooltip="Delivered to recipient" />
-                                        )}
-                                      </div>
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-
-                      {!isInbound && (
-                        <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center flex-shrink-0">
-                          <Bot size={16} className="text-white" />
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })
+                })}
+              </div>
             )}
           </div>
 
-          {/* Message Input for Desktop */}
+          {/* Message Input */}
           {canSendMessages && (
-            <div className="p-6 border-t border-gray-200 bg-gray-50">
-              <div className="flex gap-3">
-                <input
-                  type="text"
-                  value={newMessage}
-                  onChange={(e) => setNewMessage(e.target.value)}
-                  placeholder="Send a message to this lead..."
-                  className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
-                  onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
-                />
+            <div className="p-8 border-t border-gray-200 bg-gradient-to-r from-gray-50 to-white">
+              <div className="flex gap-4">
+                <div className="flex-1 relative">
+                  <input
+                    id="message-input"
+                    type="text"
+                    value={newMessage}
+                    onChange={(e) => setNewMessage(e.target.value)}
+                    placeholder="Send a message to this lead..."
+                    className="w-full px-6 py-4 border-2 border-gray-300 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-900 placeholder-gray-500 shadow-lg transition-all duration-300"
+                    onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+                    disabled={sendingMessage}
+                  />
+                </div>
                 <button
                   onClick={handleSendMessage}
                   disabled={!newMessage.trim() || sendingMessage}
-                  className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  className="flex items-center gap-3 px-8 py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-2xl hover:from-blue-700 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 font-semibold shadow-lg hover:shadow-xl"
                 >
-                  <Send size={16} />
-                  {sendingMessage ? 'Sending...' : 'Send'}
+                  {sendingMessage ? (
+                    <Timer size={20} className="animate-spin" />
+                  ) : (
+                    <Send size={20} />
+                  )}
+                  <span>{sendingMessage ? 'Sending...' : 'Send'}</span>
                 </button>
               </div>
-              <p className="text-xs text-gray-500 mt-2">
-                <Bot size={12} className="inline mr-1" />
-                Messages will be sent through your AI assistant
-              </p>
             </div>
           )}
         </div>
 
         {/* Desktop Sidebar */}
-        <div className="w-80 bg-gray-50 border-l border-gray-200 overflow-y-auto">
-          <div className="p-6 space-y-6">
-            {/* Quick Actions for Alerts */}
-            {lead.requires_immediate_attention && canTagAsHot && (
-              <div className="bg-yellow-50 rounded-xl border border-yellow-200 p-4">
-                <div className="flex items-center gap-2 mb-3">
-                  <AlertCircle size={18} className="text-yellow-600" />
-                  <h3 className="text-sm font-semibold text-gray-900">Recommended Actions</h3>
+        <div className="w-96 bg-gradient-to-b from-white to-gray-50 border-l border-gray-200 overflow-y-auto shadow-xl">
+          <div className="p-8 space-y-8">
+            {/* AI Insights Card */}
+            <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-xl">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="p-3 bg-gradient-to-r from-purple-500 to-blue-600 rounded-xl shadow-lg">
+                  <Sparkles size={24} className="text-white" />
                 </div>
-                
-                <div className="space-y-2">
-                  {lead.attention_reasons?.includes('agreed_to_meeting') && (
-                    <button className="w-full flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200 hover:border-blue-300 hover:shadow-sm transition-all">
-                      <div className="flex items-center gap-3">
-                        <Phone className="h-4 w-4 text-blue-600" />
-                        <span className="text-sm font-medium">Call Now</span>
-                      </div>
-                      <span className="text-xs text-gray-500">Lead is expecting your call</span>
-                    </button>
-                  )}
-                  
-                  {lead.attention_reasons?.includes('requested_callback') && (
-                    <button className="w-full flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200 hover:border-green-300 hover:shadow-sm transition-all">
-                      <div className="flex items-center gap-3">
-                        <Calendar className="h-4 w-4 text-green-600" />
-                        <span className="text-sm font-medium">Schedule Call</span>
-                      </div>
-                      <span className="text-xs text-gray-500">Set up callback time</span>
-                    </button>
-                  )}
-                  
-                  {lead.attention_reasons?.includes('timeline_urgent') && (
-                    <button className="w-full flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200 hover:border-orange-300 hover:shadow-sm transition-all">
-                      <div className="flex items-center gap-3">
-                        <MessageCircle className="h-4 w-4 text-orange-600" />
-                        <span className="text-sm font-medium">Send Proposal</span>
-                      </div>
-                      <span className="text-xs text-gray-500">Urgent timeline detected</span>
-                    </button>
-                  )}
+                <div className="flex-1">
+                  <h3 className="text-lg font-bold text-gray-900">AI Insights</h3>
+                  <p className="text-sm text-gray-500">Real-time conversation analysis</p>
                 </div>
               </div>
-            )}
 
-            {/* Updated AI Insights Card */}
-            <div className="bg-white rounded-xl border border-gray-200 p-4">
-              <div className="flex items-center gap-2 mb-4">
-                <Sparkles size={18} className="text-purple-600" />
-                <h3 className="text-sm font-semibold text-gray-900">AI Insights</h3>
-                {lead.requires_immediate_attention && (
-                  <span className="ml-auto">
-                    <span className="flex h-2 w-2">
-                      <span className="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-red-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
-                    </span>
-                  </span>
-                )}
-              </div>
-
-              <div className="space-y-4">
-                {/* Hot Score if available */}
-                {lead.hot_score !== undefined && (
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-600">Hot Score</span>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-semibold text-gray-900">
-                        {lead.hot_score}
-                      </span>
-                      <div className="w-16 bg-gray-200 rounded-full h-2">
-                        <div 
-                          className={`h-2 rounded-full ${
-                            lead.hot_score >= 80 ? 'bg-red-500' :
-                            lead.hot_score >= 60 ? 'bg-orange-500' :
-                            lead.hot_score >= 40 ? 'bg-yellow-500' : 'bg-blue-500'
-                          }`}
-                          style={{ width: `${lead.hot_score || 0}%` }}
-                        />
-                      </div>
-                    </div>
+              <div className="space-y-6">
+                <div className="text-center">
+                  <div className="flex justify-center mb-3">
+                    <ProgressRing 
+                      progress={aiInsights.conversationHealth} 
+                      size={80} 
+                      strokeWidth={6}
+                      color={aiInsights.conversationHealth > 70 ? '#10b981' : aiInsights.conversationHealth > 40 ? '#f59e0b' : '#ef4444'}
+                      label="Health"
+                    />
                   </div>
-                )}
+                  <h4 className="text-sm font-medium text-gray-600">Conversation Health</h4>
+                </div>
 
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">Lead Score</span>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-semibold text-gray-900">
+                  <span className="text-sm font-medium text-gray-600">Lead Score</span>
+                  <div className="flex items-center gap-3">
+                    <span className="text-lg font-bold text-gray-900">
                       {aiInsights.leadScore}
                     </span>
                     {typeof aiInsights.leadScore === 'number' && (
-                      <span className={`text-xs px-2 py-1 rounded-full ${getScoreZone(aiInsights.leadScore).bg}`} 
-                            style={{ color: getScoreZone(aiInsights.leadScore).color }}>
-                        {getScoreZone(aiInsights.leadScore).emoji}
-                      </span>
+                      <span className="text-lg">{getScoreZone(aiInsights.leadScore).emoji}</span>
                     )}
                   </div>
                 </div>
 
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">Sentiment</span>
-                  <span className="text-sm font-semibold text-gray-900">
-                    {aiInsights.sentiment}
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">Engagement</span>
-                  <div className="flex items-center gap-1">
-                    <div className={`w-2 h-2 ${aiInsights.engagementColor} rounded-full`}></div>
-                    <span className="text-sm font-semibold text-gray-900">{aiInsights.engagement}</span>
+                  <span className="text-sm font-medium text-gray-600">Engagement</span>
+                  <div className="flex items-center gap-2">
+                    <div className={`w-3 h-3 ${aiInsights.engagementColor} rounded-full animate-pulse`}></div>
+                    <span className="text-sm font-bold text-gray-900">{aiInsights.engagement}</span>
                   </div>
                 </div>
 
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">Last Activity</span>
-                  <span className="text-sm font-semibold text-gray-900">
-                    {aiInsights.lastActivity}
-                  </span>
-                </div>
-
-                {/* Show Alert Triggers if any */}
-                {lead.alert_triggers && Object.entries(lead.alert_triggers).some(([_, v]) => v) && (
-                  <div className="pt-3 border-t border-gray-100">
-                    <div className="text-xs font-medium text-gray-700 mb-2">Active Triggers:</div>
-                    <div className="space-y-1">
-                      {Object.entries(lead.alert_triggers)
-                        .filter(([_, triggered]) => triggered)
-                        .map(([trigger, _]) => (
-                          <div key={trigger} className="flex items-center gap-2 text-xs">
-                            <div className="w-1.5 h-1.5 bg-green-500 rounded-full"></div>
-                            <span className="text-gray-600">
-                              {trigger.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                            </span>
-                          </div>
-                        ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Message Statistics */}
-            <div className="bg-white rounded-xl border border-gray-200 p-4">
-              <div className="flex items-center gap-2 mb-4">
-                <Activity size={18} className="text-blue-600" />
-                <h3 className="text-sm font-semibold text-gray-900">Conversation Stats</h3>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-blue-600">{inboundMessages.length}</div>
-                  <div className="text-xs text-gray-500">Inbound</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-green-600">{outboundMessages.length}</div>
-                  <div className="text-xs text-gray-500">Outbound</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-orange-600">{retryStats.failedMessages}</div>
-                  <div className="text-xs text-gray-500">Failed</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-purple-600">{retryStats.retryMessages}</div>
-                  <div className="text-xs text-gray-500">Retries</div>
-                </div>
-              </div>
-
-              {retryStats.retryMessages > 0 && (
-                <div className="mt-4 pt-4 border-t border-gray-100">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-gray-600">Retry Success Rate</span>
-                    <span className="font-semibold text-gray-900">{retryStats.retrySuccessRate}%</span>
-                  </div>
-                  <div className="mt-2 w-full bg-gray-200 rounded-full h-2">
-                    <div 
-                      className="bg-green-500 h-2 rounded-full transition-all duration-300"
-                      style={{ width: `${retryStats.retrySuccessRate}%` }}
-                    />
+                  <span className="text-sm font-medium text-gray-600">Last Activity</span>
+                  <div className="flex items-center gap-2">
+                    <Clock size={14} className="text-gray-400" />
+                    <span className="text-sm font-bold text-gray-900">
+                      {aiInsights.lastActivity}
+                    </span>
                   </div>
                 </div>
-              )}
+              </div>
             </div>
 
             {/* Lead Information */}
-            <div className="bg-white rounded-xl border border-gray-200 p-4">
-              <div className="flex items-center gap-2 mb-4">
-                <User size={18} className="text-gray-600" />
-                <h3 className="text-sm font-semibold text-gray-900">Lead Information</h3>
+            <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-xl">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="p-3 bg-gradient-to-r from-gray-500 to-gray-600 rounded-xl shadow-lg">
+                  <User size={24} className="text-white" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900">Lead Information</h3>
+                  <p className="text-sm text-gray-500">Contact details & history</p>
+                </div>
               </div>
 
-              <div className="space-y-3">
+              <div className="space-y-4">
                 {lead.name && (
-                  <div className="flex justify-between">
-                    <span className="text-sm text-gray-600">Name</span>
-                    <span className="text-sm font-medium text-gray-900">{lead.name}</span>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm font-medium text-gray-600">Name</span>
+                    <span className="text-sm font-bold text-gray-900">{lead.name}</span>
                   </div>
                 )}
                 
                 {lead.phone && (
-                  <div className="flex justify-between">
-                    <span className="text-sm text-gray-600">Phone</span>
-                    <span className="text-sm font-medium text-gray-900">{lead.phone}</span>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm font-medium text-gray-600">Phone</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-bold text-gray-900">{lead.phone}</span>
+                      <button 
+                        onClick={() => handleCall(lead.phone)}
+                        className="p-1 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                      >
+                        <Phone size={14} />
+                      </button>
+                    </div>
                   </div>
                 )}
                 
                 {lead.email && (
-                  <div className="flex justify-between">
-                    <span className="text-sm text-gray-600">Email</span>
-                    <span className="text-sm font-medium text-gray-900">{lead.email}</span>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm font-medium text-gray-600">Email</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-bold text-gray-900 truncate max-w-[200px]">{lead.email}</span>
+                      <button className="p-1 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
+                        <Mail size={14} />
+                      </button>
+                    </div>
                   </div>
                 )}
                 
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-600">Status</span>
-                  <span className={`text-sm font-medium ${statusConfig.textColor}`}>
-                    {statusConfig.icon} {displayStatus}
-                  </span>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-medium text-gray-600">Status</span>
+                  <div className="flex items-center gap-2">
+                    <span className={`text-sm font-bold ${statusConfig.textColor}`}>
+                      {statusConfig.icon} {displayStatus}
+                    </span>
+                  </div>
                 </div>
                 
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-600">Created</span>
-                  <span className="text-sm font-medium text-gray-900">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-medium text-gray-600">Created</span>
+                  <span className="text-sm font-bold text-gray-900">
                     {new Date(lead.created_at).toLocaleDateString()}
                   </span>
                 </div>
-                
-                {lead.last_message_at && (
-                  <div className="flex justify-between">
-                    <span className="text-sm text-gray-600">Last Message</span>
-                    <span className="text-sm font-medium text-gray-900">
-                      {new Date(lead.last_message_at).toLocaleDateString()}
-                    </span>
-                  </div>
-                )}
               </div>
             </div>
-
-            {/* Call Status */}
-            {callStatus && (
-              <div className="bg-white rounded-xl border border-gray-200 p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <Phone size={18} className="text-green-600" />
-                  <h3 className="text-sm font-semibold text-gray-900">Call Status</h3>
-                </div>
-                <p className="text-sm text-gray-600">{callStatus}</p>
-              </div>
-            )}
           </div>
         </div>
       </div>
 
-      {/* Mobile Content (lg and below) */}
+      {/* Mobile Content */}
       <div className="lg:hidden flex-1 overflow-hidden">
-        {/* Conversation Tab */}
         {activeTab === 'conversation' && (
-          <div className="h-full flex flex-col">
-            {/* First Message Failure Banner */}
-            {canViewMessages && hasFirstMessageFailure() && (
-              <div className="px-4 pt-4">
-                <Alert variant="warning">
-                  <div className="flex items-center gap-2">
-                    <AlertTriangle size={16} />
-                    <span>⚠️ First message failed to send. SurFox automatically retried with a new message.</span>
-                  </div>
-                </Alert>
-              </div>
-            )}
-
-            {/* Messages Container */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4 pb-20">
+          <div className="h-[calc(100vh-200px)] flex flex-col">
+            <div className="flex-1 overflow-y-auto p-4 space-y-4 pb-24">
               {!canViewMessages ? (
                 <div className="text-center py-12">
-                  <Lock size={24} className="text-red-600 mx-auto mb-4" />
+                  <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Lock size={24} className="text-red-600" />
+                  </div>
                   <p className="text-gray-600">Messages restricted</p>
                 </div>
               ) : messages.length === 0 ? (
                 <div className="text-center py-12">
-                  <Bot size={24} className="text-blue-600 mx-auto mb-4" />
+                  <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Bot size={24} className="text-blue-600" />
+                  </div>
                   <p className="text-gray-600 mb-4">No conversation yet</p>
                   {canSendMessages && (
-                    <button className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm">
+                    <button 
+                      onClick={() => document.getElementById('mobile-message-input')?.focus()}
+                      className="px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl text-sm font-medium shadow-lg"
+                    >
                       Send First Message
                     </button>
                   )}
                 </div>
               ) : (
                 groupedMessages.map((timelineItem, itemIndex) => {
-                  // Handle activity items
-                  if (timelineItem.type === 'activity') {
-                    const activity = timelineItem.data;
-                    const showTimestamp = itemIndex === 0 || 
-                      new Date(activity.timeline_timestamp) - new Date(
-                        groupedMessages[itemIndex - 1].type === 'activity' 
-                          ? groupedMessages[itemIndex - 1].data.timeline_timestamp
-                          : groupedMessages[itemIndex - 1].data.original.timestamp
-                      ) > 5 * 60 * 1000;
-
-                    return (
-                      <div key={`activity-${activity.id}`}>
-                        {showTimestamp && (
-                          <div className="text-center my-4">
-                            <span className="px-3 py-1 bg-gray-100 text-gray-500 text-xs rounded-full">
-                              {formatDate(activity.timeline_timestamp)}
-                            </span>
-                          </div>
-                        )}
-
-                        {/* Activity Timeline Item - Mobile */}
-                        <div className="flex justify-center items-center my-4">
-                          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 max-w-[85%]">
-                            <div className="flex items-center gap-2 mb-2">
-                              <Phone size={14} className="text-yellow-600" />
-                              <span className="text-sm font-medium text-yellow-900">
-                                {activity.activity_type === 'call' ? 'Phone Call' :
-                                 activity.activity_type === 'email' ? 'Email Sent' :
-                                 activity.activity_type === 'meeting' ? 'Meeting' :
-                                 activity.activity_type || 'Sales Activity'}
-                              </span>
-                            </div>
-                            
-                            <div className="text-xs text-gray-600 space-y-1">
-                              {activity.outcome && (
-                                <div><strong>Outcome:</strong> {activity.outcome}</div>
-                              )}
-                              {activity.duration_seconds && (
-                                <div><strong>Duration:</strong> {Math.round(activity.duration_seconds / 60)} minutes</div>
-                              )}
-                              {activity.notes && (
-                                <div><strong>Notes:</strong> {activity.notes}</div>
-                              )}
-                              {activity.created_by && (
-                                <div><strong>By:</strong> {activity.created_by}</div>
-                              )}
-                            </div>
-                            
-                            <div className="text-xs text-gray-400 mt-2">
-                              {formatTime(activity.timeline_timestamp)}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  }
-                  
-                  // Handle message group items
                   const messageGroup = timelineItem.data;
-                  const { original, retries } = messageGroup;
+                  const { original } = messageGroup;
                   const isInbound = original.direction?.toLowerCase() === 'inbound';
-                  const showTimestamp = itemIndex === 0 || 
-                    new Date(original.timestamp) - new Date(
-                      groupedMessages[itemIndex - 1].type === 'activity' 
-                        ? groupedMessages[itemIndex - 1].data.timeline_timestamp
-                        : groupedMessages[itemIndex - 1].data.original.timestamp
-                    ) > 5 * 60 * 1000;
+                  const isAI = !isInbound && original.sender !== 'Manual';
 
                   return (
                     <div key={original.id}>
-                      {showTimestamp && (
-                        <div className="text-center my-4">
-                          <span className="px-3 py-1 bg-gray-100 text-gray-500 text-xs rounded-full">
-                            {formatDate(original.timestamp)}
-                          </span>
-                        </div>
-                      )}
-
                       <div className={`flex ${isInbound ? 'justify-start' : 'justify-end'} items-start gap-2`}>
                         {isInbound && (
-                          <div className="w-7 h-7 bg-gray-200 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
-                            <User size={14} className="text-gray-600" />
+                          <div className="flex-shrink-0 mt-1">
+                            <LeadAvatar 
+                              name={lead.name} 
+                              temperature={statusConfig.temp}
+                              size="sm"
+                            />
                           </div>
                         )}
 
                         <div className={`max-w-[85%] ${isInbound ? '' : 'ml-8'}`}>
-                          <div
-                            className={`px-3 py-2 rounded-2xl ${
-                              isInbound
-                                ? 'bg-gray-100 text-gray-900'
-                                : 'bg-gradient-to-r from-blue-600 to-blue-700 text-white'
-                            }`}
-                          >
-                            <p className="text-sm leading-relaxed">{original.message_body || '—'}</p>
+                          <div className="relative">
+                            <div
+                              className={`px-4 py-3 rounded-2xl shadow-lg ${
+                                isInbound
+                                  ? 'bg-white border border-gray-200 text-gray-900'
+                                  : isAI
+                                    ? 'bg-gradient-to-br from-blue-600 to-purple-600 text-white'
+                                    : 'bg-gradient-to-br from-green-600 to-emerald-600 text-white'
+                              }`}
+                            >
+                              <p className="text-sm leading-relaxed whitespace-pre-wrap">{original.message_body || '—'}</p>
+                            </div>
                           </div>
 
                           <div className={`flex items-center gap-1 mt-1 text-xs text-gray-500 ${
                             isInbound ? 'justify-start' : 'justify-end'
                           }`}>
-                            <span>{formatTime(original.timestamp)}</span>
-                            {!isInbound && (
-                              <>
-                                <span>•</span>
-                                <Sparkles size={10} />
-                                <span>{original.sender === 'Manual' ? 'Manual' : 'AI'}</span>
-                              </>
-                            )}
-                            {/* Show scoring info for inbound messages with scores */}
+                            <MessageStatusIndicator 
+                              status={original.status}
+                              timestamp={original.timestamp}
+                              isAI={isAI}
+                            />
                             {original.direction === 'inbound' && original.weighted_score && (
                               <>
                                 <span>•</span>
@@ -2170,89 +1427,29 @@ export default function LeadDetail() {
                             )}
                           </div>
 
-                          {/* Status for outbound messages */}
                           {original.direction === 'outbound' && (
                             <div className={`mt-1 ${isInbound ? 'text-left' : 'text-right'}`}>
-                              {original.status === 'failed' && <StatusPill type="error" label="Failed" tooltip={`Error Code: ${original.error_code || 'Unknown'}`} />}
-                              {original.status === 'sent' && <StatusPill type="warning" label="Sent" tooltip="Delivered to carrier" />}
-                              {original.status === 'queued' && <StatusPill type="warning" label="Queued" />}
-                              {original.status === 'delivered' && <StatusPill type="success" label="Delivered" tooltip="Delivered to recipient" />}
-                            </div>
-                          )}
-
-                          {/* Show if this message triggered an alert */}
-                          {lead.alert_details?.last_message && 
-                           original.message_body?.toLowerCase().includes(lead.alert_details.last_message.toLowerCase()) && (
-                            <div className="mt-2 flex items-center gap-2 text-xs text-orange-600">
-                              <AlertCircle size={12} />
-                              <span>This message triggered an alert</span>
-                            </div>
-                          )}
-
-                          {/* Retry Messages Section */}
-                          {retries.length > 0 && (
-                            <div className="mt-3 space-y-2">
-                              <button
-                                onClick={() => toggleRetryExpansion(original.id)}
-                                className="flex items-center gap-2 text-xs text-gray-500 hover:text-gray-700 transition-colors"
-                              >
-                                {expandedRetries.has(original.id) ? (
-                                  <ChevronDown size={14} />
-                                ) : (
-                                  <ChevronRight size={14} />
-                                )}
-                                <span>{retries.length} retry attempt{retries.length > 1 ? 's' : ''}</span>
-                                <span className="text-gray-400">
-                                  (Last: {formatTime(retries[retries.length - 1].timestamp)})
-                                </span>
-                              </button>
-
-                              {/* Expanded Retry Messages */}
-                              {expandedRetries.has(original.id) && (
-                                <div className="ml-4 space-y-3 border-l-2 border-gray-200 pl-4">
-                                  {retries.map((retry, retryIndex) => (
-                                    <div key={retry.id} className="space-y-1">
-                                      <div className="px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg text-sm">
-                                        <p className="text-gray-900">{retry.message_body}</p>
-                                      </div>
-                                      
-                                      <div className="flex items-center justify-between text-xs text-gray-500">
-                                        <div className="flex items-center gap-2">
-                                          <span>Retry #{retryIndex + 1}</span>
-                                          <span>•</span>
-                                          <span>{formatTime(retry.timestamp)}</span>
-                                        </div>
-                                        
-                                        <div>
-                                          {retry.status === 'failed' && (
-                                            <StatusPill 
-                                              type="error" 
-                                              label="Failed" 
-                                              tooltip={`Error Code: ${retry.error_code || 'Unknown'}`} 
-                                            />
-                                          )}
-                                          {retry.status === 'sent' && (
-                                            <StatusPill type="warning" label="Sent" tooltip="Delivered to carrier" />
-                                          )}
-                                          {retry.status === 'queued' && (
-                                            <StatusPill type="warning" label="Queued" />
-                                          )}
-                                          {retry.status === 'delivered' && (
-                                            <StatusPill type="success" label="Delivered" tooltip="Delivered to recipient" />
-                                          )}
-                                        </div>
-                                      </div>
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
+                              {original.status === 'failed' && <StatusPill type="error" label="Failed" />}
+                              {original.status === 'sent' && <StatusPill type="warning" label="Sent" />}
+                              {original.status === 'queued' && <StatusPill type="processing" label="Queued" animated={true} />}
+                              {original.status === 'delivered' && <StatusPill type="success" label="Delivered" />}
                             </div>
                           )}
                         </div>
 
                         {!isInbound && (
-                          <div className="w-7 h-7 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
-                            <Bot size={14} className="text-white" />
+                          <div className="flex-shrink-0 mt-1">
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center shadow-lg ${
+                              isAI 
+                                ? 'bg-gradient-to-br from-blue-500 to-purple-600' 
+                                : 'bg-gradient-to-br from-green-500 to-emerald-600'
+                            }`}>
+                              {isAI ? (
+                                <Bot size={16} className="text-white" />
+                              ) : (
+                                <User size={16} className="text-white" />
+                              )}
+                            </div>
                           </div>
                         )}
                       </div>
@@ -2260,48 +1457,73 @@ export default function LeadDetail() {
                   );
                 })
               )}
+            </div>
 
-              {/* Message Input for Mobile */}
-              {canSendMessages && (
-                <div className="fixed bottom-20 left-0 right-0 p-4 bg-white border-t border-gray-200">
-                  <div className="flex gap-3">
+            {canSendMessages && (
+              <div className="fixed bottom-20 left-0 right-0 p-4 bg-white border-t border-gray-200 shadow-2xl">
+                <div className="flex gap-3">
+                  <div className="flex-1 relative">
                     <input
+                      id="mobile-message-input"
                       type="text"
                       value={newMessage}
                       onChange={(e) => setNewMessage(e.target.value)}
                       placeholder="Send a message..."
-                      className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+                      className="w-full px-4 py-3 border-2 border-gray-300 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white transition-all duration-300"
                       onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+                      disabled={sendingMessage}
                     />
-                    <button
-                      onClick={handleSendMessage}
-                      disabled={!newMessage.trim() || sendingMessage}
-                      className="flex items-center gap-2 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                    >
-                      <Send size={16} />
-                    </button>
+                    {aiProcessing && (
+                      <div className="absolute right-3 top-1/2 transform -translate-y-1/2 flex space-x-1">
+                        <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce"></div>
+                        <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                        <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                      </div>
+                    )}
                   </div>
+                  <button
+                    onClick={handleSendMessage}
+                    disabled={!newMessage.trim() || sendingMessage}
+                    className="flex items-center gap-2 px-4 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-2xl hover:from-blue-700 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 shadow-lg"
+                  >
+                    {sendingMessage ? (
+                      <Timer size={16} className="animate-spin" />
+                    ) : (
+                      <Send size={16} />
+                    )}
+                  </button>
                 </div>
-              )}
-            </div>
+                {lead.ai_conversation_enabled && (
+                  <p className="text-xs text-orange-600 mt-2 text-center font-medium">
+                    Sending will disable AI mode
+                  </p>
+                )}
+              </div>
+            )}
           </div>
         )}
 
-        {/* Analytics Tab */}
         {activeTab === 'analytics' && (
-          <div className="p-4 space-y-4 pb-20">
-            {/* Lead Score Chart */}
-            <div className="bg-white rounded-lg border border-gray-200 p-4">
-              <h3 className="text-sm font-semibold text-gray-900 mb-3">Lead Scoring Trends</h3>
-              <div className="text-xs text-gray-500 mb-3">
-                {inboundMessages.length} messages • {inboundMessages.filter(msg => msg.weighted_score !== null).length} scored
+          <div className="p-4 space-y-4 pb-20 max-h-[calc(100vh-200px)] overflow-y-auto">
+            <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-lg">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-sm font-semibold text-gray-900">Lead Trends</h3>
+                <div className="text-xs text-gray-500">
+                  {inboundMessages.length} messages
+                </div>
               </div>
               
               {motivationChartData.length > 0 ? (
                 <div>
                   <div className="h-48">
                     <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={motivationChartData}>
+                      <AreaChart data={motivationChartData}>
+                        <defs>
+                          <linearGradient id="mobileLeadGradient" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3}/>
+                            <stop offset="95%" stopColor="#6366f1" stopOpacity={0.05}/>
+                          </linearGradient>
+                        </defs>
                         <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
                         <XAxis 
                           dataKey="name" 
@@ -2315,42 +1537,22 @@ export default function LeadDetail() {
                         />
                         <Tooltip content={<CustomTooltip />} />
                         
-                        {/* Lead Score Line */}
-                        <Line 
-                          type="monotone" 
-                          dataKey="leadScore" 
-                          stroke="#6366f1" 
+                        <Area
+                          type="monotone"
+                          dataKey="leadScore"
+                          stroke="#6366f1"
                           strokeWidth={2}
+                          fill="url(#mobileLeadGradient)"
                           dot={{ fill: '#6366f1', strokeWidth: 2, r: 3 }}
-                          activeDot={{ r: 5, fill: '#4f46e5', stroke: '#ffffff', strokeWidth: 2 }}
-                          name="Lead Score"
                         />
-                        
-                        {/* Sentiment Line */}
-                        <Line 
-                          type="monotone" 
-                          dataKey="sentimentScore" 
-                          stroke="#10b981" 
-                          strokeWidth={2}
-                          strokeDasharray="3 3"
-                          dot={{ fill: '#10b981', strokeWidth: 2, r: 2 }}
-                          activeDot={{ r: 4, fill: '#059669', stroke: '#ffffff', strokeWidth: 2 }}
-                          name="Sentiment"
-                        />
-                      </LineChart>
+                      </AreaChart>
                     </ResponsiveContainer>
                   </div>
                   
-                  {/* Mobile-friendly legend */}
                   <div className="flex items-center justify-center gap-4 mt-3 pt-3 border-t border-gray-100 text-xs">
                     <div className="flex items-center gap-1">
                       <div className="w-3 h-3 bg-indigo-600 rounded-full"></div>
                       <span className="text-gray-600">Lead Score</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <div className="w-3 h-3 border-2 border-green-600 rounded-full bg-white" 
-                           style={{ borderStyle: 'dashed' }}></div>
-                      <span className="text-gray-600">Sentiment</span>
                     </div>
                   </div>
                 </div>
@@ -2360,37 +1562,22 @@ export default function LeadDetail() {
                     <Activity size={20} className="text-blue-600" />
                   </div>
                   <p className="text-gray-500 text-sm font-medium">No scored messages yet</p>
-                  <p className="text-gray-400 text-xs mt-1">Chart will appear once messages are analyzed</p>
+                  <p className="text-gray-400 text-xs mt-1">Chart will appear once analyzed</p>
                 </div>
               )}
             </div>
 
-            {/* AI Insights */}
-            <CollapsibleSection 
-              title="AI Insights" 
-              icon={Sparkles} 
-              defaultOpen={true}
-              badge={lead.requires_immediate_attention ? "Alert" : null}
-            >
-              <div className="space-y-3">
-                {lead.hot_score !== undefined && (
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-600">Hot Score</span>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-semibold">{lead.hot_score}</span>
-                      <div className="w-16 bg-gray-200 rounded-full h-2">
-                        <div 
-                          className={`h-2 rounded-full ${
-                            lead.hot_score >= 80 ? 'bg-red-500' :
-                            lead.hot_score >= 60 ? 'bg-orange-500' :
-                            lead.hot_score >= 40 ? 'bg-yellow-500' : 'bg-blue-500'
-                          }`}
-                          style={{ width: `${lead.hot_score || 0}%` }}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                )}
+            <CollapsibleSection title="AI Insights" icon={Sparkles} defaultOpen={true}>
+              <div className="space-y-4">
+                <div className="text-center">
+                  <ProgressRing 
+                    progress={aiInsights.conversationHealth} 
+                    size={60} 
+                    strokeWidth={4}
+                    color={aiInsights.conversationHealth > 70 ? '#10b981' : aiInsights.conversationHealth > 40 ? '#f59e0b' : '#ef4444'}
+                    label="Health"
+                  />
+                </div>
 
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-gray-600">Lead Score</span>
@@ -2405,16 +1592,9 @@ export default function LeadDetail() {
                 </div>
 
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">Sentiment</span>
-                  <span className="text-sm font-semibold text-gray-900">
-                    {aiInsights.sentiment}
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between">
                   <span className="text-sm text-gray-600">Engagement</span>
                   <div className="flex items-center gap-1">
-                    <div className={`w-2 h-2 ${aiInsights.engagementColor} rounded-full`}></div>
+                    <div className={`w-2 h-2 ${aiInsights.engagementColor} rounded-full animate-pulse`}></div>
                     <span className="text-sm font-semibold text-gray-900">{aiInsights.engagement}</span>
                   </div>
                 </div>
@@ -2425,29 +1605,9 @@ export default function LeadDetail() {
                     {aiInsights.lastActivity}
                   </span>
                 </div>
-
-                {/* Show Alert Triggers if any */}
-                {lead.alert_triggers && Object.entries(lead.alert_triggers).some(([_, v]) => v) && (
-                  <div className="pt-3 border-t border-gray-100">
-                    <div className="text-xs font-medium text-gray-700 mb-2">Active Triggers:</div>
-                    <div className="space-y-1">
-                      {Object.entries(lead.alert_triggers)
-                        .filter(([_, triggered]) => triggered)
-                        .map(([trigger, _]) => (
-                          <div key={trigger} className="flex items-center gap-2 text-xs">
-                            <div className="w-1.5 h-1.5 bg-green-500 rounded-full"></div>
-                            <span className="text-gray-600">
-                              {trigger.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                            </span>
-                          </div>
-                        ))}
-                    </div>
-                  </div>
-                )}
               </div>
             </CollapsibleSection>
 
-            {/* Conversation Statistics */}
             <CollapsibleSection title="Conversation Stats" icon={Activity}>
               <div className="grid grid-cols-2 gap-4 mb-4">
                 <div className="text-center">
@@ -2458,74 +1618,13 @@ export default function LeadDetail() {
                   <div className="text-2xl font-bold text-green-600">{outboundMessages.length}</div>
                   <div className="text-xs text-gray-500">Outbound</div>
                 </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-orange-600">{retryStats.failedMessages}</div>
-                  <div className="text-xs text-gray-500">Failed</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-purple-600">{retryStats.retryMessages}</div>
-                  <div className="text-xs text-gray-500">Retries</div>
-                </div>
               </div>
-
-              {retryStats.retryMessages > 0 && (
-                <div className="pt-3 border-t border-gray-100">
-                  <div className="flex items-center justify-between text-sm mb-2">
-                    <span className="text-gray-600">Retry Success Rate</span>
-                    <span className="font-semibold text-gray-900">{retryStats.retrySuccessRate}%</span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div 
-                      className="bg-green-500 h-2 rounded-full transition-all duration-300"
-                      style={{ width: `${retryStats.retrySuccessRate}%` }}
-                    />
-                  </div>
-                </div>
-              )}
             </CollapsibleSection>
-
-            {/* Quick Actions for Alerts */}
-            {lead.requires_immediate_attention && canTagAsHot && (
-              <CollapsibleSection title="Recommended Actions" icon={AlertCircle} defaultOpen={true}>
-                <div className="space-y-2">
-                  {lead.attention_reasons?.includes('agreed_to_meeting') && (
-                    <button className="w-full flex items-center justify-between p-3 bg-blue-50 rounded-lg border border-blue-200 hover:border-blue-300 hover:shadow-sm transition-all">
-                      <div className="flex items-center gap-3">
-                        <Phone className="h-4 w-4 text-blue-600" />
-                        <span className="text-sm font-medium">Call Now</span>
-                      </div>
-                      <span className="text-xs text-gray-500">Lead is expecting your call</span>
-                    </button>
-                  )}
-                  
-                  {lead.attention_reasons?.includes('requested_callback') && (
-                    <button className="w-full flex items-center justify-between p-3 bg-green-50 rounded-lg border border-green-200 hover:border-green-300 hover:shadow-sm transition-all">
-                      <div className="flex items-center gap-3">
-                        <Calendar className="h-4 w-4 text-green-600" />
-                        <span className="text-sm font-medium">Schedule Call</span>
-                      </div>
-                      <span className="text-xs text-gray-500">Set up callback time</span>
-                    </button>
-                  )}
-                  
-                  {lead.attention_reasons?.includes('timeline_urgent') && (
-                    <button className="w-full flex items-center justify-between p-3 bg-orange-50 rounded-lg border border-orange-200 hover:border-orange-300 hover:shadow-sm transition-all">
-                      <div className="flex items-center gap-3">
-                        <MessageCircle className="h-4 w-4 text-orange-600" />
-                        <span className="text-sm font-medium">Send Proposal</span>
-                      </div>
-                      <span className="text-xs text-gray-500">Urgent timeline detected</span>
-                    </button>
-                  )}
-                </div>
-              </CollapsibleSection>
-            )}
           </div>
         )}
 
-        {/* Details Tab */}
         {activeTab === 'details' && (
-          <div className="p-4 space-y-4 pb-20">
+          <div className="p-4 space-y-4 pb-20 max-h-[calc(100vh-200px)] overflow-y-auto">
             <CollapsibleSection title="Contact Information" icon={User} defaultOpen={true}>
               <div className="space-y-3">
                 {lead.name && (
@@ -2542,7 +1641,7 @@ export default function LeadDetail() {
                       <span className="text-sm font-medium text-gray-900">{lead.phone}</span>
                       <button 
                         onClick={() => handleCall(lead.phone)}
-                        className="p-1 text-green-600 hover:bg-green-50 rounded"
+                        className="p-1 text-green-600 hover:bg-green-50 rounded transition-colors"
                       >
                         <Phone size={14} />
                       </button>
@@ -2568,15 +1667,6 @@ export default function LeadDetail() {
                   </span>
                 </div>
                 
-                {lead.stage_override_reason && (
-                  <div className="flex justify-between">
-                    <span className="text-sm text-gray-600">Override Reason</span>
-                    <span className="text-sm font-medium text-gray-900 text-right ml-2">
-                      {lead.stage_override_reason}
-                    </span>
-                  </div>
-                )}
-                
                 <div className="flex justify-between">
                   <span className="text-sm text-gray-600">Created</span>
                   <span className="text-sm font-medium text-gray-900">
@@ -2589,15 +1679,6 @@ export default function LeadDetail() {
                     <span className="text-sm text-gray-600">Last Message</span>
                     <span className="text-sm font-medium text-gray-900">
                       {new Date(lead.last_message_at).toLocaleDateString()}
-                    </span>
-                  </div>
-                )}
-
-                {lead.last_manual_contact && (
-                  <div className="flex justify-between">
-                    <span className="text-sm text-gray-600">Last Manual Contact</span>
-                    <span className="text-sm font-medium text-gray-900">
-                      {new Date(lead.last_manual_contact).toLocaleDateString()}
                     </span>
                   </div>
                 )}
@@ -2626,7 +1707,7 @@ export default function LeadDetail() {
                 >
                   {togglingAI ? (
                     <div className="flex items-center justify-center gap-2">
-                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-gray-500 border-t-transparent" />
+                      <Timer size={16} className="animate-spin" />
                       <span>Updating...</span>
                     </div>
                   ) : (
@@ -2651,29 +1732,6 @@ export default function LeadDetail() {
               </div>
             </CollapsibleSection>
 
-            {/* Call Status */}
-            {callStatus && (
-              <CollapsibleSection title="Call Status" icon={Phone}>
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-600">Status</span>
-                    <span className="text-sm font-medium text-gray-900">{callStatus}</span>
-                  </div>
-                  
-                  {twilioDevice && (
-                    <div className="text-xs text-gray-500 bg-green-50 p-3 rounded-lg">
-                      <div className="flex items-center gap-2 mb-1">
-                        <Phone size={12} />
-                        <span className="font-medium">Calling Available</span>
-                      </div>
-                      <p>Tap the phone icon to call this lead directly from your device.</p>
-                    </div>
-                  )}
-                </div>
-              </CollapsibleSection>
-            )}
-
-            {/* Campaign Information */}
             {lead.campaign_id && (
               <CollapsibleSection title="Campaign Details" icon={Activity}>
                 <div className="space-y-2">
@@ -2688,31 +1746,16 @@ export default function LeadDetail() {
                       <span className="text-sm font-medium text-gray-900">{lead.source}</span>
                     </div>
                   )}
-                  
-                  {lead.utm_source && (
-                    <div className="flex justify-between">
-                      <span className="text-sm text-gray-600">UTM Source</span>
-                      <span className="text-sm font-medium text-gray-900">{lead.utm_source}</span>
-                    </div>
-                  )}
                 </div>
               </CollapsibleSection>
             )}
 
-            {/* Technical Details */}
             <CollapsibleSection title="Technical Details" icon={Info}>
               <div className="space-y-2 text-xs">
                 <div className="flex justify-between">
                   <span className="text-gray-600">Lead ID</span>
                   <span className="font-mono text-gray-900">{lead.id}</span>
                 </div>
-                
-                {lead.tenant_id && (
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Tenant ID</span>
-                    <span className="font-mono text-gray-900">{lead.tenant_id}</span>
-                  </div>
-                )}
                 
                 <div className="flex justify-between">
                   <span className="text-gray-600">Messages Count</span>
