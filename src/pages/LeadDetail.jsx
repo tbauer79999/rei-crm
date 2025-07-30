@@ -485,27 +485,25 @@ export default function LeadDetail() {
   }, [user]);
 
   const handleCall = async (phoneNumber) => {
-    if (!twilioDevice) {
-      alert('Calling not available. Please refresh the page.');
-      return;
-    }
-
-    try {
-      console.log('📞 Initiating call to:', phoneNumber);
-      setCallStatus('Opening phone dialer...');
-      
-      // For now, use system dialer
-      window.open(`tel:${phoneNumber}`, '_self');
-      
-      setTimeout(() => {
-        setCallStatus('Ready to call');
-      }, 2000);
-      
-    } catch (err) {
-      console.error('Call failed:', err);
-      setCallStatus('Call failed: ' + err.message);
-    }
-  };
+  try {
+    // Log call attempt to database
+    await supabase.from('sales_activities').insert({
+      lead_id: id,
+      tenant_id: user?.tenant_id,
+      activity_type: 'call',
+      attempted_at: new Date().toISOString(),
+      created_by: user?.id,
+      phone_number_used: phoneNumber,
+      outcome: 'attempted',
+      notes: 'Call initiated from lead detail page'
+    });
+    
+    // Then open dialer
+    window.open(`tel:${phoneNumber}`, '_self');
+  } catch (err) {
+    console.error('Call logging failed:', err);
+  }
+};
 
   // Helper function to group messages with their retries
   const groupMessagesWithRetries = (messages) => {
