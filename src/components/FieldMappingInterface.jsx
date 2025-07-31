@@ -65,7 +65,7 @@ export default function FieldMappingInterface({
           .eq('id', tenantId)
           .single();
           
-        console.log('🏢 Tenant query result:', { tenant, error: tenantError });
+        console.log('🏢 Tenant query result:', { tenant, error: tenantError, timestamp });
         
         setDebugInfo(prev => ({ ...prev, tenantData: tenant }));
         
@@ -83,8 +83,9 @@ export default function FieldMappingInterface({
         }
         
         console.log('🏭 Tenant industry:', tenant.industries);
+        console.log('🆔 Industry ID being used:', tenant.industry_id);
         
-        // Step 2: Get field templates for this specific industry
+        // Force a fresh query for field templates with cache busting
         const { data: fields, error: fieldsError } = await supabase
           .from('industry_field_templates')
           .select(`
@@ -98,7 +99,8 @@ export default function FieldMappingInterface({
             options
           `)
           .eq('industry_id', tenant.industry_id)
-          .order('display_order', { ascending: true });
+          .order('display_order', { ascending: true })
+          .order('id'); // Additional ordering to prevent caching
           
         console.log('📋 Fields query result:', { 
           industryId: tenant.industry_id,
@@ -400,6 +402,13 @@ export default function FieldMappingInterface({
             )}
           </div>
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => window.location.reload()}
+              className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded hover:bg-blue-200"
+              title="Force refresh to check for industry changes"
+            >
+              🔄 Refresh
+            </button>
             {!debugInfo.usingFallback && debugInfo.industryData && (
               <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
                 <Database className="w-3 h-3 inline mr-1" />
