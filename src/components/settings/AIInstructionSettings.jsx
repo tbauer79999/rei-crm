@@ -641,16 +641,17 @@ const EnterpriseAIStrategyHub = () => {
           })
         );
 
-        const settingsPayload = {
-          ai_instruction_initial: { value: initialBundle },
-          aiinstruction_bundle: { value: engagementBundle },
-          ai_instruction_followup_1: { value: followupBundles[0] || '' },
-          ai_instruction_followup_2: { value: followupBundles[1] || '' },
-          ai_instruction_followup_3: { value: followupBundles[2] || '' },
-          followup_delay_1: { value: strategyConfig.followups[0]?.day.toString() || '3' },
-          followup_delay_2: { value: strategyConfig.followups[1]?.day.toString() || '7' },
-          followup_delay_3: { value: strategyConfig.followups[2]?.day.toString() || '14' }
-        };
+            const settingsPayload = {
+              ai_instruction_initial: { value: initialBundle },
+              aiinstruction_bundle: { value: engagementBundle },
+              ai_instruction_followup_1: { value: followupBundles[0] || '' },
+              ai_instruction_followup_2: { value: followupBundles[1] || '' },
+              ai_instruction_followup_3: { value: followupBundles[2] || '' },
+              followup_delay_1: { value: strategyConfig.followups[0]?.day.toString() || '3' },
+              followup_delay_2: { value: strategyConfig.followups[1]?.day.toString() || '7' },
+              followup_delay_3: { value: strategyConfig.followups[2]?.day.toString() || '14' },
+              industry: { value: strategyConfig.industry }  // <- ADD THIS LINE
+            };
 
         // Updated to use the correct endpoint format
         await callAPI('/settings', {

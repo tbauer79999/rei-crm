@@ -286,6 +286,7 @@ const CampaignCard = ({
   setKnowledgeDropdownOpen,
   showArchived,
   showDynamicColumn,
+  tenantIndustry,  // ← ADD THIS LINE
   getDynamicColumnHeader,
   getDynamicDropdownOptions,
   getStatusBadge,
@@ -298,6 +299,7 @@ const CampaignCard = ({
   archiveCampaign,
   unarchiveCampaign
 }) => {
+
   const [expanded, setExpanded] = useState(false);
 
   return (
@@ -392,18 +394,18 @@ const CampaignCard = ({
             </select>
           </div>
 
-          {/* Dynamic Field */}
-          {showDynamicColumn && (
-            <div className="space-y-2">
-              <label className="block text-sm font-medium text-gray-700">{getDynamicColumnHeader()}</label>
-              <DynamicFieldComponent
-                campaign={campaign}
-                tenantIndustry={tenantIndustry}
-                getDynamicDropdownOptions={getDynamicDropdownOptions}
-                updateCampaignDynamicField={updateCampaignDynamicField}
-              />
-            </div>
-          )}
+            {/* Dynamic Field */}
+            {showDynamicColumn && (
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-gray-700">{getDynamicColumnHeader()}</label>
+                <DynamicFieldComponent
+                  campaign={campaign}
+                  tenantIndustry={tenantIndustry}  // ← ADD THIS LINE
+                  getDynamicDropdownOptions={getDynamicDropdownOptions}
+                  updateCampaignDynamicField={updateCampaignDynamicField}
+                />
+              </div>
+            )}
 
           {/* Knowledge Assets */}
           <div className="space-y-2">
@@ -1610,6 +1612,7 @@ useEffect(() => {
               setKnowledgeDropdownOpen={setKnowledgeDropdownOpen}
               showArchived={showArchived}
               showDynamicColumn={showDynamicColumn}
+              tenantIndustry={tenantIndustry}  // ← ADD THIS LINE
               getDynamicColumnHeader={getDynamicColumnHeader}
               getDynamicDropdownOptions={getDynamicDropdownOptions}
               getStatusBadge={getStatusBadge}
@@ -1621,7 +1624,7 @@ useEffect(() => {
               toggleAiOn={toggleAiOn}
               archiveCampaign={archiveCampaign}
               unarchiveCampaign={unarchiveCampaign}
-            />
+/>
           ))}
         </div>
       ) : (
