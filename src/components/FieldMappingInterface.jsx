@@ -55,27 +55,6 @@ export default function FieldMappingInterface({
           generateAutoMapping(defaultFields);
           return;
         }
-
-  const autoMappedCount = Array.from(autoMappedFields).filter(header => fieldMapping[header]).length;
-  const totalMappedCount = Object.values(fieldMapping).filter(Boolean).length;
-
-  // Sort CSV headers: auto-mapped first, then unmapped
-  const sortedHeaders = [...csvHeaders].sort((a, b) => {
-    const aAutoMapped = autoMappedFields.has(a) && fieldMapping[a];
-    const bAutoMapped = autoMappedFields.has(b) && fieldMapping[b];
-    
-    if (aAutoMapped && !bAutoMapped) return -1;
-    if (!aAutoMapped && bAutoMapped) return 1;
-    
-    // Within each group, sort mapped vs unmapped
-    const aMapped = Boolean(fieldMapping[a]);
-    const bMapped = Boolean(fieldMapping[b]);
-    
-    if (aMapped && !bMapped) return -1;
-    if (!aMapped && bMapped) return 1;
-    
-    return 0;
-  });
         
         if (!tenant?.industry_id) {
           console.log('No industry_id found, using default fields');
@@ -250,6 +229,26 @@ export default function FieldMappingInterface({
     return requiredFields.filter(field => !mappedRequiredFields.some(mapped => mapped.field_name === field.field_name));
   };
 
+  const canProceed = () => {
+    const unmappedRequired = getUnmappedRequiredFields();
+    const mappedFields = Object.values(fieldMapping).filter(Boolean);
+    return unmappedRequired.length === 0 && mappedFields.length > 0;
+  };
+
+  const handleContinue = () => {
+    if (canProceed()) {
+      // Filter out empty mappings
+      const cleanMapping = Object.fromEntries(
+        Object.entries(fieldMapping).filter(([_, value]) => value)
+      );
+      onMappingComplete(cleanMapping);
+    }
+  };
+
+  // Calculate stats
+  const autoMappedCount = Array.from(autoMappedFields).filter(header => fieldMapping[header]).length;
+  const totalMappedCount = Object.values(fieldMapping).filter(Boolean).length;
+
   // Sort CSV headers: auto-mapped first, then unmapped
   const sortedHeaders = [...csvHeaders].sort((a, b) => {
     const aAutoMapped = autoMappedFields.has(a) && fieldMapping[a];
@@ -267,20 +266,6 @@ export default function FieldMappingInterface({
     
     return 0;
   });
-    const unmappedRequired = getUnmappedRequiredFields();
-    const mappedFields = Object.values(fieldMapping).filter(Boolean);
-    return unmappedRequired.length === 0 && mappedFields.length > 0;
-  };
-
-  const handleContinue = () => {
-    if (canProceed()) {
-      // Filter out empty mappings
-      const cleanMapping = Object.fromEntries(
-        Object.entries(fieldMapping).filter(([_, value]) => value)
-      );
-      onMappingComplete(cleanMapping);
-    }
-  };
 
   if (loading) {
     return (
@@ -536,3 +521,4 @@ export default function FieldMappingInterface({
       </div>
     </div>
   );
+}
