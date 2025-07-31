@@ -35,11 +35,33 @@ function getRoleDescription(role, industry) {
 
 function getCampaignStrategy({ industry, service_type, talk_track, vehicle_type }) {
   if (industry === 'Staffing') {
-    if (talk_track === 'Recruiting Candidates (B2C)') {
+    if (talk_track === 'recruiting_candidates') {  // ← Fixed to match UI value
       return "This campaign is focused on recruiting candidates for open roles. Messages should check for interest, qualifications, and timing. Proactively share specific job opportunities when relevant.";
     }
-    if (talk_track === 'Acquiring Clients (B2B)') {
+    if (talk_track === 'acquiring_clients') {  // ← Fixed to match UI value
       return "This campaign is focused on signing new business clients who need staffing help. Messaging should build credibility and invite a call. When clients ask about capabilities, provide specific examples from your knowledge base.";
+    }
+  }
+
+  // ADD Real Estate talk tracks
+  if (industry === 'Real Estate') {
+    if (talk_track === 'seller_leads') {
+      return "This campaign targets homeowners looking to sell. Focus on market conditions, home value, and making the selling process feel simple and profitable.";
+    }
+    if (talk_track === 'buyer_leads') {
+      return "This campaign targets potential home buyers. Emphasize available inventory, financing options, and helping them find their perfect home quickly.";
+    }
+    if (talk_track === 'traditional_sales') {
+      return "This campaign is for traditional real estate sales. Focus on market expertise, full-service representation, and maximizing home value through proper marketing.";
+    }
+    if (talk_track === 'investment_buying') {
+      return "This campaign targets off-market deals and quick sales. Emphasize fast closings, cash offers, and helping sellers avoid the traditional listing process.";
+    }
+    if (talk_track === 'expired_listings') {
+      return "This campaign targets expired listings. Acknowledge their previous experience and offer a fresh approach with better marketing and pricing strategy.";
+    }
+    if (talk_track === 'fsbo_leads') {
+      return "This campaign targets For Sale By Owner properties. Focus on the complexity they're facing and how professional help can save time and maximize profit.";
     }
   }
 

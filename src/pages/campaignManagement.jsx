@@ -770,43 +770,47 @@ const getDynamicColumnHeader = () => {
   };
 
   // Update campaign dynamic field
-  const updateCampaignDynamicField = async (campaignId, value) => {
-    try {
-      // Determine which field to update based on industry
-      let fieldName = '';
-      switch (tenantIndustry) {
-        case 'Staffing':
-          fieldName = 'talk_track';
-          break;
-        case 'Home Services':
-        case 'Financial Services':
-        case 'Mortgage Lending':
-          fieldName = 'service_type';
-          break;
-        case 'Auto Sales':
-          fieldName = 'vehicle_type';
-          break;
-        default:
-          return;
-      }
-
-      const { error } = await supabase
-        .from('campaigns')
-        .update({ [fieldName]: value })
-        .eq('id', campaignId);
-
-      if (error) throw error;
-
-      setCampaigns(campaigns.map(c => 
-        c.id === campaignId ? { ...c, [fieldName]: value } : c
-      ));
-      
-      setError('');
-    } catch (err) {
-      console.error('Error updating campaign dynamic field:', err);
-      setError('Failed to update campaign');
+  // Update campaign dynamic field
+const updateCampaignDynamicField = async (campaignId, value) => {
+  try {
+    // Determine which field to update based on industry
+    let fieldName = '';
+    switch (tenantIndustry) {
+      case 'Staffing':
+        fieldName = 'talk_track';
+        break;
+      case 'Real Estate':          // ← ADD THIS
+        fieldName = 'talk_track';   // ← ADD THIS
+        break;
+      case 'Home Services':
+      case 'Financial Services':
+      case 'Mortgage Lending':
+        fieldName = 'service_type';
+        break;
+      case 'Auto Sales':
+        fieldName = 'vehicle_type';
+        break;
+      default:
+        return;
     }
-  };
+
+    const { error } = await supabase
+      .from('campaigns')
+      .update({ [fieldName]: value })
+      .eq('id', campaignId);
+
+    if (error) throw error;
+
+    setCampaigns(campaigns.map(c => 
+      c.id === campaignId ? { ...c, [fieldName]: value } : c
+    ));
+    
+    setError('');
+  } catch (err) {
+    console.error('Error updating campaign dynamic field:', err);
+    setError('Failed to update campaign');
+  }
+};
 
   // Fetch campaigns from API
   const fetchCampaigns = async () => {
