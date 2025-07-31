@@ -95,9 +95,7 @@ export default function FieldMappingInterface({
             field_type,
             is_required,
             display_order,
-            validation_rules,
-            default_value,
-            help_text
+            options
           `)
           .eq('industry_id', tenant.industry_id)
           .order('display_order', { ascending: true });
@@ -549,9 +547,6 @@ export default function FieldMappingInterface({
                     <span>{targetField.field_type}</span>
                     {targetField.is_required && <span className="text-red-600">• Required</span>}
                     {isAutoMapped && <span className="text-green-600">• Auto-detected</span>}
-                    {targetField.help_text && (
-                      <span className="text-gray-400">• {targetField.help_text}</span>
-                    )}
                   </div>
                 )}
               </div>
