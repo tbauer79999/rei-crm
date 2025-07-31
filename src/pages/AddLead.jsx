@@ -111,47 +111,63 @@ export default function AddLead({ onSuccess, onCancel }) {
       try {
         const parsedState = JSON.parse(savedState);
         
-        // Only restore if we're coming back to the same session
-        if (parsedState.activeTab && parsedState.activeTab !== 'single') {
-          setActiveTab(parsedState.activeTab);
-        }
+        // Only restore if we have meaningful data to restore
+        const hasCSVData = parsedState.csvHeaders?.length > 0;
+        const hasMapping = parsedState.fieldMapping && Object.keys(parsedState.fieldMapping).length > 0;
+        const hasParsedRecords = parsedState.parsedRecords?.length > 0;
         
-        if (parsedState.csvHeaders?.length > 0) {
-          setCsvHeaders(parsedState.csvHeaders);
-        }
-        
-        if (parsedState.csvPreviewData?.length > 0) {
-          setCsvPreviewData(parsedState.csvPreviewData);
-        }
-        
-        if (parsedState.parsedRecords?.length > 0) {
-          setParsedRecords(parsedState.parsedRecords);
-        }
-        
-        if (parsedState.fieldMapping && Object.keys(parsedState.fieldMapping).length > 0) {
-          setFieldMapping(parsedState.fieldMapping);
-        }
-        
-        if (parsedState.showMappingInterface) {
-          setShowMappingInterface(parsedState.showMappingInterface);
-        }
-        
-        if (parsedState.fileReady) {
-          setFileReady(parsedState.fileReady);
-        }
-        
-        if (parsedState.uploadStatus) {
-          setUploadStatus(parsedState.uploadStatus);
-          setUploadError(parsedState.uploadError || false);
-        }
-        
-        // Note: We can't restore the actual File object, but we can restore the metadata
-        if (parsedState.selectedFile) {
-          // Create a placeholder that indicates file was previously selected
-          setUploadStatus(`📁 Previously selected: ${parsedState.selectedFile.name} (${(parsedState.selectedFile.size / 1024).toFixed(1)} KB)`);
+        // Only restore state if there's actually work in progress
+        if (hasCSVData || hasMapping || hasParsedRecords) {
+          console.log('🔄 Restoring saved state with data:', {
+            csvHeaders: parsedState.csvHeaders?.length || 0,
+            mapping: Object.keys(parsedState.fieldMapping || {}).length,
+            records: parsedState.parsedRecords?.length || 0
+          });
+          
+          if (parsedState.activeTab && parsedState.activeTab !== 'single') {
+            setActiveTab(parsedState.activeTab);
+          }
+          
+          if (parsedState.csvHeaders?.length > 0) {
+            setCsvHeaders(parsedState.csvHeaders);
+          }
+          
+          if (parsedState.csvPreviewData?.length > 0) {
+            setCsvPreviewData(parsedState.csvPreviewData);
+          }
+          
+          if (parsedState.parsedRecords?.length > 0) {
+            setParsedRecords(parsedState.parsedRecords);
+          }
+          
+          if (parsedState.fieldMapping && Object.keys(parsedState.fieldMapping).length > 0) {
+            setFieldMapping(parsedState.fieldMapping);
+          }
+          
+          if (parsedState.showMappingInterface) {
+            setShowMappingInterface(parsedState.showMappingInterface);
+          }
+          
+          if (parsedState.fileReady) {
+            setFileReady(parsedState.fileReady);
+          }
+          
+          if (parsedState.uploadStatus) {
+            setUploadStatus(parsedState.uploadStatus);
+            setUploadError(parsedState.uploadError || false);
+          }
+          
+          // Note: We can't restore the actual File object, but we can restore the metadata
+          if (parsedState.selectedFile) {
+            setUploadStatus(`📁 Previously selected: ${parsedState.selectedFile.name} (${(parsedState.selectedFile.size / 1024).toFixed(1)} KB) - Please re-select file to continue`);
+          }
+        } else {
+          console.log('🗑️ Clearing empty saved state');
+          sessionStorage.removeItem('addLeadState');
         }
       } catch (e) {
         console.warn('Failed to restore saved state:', e);
+        sessionStorage.removeItem('addLeadState');
       }
     }
   }, []);
@@ -227,26 +243,36 @@ export default function AddLead({ onSuccess, onCancel }) {
     if (!user?.tenant_id) return;
 
     try {
-      const { data, error } = await supabase
-        .from('lead_field_config')
-        .select('*')
-        .eq('tenant_id', user.tenant_id)
-        .order('field_name');
+      // First get the tenant's industry_id
+      const { data: tenant, error: tenantError } = await supabase
+        .from('tenants')
+        .select('industry_id')
+        .eq('id', user.tenant_id)
+        .single();
 
-      if (error) {
-        console.error('Error fetching lead fields:', error);
+      if (tenantError) {
+        console.error('Error fetching tenant:', tenantError);
         return;
       }
 
-      const uniqueFields = data?.reduce((acc, field) => {
-        const exists = acc.find(f => f.field_name === field.field_name);
-        if (!exists) {
-          acc.push(field);
-        }
-        return acc;
-      }, []) || [];
+      if (!tenant?.industry_id) {
+        console.log('No industry configured for tenant');
+        return;
+      }
 
-      setLeadFields(uniqueFields);
+      // Get field templates for this industry
+      const { data, error } = await supabase
+        .from('industry_field_templates')
+        .select('*')
+        .eq('industry_id', tenant.industry_id)
+        .order('display_order');
+
+      if (error) {
+        console.error('Error fetching industry field templates:', error);
+        return;
+      }
+
+      setLeadFields(data || []);
     } catch (err) {
       console.error('Error fetching lead fields:', err);
     }
@@ -544,7 +570,39 @@ export default function AddLead({ onSuccess, onCancel }) {
 
   const downloadTemplate = () => {
     if (!leadFields || leadFields.length === 0) {
-      alert('Field configuration is still loading. Please try again.');
+      // Create a basic template if no fields are configured
+      const basicTemplate = [
+        'Full Name',
+        'Phone Number', 
+        'Email Address',
+        'Property Address',
+        'Lead Status',
+        'Company Name',
+        'Notes'
+      ];
+      
+      const sampleData = [
+        'John Doe',
+        '+1-555-123-4567',
+        'john.doe@example.com',
+        '123 Main St, City, State 12345',
+        'Hot Lead',
+        'ABC Company',
+        'Interested in our services'
+      ];
+
+      const csvContent = [
+        basicTemplate.join(','),
+        sampleData.join(',')
+      ].join('\n');
+
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `lead_import_template_${new Date().toISOString().split('T')[0]}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
       return;
     }
 
@@ -666,13 +724,13 @@ export default function AddLead({ onSuccess, onCancel }) {
   // Enhanced cleanup on unmount
   useEffect(() => {
     return () => {
-      // Clear session storage when component unmounts via cancel
-      if (onCancel) {
-        sessionStorage.removeItem('addLeadState');
-        sessionStorage.removeItem('mappingCompleted');
-      }
+      // Only clear session storage if component is being unmounted due to cancel/close
+      // Don't clear if it's just a re-render or navigation within the same session
+      console.log('🧹 Component unmounting - clearing session data');
+      sessionStorage.removeItem('addLeadState');
+      sessionStorage.removeItem('mappingCompleted');
     };
-  }, [onCancel]);
+  }, []);
 
   return (
     <>
