@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   X, Upload, FileText, AlertCircle, CheckCircle2, Download, Loader2, Users, Phone, Mail, Building2, Tag, Sparkles, Zap, TrendingUp, ChevronDown,
   Clock, Activity, RefreshCw, Pause, Play, Calendar, BarChart3
@@ -30,11 +30,22 @@ export default function AddLead({ onSuccess, onCancel }) {
   const [hiddenJobIds, setHiddenJobIds] = useState(new Set());
   const [showAllJobs, setShowAllJobs] = useState(false);
   
-  // Mapping
+  // Enhanced Mapping State Management
   const [showMappingInterface, setShowMappingInterface] = useState(false);
   const [csvHeaders, setCsvHeaders] = useState([]);
   const [csvPreviewData, setCsvPreviewData] = useState([]);
   const [fieldMapping, setFieldMapping] = useState({});
+  const [navigationHistory, setNavigationHistory] = useState([]);
+  
+  // Refs to persist data across renders
+  const persistentDataRef = useRef({
+    csvHeaders: [],
+    csvPreviewData: [],
+    parsedRecords: [],
+    fieldMapping: {},
+    selectedFile: null,
+    showMappingInterface: false
+  });
 
   // Form state
   const [campaigns, setCampaigns] = useState([]);
@@ -60,12 +71,119 @@ export default function AddLead({ onSuccess, onCancel }) {
     { value: 'Cold Lead', icon: TrendingUp, color: 'text-gray-600 bg-gray-50' }
   ];
 
+  // Enhanced navigation state management
+  useEffect(() => {
+    // Save state to sessionStorage for persistence
+    const currentState = {
+      activeTab,
+      csvHeaders,
+      csvPreviewData,
+      parsedRecords,
+      fieldMapping,
+      selectedFile: selectedFile ? {
+        name: selectedFile.name,
+        size: selectedFile.size,
+        type: selectedFile.type
+      } : null,
+      showMappingInterface,
+      fileReady,
+      uploadStatus,
+      uploadError
+    };
+    
+    sessionStorage.setItem('addLeadState', JSON.stringify(currentState));
+    
+    // Update persistent ref
+    persistentDataRef.current = {
+      csvHeaders,
+      csvPreviewData,
+      parsedRecords,
+      fieldMapping,
+      selectedFile,
+      showMappingInterface
+    };
+  }, [activeTab, csvHeaders, csvPreviewData, parsedRecords, fieldMapping, selectedFile, showMappingInterface, fileReady, uploadStatus, uploadError]);
+
+  // Restore state on component mount
+  useEffect(() => {
+    const savedState = sessionStorage.getItem('addLeadState');
+    if (savedState) {
+      try {
+        const parsedState = JSON.parse(savedState);
+        
+        // Only restore if we're coming back to the same session
+        if (parsedState.activeTab && parsedState.activeTab !== 'single') {
+          setActiveTab(parsedState.activeTab);
+        }
+        
+        if (parsedState.csvHeaders?.length > 0) {
+          setCsvHeaders(parsedState.csvHeaders);
+        }
+        
+        if (parsedState.csvPreviewData?.length > 0) {
+          setCsvPreviewData(parsedState.csvPreviewData);
+        }
+        
+        if (parsedState.parsedRecords?.length > 0) {
+          setParsedRecords(parsedState.parsedRecords);
+        }
+        
+        if (parsedState.fieldMapping && Object.keys(parsedState.fieldMapping).length > 0) {
+          setFieldMapping(parsedState.fieldMapping);
+        }
+        
+        if (parsedState.showMappingInterface) {
+          setShowMappingInterface(parsedState.showMappingInterface);
+        }
+        
+        if (parsedState.fileReady) {
+          setFileReady(parsedState.fileReady);
+        }
+        
+        if (parsedState.uploadStatus) {
+          setUploadStatus(parsedState.uploadStatus);
+          setUploadError(parsedState.uploadError || false);
+        }
+        
+        // Note: We can't restore the actual File object, but we can restore the metadata
+        if (parsedState.selectedFile) {
+          // Create a placeholder that indicates file was previously selected
+          setUploadStatus(`📁 Previously selected: ${parsedState.selectedFile.name} (${(parsedState.selectedFile.size / 1024).toFixed(1)} KB)`);
+        }
+      } catch (e) {
+        console.warn('Failed to restore saved state:', e);
+      }
+    }
+  }, []);
+
+  // Track navigation history
+  const trackNavigation = (from, to, data = {}) => {
+    setNavigationHistory(prev => [...prev, {
+      from,
+      to,
+      timestamp: Date.now(),
+      data
+    }]);
+  };
+
+  // Enhanced tab switching with state preservation
+  const handleTabSwitch = (newTab) => {
+    trackNavigation(activeTab, newTab);
+    setActiveTab(newTab);
+    
+    // Special handling for status tab
+    if (newTab === 'status') {
+      setJobsLoading(true);
+      fetchUploadJobs();
+    }
+  };
+
   useEffect(() => {
     fetchLeadFields();
     fetchCampaigns();
   }, [user]);
 
-  // Fetch upload jobs for status tab
+  // Rest of your existing functions remain the same...
   const fetchUploadJobs = async () => {
     if (!user?.tenant_id || activeTab !== 'status') return;
 
@@ -90,7 +208,6 @@ export default function AddLead({ onSuccess, onCancel }) {
     }
   };
 
-  // Poll for job updates when status tab is active
   useEffect(() => {
     if (activeTab === 'status') {
       fetchUploadJobs();
@@ -159,23 +276,33 @@ export default function AddLead({ onSuccess, onCancel }) {
     }
   };
 
+  // Enhanced mapping completion with state preservation
   const handleMappingComplete = (mapping) => {
-  setFieldMapping(mapping);
-  setShowMappingInterface(false);
-  setFileReady(true);
-  setUploadStatus(`✅ Ready to import ${parsedRecords.length} leads with ${Object.keys(mapping).length} mapped fields`);
-};
+    setFieldMapping(mapping);
+    setShowMappingInterface(false);
+    setFileReady(true);
+    trackNavigation('mapping', 'bulk', { mappingCount: Object.keys(mapping).length });
+    setUploadStatus(`✅ Ready to import ${parsedRecords.length} leads with ${Object.keys(mapping).length} mapped fields`);
+    
+    // Persist the completion state
+    sessionStorage.setItem('mappingCompleted', 'true');
+  };
 
-const handleMappingCancel = () => {
-  localStorage.removeItem('draft_field_mapping'); // ADD THIS LINE
-  setShowMappingInterface(false);
-  setSelectedFile(null);
-  setParsedRecords([]);
-  setCsvHeaders([]);
-  setCsvPreviewData([]);
-  setFieldMapping({});
-  setUploadStatus('');
-};
+  // Enhanced mapping cancel with cleanup
+  const handleMappingCancel = () => {
+    trackNavigation('mapping', 'bulk', { action: 'cancel' });
+    setShowMappingInterface(false);
+    setSelectedFile(null);
+    setParsedRecords([]);
+    setCsvHeaders([]);
+    setCsvPreviewData([]);
+    setFieldMapping({});
+    setUploadStatus('');
+    
+    // Clear persistent state
+    sessionStorage.removeItem('addLeadState');
+    sessionStorage.removeItem('mappingCompleted');
+  };
 
   const handleCreateCampaign = async () => {
     if (!newCampaignName.trim()) {
@@ -206,7 +333,7 @@ const handleMappingCancel = () => {
 
       setCampaigns([...campaigns, data]);
       setForm({ ...form, campaign_id: String(data.id) });
-      setBulkCampaignId(String(data.id)); // Also set for bulk if that's active
+      setBulkCampaignId(String(data.id));
       setNewCampaignName('');
       setShowCreateCampaign(false);
       setShowCreateCampaignBulk(false);
@@ -239,50 +366,52 @@ const handleMappingCancel = () => {
   };
 
   const handleFileSelect = (file) => {
-  if (!file) return;
-  
-  if (file.type !== 'text/csv' && !file.name.endsWith('.csv')) {
-    setUploadStatus('Please upload a CSV file');
-    setUploadError(true);
-    return;
-  }
-
-  setSelectedFile(file);
-  setUploadStatus('');
-  setUploadError(false);
-
-  Papa.parse(file, {
-    header: true,
-    skipEmptyLines: true,
-    complete: (results) => {
-      if (results.data.length === 0) {
-        setUploadStatus('CSV file appears to be empty');
-        setUploadError(true);
-        return;
-      }
-
-      // Extract headers and preview data
-      const headers = Object.keys(results.data[0] || {});
-      setCsvHeaders(headers);
-      setCsvPreviewData(results.data.slice(0, 5)); // First 5 rows for preview
-      setParsedRecords(results.data); // Keep for later use
-      
-      // Show mapping interface instead of "ready to import"
-      setShowMappingInterface(true);
-      setUploadStatus(`Found ${results.data.length} records. Please map your fields.`);
-    },
-    error: (error) => {
-      console.error('CSV parsing error:', error);
-      setUploadStatus('Error parsing CSV file');
+    if (!file) return;
+    
+    if (file.type !== 'text/csv' && !file.name.endsWith('.csv')) {
+      setUploadStatus('Please upload a CSV file');
       setUploadError(true);
+      return;
     }
-  });
-};
+
+    setSelectedFile(file);
+    setUploadStatus('');
+    setUploadError(false);
+
+    Papa.parse(file, {
+      header: true,
+      skipEmptyLines: true,
+      complete: (results) => {
+        if (results.data.length === 0) {
+          setUploadStatus('CSV file appears to be empty');
+          setUploadError(true);
+          return;
+        }
+
+        const headers = Object.keys(results.data[0] || {});
+        setCsvHeaders(headers);
+        setCsvPreviewData(results.data.slice(0, 5));
+        setParsedRecords(results.data);
+        
+        trackNavigation('bulk', 'mapping', { 
+          recordCount: results.data.length, 
+          headerCount: headers.length 
+        });
+        
+        setShowMappingInterface(true);
+        setUploadStatus(`Found ${results.data.length} records. Please map your fields.`);
+      },
+      error: (error) => {
+        console.error('CSV parsing error:', error);
+        setUploadStatus('Error parsing CSV file');
+        setUploadError(true);
+      }
+    });
+  };
 
   const [showCreateCampaignBulk, setShowCreateCampaignBulk] = useState(false);
   const [bulkCampaignId, setBulkCampaignId] = useState('');
-  
-  // Updated bulk submit to use new job queue system
+
   const handleBulkSubmit = async () => {
     if (!bulkCampaignId && campaigns.length > 0) {
       alert('Please select a campaign for the bulk import');
@@ -296,7 +425,6 @@ const handleMappingCancel = () => {
     
     setIsUploading(true);
     try {
-      // Upload file to Supabase Storage first
       const fileName = `bulk-uploads/${user.tenant_id}/${Date.now()}-${selectedFile.name}`;
       
       const { data: uploadData, error: uploadError } = await supabase.storage
@@ -307,23 +435,21 @@ const handleMappingCancel = () => {
         throw new Error(`File upload failed: ${uploadError.message}`);
       }
 
-      // Get public URL
       const { data: { publicUrl } } = supabase.storage
         .from('bulk-uploads')
         .getPublicUrl(fileName);
 
-      // Create bulk upload job
-const { data: jobData, error: jobError } = await supabase
-  .rpc('create_bulk_upload_job', {
-    p_tenant_id: user.tenant_id,
-    p_created_by: user.id,
-    p_file_name: selectedFile.name,
-    p_file_url: publicUrl,
-    p_file_size: selectedFile.size,
-    p_campaign_id: bulkCampaignId || null,
-    p_total_records: parsedRecords.length,
-    p_field_mapping: fieldMapping
-  });
+      const { data: jobData, error: jobError } = await supabase
+        .rpc('create_bulk_upload_job', {
+          p_tenant_id: user.tenant_id,
+          p_created_by: user.id,
+          p_file_name: selectedFile.name,
+          p_file_url: publicUrl,
+          p_file_size: selectedFile.size,
+          p_campaign_id: bulkCampaignId || null,
+          p_total_records: parsedRecords.length,
+          p_field_mapping: fieldMapping
+        });
 
       if (jobError) {
         throw new Error(`Failed to create upload job: ${jobError.message}`);
@@ -339,9 +465,14 @@ const { data: jobData, error: jobError } = await supabase
       setCsvHeaders([]);
       setCsvPreviewData([]);
       setShowMappingInterface(false);
-      // Switch to status tab to show progress
-      setActiveTab('status');
-      fetchUploadJobs(); // Refresh jobs
+      
+      // Clear session state after successful upload
+      sessionStorage.removeItem('addLeadState');
+      sessionStorage.removeItem('mappingCompleted');
+      
+      // Switch to status tab
+      handleTabSwitch('status');
+      fetchUploadJobs();
       
     } catch (err) {
       console.error('Bulk upload error:', err);
@@ -393,7 +524,6 @@ const { data: jobData, error: jobError } = await supabase
         throw new Error(errorData.error || 'Failed to submit lead');
       }
 
-      // Reset form
       setForm({
         name: '',
         phone: '',
@@ -477,7 +607,6 @@ const { data: jobData, error: jobError } = await supabase
     return `~${diffHours}h ${diffMins % 60}m`;
   };
 
-  // Download failed rows CSV
   const downloadFailedRows = async (jobId, fileName) => {
     try {
       const { data: errors, error } = await supabase
@@ -492,7 +621,6 @@ const { data: jobData, error: jobError } = await supabase
         return;
       }
 
-      // Convert errors to CSV
       const headers = ['Row Number', 'Error Type', 'Error Message', 'Field', 'Original Data'];
       const csvData = errors.map(error => [
         error.row_number,
@@ -520,11 +648,9 @@ const { data: jobData, error: jobError } = await supabase
     }
   };
 
-  // Separate active and completed jobs
   const activeJobs = jobs.filter(job => ['pending', 'processing'].includes(job.status));
   const completedJobs = jobs.filter(job => ['completed', 'failed', 'cancelled'].includes(job.status));
 
-  // Hide dismissed jobs and limit completed jobs if not showing all
   const visibleJobs = jobs.filter(job => !hiddenJobIds.has(job.id));
   const displayedJobs = showAllJobs ? visibleJobs : [
     ...visibleJobs.filter(job => ['pending', 'processing'].includes(job.status)),
@@ -533,10 +659,20 @@ const { data: jobData, error: jobError } = await supabase
 
   const hasMoreJobs = visibleJobs.length > displayedJobs.length;
 
-  // Function to dismiss a job
   const dismissJob = (jobId) => {
     setHiddenJobIds(prev => new Set([...prev, jobId]));
   };
+
+  // Enhanced cleanup on unmount
+  useEffect(() => {
+    return () => {
+      // Clear session storage when component unmounts via cancel
+      if (onCancel) {
+        sessionStorage.removeItem('addLeadState');
+        sessionStorage.removeItem('mappingCompleted');
+      }
+    };
+  }, [onCancel]);
 
   return (
     <>
@@ -561,11 +697,11 @@ const { data: jobData, error: jobError } = await supabase
               </button>
             </div>
 
-            {/* Tab Navigation */}
+            {/* Enhanced Tab Navigation with State Indicators */}
             <div className="border-b border-gray-200">
               <nav className="-mb-px flex">
                 <button
-                  onClick={() => setActiveTab('single')}
+                  onClick={() => handleTabSwitch('single')}
                   className={`py-4 px-6 text-sm font-medium border-b-2 transition-colors ${
                     activeTab === 'single'
                       ? 'border-blue-500 text-blue-600'
@@ -576,8 +712,8 @@ const { data: jobData, error: jobError } = await supabase
                   Single Entry
                 </button>
                 <button
-                  onClick={() => setActiveTab('bulk')}
-                  className={`py-4 px-6 text-sm font-medium border-b-2 transition-colors ${
+                  onClick={() => handleTabSwitch('bulk')}
+                  className={`py-4 px-6 text-sm font-medium border-b-2 transition-colors relative ${
                     activeTab === 'bulk'
                       ? 'border-blue-500 text-blue-600'
                       : 'border-transparent text-gray-500 hover:text-gray-700'
@@ -585,13 +721,12 @@ const { data: jobData, error: jobError } = await supabase
                 >
                   <Upload className="w-4 h-4 inline-block mr-2" />
                   Bulk Import
+                  {(fileReady || Object.keys(fieldMapping).length > 0) && (
+                    <span className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full" />
+                  )}
                 </button>
                 <button
-                  onClick={() => {
-                    setActiveTab('status');
-                    setJobsLoading(true);
-                    fetchUploadJobs();
-                  }}
+                  onClick={() => handleTabSwitch('status')}
                   className={`py-4 px-6 text-sm font-medium border-b-2 transition-colors ${
                     activeTab === 'status'
                       ? 'border-blue-500 text-blue-600'
@@ -612,7 +747,7 @@ const { data: jobData, error: jobError } = await supabase
             {/* Content */}
             <div className="p-6 max-h-[calc(100vh-300px)] overflow-y-auto">
               {activeTab === 'single' ? (
-                /* Single Entry Form */
+                /* Single Entry Form - Keep existing implementation */
                 <div className="space-y-6">
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div>
@@ -763,10 +898,17 @@ const { data: jobData, error: jobError } = await supabase
                   </div>
                 </div>
               ) : activeTab === 'bulk' ? (
-                /* Bulk Import */
+                /* Enhanced Bulk Import with better state management */
                 <div className="space-y-6">
                   <div className="flex items-center justify-between">
-                    <p className="text-sm text-gray-600">Upload a CSV file to import multiple leads at once</p>
+                    <div>
+                      <p className="text-sm text-gray-600">Upload a CSV file to import multiple leads at once</p>
+                      {navigationHistory.length > 0 && (
+                        <p className="text-xs text-gray-400 mt-1">
+                          Session activity: {navigationHistory.length} navigation events
+                        </p>
+                      )}
+                    </div>
                     <button
                       onClick={downloadTemplate}
                       className="text-sm text-blue-600 hover:text-blue-700 flex items-center"
@@ -776,7 +918,7 @@ const { data: jobData, error: jobError } = await supabase
                     </button>
                   </div>
 
-                  {/* Campaign Selection for Bulk Import */}
+                  {/* Campaign Selection - Keep existing implementation */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Select Campaign for Import *
@@ -874,7 +1016,7 @@ const { data: jobData, error: jobError } = await supabase
                     />
                   ) : (
                     <>
-                      {/* Drop Zone */}
+                      {/* Drop Zone - Keep existing implementation */}
                       <div
                         className={`relative border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
                           dragActive ? 'border-blue-500 bg-blue-50' : 'border-gray-300 hover:border-gray-400'
@@ -906,6 +1048,7 @@ const { data: jobData, error: jobError } = await supabase
                                 setCsvHeaders([]);
                                 setCsvPreviewData([]);
                                 setShowMappingInterface(false);
+                                sessionStorage.removeItem('addLeadState');
                               }}
                               className="text-sm text-red-600 hover:text-red-700"
                             >
@@ -964,9 +1107,8 @@ const { data: jobData, error: jobError } = await supabase
                   </div>
                 </div>
               ) : (
-                /* Upload Status Tab - NEW IMPROVED VERSION */
+                /* Upload Status Tab - Keep existing implementation but add state indicators */
                 <div className="space-y-6">
-                  {/* Header */}
                   <div className="flex items-center justify-between">
                     <div>
                       <h3 className="text-lg font-medium text-gray-900">Upload Status</h3>
@@ -1022,7 +1164,6 @@ const { data: jobData, error: jobError } = await supabase
                             'bg-red-50 border-red-200'
                           }`}>
                             
-                            {/* Header Row */}
                             <div className="flex items-center justify-between mb-3">
                               <div className="flex items-center gap-3 min-w-0 flex-1">
                                 <div className={`p-1.5 rounded-full ${
@@ -1055,7 +1196,6 @@ const { data: jobData, error: jobError } = await supabase
                                 </div>
                               </div>
                               
-                              {/* Actions */}
                               <div className="flex items-center gap-1">
                                 {job.failed_records > 0 && (
                                   <button
@@ -1078,7 +1218,6 @@ const { data: jobData, error: jobError } = await supabase
                               </div>
                             </div>
 
-                            {/* Progress Bar for Active Jobs */}
                             {isActive && (
                               <div className="mb-3">
                                 <div className="flex items-center justify-between text-xs text-gray-600 mb-1">
@@ -1099,7 +1238,6 @@ const { data: jobData, error: jobError } = await supabase
                               </div>
                             )}
 
-                            {/* Results Summary */}
                             <div className="flex items-center justify-between text-sm">
                               <div className="flex items-center gap-4">
                                 {job.successful_records > 0 && (
@@ -1127,7 +1265,6 @@ const { data: jobData, error: jobError } = await supabase
                                 )}
                               </div>
                               
-                              {/* Success Rate for Completed Jobs */}
                               {isCompleted && job.total_records > 0 && (
                                 <div className="text-xs text-gray-500">
                                   {successRate.toFixed(1)}% success rate
@@ -1135,7 +1272,6 @@ const { data: jobData, error: jobError } = await supabase
                               )}
                             </div>
 
-                            {/* Error Message */}
                             {isFailed && job.error_message && (
                               <div className="mt-3 pt-3 border-t border-red-200">
                                 <p className="text-xs text-red-600 flex items-start gap-1">
@@ -1149,7 +1285,6 @@ const { data: jobData, error: jobError } = await supabase
 })}
                     </div>
 
-                    {/* Show More/Less Button */}
                     {hasMoreJobs && (
                       <div className="text-center pt-4">
                         <button
@@ -1174,8 +1309,6 @@ const { data: jobData, error: jobError } = await supabase
                   </>
                   )}
 
-
-                  {/* Summary Stats */}
                   {jobs.length > 0 && (
                     <div className="grid grid-cols-4 gap-4 pt-4 border-t border-gray-200">
                       <div className="text-center">
