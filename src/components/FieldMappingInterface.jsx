@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowRight, Check, X, AlertCircle, Eye, EyeOff, Loader2, Zap, CheckCircle } from 'lucide-react';
+import { ArrowRight, Check, X, AlertCircle, Eye, EyeOff, Loader2, Zap, CheckCircle, Database, Building } from 'lucide-react';
 import supabase from '../lib/supabaseClient';
 
 export default function FieldMappingInterface({ 
@@ -16,7 +16,15 @@ export default function FieldMappingInterface({
   const [showPreview, setShowPreview] = useState(false);
   const [autoMappedFields, setAutoMappedFields] = useState(new Set());
   
-  // Fallback fields if database doesn't have proper templates
+  // Debug states
+  const [debugInfo, setDebugInfo] = useState({
+    tenantData: null,
+    industryData: null,
+    fieldsData: null,
+    usingFallback: false
+  });
+  
+  // Fallback fields - only used as absolute last resort
   const defaultFields = [
     { field_name: 'name', field_label: 'Full Name', field_type: 'text', is_required: true, display_order: 1 },
     { field_name: 'phone', field_label: 'Phone Number', field_type: 'phone', is_required: true, display_order: 2 },
@@ -24,101 +32,135 @@ export default function FieldMappingInterface({
     { field_name: 'property_address', field_label: 'Property Address', field_type: 'text', is_required: false, display_order: 4 },
     { field_name: 'status', field_label: 'Lead Status', field_type: 'select', is_required: false, display_order: 5 },
     { field_name: 'company_name', field_label: 'Company Name', field_type: 'text', is_required: false, display_order: 6 },
-    { field_name: 'notes', field_label: 'Notes', field_type: 'textarea', is_required: false, display_order: 7 },
-    { field_name: 'source', field_label: 'Lead Source', field_type: 'text', is_required: false, display_order: 8 },
-    { field_name: 'budget', field_label: 'Budget', field_type: 'number', is_required: false, display_order: 9 },
-    { field_name: 'timeline', field_label: 'Timeline', field_type: 'text', is_required: false, display_order: 10 }
+    { field_name: 'notes', field_label: 'Notes', field_type: 'textarea', is_required: false, display_order: 7 }
   ];
   
-  // Fetch industry field templates for the tenant
+  // Enhanced industry field fetching with proper error handling
   useEffect(() => {
     const fetchIndustryFields = async () => {
+      if (!tenantId || !csvHeaders.length) {
+        console.log('Missing tenantId or csvHeaders');
+        return;
+      }
+
       try {
         setLoading(true);
         setError('');
         
-        console.log('Fetching fields for tenant:', tenantId);
+        console.log('🔍 Fetching fields for tenant:', tenantId);
         
-        // First get the tenant's industry_id
+        // Step 1: Get tenant with industry information
         const { data: tenant, error: tenantError } = await supabase
           .from('tenants')
-          .select('industry_id')
+          .select(`
+            id,
+            name,
+            industry_id,
+            industries (
+              id,
+              name,
+              description
+            )
+          `)
           .eq('id', tenantId)
           .single();
           
-        console.log('Tenant data:', tenant);
+        console.log('🏢 Tenant query result:', { tenant, error: tenantError });
+        
+        setDebugInfo(prev => ({ ...prev, tenantData: tenant }));
         
         if (tenantError) {
-          console.error('Tenant error:', tenantError);
-          console.log('Using default fields due to tenant error');
-          setIndustryFields(defaultFields);
-          generateAutoMapping(defaultFields);
-          return;
+          console.error('❌ Tenant fetch error:', tenantError);
+          throw new Error(`Failed to fetch tenant: ${tenantError.message}`);
         }
         
-        if (!tenant?.industry_id) {
-          console.log('No industry_id found, using default fields');
-          setIndustryFields(defaultFields);
-          generateAutoMapping(defaultFields);
-          return;
+        if (!tenant) {
+          throw new Error('Tenant not found');
         }
         
-        // Get field templates for this industry
+        if (!tenant.industry_id) {
+          throw new Error(`No industry configured for tenant "${tenant.name}". Please set up your industry in account settings.`);
+        }
+        
+        console.log('🏭 Tenant industry:', tenant.industries);
+        
+        // Step 2: Get field templates for this specific industry
         const { data: fields, error: fieldsError } = await supabase
           .from('industry_field_templates')
-          .select('*')
+          .select(`
+            id,
+            industry_id,
+            field_name,
+            field_label,
+            field_type,
+            is_required,
+            display_order,
+            validation_rules,
+            default_value,
+            help_text
+          `)
           .eq('industry_id', tenant.industry_id)
-          .order('display_order');
+          .order('display_order', { ascending: true });
           
-        console.log('Industry fields raw:', fields);
+        console.log('📋 Fields query result:', { 
+          industryId: tenant.industry_id,
+          fields, 
+          error: fieldsError,
+          count: fields?.length 
+        });
+        
+        setDebugInfo(prev => ({ 
+          ...prev, 
+          industryData: tenant.industries,
+          fieldsData: fields 
+        }));
         
         if (fieldsError) {
-          console.error('Fields error:', fieldsError);
-          console.log('Using default fields due to fetch error');
-          setIndustryFields(defaultFields);
-          generateAutoMapping(defaultFields);
-          return;
+          console.error('❌ Fields fetch error:', fieldsError);
+          throw new Error(`Failed to load field templates: ${fieldsError.message}`);
         }
         
-        // Check if we got valid field data
+        // Step 3: Validate field data quality
         if (!fields || fields.length === 0) {
-          console.log('No fields found, using defaults');
-          setIndustryFields(defaultFields);
-          generateAutoMapping(defaultFields);
-          return;
+          throw new Error(`No field templates found for industry "${tenant.industries?.name || tenant.industry_id}". Please contact support to set up field templates for your industry.`);
         }
         
         // Check for data quality issues
-        const uniqueLabels = new Set(fields.map(f => f.field_label));
-        const uniqueNames = new Set(fields.map(f => f.field_name));
+        const uniqueLabels = new Set(fields.map(f => f.field_label).filter(Boolean));
+        const uniqueNames = new Set(fields.map(f => f.field_name).filter(Boolean));
         
-        if (uniqueLabels.size === 1) {
-          console.warn('Data quality issue: all fields have the same label');
-          console.log('Field labels found:', Array.from(uniqueLabels));
-          console.log('Using default fields due to data quality issue');
-          setIndustryFields(defaultFields);
-          generateAutoMapping(defaultFields);
-          return;
+        console.log('🔍 Data quality check:', {
+          totalFields: fields.length,
+          uniqueLabels: uniqueLabels.size,
+          uniqueNames: uniqueNames.size,
+          labels: Array.from(uniqueLabels),
+          names: Array.from(uniqueNames)
+        });
+        
+        if (uniqueLabels.size === 1 && uniqueLabels.has('lead status')) {
+          console.warn('⚠️ Data quality issue: all fields have the same label "lead status"');
+          throw new Error('Field template data quality issue detected. All fields have the same label. Please contact support to fix your industry field templates.');
         }
         
         if (uniqueNames.size === 1) {
-          console.warn('Data quality issue: all fields have the same name');
-          console.log('Field names found:', Array.from(uniqueNames));
-          console.log('Using default fields due to data quality issue');
-          setIndustryFields(defaultFields);
-          generateAutoMapping(defaultFields);
-          return;
+          console.warn('⚠️ Data quality issue: all fields have the same name');
+          throw new Error('Field template data quality issue detected. All fields have the same name. Please contact support to fix your industry field templates.');
         }
         
-        // Data looks good, use it
-        console.log('Using fetched industry fields:', fields.length);
+        // Step 4: Use the fetched fields
+        console.log('✅ Using industry-specific fields:', fields.length, 'fields');
         setIndustryFields(fields);
+        setDebugInfo(prev => ({ ...prev, usingFallback: false }));
         generateAutoMapping(fields);
         
       } catch (err) {
-        console.error('Error fetching industry fields:', err);
-        console.log('Using default fields due to catch error');
+        console.error('💥 Error in fetchIndustryFields:', err);
+        setError(err.message);
+        
+        // Only fall back to defaults if absolutely necessary
+        console.warn('⚠️ Falling back to default fields due to error');
         setIndustryFields(defaultFields);
+        setDebugInfo(prev => ({ ...prev, usingFallback: true }));
         generateAutoMapping(defaultFields);
       } finally {
         setLoading(false);
@@ -129,16 +171,22 @@ export default function FieldMappingInterface({
       const autoMapping = {};
       const autoMapped = new Set();
       
+      console.log('🤖 Generating auto-mapping for', csvHeaders.length, 'CSV headers against', fields.length, 'field templates');
+      
       csvHeaders.forEach(header => {
         const normalizedHeader = header.toLowerCase().trim();
+        console.log(`🔍 Processing header: "${header}" (normalized: "${normalizedHeader}")`);
         
-        // Try exact matches first
-        const exactMatch = fields.find(field => 
-          field.field_name.toLowerCase() === normalizedHeader ||
-          (field.field_label && field.field_label.toLowerCase()) === normalizedHeader
-        );
+        // Try exact matches first (field_name or field_label)
+        const exactMatch = fields.find(field => {
+          const fieldName = field.field_name?.toLowerCase();
+          const fieldLabel = field.field_label?.toLowerCase();
+          
+          return fieldName === normalizedHeader || fieldLabel === normalizedHeader;
+        });
         
         if (exactMatch) {
+          console.log(`✅ Exact match found: "${header}" → "${exactMatch.field_label}" (${exactMatch.field_name})`);
           autoMapping[header] = exactMatch.field_name;
           autoMapped.add(header);
           return;
@@ -146,41 +194,51 @@ export default function FieldMappingInterface({
         
         // Try partial matches
         const partialMatch = fields.find(field => {
-          const fieldName = field.field_name.toLowerCase();
-          const fieldLabel = field.field_label ? field.field_label.toLowerCase() : '';
+          const fieldName = field.field_name?.toLowerCase() || '';
+          const fieldLabel = field.field_label?.toLowerCase() || '';
           
-          return (
-            normalizedHeader.includes(fieldName) ||
-            fieldName.includes(normalizedHeader) ||
-            (fieldLabel && normalizedHeader.includes(fieldLabel.split(' ')[0].toLowerCase())) ||
-            // Common variations
-            (normalizedHeader.includes('name') && fieldName.includes('name')) ||
-            (normalizedHeader.includes('phone') && fieldName.includes('phone')) ||
-            (normalizedHeader.includes('email') && fieldName.includes('email')) ||
-            (normalizedHeader.includes('address') && fieldName.includes('address')) ||
-            (normalizedHeader.includes('company') && fieldName.includes('company')) ||
-            (normalizedHeader.includes('status') && fieldName.includes('status'))
-          );
+          // Check if header contains field name/label or vice versa
+          const headerContainsField = normalizedHeader.includes(fieldName) || normalizedHeader.includes(fieldLabel.split(' ')[0]);
+          const fieldContainsHeader = fieldName.includes(normalizedHeader) || fieldLabel.includes(normalizedHeader);
+          
+          // Common field mappings
+          const commonMappings = [
+            (normalizedHeader.includes('name') && (fieldName.includes('name') || fieldLabel.includes('name'))),
+            (normalizedHeader.includes('phone') && (fieldName.includes('phone') || fieldLabel.includes('phone'))),
+            (normalizedHeader.includes('email') && (fieldName.includes('email') || fieldLabel.includes('email'))),
+            (normalizedHeader.includes('address') && (fieldName.includes('address') || fieldLabel.includes('address'))),
+            (normalizedHeader.includes('company') && (fieldName.includes('company') || fieldLabel.includes('company'))),
+            (normalizedHeader.includes('status') && (fieldName.includes('status') || fieldLabel.includes('status'))),
+            (normalizedHeader.includes('property') && (fieldName.includes('property') || fieldLabel.includes('property')))
+          ];
+          
+          return headerContainsField || fieldContainsHeader || commonMappings.some(Boolean);
         });
         
         if (partialMatch) {
+          console.log(`🔶 Partial match found: "${header}" → "${partialMatch.field_label}" (${partialMatch.field_name})`);
           autoMapping[header] = partialMatch.field_name;
           autoMapped.add(header);
+        } else {
+          console.log(`❌ No match found for: "${header}"`);
         }
       });
       
-      console.log('Generated auto-mapping:', autoMapping);
-      console.log('Auto-mapped fields:', Array.from(autoMapped));
+      console.log('🎯 Auto-mapping complete:', {
+        totalHeaders: csvHeaders.length,
+        mappedHeaders: Object.keys(autoMapping).length,
+        mapping: autoMapping
+      });
+      
       setFieldMapping(autoMapping);
       setAutoMappedFields(autoMapped);
     };
 
-    if (tenantId && csvHeaders.length > 0) {
-      fetchIndustryFields();
-    }
+    fetchIndustryFields();
   }, [tenantId, csvHeaders]);
 
   const handleMappingChange = (csvHeader, targetField) => {
+    console.log('🔄 Mapping change:', csvHeader, '→', targetField);
     setFieldMapping(prev => ({
       ...prev,
       [csvHeader]: targetField === '' ? undefined : targetField
@@ -241,6 +299,7 @@ export default function FieldMappingInterface({
       const cleanMapping = Object.fromEntries(
         Object.entries(fieldMapping).filter(([_, value]) => value)
       );
+      console.log('✅ Final mapping being sent:', cleanMapping);
       onMappingComplete(cleanMapping);
     }
   };
@@ -272,7 +331,8 @@ export default function FieldMappingInterface({
       <div className="flex items-center justify-center py-12">
         <div className="text-center">
           <Loader2 className="w-8 h-8 animate-spin text-blue-600 mx-auto mb-4" />
-          <p className="text-gray-600">Loading field configuration...</p>
+          <p className="text-gray-600">Loading industry-specific field configuration...</p>
+          <p className="text-xs text-gray-500 mt-2">Tenant ID: {tenantId}</p>
         </div>
       </div>
     );
@@ -283,15 +343,37 @@ export default function FieldMappingInterface({
       <div className="bg-red-50 border border-red-200 rounded-lg p-4">
         <div className="flex items-start">
           <AlertCircle className="w-5 h-5 text-red-600 mr-3 mt-0.5 flex-shrink-0" />
-          <div>
+          <div className="flex-1">
             <h4 className="text-sm font-medium text-red-800">Configuration Error</h4>
             <p className="text-sm text-red-700 mt-1">{error}</p>
-            <button
-              onClick={onCancel}
-              className="mt-3 text-sm text-red-600 hover:text-red-700 underline"
-            >
-              Go back and try again
-            </button>
+            
+            {/* Debug information */}
+            <div className="mt-3 p-3 bg-red-100 rounded text-xs">
+              <p className="font-medium text-red-900">Debug Information:</p>
+              <ul className="mt-1 space-y-1 text-red-800">
+                <li>• Tenant ID: {tenantId}</li>
+                <li>• Tenant Data: {debugInfo.tenantData ? '✅ Found' : '❌ Not found'}</li>
+                <li>• Industry: {debugInfo.industryData?.name || 'Not configured'}</li>
+                <li>• Industry ID: {debugInfo.tenantData?.industry_id || 'None'}</li>
+                <li>• Field Templates: {debugInfo.fieldsData?.length || 0} available</li>
+                <li>• Using Fallback: {debugInfo.usingFallback ? 'Yes' : 'No'}</li>
+              </ul>
+            </div>
+            
+            <div className="mt-3 flex gap-2">
+              <button
+                onClick={onCancel}
+                className="text-sm text-red-600 hover:text-red-700 underline"
+              >
+                Go back and try again
+              </button>
+              <button
+                onClick={() => window.location.reload()}
+                className="text-sm text-red-600 hover:text-red-700 underline"
+              >
+                Refresh page
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -300,21 +382,38 @@ export default function FieldMappingInterface({
 
   return (
     <div className="space-y-6">
-      {/* Header */}
+      {/* Enhanced Header with Industry Information */}
       <div>
         <h3 className="text-lg font-semibold text-gray-900 mb-2">Map Your CSV Fields</h3>
         <p className="text-sm text-gray-600">
           Match your CSV columns to the appropriate fields. Required fields are marked with *.
         </p>
-        <div className="flex items-center justify-between mt-1">
-          <p className="text-xs text-gray-500">
-            Found {industryFields.length} available fields for mapping
-          </p>
-          {industryFields === defaultFields && (
-            <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">
-              Using default fields
-            </span>
-          )}
+        <div className="flex items-center justify-between mt-2">
+          <div className="flex items-center gap-4 text-xs text-gray-500">
+            <span>Found {industryFields.length} available fields</span>
+            {debugInfo.industryData && (
+              <div className="flex items-center gap-1">
+                <Building className="w-3 h-3" />
+                <span>Industry: {debugInfo.industryData.name}</span>
+              </div>
+            )}
+            {debugInfo.usingFallback && (
+              <span className="text-amber-600 font-medium">⚠️ Using fallback fields</span>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            {!debugInfo.usingFallback && debugInfo.industryData && (
+              <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
+                <Database className="w-3 h-3 inline mr-1" />
+                Industry-specific
+              </span>
+            )}
+            {debugInfo.usingFallback && (
+              <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">
+                Using defaults
+              </span>
+            )}
+          </div>
         </div>
       </div>
 
@@ -371,7 +470,7 @@ export default function FieldMappingInterface({
         </div>
       )}
 
-      {/* Mapping Interface */}
+      {/* Enhanced Mapping Interface */}
       <div className="space-y-3 max-h-96 overflow-y-auto">
         {sortedHeaders.map((header, index) => {
           const mappedField = fieldMapping[header];
@@ -450,6 +549,9 @@ export default function FieldMappingInterface({
                     <span>{targetField.field_type}</span>
                     {targetField.is_required && <span className="text-red-600">• Required</span>}
                     {isAutoMapped && <span className="text-green-600">• Auto-detected</span>}
+                    {targetField.help_text && (
+                      <span className="text-gray-400">• {targetField.help_text}</span>
+                    )}
                   </div>
                 )}
               </div>
