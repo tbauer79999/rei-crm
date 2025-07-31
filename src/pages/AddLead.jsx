@@ -6,7 +6,7 @@ import {
 import Papa from 'papaparse';
 import supabase from '../lib/supabaseClient';
 import { useAuth } from '../context/AuthContext';
-import FieldMappingInterface from './FieldMappingInterface';
+import FieldMappingInterface from '../components/FieldMappingInterface';
 
 export default function AddLead({ onSuccess, onCancel }) {
   const { user } = useAuth();
