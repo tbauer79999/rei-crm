@@ -58,6 +58,24 @@ export default function FieldMappingInterface({
 
   const autoMappedCount = Array.from(autoMappedFields).filter(header => fieldMapping[header]).length;
   const totalMappedCount = Object.values(fieldMapping).filter(Boolean).length;
+
+  // Sort CSV headers: auto-mapped first, then unmapped
+  const sortedHeaders = [...csvHeaders].sort((a, b) => {
+    const aAutoMapped = autoMappedFields.has(a) && fieldMapping[a];
+    const bAutoMapped = autoMappedFields.has(b) && fieldMapping[b];
+    
+    if (aAutoMapped && !bAutoMapped) return -1;
+    if (!aAutoMapped && bAutoMapped) return 1;
+    
+    // Within each group, sort mapped vs unmapped
+    const aMapped = Boolean(fieldMapping[a]);
+    const bMapped = Boolean(fieldMapping[b]);
+    
+    if (aMapped && !bMapped) return -1;
+    if (!aMapped && bMapped) return 1;
+    
+    return 0;
+  });
         
         if (!tenant?.industry_id) {
           console.log('No industry_id found, using default fields');
