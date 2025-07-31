@@ -113,39 +113,10 @@ export default function Dashboard() {
   }, [user]);
 
   // Fetch the dynamic field configuration for this tenant, or use actual leads table columns as fallback
-  const fetchLeadFields = async () => {
-    // First try to get configured fields
-    if (user?.tenant_id) {
-      try {
-        const { data, error } = await supabase
-          .from('lead_field_config')
-          .select('*')
-          .eq('industry_id', user.industry_id)
-          .order('field_name');
-
-        if (!error && data && data.length > 0) {
-          // Remove duplicates by field_name
-          const uniqueFields = data.reduce((acc, field) => {
-            const exists = acc.find(f => f.field_name === field.field_name);
-            if (!exists) {
-              acc.push(field);
-            }
-            return acc;
-          }, []);
-
-          console.log(`Loaded ${data.length} total fields, ${uniqueFields.length} unique fields`);
-          setLeadFields(uniqueFields);
-          return;
-        }
-      } catch (err) {
-        console.log('Lead field config not available, using schema defaults:', err);
-      }
-    }
-
-    // Fallback to actual leads table columns from your schema
-    setDefaultLeadFields();
-  };
-
+ const fetchLeadFields = async () => {
+  // lead_field_config table was removed, so just use default fields
+  setDefaultLeadFields();
+};
   const setDefaultLeadFields = () => {
     // Based on your actual leads table schema
     const defaultFields = [
