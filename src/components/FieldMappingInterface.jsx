@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowRight, Check, X, AlertCircle, Eye, EyeOff, Loader2 } from 'lucide-react';
+import { ArrowRight, Check, X, AlertCircle, Eye, EyeOff, Loader2, Zap, CheckCircle } from 'lucide-react';
 import supabase from '../lib/supabaseClient';
 
 export default function FieldMappingInterface({ 
@@ -14,6 +14,7 @@ export default function FieldMappingInterface({
   const [error, setError] = useState('');
   const [fieldMapping, setFieldMapping] = useState({});
   const [showPreview, setShowPreview] = useState(false);
+  const [autoMappedFields, setAutoMappedFields] = useState(new Set());
   
   // Fallback fields if database doesn't have proper templates
   const defaultFields = [
@@ -54,6 +55,9 @@ export default function FieldMappingInterface({
           generateAutoMapping(defaultFields);
           return;
         }
+
+  const autoMappedCount = Array.from(autoMappedFields).filter(header => fieldMapping[header]).length;
+  const totalMappedCount = Object.values(fieldMapping).filter(Boolean).length;
         
         if (!tenant?.industry_id) {
           console.log('No industry_id found, using default fields');
@@ -126,6 +130,8 @@ export default function FieldMappingInterface({
 
     const generateAutoMapping = (fields) => {
       const autoMapping = {};
+      const autoMapped = new Set();
+      
       csvHeaders.forEach(header => {
         const normalizedHeader = header.toLowerCase().trim();
         
@@ -137,6 +143,7 @@ export default function FieldMappingInterface({
         
         if (exactMatch) {
           autoMapping[header] = exactMatch.field_name;
+          autoMapped.add(header);
           return;
         }
         
@@ -161,11 +168,14 @@ export default function FieldMappingInterface({
         
         if (partialMatch) {
           autoMapping[header] = partialMatch.field_name;
+          autoMapped.add(header);
         }
       });
       
       console.log('Generated auto-mapping:', autoMapping);
+      console.log('Auto-mapped fields:', Array.from(autoMapped));
       setFieldMapping(autoMapping);
+      setAutoMappedFields(autoMapped);
     };
 
     if (tenantId && csvHeaders.length > 0) {
@@ -178,6 +188,15 @@ export default function FieldMappingInterface({
       ...prev,
       [csvHeader]: targetField === '' ? undefined : targetField
     }));
+    
+    // Remove from auto-mapped set if user manually changes it
+    if (autoMappedFields.has(csvHeader)) {
+      setAutoMappedFields(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(csvHeader);
+        return newSet;
+      });
+    }
   };
 
   const handleRemoveMapping = (csvHeader) => {
@@ -186,6 +205,15 @@ export default function FieldMappingInterface({
       delete newMapping[csvHeader];
       return newMapping;
     });
+    
+    // Remove from auto-mapped set
+    if (autoMappedFields.has(csvHeader)) {
+      setAutoMappedFields(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(csvHeader);
+        return newSet;
+      });
+    }
   };
 
   const getRequiredFields = () => {
@@ -204,7 +232,23 @@ export default function FieldMappingInterface({
     return requiredFields.filter(field => !mappedRequiredFields.some(mapped => mapped.field_name === field.field_name));
   };
 
-  const canProceed = () => {
+  // Sort CSV headers: auto-mapped first, then unmapped
+  const sortedHeaders = [...csvHeaders].sort((a, b) => {
+    const aAutoMapped = autoMappedFields.has(a) && fieldMapping[a];
+    const bAutoMapped = autoMappedFields.has(b) && fieldMapping[b];
+    
+    if (aAutoMapped && !bAutoMapped) return -1;
+    if (!aAutoMapped && bAutoMapped) return 1;
+    
+    // Within each group, sort mapped vs unmapped
+    const aMapped = Boolean(fieldMapping[a]);
+    const bMapped = Boolean(fieldMapping[b]);
+    
+    if (aMapped && !bMapped) return -1;
+    if (!aMapped && bMapped) return 1;
+    
+    return 0;
+  });
     const unmappedRequired = getUnmappedRequiredFields();
     const mappedFields = Object.values(fieldMapping).filter(Boolean);
     return unmappedRequired.length === 0 && mappedFields.length > 0;
@@ -271,10 +315,18 @@ export default function FieldMappingInterface({
         </div>
       </div>
 
-      {/* Preview Toggle */}
+      {/* Mapping Stats & Preview Toggle */}
       <div className="flex items-center justify-between">
-        <div className="text-sm text-gray-500">
-          {csvHeaders.length} columns found • {Object.values(fieldMapping).filter(Boolean).length} mapped
+        <div className="flex items-center gap-4 text-sm">
+          <span className="text-gray-500">
+            {csvHeaders.length} columns found • {totalMappedCount} mapped
+          </span>
+          {autoMappedCount > 0 && (
+            <div className="flex items-center gap-1 text-green-700 bg-green-50 px-2 py-1 rounded-full">
+              <Zap className="w-3 h-3" />
+              <span className="text-xs font-medium">{autoMappedCount} auto-mapped</span>
+            </div>
+          )}
         </div>
         <button
           onClick={() => setShowPreview(!showPreview)}
@@ -318,15 +370,45 @@ export default function FieldMappingInterface({
 
       {/* Mapping Interface */}
       <div className="space-y-3 max-h-96 overflow-y-auto">
-        {csvHeaders.map(header => {
+        {sortedHeaders.map((header, index) => {
           const mappedField = fieldMapping[header];
           const targetField = industryFields.find(f => f.field_name === mappedField);
+          const isAutoMapped = autoMappedFields.has(header) && mappedField;
+          const isMapped = Boolean(mappedField);
           
           return (
-            <div key={header} className="flex items-center gap-4 p-3 bg-gray-50 rounded-lg">
+            <div key={header} className={`flex items-center gap-4 p-3 rounded-lg transition-all ${
+              isAutoMapped 
+                ? 'bg-green-50 border-2 border-green-200' 
+                : isMapped 
+                ? 'bg-blue-50 border border-blue-200'
+                : 'bg-gray-50 border border-gray-200'
+            }`}>
+              {/* Status Indicator */}
+              <div className="flex-shrink-0">
+                {isAutoMapped ? (
+                  <div className="flex items-center justify-center w-6 h-6 bg-green-100 rounded-full">
+                    <Zap className="w-3 h-3 text-green-600" />
+                  </div>
+                ) : isMapped ? (
+                  <div className="flex items-center justify-center w-6 h-6 bg-blue-100 rounded-full">
+                    <CheckCircle className="w-3 h-3 text-blue-600" />
+                  </div>
+                ) : (
+                  <div className="w-6 h-6 bg-gray-200 rounded-full" />
+                )}
+              </div>
+
               {/* CSV Column */}
               <div className="flex-1 min-w-0">
-                <div className="font-medium text-gray-900 truncate">{header}</div>
+                <div className="flex items-center gap-2">
+                  <div className="font-medium text-gray-900 truncate">{header}</div>
+                  {isAutoMapped && (
+                    <span className="text-xs bg-green-100 text-green-800 px-1.5 py-0.5 rounded">
+                      Auto
+                    </span>
+                  )}
+                </div>
                 {csvPreviewData && csvPreviewData[0] && (
                   <div className="text-xs text-gray-500 truncate">
                     e.g., "{csvPreviewData[0][header] || 'empty'}"
@@ -335,27 +417,36 @@ export default function FieldMappingInterface({
               </div>
 
               {/* Arrow */}
-              <ArrowRight className="w-4 h-4 text-gray-400 flex-shrink-0" />
+              <ArrowRight className={`w-4 h-4 flex-shrink-0 ${
+                isAutoMapped ? 'text-green-400' : isMapped ? 'text-blue-400' : 'text-gray-400'
+              }`} />
 
               {/* Target Field Selector */}
               <div className="flex-1">
                 <select
                   value={mappedField || ''}
                   onChange={(e) => handleMappingChange(header, e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className={`w-full px-3 py-2 border rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                    isAutoMapped 
+                      ? 'border-green-300 bg-green-50' 
+                      : isMapped 
+                      ? 'border-blue-300 bg-blue-50'
+                      : 'border-gray-300 bg-white'
+                  }`}
                 >
                   <option value="">Don't import this column</option>
-                  {industryFields.map((field, index) => (
-                    <option key={`${field.field_name}-${index}`} value={field.field_name}>
+                  {industryFields.map((field, fieldIndex) => (
+                    <option key={`${field.field_name}-${fieldIndex}`} value={field.field_name}>
                       {field.field_label || field.field_name} {field.is_required ? '*' : ''}
                     </option>
                   ))}
                 </select>
                 
                 {targetField && (
-                  <div className="text-xs text-gray-500 mt-1">
-                    {targetField.field_type} 
-                    {targetField.is_required && <span className="text-red-600 ml-1">• Required</span>}
+                  <div className="text-xs text-gray-500 mt-1 flex items-center gap-2">
+                    <span>{targetField.field_type}</span>
+                    {targetField.is_required && <span className="text-red-600">• Required</span>}
+                    {isAutoMapped && <span className="text-green-600">• Auto-detected</span>}
                   </div>
                 )}
               </div>
@@ -364,7 +455,11 @@ export default function FieldMappingInterface({
               {mappedField && (
                 <button
                   onClick={() => handleRemoveMapping(header)}
-                  className="p-1 text-gray-400 hover:text-red-600 flex-shrink-0"
+                  className={`p-1 flex-shrink-0 transition-colors ${
+                    isAutoMapped 
+                      ? 'text-green-400 hover:text-red-600' 
+                      : 'text-gray-400 hover:text-red-600'
+                  }`}
                   title="Remove mapping"
                 >
                   <X className="w-4 h-4" />
@@ -396,7 +491,8 @@ export default function FieldMappingInterface({
             <div className="flex items-center">
               <Check className="w-4 h-4 text-green-600 mr-2" />
               <p className="text-sm text-green-800">
-                Ready to import! {Object.values(fieldMapping).filter(Boolean).length} fields mapped.
+                Ready to import! {totalMappedCount} fields mapped
+                {autoMappedCount > 0 && ` (${autoMappedCount} auto-detected)`}.
               </p>
             </div>
           </div>
@@ -422,4 +518,3 @@ export default function FieldMappingInterface({
       </div>
     </div>
   );
-}
