@@ -15,7 +15,6 @@ const { fetchAllRecords, fetchRecordById, fetchSettingValue } = require('./src/l
 const { supabase } = require('./src/lib/supabaseService');
 
 // Import routers AFTER environment variables are loaded
-const leadsRouter = require('./src/api_routes/leadRoutes');
 const settingsApiRouter = require('./src/api_routes/settingsApiRoutes');
 const knowledgeBaseRouter = require('./src/api_routes/knowledgeBaseRoutes');
 const funnelRouter = require('./src/api_routes/funnel');
@@ -54,12 +53,11 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
 }));
 
-
+console.log("helo")
 
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use('/api/hot-summary', hotSummaryRoutes);
-app.use('/api/leads', leadsRouter);
 app.use('/api/settings', settingsApiRouter);
 app.use('/api/knowledge', knowledgeBaseRouter);
 app.use('/api/funnel', funnelRouter);
@@ -253,7 +251,7 @@ app.listen(PORT, () => {
 });
 
 // Run website scraper every 2 minutes
-require('./workers/websiteWorker.js');
+require('./workers/websiteWorker');
 
 // Export shared utilities and Supabase client
 module.exports = {
