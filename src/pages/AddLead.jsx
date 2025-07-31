@@ -4,9 +4,9 @@ import {
   Clock, Activity, RefreshCw, Pause, Play, Calendar, BarChart3
 } from 'lucide-react';
 import Papa from 'papaparse';
-import apiClient from '../lib/apiClient';
 import supabase from '../lib/supabaseClient';
 import { useAuth } from '../context/AuthContext';
+import FieldMappingInterface from './FieldMappingInterface';
 
 export default function AddLead({ onSuccess, onCancel }) {
   const { user } = useAuth();
@@ -30,6 +30,12 @@ export default function AddLead({ onSuccess, onCancel }) {
   const [hiddenJobIds, setHiddenJobIds] = useState(new Set());
   const [showAllJobs, setShowAllJobs] = useState(false);
   
+  // Mapping
+  const [showMappingInterface, setShowMappingInterface] = useState(false);
+  const [csvHeaders, setCsvHeaders] = useState([]);
+  const [csvPreviewData, setCsvPreviewData] = useState([]);
+  const [fieldMapping, setFieldMapping] = useState({});
+
   // Form state
   const [campaigns, setCampaigns] = useState([]);
   const [loadingCampaigns, setLoadingCampaigns] = useState(true);
@@ -153,6 +159,23 @@ export default function AddLead({ onSuccess, onCancel }) {
     }
   };
 
+  const handleMappingComplete = (mapping) => {
+  setFieldMapping(mapping);
+  setShowMappingInterface(false);
+  setFileReady(true);
+  setUploadStatus(`✅ Ready to import ${parsedRecords.length} leads with ${Object.keys(mapping).length} mapped fields`);
+};
+
+const handleMappingCancel = () => {
+  setShowMappingInterface(false);
+  setSelectedFile(null);
+  setParsedRecords([]);
+  setCsvHeaders([]);
+  setCsvPreviewData([]);
+  setFieldMapping({});
+  setUploadStatus('');
+};
+
   const handleCreateCampaign = async () => {
     if (!newCampaignName.trim()) {
       alert('Please enter a campaign name');
@@ -215,56 +238,45 @@ export default function AddLead({ onSuccess, onCancel }) {
   };
 
   const handleFileSelect = (file) => {
-    if (!file) return;
-    
-    if (file.type !== 'text/csv' && !file.name.endsWith('.csv')) {
-      setUploadStatus('Please upload a CSV file');
-      setUploadError(true);
-      return;
-    }
+  if (!file) return;
+  
+  if (file.type !== 'text/csv' && !file.name.endsWith('.csv')) {
+    setUploadStatus('Please upload a CSV file');
+    setUploadError(true);
+    return;
+  }
 
-    if (!leadFields || leadFields.length === 0) {
-      alert('Field configuration is still loading. Please try again.');
-      return;
-    }
+  setSelectedFile(file);
+  setUploadStatus('');
+  setUploadError(false);
 
-    setSelectedFile(file);
-    setUploadStatus('');
-    setUploadError(false);
-
-    Papa.parse(file, {
-      header: true,
-      skipEmptyLines: true,
-      complete: (results) => {
-        const labelToFieldMap = {};
-        leadFields.forEach(field => {
-          labelToFieldMap[field.field_label] = field.field_name;
-          labelToFieldMap[field.field_name] = field.field_name;
-        });
-
-        const records = results.data.map((row, index) => {
-          const fields = {};
-          
-          leadFields.forEach(field => {
-            const value = row[field.field_label] || row[field.field_name] || '';
-            fields[field.field_name] = value;
-          });
-
-          console.log(`Record ${index + 1} mapped:`, fields);
-          return { fields };
-        });
-
-        setParsedRecords(records);
-        setFileReady(true);
-        setUploadStatus(`Ready to import ${records.length} leads`);
-      },
-      error: (error) => {
-        console.error('CSV parsing error:', error);
-        setUploadStatus('Error parsing CSV file');
+  Papa.parse(file, {
+    header: true,
+    skipEmptyLines: true,
+    complete: (results) => {
+      if (results.data.length === 0) {
+        setUploadStatus('CSV file appears to be empty');
         setUploadError(true);
+        return;
       }
-    });
-  };
+
+      // Extract headers and preview data
+      const headers = Object.keys(results.data[0] || {});
+      setCsvHeaders(headers);
+      setCsvPreviewData(results.data.slice(0, 5)); // First 5 rows for preview
+      setParsedRecords(results.data); // Keep for later use
+      
+      // Show mapping interface instead of "ready to import"
+      setShowMappingInterface(true);
+      setUploadStatus(`Found ${results.data.length} records. Please map your fields.`);
+    },
+    error: (error) => {
+      console.error('CSV parsing error:', error);
+      setUploadStatus('Error parsing CSV file');
+      setUploadError(true);
+    }
+  });
+};
 
   const [showCreateCampaignBulk, setShowCreateCampaignBulk] = useState(false);
   const [bulkCampaignId, setBulkCampaignId] = useState('');
@@ -300,16 +312,17 @@ export default function AddLead({ onSuccess, onCancel }) {
         .getPublicUrl(fileName);
 
       // Create bulk upload job
-      const { data: jobData, error: jobError } = await supabase
-        .rpc('create_bulk_upload_job', {
-          p_tenant_id: user.tenant_id,
-          p_created_by: user.id,
-          p_file_name: selectedFile.name,
-          p_file_url: publicUrl,
-          p_file_size: selectedFile.size,
-          p_campaign_id: bulkCampaignId || null,
-          p_total_records: parsedRecords.length
-        });
+const { data: jobData, error: jobError } = await supabase
+  .rpc('create_bulk_upload_job', {
+    p_tenant_id: user.tenant_id,
+    p_created_by: user.id,
+    p_file_name: selectedFile.name,
+    p_file_url: publicUrl,
+    p_file_size: selectedFile.size,
+    p_campaign_id: bulkCampaignId || null,
+    p_total_records: parsedRecords.length,
+    p_field_mapping: fieldMapping
+  });
 
       if (jobError) {
         throw new Error(`Failed to create upload job: ${jobError.message}`);
@@ -321,7 +334,10 @@ export default function AddLead({ onSuccess, onCancel }) {
       setParsedRecords([]);
       setFileReady(false);
       setBulkCampaignId('');
-      
+      setFieldMapping({});
+      setCsvHeaders([]);
+      setCsvPreviewData([]);
+      setShowMappingInterface(false);
       // Switch to status tab to show progress
       setActiveTab('status');
       fetchUploadJobs(); // Refresh jobs
@@ -847,75 +863,91 @@ export default function AddLead({ onSuccess, onCancel }) {
                     )}
                   </div>
 
-                  {/* Drop Zone */}
-                  <div
-                    className={`relative border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
-                      dragActive ? 'border-blue-500 bg-blue-50' : 'border-gray-300 hover:border-gray-400'
-                    }`}
-                    onDragEnter={handleDrag}
-                    onDragLeave={handleDrag}
-                    onDragOver={handleDrag}
-                    onDrop={handleDrop}
-                  >
-                    <input
-                      type="file"
-                      accept=".csv"
-                      onChange={(e) => handleFileSelect(e.target.files[0])}
-                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  {showMappingInterface ? (
+                    <FieldMappingInterface
+                      csvHeaders={csvHeaders}
+                      csvPreviewData={csvPreviewData}
+                      tenantId={user?.tenant_id}
+                      onMappingComplete={handleMappingComplete}
+                      onCancel={handleMappingCancel}
                     />
-                    
-                    {selectedFile ? (
-                      <div className="space-y-2">
-                        <FileText className="w-10 h-10 text-blue-600 mx-auto" />
-                        <p className="font-medium text-gray-900">{selectedFile.name}</p>
-                        <p className="text-sm text-gray-500">{(selectedFile.size / 1024).toFixed(1)} KB</p>
-                        <button
-                          onClick={() => {
-                            setSelectedFile(null);
-                            setParsedRecords([]);
-                            setFileReady(false);
-                            setUploadStatus('');
-                          }}
-                          className="text-sm text-red-600 hover:text-red-700"
-                        >
-                          Remove file
-                        </button>
+                  ) : (
+                    <>
+                      {/* Drop Zone */}
+                      <div
+                        className={`relative border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+                          dragActive ? 'border-blue-500 bg-blue-50' : 'border-gray-300 hover:border-gray-400'
+                        }`}
+                        onDragEnter={handleDrag}
+                        onDragLeave={handleDrag}
+                        onDragOver={handleDrag}
+                        onDrop={handleDrop}
+                      >
+                        <input
+                          type="file"
+                          accept=".csv"
+                          onChange={(e) => handleFileSelect(e.target.files[0])}
+                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                        />
+                        
+                        {selectedFile ? (
+                          <div className="space-y-2">
+                            <FileText className="w-10 h-10 text-blue-600 mx-auto" />
+                            <p className="font-medium text-gray-900">{selectedFile.name}</p>
+                            <p className="text-sm text-gray-500">{(selectedFile.size / 1024).toFixed(1)} KB</p>
+                            <button
+                              onClick={() => {
+                                setSelectedFile(null);
+                                setParsedRecords([]);
+                                setFileReady(false);
+                                setUploadStatus('');
+                                setFieldMapping({});
+                                setCsvHeaders([]);
+                                setCsvPreviewData([]);
+                                setShowMappingInterface(false);
+                              }}
+                              className="text-sm text-red-600 hover:text-red-700"
+                            >
+                              Remove file
+                            </button>
+                          </div>
+                        ) : (
+                          <>
+                            <Upload className="w-10 h-10 text-gray-400 mx-auto mb-3" />
+                            <p className="font-medium text-gray-900">Drop your CSV file here</p>
+                            <p className="text-sm text-gray-500">or click to browse</p>
+                          </>
+                        )}
                       </div>
-                    ) : (
-                      <>
-                        <Upload className="w-10 h-10 text-gray-400 mx-auto mb-3" />
-                        <p className="font-medium text-gray-900">Drop your CSV file here</p>
-                        <p className="text-sm text-gray-500">or click to browse</p>
-                      </>
-                    )}
-                  </div>
 
-                  {/* Status Messages */}
-                  {uploadStatus && (
-                    <div className={`p-3 rounded-lg flex items-center text-sm ${
-                      uploadError 
-                        ? 'bg-red-50 text-red-800' 
-                        : 'bg-green-50 text-green-800'
-                    }`}>
-                      {uploadError ? (
-                        <AlertCircle className="w-4 h-4 mr-2" />
-                      ) : (
-                        <CheckCircle2 className="w-4 h-4 mr-2" />
+                      {/* Status Messages */}
+                      {uploadStatus && (
+                        <div className={`p-3 rounded-lg flex items-center text-sm ${
+                          uploadError 
+                            ? 'bg-red-50 text-red-800' 
+                            : 'bg-green-50 text-green-800'
+                        }`}>
+                          {uploadError ? (
+                            <AlertCircle className="w-4 h-4 mr-2" />
+                          ) : (
+                            <CheckCircle2 className="w-4 h-4 mr-2" />
+                          )}
+                          {uploadStatus}
+                        </div>
                       )}
-                      {uploadStatus}
-                    </div>
-                  )}
 
-                  {/* Preview */}
-                  {parsedRecords.length > 0 && (
-                    <div className="bg-gray-50 rounded-lg p-4">
-                      <p className="text-sm font-medium text-gray-700 mb-2">
-                        Preview: {parsedRecords.length} records ready to import
-                      </p>
-                      <div className="text-xs text-gray-600">
-                        Fields detected: {Object.keys(parsedRecords[0]?.fields || {}).join(', ')}
-                      </div>
-                    </div>
+                      {/* Preview */}
+                      {parsedRecords.length > 0 && fileReady && (
+                        <div className="bg-gray-50 rounded-lg p-4">
+                          <p className="text-sm font-medium text-gray-700 mb-2">
+                            Ready to import: {parsedRecords.length} records
+                          </p>
+                          <div className="text-xs text-gray-600">
+                            Mapped fields: {Object.keys(fieldMapping).length > 0 ? Object.values(fieldMapping).join(', ') : 'None'}
+                          </div>
+                        </div>
+                      )}
+                    </>
                   )}
 
                   {/* Guidelines */}
@@ -1195,7 +1227,7 @@ export default function AddLead({ onSuccess, onCancel }) {
               ) : activeTab === 'bulk' ? (
                 <button
                   onClick={handleBulkSubmit}
-                  disabled={!fileReady || isUploading || !bulkCampaignId}
+                  disabled={!fileReady || isUploading || !bulkCampaignId || Object.keys(fieldMapping).length === 0}
                   className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
                 >
                   {isUploading ? (
