@@ -396,23 +396,12 @@ const CampaignCard = ({
           {showDynamicColumn && (
             <div className="space-y-2">
               <label className="block text-sm font-medium text-gray-700">{getDynamicColumnHeader()}</label>
-              <select
-                value={
-                  campaign.talk_track || 
-                  campaign.service_type || 
-                  campaign.vehicle_type || 
-                  ''
-                }
-                onChange={(e) => updateCampaignDynamicField(campaign.id, e.target.value || null)}
-                className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              >
-                <option value="">Select {getDynamicColumnHeader().toLowerCase()}...</option>
-                {getDynamicDropdownOptions().map(option => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
+              <DynamicFieldComponent
+                campaign={campaign}
+                tenantIndustry={tenantIndustry}
+                getDynamicDropdownOptions={getDynamicDropdownOptions}
+                updateCampaignDynamicField={updateCampaignDynamicField}
+              />
             </div>
           )}
 
@@ -490,6 +479,72 @@ const CampaignCard = ({
         </div>
       )}
     </div>
+  );
+};
+
+const DynamicFieldComponent = ({ campaign, tenantIndustry, getDynamicDropdownOptions, updateCampaignDynamicField }) => {
+  if (tenantIndustry === 'Staffing') {
+    const options = getDynamicDropdownOptions();
+    
+    return (
+      <div className="space-y-2">
+        {/* Parent Dropdown */}
+        <div>
+          <select
+            value={campaign.talk_track_type || ''}
+            onChange={(e) => updateCampaignDynamicField(campaign.id, 'parent', e.target.value || null)}
+            className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          >
+            <option value="">Select approach...</option>
+            {options.parentOptions.map(option => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </div>
+        
+        {/* Child Dropdown - Only show if parent is selected */}
+        {campaign.talk_track_type && (
+          <div>
+            <select
+              value={campaign.talk_track_specialty || ''}
+              onChange={(e) => updateCampaignDynamicField(campaign.id, 'child', e.target.value || null)}
+              className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            >
+              <option value="">Select specialty...</option>
+              {options.childOptions.map(option => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+      </div>
+    );
+  }
+  
+  // For non-Staffing industries, use single dropdown
+  const options = getDynamicDropdownOptions();
+  return (
+    <select
+      value={
+        campaign.talk_track || 
+        campaign.service_type || 
+        campaign.vehicle_type || 
+        ''
+      }
+      onChange={(e) => updateCampaignDynamicField(campaign.id, 'single', e.target.value || null)}
+      className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+    >
+      <option value="">Select...</option>
+      {options.map(option => (
+        <option key={option.value} value={option.value}>
+          {option.label}
+        </option>
+      ))}
+    </select>
   );
 };
 
@@ -654,24 +709,28 @@ const getDynamicColumnHeader = () => {
 };
 
   // Get the dynamic dropdown options based on industry
-  const getDynamicDropdownOptions = () => {
+  // REPLACE THIS ENTIRE FUNCTION
+const getDynamicDropdownOptions = () => {
   switch (tenantIndustry) {
     case 'Staffing':
+      return {
+        parentOptions: [
+          { value: 'recruiting_candidates', label: 'Recruiting Candidates (B2C)' },
+          { value: 'acquiring_clients', label: 'Acquiring Clients (B2B)' }
+        ],
+        childOptions: [
+          { value: 'healthcare', label: 'Healthcare' },
+          { value: 'tech', label: 'Tech/IT' },
+          { value: 'industrial', label: 'Industrial/Manufacturing' },
+          { value: 'executive', label: 'Executive Search' }
+        ]
+      };
+    case 'Real Estate':
       return [
-        { value: 'recruiting_candidates', label: 'Recruiting Candidates (B2C)' },
-        { value: 'acquiring_clients', label: 'Acquiring Clients (B2B)' }
-      ];
-    case 'Real Estate':               // ← ADD THIS ENTIRE BLOCK
-      return [
-        // Transaction Type
         { value: 'seller_leads', label: 'Seller Leads' },
         { value: 'buyer_leads', label: 'Buyer Leads' },
-        
-        // Business Model
         { value: 'traditional_sales', label: 'Traditional Sales' },
         { value: 'investment_buying', label: 'Investment/Wholesale Buying' },
-        
-        // Lead Source
         { value: 'expired_listings', label: 'Expired Listings' },
         { value: 'fsbo_leads', label: 'FSBO (For Sale By Owner)' }
       ];
@@ -771,38 +830,50 @@ const getDynamicColumnHeader = () => {
 
   // Update campaign dynamic field
   // Update campaign dynamic field
-const updateCampaignDynamicField = async (campaignId, value) => {
+// REPLACE THIS ENTIRE FUNCTION
+const updateCampaignDynamicField = async (campaignId, field, value) => {
   try {
-    // Determine which field to update based on industry
-    let fieldName = '';
-    switch (tenantIndustry) {
-      case 'Staffing':
-        fieldName = 'talk_track';
-        break;
-      case 'Real Estate':          // ← ADD THIS
-        fieldName = 'talk_track';   // ← ADD THIS
-        break;
-      case 'Home Services':
-      case 'Financial Services':
-      case 'Mortgage Lending':
-        fieldName = 'service_type';
-        break;
-      case 'Auto Sales':
-        fieldName = 'vehicle_type';
-        break;
-      default:
-        return;
+    let updateData = {};
+    
+    if (tenantIndustry === 'Staffing') {
+      // For Staffing, handle parent-child structure
+      if (field === 'parent') {
+        updateData.talk_track_type = value;
+        // Reset child when parent changes
+        updateData.talk_track_specialty = null;
+      } else if (field === 'child') {
+        updateData.talk_track_specialty = value;
+      }
+    } else {
+      // For other industries, use existing single field logic
+      let fieldName = '';
+      switch (tenantIndustry) {
+        case 'Real Estate':
+          fieldName = 'talk_track';
+          break;
+        case 'Home Services':
+        case 'Financial Services':
+        case 'Mortgage Lending':
+          fieldName = 'service_type';
+          break;
+        case 'Auto Sales':
+          fieldName = 'vehicle_type';
+          break;
+        default:
+          return;
+      }
+      updateData[fieldName] = value;
     }
 
     const { error } = await supabase
       .from('campaigns')
-      .update({ [fieldName]: value })
+      .update(updateData)
       .eq('id', campaignId);
 
     if (error) throw error;
 
     setCampaigns(campaigns.map(c => 
-      c.id === campaignId ? { ...c, [fieldName]: value } : c
+      c.id === campaignId ? { ...c, ...updateData } : c
     ));
     
     setError('');
@@ -859,6 +930,8 @@ const updateCampaignDynamicField = async (campaignId, value) => {
             assigned_to_sales_team_id,
             phone_number_id,
             talk_track,
+            talk_track_type,
+            talk_track_specialty,
             service_type,
             vehicle_type,
             phone_numbers (
@@ -1659,23 +1732,12 @@ useEffect(() => {
                     {/* Dynamic Dropdown Cell */}
                     {showDynamicColumn && (
                       <td className="px-6 py-4">
-                        <select
-                          value={
-                            campaign.talk_track || 
-                            campaign.service_type || 
-                            campaign.vehicle_type || 
-                            ''
-                          }
-                          onChange={(e) => updateCampaignDynamicField(campaign.id, e.target.value || null)}
-                          className="text-sm border border-gray-300 rounded-lg px-2 py-1 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 w-full"
-                        >
-                          <option value="">Select {getDynamicColumnHeader().toLowerCase()}...</option>
-                          {getDynamicDropdownOptions().map(option => (
-                            <option key={option.value} value={option.value}>
-                              {option.label}
-                            </option>
-                          ))}
-                        </select>
+                        <DynamicFieldComponent
+                          campaign={campaign}
+                          tenantIndustry={tenantIndustry}
+                          getDynamicDropdownOptions={getDynamicDropdownOptions}
+                          updateCampaignDynamicField={updateCampaignDynamicField}
+                        />
                       </td>
                     )}
                     {/* Knowledge Assets Multi-Select */}

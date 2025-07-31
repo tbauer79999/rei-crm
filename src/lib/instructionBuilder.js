@@ -33,17 +33,56 @@ function getRoleDescription(role, industry) {
   return '';
 }
 
-function getCampaignStrategy({ industry, service_type, talk_track, vehicle_type }) {
-  if (industry === 'Staffing') {
-    if (talk_track === 'recruiting_candidates') {  // ← Fixed to match UI value
+function getCampaignStrategy({ industry, service_type, talk_track, vehicle_type, talk_track_type, talk_track_specialty }) {
+  if (industry === 'Staffing' && talk_track_type && talk_track_specialty) {
+    // Parent-Child structure for Staffing
+    const isRecruiting = talk_track_type === 'recruiting_candidates';
+    const isAcquiring = talk_track_type === 'acquiring_clients';
+    
+    if (isRecruiting && talk_track_specialty === 'healthcare') {
+      return "This campaign recruits healthcare candidates. Focus on certifications, shift flexibility, patient care experience, and licensing requirements. Mention specific healthcare roles, pay rates, and benefits when relevant.";
+    }
+    
+    if (isRecruiting && talk_track_specialty === 'tech') {
+      return "This campaign recruits tech/IT candidates. Emphasize skills, remote work options, project experience, and growth opportunities. Reference specific technologies, frameworks, and career advancement.";
+    }
+    
+    if (isRecruiting && talk_track_specialty === 'industrial') {
+      return "This campaign recruits industrial/manufacturing candidates. Focus on safety certifications, shift work, hands-on experience, and equipment familiarity. Mention specific roles and hourly rates.";
+    }
+    
+    if (isRecruiting && talk_track_specialty === 'executive') {
+      return "This campaign recruits executive-level candidates. Focus on leadership experience, strategic thinking, and career advancement. Be professional and emphasize confidentiality and high-level opportunities.";
+    }
+    
+    if (isAcquiring && talk_track_specialty === 'healthcare') {
+      return "This campaign targets healthcare clients who need staffing help. Emphasize your healthcare talent pipeline, compliance expertise, quick placements for critical roles, and understanding of healthcare regulations.";
+    }
+    
+    if (isAcquiring && talk_track_specialty === 'tech') {
+      return "This campaign targets tech companies needing IT talent. Highlight your tech talent network, understanding of technical requirements, and ability to find specialized skills quickly.";
+    }
+    
+    if (isAcquiring && talk_track_specialty === 'industrial') {
+      return "This campaign targets manufacturing/industrial clients. Emphasize your blue-collar talent pool, safety-trained workers, and understanding of industrial operations and requirements.";
+    }
+    
+    if (isAcquiring && talk_track_specialty === 'executive') {
+      return "This campaign targets companies needing executive-level talent. Focus on your executive search capabilities, confidential recruiting process, and track record with C-level placements.";
+    }
+  }
+  
+  // Fallback for old single talk_track field (backward compatibility)
+  if (industry === 'Staffing' && talk_track) {
+    if (talk_track === 'recruiting_candidates') {
       return "This campaign is focused on recruiting candidates for open roles. Messages should check for interest, qualifications, and timing. Proactively share specific job opportunities when relevant.";
     }
-    if (talk_track === 'acquiring_clients') {  // ← Fixed to match UI value
+    if (talk_track === 'acquiring_clients') {
       return "This campaign is focused on signing new business clients who need staffing help. Messaging should build credibility and invite a call. When clients ask about capabilities, provide specific examples from your knowledge base.";
     }
   }
 
-  // ADD Real Estate talk tracks
+  // Real Estate and other industries (unchanged)
   if (industry === 'Real Estate') {
     if (talk_track === 'seller_leads') {
       return "This campaign targets homeowners looking to sell. Focus on market conditions, home value, and making the selling process feel simple and profitable.";
