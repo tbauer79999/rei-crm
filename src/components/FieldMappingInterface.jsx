@@ -20,8 +20,7 @@ useEffect(() => {
   if (Object.keys(fieldMapping).length > 0) {
     localStorage.setItem('draft_field_mapping', JSON.stringify({
       fieldMapping,
-      csvHeaders,
-      fileName: selectedFile?.name || 'current_upload'
+      csvHeaders
     }));
   }
 }, [fieldMapping, csvHeaders]);
