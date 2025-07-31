@@ -65,7 +65,7 @@ export default function FieldMappingInterface({
           .eq('id', tenantId)
           .single();
           
-        console.log('🏢 Tenant query result:', { tenant, error: tenantError, timestamp });
+        console.log('🏢 Tenant query result:', { tenant, error: tenantError });
         
         setDebugInfo(prev => ({ ...prev, tenantData: tenant }));
         
