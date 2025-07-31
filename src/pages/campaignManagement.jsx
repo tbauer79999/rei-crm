@@ -634,64 +634,81 @@ export default function CampaignManagement() {
     }
   };
 
-  // Get the dynamic column header based on industry
-  const getDynamicColumnHeader = () => {
-    switch (tenantIndustry) {
-      case 'Staffing':
-        return 'Talk Track';
-      case 'Home Services':
-      case 'Financial Services':
-      case 'Mortgage Lending':
-        return 'Service Type';
-      case 'Auto Sales':
-        return 'Vehicle Type';
-      default:
-        return null;
-    }
-  };
+
+// Get the dynamic column header based on industry
+const getDynamicColumnHeader = () => {
+  switch (tenantIndustry) {
+    case 'Staffing':
+      return 'Talk Track';
+    case 'Real Estate':               // ← ADD THIS
+      return 'Talk Track';            // ← ADD THIS
+    case 'Home Services':
+    case 'Financial Services':
+    case 'Mortgage Lending':
+      return 'Service Type';
+    case 'Auto Sales':
+      return 'Vehicle Type';
+    default:
+      return null;
+  }
+};
 
   // Get the dynamic dropdown options based on industry
   const getDynamicDropdownOptions = () => {
-    switch (tenantIndustry) {
-      case 'Staffing':
-        return [
-          { value: 'recruiting_candidates', label: 'Recruiting Candidates (B2C)' },
-          { value: 'acquiring_clients', label: 'Acquiring Clients (B2B)' }
-        ];
-      case 'Home Services':
-        return [
-          { value: 'hvac', label: 'HVAC' },
-          { value: 'roofing', label: 'Roofing' },
-          { value: 'solar', label: 'Solar' },
-          { value: 'lawn_care', label: 'Lawn Care' },
-          { value: 'plumbing', label: 'Plumbing' },
-          { value: 'other', label: 'Other' }
-        ];
-      case 'Financial Services':
-        return [
-          { value: 'mortgage_lending', label: 'Mortgage Lending' },
-          { value: 'insurance', label: 'Insurance' },
-          { value: 'credit_repair', label: 'Credit Repair' },
-          { value: 'tax_relief', label: 'Tax Relief' }
-        ];
-      case 'Auto Sales':
-        return [
-          { value: 'new_cars', label: 'New Cars' },
-          { value: 'used_cars', label: 'Used Cars' },
-          { value: 'lease_offers', label: 'Lease Offers' },
-          { value: 'trade_in_leads', label: 'Trade-In Leads' }
-        ];
-      case 'Mortgage Lending':
-        return [
-          { value: 'purchase', label: 'Purchase' },
-          { value: 'refinance', label: 'Refinance' },
-          { value: 'heloc', label: 'HELOC' },
-          { value: 'pre_approval', label: 'Pre-Approval' }
-        ];
-      default:
-        return [];
-    }
-  };
+  switch (tenantIndustry) {
+    case 'Staffing':
+      return [
+        { value: 'recruiting_candidates', label: 'Recruiting Candidates (B2C)' },
+        { value: 'acquiring_clients', label: 'Acquiring Clients (B2B)' }
+      ];
+    case 'Real Estate':               // ← ADD THIS ENTIRE BLOCK
+      return [
+        // Transaction Type
+        { value: 'seller_leads', label: 'Seller Leads' },
+        { value: 'buyer_leads', label: 'Buyer Leads' },
+        
+        // Business Model
+        { value: 'traditional_sales', label: 'Traditional Sales' },
+        { value: 'investment_buying', label: 'Investment/Wholesale Buying' },
+        
+        // Lead Source
+        { value: 'expired_listings', label: 'Expired Listings' },
+        { value: 'fsbo_leads', label: 'FSBO (For Sale By Owner)' }
+      ];
+    case 'Home Services':
+      return [
+        { value: 'hvac', label: 'HVAC' },
+        { value: 'roofing', label: 'Roofing' },
+        { value: 'solar', label: 'Solar' },
+        { value: 'lawn_care', label: 'Lawn Care' },
+        { value: 'plumbing', label: 'Plumbing' },
+        { value: 'other', label: 'Other' }
+      ];
+    case 'Financial Services':
+      return [
+        { value: 'mortgage_lending', label: 'Mortgage Lending' },
+        { value: 'insurance', label: 'Insurance' },
+        { value: 'credit_repair', label: 'Credit Repair' },
+        { value: 'tax_relief', label: 'Tax Relief' }
+      ];
+    case 'Auto Sales':
+      return [
+        { value: 'new_cars', label: 'New Cars' },
+        { value: 'used_cars', label: 'Used Cars' },
+        { value: 'lease_offers', label: 'Lease Offers' },
+        { value: 'trade_in_leads', label: 'Trade-In Leads' }
+      ];
+    case 'Mortgage Lending':
+      return [
+        { value: 'purchase', label: 'Purchase' },
+        { value: 'refinance', label: 'Refinance' },
+        { value: 'heloc', label: 'HELOC' },
+        { value: 'pre_approval', label: 'Pre-Approval' }
+      ];
+    default:
+      return [];
+  }
+};
 
   // Update campaign assignment
   const updateCampaignAssignment = async (campaignId, salesTeamId) => {
@@ -1285,7 +1302,14 @@ useEffect(() => {
   const activeCampaigns = campaigns.filter(c => c.is_active === true && c.ai_on === true).length;
 
   // Check if we should show the dynamic column
-  const showDynamicColumn = ['Staffing', 'Home Services', 'Financial Services', 'Auto Sales', 'Mortgage Lending'].includes(tenantIndustry);
+  const showDynamicColumn = [
+  'Staffing', 
+  'Real Estate',        // ← ADD THIS
+  'Home Services', 
+  'Financial Services', 
+  'Auto Sales', 
+  'Mortgage Lending'
+].includes(tenantIndustry);
 
   if (loading) {
     return (
