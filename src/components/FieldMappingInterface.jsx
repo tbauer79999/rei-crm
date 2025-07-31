@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowRight, Check, X, AlertCircle, Eye, EyeOff } from 'lucide-react';
+import { ArrowRight, Check, X, AlertCircle, Eye, EyeOff, Loader2 } from 'lucide-react';
 import supabase from '../lib/supabaseClient';
 
 export default function FieldMappingInterface({ 
@@ -15,32 +15,14 @@ export default function FieldMappingInterface({
   const [fieldMapping, setFieldMapping] = useState({});
   const [showPreview, setShowPreview] = useState(false);
   
-  // Save mapping state to localStorage
-useEffect(() => {
-  if (Object.keys(fieldMapping).length > 0) {
-    localStorage.setItem('draft_field_mapping', JSON.stringify({
-      fieldMapping,
-      csvHeaders
-    }));
-  }
-}, [fieldMapping, csvHeaders]);
-
-// Restore on component mount
-useEffect(() => {
-  const draft = localStorage.getItem('draft_field_mapping');
-  if (draft && csvHeaders.length > 0) {
-    const parsed = JSON.parse(draft);
-    if (parsed.fieldMapping) {
-      setFieldMapping(parsed.fieldMapping);
-    }
-  }
-}, [csvHeaders]);
-
   // Fetch industry field templates for the tenant
   useEffect(() => {
     const fetchIndustryFields = async () => {
       try {
         setLoading(true);
+        setError('');
+        
+        console.log('Fetching fields for tenant:', tenantId);
         
         // First get the tenant's industry_id
         const { data: tenant, error: tenantError } = await supabase
@@ -49,8 +31,15 @@ useEffect(() => {
           .eq('id', tenantId)
           .single();
           
-        if (tenantError || !tenant?.industry_id) {
-          throw new Error('Industry not configured for your account. Please contact support.');
+        console.log('Tenant data:', tenant);
+        
+        if (tenantError) {
+          console.error('Tenant error:', tenantError);
+          throw new Error(`Failed to fetch tenant info: ${tenantError.message}`);
+        }
+        
+        if (!tenant?.industry_id) {
+          throw new Error('No industry configured for your account. Please set up your industry in settings.');
         }
         
         // Get field templates for this industry
@@ -60,9 +49,59 @@ useEffect(() => {
           .eq('industry_id', tenant.industry_id)
           .order('display_order');
           
-        if (fieldsError) throw fieldsError;
+        console.log('Industry fields:', fields);
         
-        setIndustryFields(fields || []);
+        if (fieldsError) {
+          console.error('Fields error:', fieldsError);
+          throw new Error(`Failed to load field templates: ${fieldsError.message}`);
+        }
+        
+        if (!fields || fields.length === 0) {
+          throw new Error('No field templates found for your industry. Please contact support.');
+        }
+        
+        setIndustryFields(fields);
+        
+        // Auto-suggest mappings
+        const autoMapping = {};
+        csvHeaders.forEach(header => {
+          const normalizedHeader = header.toLowerCase().trim();
+          
+          // Try exact matches first
+          const exactMatch = fields.find(field => 
+            field.field_name.toLowerCase() === normalizedHeader ||
+            field.field_label.toLowerCase() === normalizedHeader
+          );
+          
+          if (exactMatch) {
+            autoMapping[header] = exactMatch.field_name;
+            return;
+          }
+          
+          // Try partial matches
+          const partialMatch = fields.find(field => {
+            const fieldName = field.field_name.toLowerCase();
+            const fieldLabel = field.field_label.toLowerCase();
+            
+            return (
+              normalizedHeader.includes(fieldName) ||
+              fieldName.includes(normalizedHeader) ||
+              normalizedHeader.includes(fieldLabel.split(' ')[0].toLowerCase()) ||
+              // Common variations
+              (normalizedHeader.includes('name') && fieldName === 'name') ||
+              (normalizedHeader.includes('phone') && fieldName === 'phone') ||
+              (normalizedHeader.includes('email') && fieldName === 'email') ||
+              (normalizedHeader.includes('address') && fieldName.includes('address'))
+            );
+          });
+          
+          if (partialMatch) {
+            autoMapping[header] = partialMatch.field_name;
+          }
+        });
+        
+        setFieldMapping(autoMapping);
+        
       } catch (err) {
         console.error('Error fetching industry fields:', err);
         setError(err.message);
@@ -71,62 +110,15 @@ useEffect(() => {
       }
     };
 
-    if (tenantId) {
+    if (tenantId && csvHeaders.length > 0) {
       fetchIndustryFields();
     }
-  }, [tenantId]);
-
-  // Auto-suggest mappings based on field names/labels
-  useEffect(() => {
-    if (industryFields.length > 0 && csvHeaders.length > 0) {
-      const autoMapping = {};
-      
-      csvHeaders.forEach(header => {
-        const normalizedHeader = header.toLowerCase().trim();
-        
-        // Try to find exact matches first
-        const exactMatch = industryFields.find(field => 
-          field.field_name.toLowerCase() === normalizedHeader ||
-          field.field_label.toLowerCase() === normalizedHeader
-        );
-        
-        if (exactMatch) {
-          autoMapping[header] = exactMatch.field_name;
-          return;
-        }
-        
-        // Try partial matches for common variations
-        const partialMatch = industryFields.find(field => {
-          const fieldName = field.field_name.toLowerCase();
-          const fieldLabel = field.field_label.toLowerCase();
-          
-          return (
-            normalizedHeader.includes(fieldName) ||
-            fieldName.includes(normalizedHeader) ||
-            normalizedHeader.includes(fieldLabel.split(' ')[0].toLowerCase()) ||
-            // Common variations
-            (normalizedHeader.includes('name') && fieldName === 'name') ||
-            (normalizedHeader.includes('phone') && fieldName === 'phone') ||
-            (normalizedHeader.includes('email') && fieldName === 'email') ||
-            (normalizedHeader.includes('address') && fieldName.includes('address')) ||
-            (normalizedHeader.includes('company') && fieldName === 'company') ||
-            (normalizedHeader.includes('status') && fieldName === 'status')
-          );
-        });
-        
-        if (partialMatch) {
-          autoMapping[header] = partialMatch.field_name;
-        }
-      });
-      
-      setFieldMapping(autoMapping);
-    }
-  }, [industryFields, csvHeaders]);
+  }, [tenantId, csvHeaders]);
 
   const handleMappingChange = (csvHeader, targetField) => {
     setFieldMapping(prev => ({
       ...prev,
-      [csvHeader]: targetField
+      [csvHeader]: targetField === '' ? undefined : targetField
     }));
   };
 
@@ -144,24 +136,29 @@ useEffect(() => {
 
   const getMappedRequiredFields = () => {
     const requiredFields = getRequiredFields();
-    const mappedFieldNames = Object.values(fieldMapping);
+    const mappedFieldNames = Object.values(fieldMapping).filter(Boolean);
     return requiredFields.filter(field => mappedFieldNames.includes(field.field_name));
   };
 
   const getUnmappedRequiredFields = () => {
     const requiredFields = getRequiredFields();
     const mappedRequiredFields = getMappedRequiredFields();
-    return requiredFields.filter(field => !mappedRequiredFields.includes(field));
+    return requiredFields.filter(field => !mappedRequiredFields.some(mapped => mapped.field_name === field.field_name));
   };
 
   const canProceed = () => {
     const unmappedRequired = getUnmappedRequiredFields();
-    return unmappedRequired.length === 0 && Object.keys(fieldMapping).length > 0;
+    const mappedFields = Object.values(fieldMapping).filter(Boolean);
+    return unmappedRequired.length === 0 && mappedFields.length > 0;
   };
 
   const handleContinue = () => {
     if (canProceed()) {
-      onMappingComplete(fieldMapping);
+      // Filter out empty mappings
+      const cleanMapping = Object.fromEntries(
+        Object.entries(fieldMapping).filter(([_, value]) => value)
+      );
+      onMappingComplete(cleanMapping);
     }
   };
 
@@ -169,7 +166,7 @@ useEffect(() => {
     return (
       <div className="flex items-center justify-center py-12">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <Loader2 className="w-8 h-8 animate-spin text-blue-600 mx-auto mb-4" />
           <p className="text-gray-600">Loading field configuration...</p>
         </div>
       </div>
@@ -179,13 +176,24 @@ useEffect(() => {
   if (error) {
     return (
       <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-        <div className="flex items-center">
-          <AlertCircle className="w-5 h-5 text-red-600 mr-2" />
-          <p className="text-red-800">{error}</p>
+        <div className="flex items-start">
+          <AlertCircle className="w-5 h-5 text-red-600 mr-3 mt-0.5 flex-shrink-0" />
+          <div>
+            <h4 className="text-sm font-medium text-red-800">Configuration Error</h4>
+            <p className="text-sm text-red-700 mt-1">{error}</p>
+            <button
+              onClick={onCancel}
+              className="mt-3 text-sm text-red-600 hover:text-red-700 underline"
+            >
+              Go back and try again
+            </button>
+          </div>
         </div>
       </div>
     );
   }
+
+  console.log('Rendering with industryFields:', industryFields.length, 'fields');
 
   return (
     <div className="space-y-6">
@@ -195,12 +203,15 @@ useEffect(() => {
         <p className="text-sm text-gray-600">
           Match your CSV columns to the appropriate fields. Required fields are marked with *.
         </p>
+        <p className="text-xs text-gray-500 mt-1">
+          Found {industryFields.length} available fields for your industry
+        </p>
       </div>
 
       {/* Preview Toggle */}
       <div className="flex items-center justify-between">
         <div className="text-sm text-gray-500">
-          {csvHeaders.length} columns found • {Object.keys(fieldMapping).length} mapped
+          {csvHeaders.length} columns found • {Object.values(fieldMapping).filter(Boolean).length} mapped
         </div>
         <button
           onClick={() => setShowPreview(!showPreview)}
@@ -215,23 +226,29 @@ useEffect(() => {
       {showPreview && csvPreviewData && csvPreviewData.length > 0 && (
         <div className="bg-gray-50 rounded-lg p-4 max-h-48 overflow-auto">
           <h4 className="text-sm font-medium text-gray-700 mb-2">First 3 rows:</h4>
-          <div className="text-xs">
-            <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${csvHeaders.length}, minmax(100px, 1fr))` }}>
-              {/* Headers */}
-              {csvHeaders.map(header => (
-                <div key={header} className="font-medium text-gray-900 truncate">
-                  {header}
-                </div>
-              ))}
-              {/* Data rows */}
-              {csvPreviewData.slice(0, 3).map((row, idx) => 
-                csvHeaders.map(header => (
-                  <div key={`${idx}-${header}`} className="text-gray-600 truncate">
-                    {row[header] || '—'}
-                  </div>
-                ))
-              )}
-            </div>
+          <div className="text-xs overflow-x-auto">
+            <table className="min-w-full">
+              <thead>
+                <tr>
+                  {csvHeaders.map(header => (
+                    <th key={header} className="text-left font-medium text-gray-900 px-2 py-1 border-b">
+                      {header}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {csvPreviewData.slice(0, 3).map((row, idx) => (
+                  <tr key={idx}>
+                    {csvHeaders.map(header => (
+                      <td key={header} className="text-gray-600 px-2 py-1 border-b">
+                        {row[header] || '—'}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       )}
@@ -316,7 +333,7 @@ useEffect(() => {
             <div className="flex items-center">
               <Check className="w-4 h-4 text-green-600 mr-2" />
               <p className="text-sm text-green-800">
-                Ready to import! {Object.keys(fieldMapping).length} fields mapped.
+                Ready to import! {Object.values(fieldMapping).filter(Boolean).length} fields mapped.
               </p>
             </div>
           </div>
