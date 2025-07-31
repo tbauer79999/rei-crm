@@ -120,7 +120,7 @@ export default function Dashboard() {
         const { data, error } = await supabase
           .from('lead_field_config')
           .select('*')
-          .eq('tenant_id', user.tenant_id)
+          .eq('industry_id', user.industry_id)
           .order('field_name');
 
         if (!error && data && data.length > 0) {
