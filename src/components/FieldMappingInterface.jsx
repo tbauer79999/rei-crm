@@ -15,6 +15,28 @@ export default function FieldMappingInterface({
   const [fieldMapping, setFieldMapping] = useState({});
   const [showPreview, setShowPreview] = useState(false);
   
+  // Save mapping state to localStorage
+useEffect(() => {
+  if (Object.keys(fieldMapping).length > 0) {
+    localStorage.setItem('draft_field_mapping', JSON.stringify({
+      fieldMapping,
+      csvHeaders,
+      fileName: selectedFile?.name || 'current_upload'
+    }));
+  }
+}, [fieldMapping, csvHeaders]);
+
+// Restore on component mount
+useEffect(() => {
+  const draft = localStorage.getItem('draft_field_mapping');
+  if (draft && csvHeaders.length > 0) {
+    const parsed = JSON.parse(draft);
+    if (parsed.fieldMapping) {
+      setFieldMapping(parsed.fieldMapping);
+    }
+  }
+}, [csvHeaders]);
+
   // Fetch industry field templates for the tenant
   useEffect(() => {
     const fetchIndustryFields = async () => {

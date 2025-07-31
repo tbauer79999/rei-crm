@@ -167,6 +167,7 @@ export default function AddLead({ onSuccess, onCancel }) {
 };
 
 const handleMappingCancel = () => {
+  localStorage.removeItem('draft_field_mapping'); // ADD THIS LINE
   setShowMappingInterface(false);
   setSelectedFile(null);
   setParsedRecords([]);
