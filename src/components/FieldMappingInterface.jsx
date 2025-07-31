@@ -15,6 +15,20 @@ export default function FieldMappingInterface({
   const [fieldMapping, setFieldMapping] = useState({});
   const [showPreview, setShowPreview] = useState(false);
   
+  // Fallback fields if database doesn't have proper templates
+  const defaultFields = [
+    { field_name: 'name', field_label: 'Full Name', field_type: 'text', is_required: true, display_order: 1 },
+    { field_name: 'phone', field_label: 'Phone Number', field_type: 'phone', is_required: true, display_order: 2 },
+    { field_name: 'email', field_label: 'Email Address', field_type: 'email', is_required: false, display_order: 3 },
+    { field_name: 'property_address', field_label: 'Property Address', field_type: 'text', is_required: false, display_order: 4 },
+    { field_name: 'status', field_label: 'Lead Status', field_type: 'select', is_required: false, display_order: 5 },
+    { field_name: 'company_name', field_label: 'Company Name', field_type: 'text', is_required: false, display_order: 6 },
+    { field_name: 'notes', field_label: 'Notes', field_type: 'textarea', is_required: false, display_order: 7 },
+    { field_name: 'source', field_label: 'Lead Source', field_type: 'text', is_required: false, display_order: 8 },
+    { field_name: 'budget', field_label: 'Budget', field_type: 'number', is_required: false, display_order: 9 },
+    { field_name: 'timeline', field_label: 'Timeline', field_type: 'text', is_required: false, display_order: 10 }
+  ];
+  
   // Fetch industry field templates for the tenant
   useEffect(() => {
     const fetchIndustryFields = async () => {
@@ -35,11 +49,17 @@ export default function FieldMappingInterface({
         
         if (tenantError) {
           console.error('Tenant error:', tenantError);
-          throw new Error(`Failed to fetch tenant info: ${tenantError.message}`);
+          console.log('Using default fields due to tenant error');
+          setIndustryFields(defaultFields);
+          generateAutoMapping(defaultFields);
+          return;
         }
         
         if (!tenant?.industry_id) {
-          throw new Error('No industry configured for your account. Please set up your industry in settings.');
+          console.log('No industry_id found, using default fields');
+          setIndustryFields(defaultFields);
+          generateAutoMapping(defaultFields);
+          return;
         }
         
         // Get field templates for this industry
@@ -49,65 +69,103 @@ export default function FieldMappingInterface({
           .eq('industry_id', tenant.industry_id)
           .order('display_order');
           
-        console.log('Industry fields:', fields);
+        console.log('Industry fields raw:', fields);
         
         if (fieldsError) {
           console.error('Fields error:', fieldsError);
-          throw new Error(`Failed to load field templates: ${fieldsError.message}`);
+          console.log('Using default fields due to fetch error');
+          setIndustryFields(defaultFields);
+          generateAutoMapping(defaultFields);
+          return;
         }
         
+        // Check if we got valid field data
         if (!fields || fields.length === 0) {
-          throw new Error('No field templates found for your industry. Please contact support.');
+          console.log('No fields found, using defaults');
+          setIndustryFields(defaultFields);
+          generateAutoMapping(defaultFields);
+          return;
         }
         
+        // Check for data quality issues
+        const uniqueLabels = new Set(fields.map(f => f.field_label));
+        const uniqueNames = new Set(fields.map(f => f.field_name));
+        
+        if (uniqueLabels.size === 1) {
+          console.warn('Data quality issue: all fields have the same label');
+          console.log('Field labels found:', Array.from(uniqueLabels));
+          console.log('Using default fields due to data quality issue');
+          setIndustryFields(defaultFields);
+          generateAutoMapping(defaultFields);
+          return;
+        }
+        
+        if (uniqueNames.size === 1) {
+          console.warn('Data quality issue: all fields have the same name');
+          console.log('Field names found:', Array.from(uniqueNames));
+          console.log('Using default fields due to data quality issue');
+          setIndustryFields(defaultFields);
+          generateAutoMapping(defaultFields);
+          return;
+        }
+        
+        // Data looks good, use it
+        console.log('Using fetched industry fields:', fields.length);
         setIndustryFields(fields);
-        
-        // Auto-suggest mappings
-        const autoMapping = {};
-        csvHeaders.forEach(header => {
-          const normalizedHeader = header.toLowerCase().trim();
-          
-          // Try exact matches first
-          const exactMatch = fields.find(field => 
-            field.field_name.toLowerCase() === normalizedHeader ||
-            field.field_label.toLowerCase() === normalizedHeader
-          );
-          
-          if (exactMatch) {
-            autoMapping[header] = exactMatch.field_name;
-            return;
-          }
-          
-          // Try partial matches
-          const partialMatch = fields.find(field => {
-            const fieldName = field.field_name.toLowerCase();
-            const fieldLabel = field.field_label.toLowerCase();
-            
-            return (
-              normalizedHeader.includes(fieldName) ||
-              fieldName.includes(normalizedHeader) ||
-              normalizedHeader.includes(fieldLabel.split(' ')[0].toLowerCase()) ||
-              // Common variations
-              (normalizedHeader.includes('name') && fieldName === 'name') ||
-              (normalizedHeader.includes('phone') && fieldName === 'phone') ||
-              (normalizedHeader.includes('email') && fieldName === 'email') ||
-              (normalizedHeader.includes('address') && fieldName.includes('address'))
-            );
-          });
-          
-          if (partialMatch) {
-            autoMapping[header] = partialMatch.field_name;
-          }
-        });
-        
-        setFieldMapping(autoMapping);
+        generateAutoMapping(fields);
         
       } catch (err) {
         console.error('Error fetching industry fields:', err);
-        setError(err.message);
+        console.log('Using default fields due to catch error');
+        setIndustryFields(defaultFields);
+        generateAutoMapping(defaultFields);
       } finally {
         setLoading(false);
       }
+    };
+
+    const generateAutoMapping = (fields) => {
+      const autoMapping = {};
+      csvHeaders.forEach(header => {
+        const normalizedHeader = header.toLowerCase().trim();
+        
+        // Try exact matches first
+        const exactMatch = fields.find(field => 
+          field.field_name.toLowerCase() === normalizedHeader ||
+          (field.field_label && field.field_label.toLowerCase()) === normalizedHeader
+        );
+        
+        if (exactMatch) {
+          autoMapping[header] = exactMatch.field_name;
+          return;
+        }
+        
+        // Try partial matches
+        const partialMatch = fields.find(field => {
+          const fieldName = field.field_name.toLowerCase();
+          const fieldLabel = field.field_label ? field.field_label.toLowerCase() : '';
+          
+          return (
+            normalizedHeader.includes(fieldName) ||
+            fieldName.includes(normalizedHeader) ||
+            (fieldLabel && normalizedHeader.includes(fieldLabel.split(' ')[0].toLowerCase())) ||
+            // Common variations
+            (normalizedHeader.includes('name') && fieldName.includes('name')) ||
+            (normalizedHeader.includes('phone') && fieldName.includes('phone')) ||
+            (normalizedHeader.includes('email') && fieldName.includes('email')) ||
+            (normalizedHeader.includes('address') && fieldName.includes('address')) ||
+            (normalizedHeader.includes('company') && fieldName.includes('company')) ||
+            (normalizedHeader.includes('status') && fieldName.includes('status'))
+          );
+        });
+        
+        if (partialMatch) {
+          autoMapping[header] = partialMatch.field_name;
+        }
+      });
+      
+      console.log('Generated auto-mapping:', autoMapping);
+      setFieldMapping(autoMapping);
     };
 
     if (tenantId && csvHeaders.length > 0) {
@@ -193,8 +251,6 @@ export default function FieldMappingInterface({
     );
   }
 
-  console.log('Rendering with industryFields:', industryFields.length, 'fields');
-
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -203,9 +259,16 @@ export default function FieldMappingInterface({
         <p className="text-sm text-gray-600">
           Match your CSV columns to the appropriate fields. Required fields are marked with *.
         </p>
-        <p className="text-xs text-gray-500 mt-1">
-          Found {industryFields.length} available fields for your industry
-        </p>
+        <div className="flex items-center justify-between mt-1">
+          <p className="text-xs text-gray-500">
+            Found {industryFields.length} available fields for mapping
+          </p>
+          {industryFields === defaultFields && (
+            <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">
+              Using default fields
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Preview Toggle */}
@@ -282,9 +345,9 @@ export default function FieldMappingInterface({
                   className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 >
                   <option value="">Don't import this column</option>
-                  {industryFields.map(field => (
-                    <option key={field.field_name} value={field.field_name}>
-                      {field.field_label} {field.is_required ? '*' : ''}
+                  {industryFields.map((field, index) => (
+                    <option key={`${field.field_name}-${index}`} value={field.field_name}>
+                      {field.field_label || field.field_name} {field.is_required ? '*' : ''}
                     </option>
                   ))}
                 </select>
@@ -321,7 +384,7 @@ export default function FieldMappingInterface({
               <div>
                 <p className="text-sm font-medium text-amber-800">Missing required fields</p>
                 <p className="text-sm text-amber-700 mt-1">
-                  Please map these required fields: {getUnmappedRequiredFields().map(f => f.field_label).join(', ')}
+                  Please map these required fields: {getUnmappedRequiredFields().map(f => f.field_label || f.field_name).join(', ')}
                 </p>
               </div>
             </div>
