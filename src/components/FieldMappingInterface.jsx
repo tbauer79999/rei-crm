@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowRight, Check, X, AlertCircle, Eye, EyeOff } from 'lucide-react';
+import supabase from '../lib/supabaseClient';
 
 export default function FieldMappingInterface({ 
   csvHeaders, 
