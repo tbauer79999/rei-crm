@@ -475,6 +475,28 @@ export default function Layout({ children }) {
     return 'BC';
   }, [companyInfo]);
 
+  // Enhanced logout with proper cleanup
+  const handleLogout = useCallback(async () => {
+    try {
+      console.log('🚪 Logging out...');
+      
+      localStorage.removeItem('auth_token');
+      sessionStorage.removeItem('auth_token');
+      
+      const { error } = await supabase.auth.signOut();
+      
+      if (error) {
+        console.error('❌ Logout error:', error);
+      }
+      
+      console.log('✅ Logout successful');
+      navigate('/login');
+    } catch (err) {
+      console.error('❌ Logout exception:', err);
+      navigate('/login');
+    }
+  }, [navigate]);
+
   // Track recent pages
   useEffect(() => {
     const currentPage = {
@@ -836,28 +858,6 @@ export default function Layout({ children }) {
     if (notificationFilter === 'unread') return notifications.filter(n => !n.read);
     return notifications.filter(n => n.priority === notificationFilter);
   }, [notifications, notificationFilter]);
-
-  // Enhanced logout with proper cleanup
-  const handleLogout = useCallback(async () => {
-    try {
-      console.log('🚪 Logging out...');
-      
-      localStorage.removeItem('auth_token');
-      sessionStorage.removeItem('auth_token');
-      
-      const { error } = await supabase.auth.signOut();
-      
-      if (error) {
-        console.error('❌ Logout error:', error);
-      }
-      
-      console.log('✅ Logout successful');
-      navigate('/login');
-    } catch (err) {
-      console.error('❌ Logout exception:', err);
-      navigate('/login');
-    }
-  }, [navigate]);
 
   // Enhanced search functionality with history
   const performSearch = useCallback(async (query) => {
