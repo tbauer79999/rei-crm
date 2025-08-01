@@ -358,6 +358,123 @@ export default function Layout({ children }) {
     setMobileOpen(false);
   }, [location.pathname]);
 
+  // Get page-specific messaging based on current route
+  const getPageMessages = useCallback(() => {
+    const companyName = companyInfo.name;
+    
+    switch (location.pathname) {
+      case '/control-room':
+        return {
+          title: companyInfo.industry === 'staffing' ? 'Candidate Pipeline Control Room' :
+                 companyInfo.industry === 'real estate' ? 'Lead Pipeline Control Room' :
+                 'SurFox Control Room',
+          subtitle: companyInfo.industry === 'staffing' ? 'Monitor and optimize your candidate pipeline' :
+                   companyInfo.industry === 'real estate' ? 'Monitor and optimize your lead pipeline' :
+                   'Monitor and optimize your business pipeline'
+        };
+        
+      case '/dashboard':
+        return {
+          title: 'Dashboard',
+          subtitle: companyInfo.industry === 'staffing' ? 'Overview of your recruitment metrics and performance' :
+                   companyInfo.industry === 'real estate' ? 'Overview of your real estate business performance' :
+                   'Overview of your business performance and key metrics'
+        };
+      case '/business-analytics':
+        return {
+          title: 'AI Strategy Hub',
+          subtitle: companyInfo.industry === 'staffing' ? 'Deep insights into your recruitment and staffing data' :
+                   companyInfo.industry === 'real estate' ? 'Deep insights into your real estate business data' :
+                   'Deep insights into your business data and trends'
+        };
+      case '/enterprise-analytics':
+        return {
+          title: 'Enterprise Analytics',
+          subtitle: 'Enterprise-level analytics and cross-business insights'
+        };
+      case '/campaign-management':
+        return {
+          title: 'Campaign Management',
+          subtitle: companyInfo.industry === 'staffing' ? 'Create and manage recruitment campaigns' :
+                   companyInfo.industry === 'real estate' ? 'Create and manage lead generation campaigns' :
+                   'Create and manage marketing campaigns'
+        };
+      case '/settings':
+        return {
+          title: 'Settings',
+          subtitle: 'Configure your account, team, and system preferences'
+        };
+      default:
+        return {
+          title: location.pathname.slice(1).split('-').map(word => 
+            word.charAt(0).toUpperCase() + word.slice(1)
+          ).join(' ') || 'Home',
+          subtitle: companyInfo.industry === 'staffing' ? 'Manage your staffing and recruitment operations' :
+                   companyInfo.industry === 'real estate' ? 'Manage your real estate business' :
+                   'Manage your business operations'
+        };
+    }
+  }, [location.pathname, companyInfo]);
+
+  // Dynamic navigation items based on user role
+  const getNavItems = useCallback(() => {
+    const baseItems = [
+      { path: '/control-room', label: 'Intelligence Center', icon: BarChart2, tourClass: 'tour-controlroom', shortcut: 'Alt+1' },
+      { path: '/dashboard', label: 'Pipeline', icon: Home, tourClass: 'tour-dashboard', shortcut: 'Alt+2' },
+    ];
+
+    const analyticsItems = [];
+    
+    if (canAccessEnterprise) {
+      analyticsItems.push({
+        path: '/enterprise-analytics', 
+        label: 'Enterprise Analytics', 
+        icon: TrendingUp,
+        tourClass: 'tour-enterprise'
+      });
+    }
+    
+    if (['global_admin', 'business_admin'].includes(role)) {
+      analyticsItems.push({
+        path: '/business-analytics', 
+        label: 'AI Strategy Hub', 
+        icon: Brain,
+        tourClass: 'tour-strategy',
+        shortcut: 'Alt+3'
+      });
+    }
+
+    analyticsItems.push({
+      path: '/campaign-management',
+      label: 'Campaign Management',
+      icon: Megaphone,
+      tourClass: 'tour-campaigns',
+      shortcut: 'Alt+4'
+    });
+
+    const endItems = [
+      { path: '/settings', label: 'Settings', icon: Settings, tourClass: 'tour-settings', shortcut: 'Alt+5' },
+    ];
+
+    return [...baseItems, ...analyticsItems, ...endItems];
+  }, [role, canAccessEnterprise]);
+
+  // Get company initials for logo
+  const getCompanyInitials = useCallback(() => {
+    if (companyInfo.loading) return 'R';
+    
+    const name = companyInfo.name;
+    if (name === 'REI-CRM') return 'R';
+    
+    const words = name.split(' ').filter(word => word.length > 0);
+    if (words.length >= 2) {
+      return words[0][0].toUpperCase() + words[1][0].toUpperCase();
+    } else if (words.length === 1) {
+      return words[0].substring(0, 2).toUpperCase();
+    }
+    return 'BC';
+  }, [companyInfo]);
+
   // Track recent pages
   useEffect(() => {
     const currentPage = {
@@ -370,7 +487,7 @@ export default function Layout({ children }) {
       const filtered = prev.filter(page => page.path !== currentPage.path);
       return [currentPage, ...filtered].slice(0, 5);
     });
-  }, [location.pathname]);
+  }, [location.pathname, getPageMessages]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -741,22 +858,6 @@ export default function Layout({ children }) {
       navigate('/login');
     }
   }, [navigate]);
-
-  // Get company initials for logo
-  const getCompanyInitials = useCallback(() => {
-    if (companyInfo.loading) return 'R';
-    
-    const name = companyInfo.name;
-    if (name === 'REI-CRM') return 'R';
-    
-    const words = name.split(' ').filter(word => word.length > 0);
-    if (words.length >= 2) {
-      return words[0][0].toUpperCase() + words[1][0].toUpperCase();
-    } else if (words.length === 1) {
-      return words[0].substring(0, 2).toUpperCase();
-    }
-    return 'BC';
-  }, [companyInfo]);
 
   // Enhanced search functionality with history
   const performSearch = useCallback(async (query) => {
