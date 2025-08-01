@@ -6,12 +6,19 @@ import {
   MessageSquare, Activity, Clock, CheckCircle, Send, Inbox,
   AlertTriangle, Lock
 } from 'lucide-react';
+import { isDemoTenant, generateDemoOverviewMetrics, generateDemoDetailedMetrics } from '../../lib/demo';
 
 const supabase = require('../../lib/supabaseClient');
 
 
 // Database query functions (ONLY CHANGE - replacing edge function calls)
 const fetchOverviewMetrics = async (tenantId, userId = null, period = '30days') => {
+    // 🎭 CHECK FOR DEMO TENANT FIRST
+  if (await isDemoTenant(tenantId)) {
+    console.log('🎭 Demo mode: returning demo overview metrics');
+    return generateDemoOverviewMetrics(period);
+  }
+
   const daysBack = period === '7days' ? 7 : period === '90days' ? 90 : 30;
   const startDate = new Date();
   startDate.setDate(startDate.getDate() - daysBack);
@@ -81,6 +88,11 @@ let query = supabase
 };
 
 const fetchDetailedMetrics = async (tenantId, userId = null, metricType, period = '30days') => {
+    // 🎭 CHECK FOR DEMO TENANT FIRST
+  if (await isDemoTenant(tenantId)) {
+    console.log('🎭 Demo mode: returning demo detailed metrics for', metricType);
+    return generateDemoDetailedMetrics(metricType);
+  }
   const daysBack = period === '7days' ? 7 : period === '90days' ? 90 : 30;
   const startDate = new Date();
   startDate.setDate(startDate.getDate() - daysBack);
@@ -278,7 +290,7 @@ async function getTopSalespersons(tenantId, startDate) {
   if (userIds.length === 0) return [];
   
   const { data: userProfiles } = await supabase
-    .from('user_profiles') // or whatever your users table is called
+    .from('users_profiles') // or whatever your users table is called
     .select('id, name, email, avatar')
     .in('id', userIds);
 

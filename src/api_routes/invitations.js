@@ -155,7 +155,7 @@ router.post('/accept', async (req, res) => {
 
     // Create user profile in your custom tables using admin client
     const { error: profileError } = await supabaseAdmin
-      .from('users_profile')  // Changed from user_profiles to users_profile
+      .from('users_profile')  // Changed from users_profiles to users_profile
       .insert({
         id: user.id,
         email: user.email,

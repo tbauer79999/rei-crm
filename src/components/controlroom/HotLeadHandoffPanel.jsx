@@ -6,12 +6,19 @@ import {
   AlertTriangle, BarChart3, Activity, Timer, Target, XCircle,
   PhoneCall, PhoneOff, UserCheck, UserX, MessageSquare, Lock
 } from 'lucide-react';
+import { isDemoTenant, generateDemoHotLeadData } from '../../lib/demo';
 
 const supabase = require('../../lib/supabaseClient');
 
-// Edge Function URL - Update to use sync_sales_metrics
-// Database query functions for hot lead data
+  // Modify this function (around line 20-50)
 const fetchHotLeadData = async (tenantId, userId = null) => {
+  // 🎭 CHECK FOR DEMO TENANT FIRST
+  if (await isDemoTenant(tenantId)) {
+    console.log('🎭 Demo mode: returning demo hot lead data');
+    return generateDemoHotLeadData(tenantId);
+  }
+
+
   // Get latest sales metrics for summary stats
   let salesQuery = supabase
     .from('sales_metrics')

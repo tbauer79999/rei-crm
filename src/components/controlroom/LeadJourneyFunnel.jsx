@@ -11,12 +11,19 @@ import {
   BarChart3, Activity, Target, ArrowRight, Upload, Shuffle,
   Lock
 } from 'lucide-react';
+import { isDemoTenant, generateDemoJourneyData } from '../../lib/demo';
 
 const supabase = require('../../lib/supabaseClient');
 
 // Edge Function URL - Updated to use unified analytics endpoint
 // Database query functions for lead journey data
 const fetchLeadJourneyData = async (tenantId, userId = null, dateRange = 30) => {
+    // 🎭 CHECK FOR DEMO TENANT FIRST
+  if (await isDemoTenant(tenantId)) {
+    console.log('🎭 Demo mode: returning demo journey data');
+    return generateDemoJourneyData(tenantId, dateRange);
+  }
+
   const startDate = new Date();
   startDate.setDate(startDate.getDate() - dateRange);
 
