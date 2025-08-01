@@ -705,27 +705,135 @@ export default function LeadDetail() {
 
   // Message sending
   const handleSendMessage = async () => {
-    if (!canSendMessages) {
-      alert("You don't have permission to send messages.");
-      return;
-    }
+  if (!canSendMessages) {
+    alert("You don't have permission to send messages.");
+    return;
+  }
 
-    if (!newMessage.trim()) return;
+  if (!newMessage.trim()) return;
 
-    setSendingMessage(true);
-    setAiProcessing(true);
+  // 🚫 PRIMARY GUARD RAIL: Check if AI is still managing this lead
+  if (lead.ai_conversation_enabled) {
+    const proceed = window.confirm(
+      "This lead is currently being managed by AI. Sending a manual message will take over the conversation. " +
+      "Continue?"
+    );
+    if (!proceed) return;
+  }
+
+  // 🚫 BASIC SAFETY: Don't message unsubscribed leads
+  if (lead.status === 'Unsubscribed' || lead.status === 'Do Not Contact') {
+    alert("Cannot send messages to unsubscribed leads.");
+    return;
+  }
+
+  setSendingMessage(true);
+  try {
+    console.log('Sending manual message:', newMessage);
     
-    try {
-      console.log('Sending manual message:', newMessage);
-      setNewMessage('');
-    } catch (error) {
-      console.error('Error sending manual message:', error);
-      alert('Failed to send message: ' + error.message);
-    } finally {
-      setSendingMessage(false);
-      setAiProcessing(false);
+    // Get the lead's campaign to find the correct phone number
+    const { data: campaignData, error: campaignError } = await supabase
+      .from("campaigns")
+      .select(`
+        phone_number_id,
+        phone_numbers (
+          phone_number,
+          twilio_sid
+        )
+      `)
+      .eq("id", lead.campaign_id)
+      .eq("tenant_id", user.tenant_id)
+      .single();
+
+    if (campaignError || !campaignData?.phone_numbers) {
+      throw new Error('Campaign phone number not found');
     }
-  };
+
+    const phoneNumber = campaignData.phone_numbers;
+
+    // Insert the message into the database first
+    const { data: insertedMessage, error: insertError } = await supabase
+      .from('messages')
+      .insert({
+        direction: 'outbound',
+        message_body: newMessage.trim(),
+        timestamp: new Date().toISOString(),
+        phone: lead.phone,
+        tenant_id: user.tenant_id,
+        lead_id: lead.id,
+        sender: 'Manual', // Mark as manual send
+        channel: 'sms',
+        message_id: `manual-${Date.now()}`,
+        status: 'queued'
+      })
+      .select('id')
+      .single();
+
+    if (insertError) {
+      throw new Error('Failed to save message: ' + insertError.message);
+    }
+
+    // Send via Twilio using your edge function
+    const { data: twilioResult, error: twilioError } = await supabase.functions.invoke('send-manual-sms', {
+      body: {
+        to: lead.phone,
+        from: phoneNumber.phone_number,
+        body: newMessage.trim(),
+        message_id: insertedMessage.id,
+        tenant_id: user.tenant_id
+      }
+    });
+
+    if (twilioError) {
+      throw new Error('Failed to send SMS: ' + twilioError.message);
+    }
+
+    if (twilioResult.success) {
+      console.log('✅ Manual message sent successfully');
+      
+      // Update the message with Twilio SID
+      await supabase
+        .from('messages')
+        .update({ 
+          message_id: twilioResult.twilio_sid,
+          status: 'sent'
+        })
+        .eq('id', insertedMessage.id);
+
+      // 🆕 KEY: Disable AI conversation since human took over
+      if (lead.ai_conversation_enabled) {
+        await supabase
+          .from('leads')
+          .update({ 
+            ai_conversation_enabled: false,
+            last_manual_contact: new Date().toISOString()
+          })
+          .eq('id', lead.id);
+        
+        console.log('✅ AI conversation disabled - human took over');
+        
+        // Update local state so UI reflects the change
+        setLead(prev => ({ 
+          ...prev, 
+          ai_conversation_enabled: false,
+          last_manual_contact: new Date().toISOString()
+        }));
+      }
+
+      // Clear the input
+      setNewMessage('');
+      
+    } else {
+      throw new Error(twilioResult.error || 'Failed to send message');
+    }
+
+  } catch (error) {
+    console.error('Error sending manual message:', error);
+    alert('Failed to send message: ' + error.message);
+  } finally {
+    setSendingMessage(false);
+  }
+};
 
   // Calculate insights and stats
   const aiInsights = useMemo(() => calculateAIInsights(), [messageItems]);
