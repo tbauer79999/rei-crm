@@ -22,8 +22,12 @@ import {
   AlertTriangle,
   RefreshCcw,
   ChevronDown,
+  ChevronRight,
   Eye,
-  Settings
+  Settings,
+  User,
+  Target,
+  RotateCcw
 } from 'lucide-react';
 
 // API Base URL
@@ -574,7 +578,8 @@ export default function CampaignManagement() {
   const [knowledgeDropdownOpen, setKnowledgeDropdownOpen] = useState({});
   const [phoneNumbers, setPhoneNumbers] = useState([]);
   const [viewMode, setViewMode] = useState('table'); // 'table' or 'cards'
-  
+  const [expandedRows, setExpandedRows] = useState(new Set());
+
   // Campaign creation form state
   const [isCreating, setIsCreating] = useState(false);
   const [campaignForm, setCampaignForm] = useState({
@@ -768,6 +773,90 @@ const getDynamicDropdownOptions = () => {
       ];
     default:
       return [];
+  }
+};
+
+const toggleRow = (campaignId) => {
+  const newExpanded = new Set(expandedRows);
+  if (newExpanded.has(campaignId)) {
+    newExpanded.delete(campaignId);
+  } else {
+    newExpanded.add(campaignId);
+  }
+  setExpandedRows(newExpanded);
+};
+
+const updateHotLeadDistribution = async (campaignId, field, value) => {
+  try {
+    const updateData = {};
+    
+    if (field === 'mode') {
+      updateData.hot_lead_distribution_mode = value;
+      if (value !== 'single') updateData.hot_lead_single_assignee_id = null;
+      if (value !== 'round_robin') updateData.hot_lead_round_robin_team = null;
+    } else if (field === 'singleAssigneeId') {
+      updateData.hot_lead_single_assignee_id = value;
+    } else if (field === 'roundRobinTeam') {
+      updateData.hot_lead_round_robin_team = value;
+    }
+
+    const { error } = await supabase
+      .from('campaigns')
+      .update(updateData)
+      .eq('id', campaignId);
+
+    if (error) throw error;
+
+    setCampaigns(campaigns.map(c => 
+      c.id === campaignId ? { ...c, ...updateData } : c
+    ));
+    
+    setError('');
+  } catch (err) {
+    console.error('Error updating hot lead distribution:', err);
+    setError('Failed to update hot lead distribution');
+  }
+};
+
+const getHotLeadAssignment = (campaign) => {
+  if (campaign.hot_lead_distribution_mode === 'single' && campaign.hot_lead_single_assignee_id) {
+    const assignee = salesTeamMembers.find(m => m.sales_team_id === campaign.hot_lead_single_assignee_id);
+    return {
+      mode: 'single',
+      assignee: assignee?.full_name || assignee?.email || 'Unknown'
+    };
+  } else if (campaign.hot_lead_distribution_mode === 'round_robin' && campaign.hot_lead_round_robin_team?.length > 0) {
+    return {
+      mode: 'round_robin',
+      assignee: `${campaign.hot_lead_round_robin_team.length} team members`
+    };
+  }
+  return { mode: null, assignee: null };
+};
+
+const HotLeadAssignment = ({ assignment }) => {
+  if (assignment.mode === 'single') {
+    return (
+      <div className="flex items-center text-sm">
+        <User className="w-4 h-4 mr-2 text-blue-500" />
+        <span className="font-medium text-gray-900 truncate max-w-[200px]" title={assignment.assignee}>
+          {assignment.assignee}
+        </span>
+      </div>
+    );
+  } else if (assignment.mode === 'round_robin') {
+    return (
+      <div className="flex items-center text-sm">
+        <RotateCcw className="w-4 h-4 mr-2 text-purple-500" />
+        <span className="font-medium text-gray-900">
+          {assignment.assignee}
+        </span>
+      </div>
+    );
+  } else {
+    return (
+      <span className="text-gray-500 text-sm italic">Not configured</span>
+    );
   }
 };
 
@@ -1629,219 +1718,335 @@ useEffect(() => {
         </div>
       ) : (
         /* Desktop Table View */
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                     Campaign
                   </th>
                   {isGlobalAdmin && (
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                       Tenant
                     </th>
                   )}
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                     Status
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Progress & Delivery
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                    Progress
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Assignment & Phone
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                    Hot Leads →
                   </th>
-                  {/* Dynamic Column Header */}
-                  {showDynamicColumn && (
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      {getDynamicColumnHeader()}
-                    </th>
-                  )}
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Knowledge Assets
+                  <th className="px-6 py-4 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                    AI
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    AI Toggle
-                  </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Actions
+                  <th className="px-6 py-4 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                    Details
                   </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {filteredCampaigns.map((campaign) => (
-                  <tr key={campaign.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4">
-                      <div>
-                        <div className="text-sm font-medium text-gray-900">{campaign.name}</div>
-                        <div className="text-sm text-gray-500">
-                          {campaign.description || 'No description'}
-                        </div>
-                      </div>
-                    </td>
-                    {isGlobalAdmin && (
-                      <td className="px-6 py-4">
-                        <div className="flex items-center space-x-2">
-                          <Building2 className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                          <span className="text-sm text-gray-900 truncate">
-                            {tenantNames[campaign.tenant_id] || campaign.tenants?.name || 'Unknown Tenant'}
-                          </span>
-                        </div>
-                      </td>
-                    )}
-                    <td className="px-6 py-4">
-                      {getStatusBadge(campaign)}
-                    </td>
-                    <td className="px-6 py-4">
-                      <CampaignProgress campaignId={campaign.id} />
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="space-y-2">
-                        {/* Assigned To */}
-                        <div>
-                          <select
-                            value={campaign.assigned_to_sales_team_id || ''}
-                            onChange={(e) => updateCampaignAssignment(campaign.id, e.target.value || null)}
-                            className="text-xs border border-gray-300 rounded px-2 py-1 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 w-full"
-                            title={campaign.assigned_to_name ? `Assigned to ${campaign.assigned_to_name}` : 'Not assigned'}
-                          >
-                            <option value="">Unassigned</option>
-                            {salesTeamMembers.map(member => (
-                              <option key={member.sales_team_id} value={member.sales_team_id}>
-                                {member.full_name || member.email}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                        
-                        {/* Phone Number */}
-                        <div>
-                          <select
-                            value={campaign.phone_number_id || ''}
-                            onChange={(e) => updateCampaignPhoneNumber(campaign.id, e.target.value || null)}
-                            className="text-xs border border-gray-300 rounded px-2 py-1 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 w-full"
-                            title={campaign.phone_number ? `Current: ${campaign.phone_number}` : 'Not assigned'}
-                          >
-                            <option value="">No phone assigned</option>
-                            {phoneNumbers.map(phone => (
-                              <option key={phone.id} value={phone.id}>
-                                {phone.phone_number}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                      </div>
-                    </td>
-                    {/* Dynamic Dropdown Cell */}
-                    {showDynamicColumn && (
-                      <td className="px-6 py-4">
-                        <DynamicFieldComponent
-                          campaign={campaign}
-                          tenantIndustry={tenantIndustry}
-                          getDynamicDropdownOptions={getDynamicDropdownOptions}
-                          updateCampaignDynamicField={updateCampaignDynamicField}
-                        />
-                      </td>
-                    )}
-                    {/* Knowledge Assets Multi-Select */}
-                    <td className="px-6 py-4">
-                      <div className="relative">
-                        <button
-                          id={`knowledge-dropdown-${campaign.id}`}
-                          onClick={() => setKnowledgeDropdownOpen({
-                            ...knowledgeDropdownOpen,
-                            [campaign.id]: !knowledgeDropdownOpen[campaign.id]
-                          })}
-                          className="text-sm border border-gray-300 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 flex items-center justify-between min-w-[120px] bg-white hover:bg-gray-50"
-                        >
-                          <span className="truncate">
-                            {selectedKnowledgeAssets[campaign.id]?.length > 0
-                              ? `${selectedKnowledgeAssets[campaign.id].length} selected`
-                              : 'Select...'}
-                          </span>
-                          <svg className="w-4 h-4 ml-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                          </svg>
-                        </button>
-                        
-                        <KnowledgeAssetsDropdown
-                          campaign={campaign}
-                          knowledgeAssets={knowledgeAssets}
-                          selectedAssets={selectedKnowledgeAssets[campaign.id]}
-                          isOpen={knowledgeDropdownOpen[campaign.id]}
-                          onToggle={() => setKnowledgeDropdownOpen({
-                            ...knowledgeDropdownOpen,
-                            [campaign.id]: !knowledgeDropdownOpen[campaign.id]
-                          })}
-                          onUpdate={async (assetId, checked) => {
-                            const currentSelected = selectedKnowledgeAssets[campaign.id] || [];
-                            let newSelected;
-                            
-                            if (checked) {
-                              newSelected = [...currentSelected, assetId];
-                            } else {
-                              newSelected = currentSelected.filter(id => id !== assetId);
-                            }
-                            
-                            setSelectedKnowledgeAssets({
-                              ...selectedKnowledgeAssets,
-                              [campaign.id]: newSelected
-                            });
-                            
-                            // Update in database
-                            await updateCampaignKnowledgeLinks(campaign.id, newSelected);
-                          }}
-                        />
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center justify-center">
-                        {/* AI Toggle Switch */}
-                        <button
-                          onClick={() => toggleAiOn(campaign.id, campaign.ai_on)}
-                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
-                            campaign.ai_on 
-                              ? 'bg-blue-600' 
-                              : 'bg-gray-200'
-                          }`}
-                          title={campaign.ai_on ? 'AI Enabled - Click to disable' : 'AI Disabled - Click to enable'}
-                        >
-                          <span
-                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                              campaign.ai_on ? 'translate-x-6' : 'translate-x-1'
-                            }`}
-                          />
-                        </button>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center justify-end space-x-2">
-                        {showArchived ? (
-                          <button 
-                            className="p-2 text-gray-400 hover:text-green-600 rounded-lg hover:bg-green-50"
-                            title="Restore Campaign"
-                            onClick={() => unarchiveCampaign(campaign.id)}
-                          >
-                            <ArchiveRestore className="w-4 h-4" />
-                          </button>
-                        ) : (
-                          <button 
-                            className="p-2 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50"
-                            title="Archive Campaign"
-                            onClick={() => archiveCampaign(campaign.id)}
-                          >
-                            <Archive className="w-4 h-4" />
-                          </button>
+                {filteredCampaigns.map((campaign) => {
+                  const hotLeadAssignment = getHotLeadAssignment(campaign);
+                  
+                  return (
+                    <React.Fragment key={campaign.id}>
+                      <tr className="hover:bg-gray-50 transition-colors">
+                        <td className="px-6 py-4">
+                          <div>
+                            <div className="text-sm font-semibold text-gray-900">{campaign.name}</div>
+                            <div className="text-sm text-gray-500 mt-1">{campaign.description || 'No description'}</div>
+                          </div>
+                        </td>
+                        {isGlobalAdmin && (
+                          <td className="px-6 py-4">
+                            <div className="flex items-center space-x-2">
+                              <Building2 className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                              <span className="text-sm text-gray-900 truncate">
+                                {tenantNames[campaign.tenant_id] || campaign.tenants?.name || 'Unknown Tenant'}
+                              </span>
+                            </div>
+                          </td>
                         )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                        <td className="px-6 py-4">
+                          {getStatusBadge(campaign)}
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="w-48">
+                            <CampaignProgress campaignId={campaign.id} />
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <HotLeadAssignment assignment={hotLeadAssignment} />
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          <button
+                            onClick={() => toggleAiOn(campaign.id, campaign.ai_on)}
+                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
+                              campaign.ai_on 
+                                ? 'bg-blue-600' 
+                                : 'bg-gray-200'
+                            }`}
+                            title={campaign.ai_on ? 'AI Enabled - Click to disable' : 'AI Disabled - Click to enable'}
+                          >
+                            <span
+                              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                                campaign.ai_on ? 'translate-x-6' : 'translate-x-1'
+                              }`}
+                            />
+                          </button>
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          <button
+                            onClick={() => toggleRow(campaign.id)}
+                            className="inline-flex items-center p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                          >
+                            {expandedRows.has(campaign.id) ? (
+                              <ChevronDown className="w-5 h-5" />
+                            ) : (
+                              <ChevronRight className="w-5 h-5" />
+                            )}
+                          </button>
+                        </td>
+                      </tr>
+                      {expandedRows.has(campaign.id) && (
+                        <tr>
+                          <td colSpan={isGlobalAdmin ? "7" : "6"} className="px-6 py-3 bg-gray-50/50 border-t border-gray-100">
+                            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 items-start">
+                              {/* Assignment */}
+                              <div className="space-y-1">
+                                <label className="block text-xs font-medium text-gray-600 uppercase tracking-wide">Assignment</label>
+                                <select 
+                                  value={campaign.assigned_to_sales_team_id || ''}
+                                  onChange={(e) => updateCampaignAssignment(campaign.id, e.target.value || null)}
+                                  className="w-full text-sm border border-gray-300 rounded px-2 py-1.5 focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                                >
+                                  <option value="">Unassigned</option>
+                                  {salesTeamMembers.map(member => (
+                                    <option key={member.sales_team_id} value={member.sales_team_id}>
+                                      {member.full_name || member.email}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+
+                              {/* Phone */}
+                              <div className="space-y-1">
+                                <label className="block text-xs font-medium text-gray-600 uppercase tracking-wide">Phone</label>
+                                <select 
+                                  value={campaign.phone_number_id || ''}
+                                  onChange={(e) => updateCampaignPhoneNumber(campaign.id, e.target.value || null)}
+                                  className="w-full text-sm border border-gray-300 rounded px-2 py-1.5 focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                                >
+                                  <option value="">No phone assigned</option>
+                                  {phoneNumbers.map(phone => (
+                                    <option key={phone.id} value={phone.id}>
+                                      {phone.phone_number}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+
+                              {/* Talk Track */}
+                              {showDynamicColumn && (
+                                <div className="space-y-1">
+                                  <label className="block text-xs font-medium text-gray-600 uppercase tracking-wide">{getDynamicColumnHeader()}</label>
+                                  <DynamicFieldComponent
+                                    campaign={campaign}
+                                    tenantIndustry={tenantIndustry}
+                                    getDynamicDropdownOptions={getDynamicDropdownOptions}
+                                    updateCampaignDynamicField={updateCampaignDynamicField}
+                                  />
+                                </div>
+                              )}
+
+                              {/* Knowledge Assets */}
+                              <div className="space-y-1">
+                                <label className="block text-xs font-medium text-gray-600 uppercase tracking-wide">Knowledge</label>
+                                <div className="relative">
+                                  <button
+                                    id={`knowledge-dropdown-${campaign.id}`}
+                                    onClick={() => setKnowledgeDropdownOpen({
+                                      ...knowledgeDropdownOpen,
+                                      [campaign.id]: !knowledgeDropdownOpen[campaign.id]
+                                    })}
+                                    className="w-full text-sm border border-gray-300 rounded px-2 py-1.5 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 bg-white text-left truncate"
+                                  >
+                                    {selectedKnowledgeAssets[campaign.id]?.length > 0 ? (
+                                      `${selectedKnowledgeAssets[campaign.id].length} selected`
+                                    ) : (
+                                      'None selected'
+                                    )}
+                                  </button>
+                                  
+                                  <KnowledgeAssetsDropdown
+                                    campaign={campaign}
+                                    knowledgeAssets={knowledgeAssets}
+                                    selectedAssets={selectedKnowledgeAssets[campaign.id]}
+                                    isOpen={knowledgeDropdownOpen[campaign.id]}
+                                    onToggle={() => setKnowledgeDropdownOpen({
+                                      ...knowledgeDropdownOpen,
+                                      [campaign.id]: !knowledgeDropdownOpen[campaign.id]
+                                    })}
+                                    onUpdate={async (assetId, checked) => {
+                                      const currentSelected = selectedKnowledgeAssets[campaign.id] || [];
+                                      let newSelected;
+                                      
+                                      if (checked) {
+                                        newSelected = [...currentSelected, assetId];
+                                      } else {
+                                        newSelected = currentSelected.filter(id => id !== assetId);
+                                      }
+                                      
+                                      setSelectedKnowledgeAssets({
+                                        ...selectedKnowledgeAssets,
+                                        [campaign.id]: newSelected
+                                      });
+                                      
+                                      await updateCampaignKnowledgeLinks(campaign.id, newSelected);
+                                    }}
+                                  />
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Hot Lead Distribution - Compact Inline */}
+                            <div className="mt-4 p-3 bg-orange-50 border border-orange-200 rounded-lg">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center space-x-2">
+                                  <Target className="w-4 h-4 text-orange-600" />
+                                  <span className="text-sm font-medium text-gray-900">Hot Lead Distribution:</span>
+                                </div>
+                                <div className="flex items-center space-x-4">
+                                  {/* Mode Selection */}
+                                  <div className="flex items-center space-x-3 text-sm">
+                                    <label className="flex items-center">
+                                      <input
+                                        type="radio"
+                                        name={`distribution-${campaign.id}`}
+                                        checked={!campaign.hot_lead_distribution_mode}
+                                        onChange={() => updateHotLeadDistribution(campaign.id, 'mode', null)}
+                                        className="h-3 w-3 text-orange-600 focus:ring-orange-500 border-gray-300"
+                                      />
+                                      <span className="ml-1 text-gray-700">Off</span>
+                                    </label>
+                                    
+                                    <label className="flex items-center">
+                                      <input
+                                        type="radio"
+                                        name={`distribution-${campaign.id}`}
+                                        checked={campaign.hot_lead_distribution_mode === 'single'}
+                                        onChange={() => updateHotLeadDistribution(campaign.id, 'mode', 'single')}
+                                        className="h-3 w-3 text-orange-600 focus:ring-orange-500 border-gray-300"
+                                      />
+                                      <span className="ml-1 text-gray-700">Single</span>
+                                    </label>
+                                    
+                                    <label className="flex items-center">
+                                      <input
+                                        type="radio"
+                                        name={`distribution-${campaign.id}`}
+                                        checked={campaign.hot_lead_distribution_mode === 'round_robin'}
+                                        onChange={() => updateHotLeadDistribution(campaign.id, 'mode', 'round_robin')}
+                                        className="h-3 w-3 text-orange-600 focus:ring-orange-500 border-gray-300"
+                                      />
+                                      <span className="ml-1 text-gray-700">Round Robin</span>
+                                    </label>
+                                  </div>
+
+                                  {/* Assignment Dropdown/Multi-select */}
+                                  {campaign.hot_lead_distribution_mode === 'single' && (
+                                    <select
+                                      value={campaign.hot_lead_single_assignee_id || ''}
+                                      onChange={(e) => updateHotLeadDistribution(campaign.id, 'singleAssigneeId', e.target.value || null)}
+                                      className="text-sm border border-orange-300 rounded px-2 py-1 focus:ring-1 focus:ring-orange-500 focus:border-orange-500 bg-white min-w-[160px]"
+                                    >
+                                      <option value="">Select person...</option>
+                                      {salesTeamMembers.map(member => (
+                                        <option key={member.sales_team_id} value={member.sales_team_id}>
+                                          {member.full_name || member.email}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  )}
+
+                                  {campaign.hot_lead_distribution_mode === 'round_robin' && (
+                                    <div className="text-sm text-gray-700 bg-white border border-orange-300 rounded px-2 py-1 min-w-[160px]">
+                                      {(campaign.hot_lead_round_robin_team || []).length > 0 ? (
+                                        `${campaign.hot_lead_round_robin_team.length} members selected`
+                                      ) : (
+                                        'Select team members...'
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Round Robin Member Selection */}
+                              {campaign.hot_lead_distribution_mode === 'round_robin' && (
+                                <div className="mt-3 pt-3 border-t border-orange-200">
+                                  <div className="flex flex-wrap gap-2">
+                                    {salesTeamMembers.map(member => (
+                                      <label key={member.sales_team_id} className="flex items-center text-sm">
+                                        <input
+                                          type="checkbox"
+                                          checked={(campaign.hot_lead_round_robin_team || []).includes(member.sales_team_id)}
+                                          onChange={(e) => {
+                                            const currentTeam = campaign.hot_lead_round_robin_team || [];
+                                            const newTeam = e.target.checked 
+                                              ? [...currentTeam, member.sales_team_id]
+                                              : currentTeam.filter(id => id !== member.sales_team_id);
+                                            updateHotLeadDistribution(campaign.id, 'roundRobinTeam', newTeam);
+                                          }}
+                                          className="h-3 w-3 text-orange-600 focus:ring-orange-500 border-gray-300 rounded mr-1"
+                                        />
+                                        <span className="text-gray-700">{member.full_name || member.email}</span>
+                                      </label>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Quick Actions */}
+                            <div className="mt-3 flex justify-end space-x-2">
+                              <button className="inline-flex items-center px-3 py-1.5 text-xs font-medium text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded transition-colors">
+                                <Settings className="w-3 h-3 mr-1" />
+                                Settings
+                              </button>
+                              {showArchived ? (
+                                <button 
+                                  className="inline-flex items-center px-3 py-1.5 text-xs font-medium text-green-600 hover:text-green-800 hover:bg-green-50 rounded transition-colors"
+                                  onClick={() => unarchiveCampaign(campaign.id)}
+                                >
+                                  <ArchiveRestore className="w-3 h-3 mr-1" />
+                                  Restore
+                                </button>
+                              ) : (
+                                <button 
+                                  className="inline-flex items-center px-3 py-1.5 text-xs font-medium text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition-colors"
+                                  onClick={() => archiveCampaign(campaign.id)}
+                                >
+                                  <Archive className="w-3 h-3 mr-1" />
+                                  Archive
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  );
+                })}
               </tbody>
             </table>
           </div>
         </div>
       )}
+
 
       {/* Empty State */}
       {filteredCampaigns.length === 0 && !loading && (
