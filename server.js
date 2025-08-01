@@ -44,15 +44,15 @@ app.use(cors({
   origin: [
     'http://localhost:3000',           // For local development
     'http://localhost:3001',           // Alternative local port
-    'https://app.getsurfox.com',       // Your production frontend
-    'https://getsurfox.com',           // In case you have this domain too
-    'https://www.getsurfox.com'        // With www subdomain
+    'https://getsurfox.com',           // Your marketing website
+    'https://www.getsurfox.com',       // Marketing website with www
+    'https://surfox.ai',               // Your NEW app domain
+    'https://www.surfox.ai'            // App domain with www (optional)
   ],
   credentials: true,                   // Allow cookies/auth headers
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
 }));
-
 console.log("helo")
 
 app.use(express.json({ limit: '50mb' }));
