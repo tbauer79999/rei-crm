@@ -38,6 +38,56 @@ export default function Layout({ children }) {
   const [showNotifications, setShowNotifications] = useState(false);
   const [notificationsLoading, setNotificationsLoading] = useState(true);
 
+ // Smart notification organization for enterprise scale
+const organizeNotifications = (rawNotifications) => {
+  if (!rawNotifications || rawNotifications.length === 0) {
+    return { individual: [], batched: [] };
+  }
+
+  // Separate critical from regular notifications
+  const critical = rawNotifications.filter(n => 
+    n.priority === 'critical'
+  );
+  
+  const regular = rawNotifications.filter(n => 
+    n.priority !== 'critical'
+  );
+
+  // Show max 5 critical notifications individually
+  const individual = critical.slice(0, 5);
+  
+  // Batch the rest
+  const batched = [];
+  
+  // Add remaining critical alerts as batch if needed
+  if (critical.length > 5) {
+    batched.push({
+      id: 'critical-batch',
+      type: 'batch',
+      title: `${critical.length - 5} More Critical Alerts`,
+      message: `${critical.slice(5, 8).map(n => n.leads?.name || 'Unknown').join(', ')}${critical.length > 8 ? ` and ${critical.length - 8} others` : ''}`,
+      priority: 'critical',
+      count: critical.length - 5,
+      created_at: critical[5]?.created_at
+    });
+  }
+  
+  // Add regular notifications as batch if any exist
+  if (regular.length > 0) {
+    batched.push({
+      id: 'regular-batch',
+      type: 'batch', 
+      title: `${regular.length} New Hot Lead${regular.length === 1 ? '' : 's'}`,
+      message: `${regular.slice(0, 3).map(n => n.leads?.name || 'Unknown').join(', ')}${regular.length > 3 ? ` and ${regular.length - 3} others ready for contact` : ' ready for contact'}`,
+      priority: 'medium',
+      count: regular.length,
+      created_at: regular[0]?.created_at
+    });
+  }
+
+  return { individual, batched };
+};
+
   // Fetch company information
   useEffect(() => {
     const fetchCompanyInfo = async () => {
@@ -206,6 +256,8 @@ export default function Layout({ children }) {
         setNotificationsLoading(false);
       }
     };
+
+   
 
     // Initial fetch
     fetchNotifications();
@@ -893,72 +945,84 @@ export default function Layout({ children }) {
                           </p>
                         </div>
                       ) : (
-                        notifications.map((notification) => {
-                          const priorityColors = {
-                            critical: 'bg-red-100 text-red-800 border-red-200',
-                            high: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-                            medium: 'bg-blue-100 text-blue-800 border-blue-200',
-                            low: 'bg-gray-100 text-gray-800 border-gray-200'
-                          };
-                          
-                          return (
-                            <button
-                              key={notification.id}
-                              onClick={() => handleNotificationClick(notification)}
-                              className={`w-full p-4 text-left hover:bg-gray-50 transition-colors border-b border-gray-100 ${
-                                !notification.read ? 'bg-blue-50/30' : ''
-                              }`}
-                            >
-                              <div className="flex items-start space-x-3">
-                                {/* Priority indicator */}
-                                <div className={`mt-0.5 px-2 py-1 rounded-full text-xs font-medium ${
-                                  priorityColors[notification.priority] || priorityColors.low
-                                }`}>
-                                  {notification.priority?.toUpperCase() || 'LOW'}
-                                </div>
-                                
-                                {/* Content */}
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-center justify-between">
-                                    <p className={`text-sm ${!notification.read ? 'font-semibold' : 'font-medium'} text-gray-900`}>
-                                      {notification.title}
-                                    </p>
-                                    <div className="flex items-center space-x-2 ml-2">
-                                      {!notification.read && (
-                                        <div className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0" />
-                                      )}
-                                      <button
-                                        onClick={(e) => dismissNotification(e, notification.id)}
-                                        className="p-1 rounded hover:bg-gray-200 transition-colors group"
-                                        aria-label="Dismiss notification"
-                                      >
-                                        <X className="w-3 h-3 text-gray-400 group-hover:text-gray-600" />
-                                      </button>
-                                    </div>
-                                  </div>
-                                  
-                                  <p className="text-sm text-gray-600 mt-0.5 line-clamp-2">
-                                    {notification.message}
-                                  </p>
-                                  
-                                  {notification.leads && (
-                                    <div className="mt-2 flex items-center text-xs text-gray-500">
-                                      <span className="font-medium">
-                                        {notification.leads.name || 'Unknown Lead'}
-                                      </span>
-                                      <span className="mx-1">•</span>
-                                      <span>{notification.leads.campaigns?.name || 'No Campaign'}</span>
-                                    </div>
-                                  )}
-                                  
-                                  <p className="text-xs text-gray-400 mt-1">
-                                    {new Date(notification.created_at).toLocaleString()}
-                                  </p>
-                                </div>
-                              </div>
-                            </button>
-                          );
-                        })
+                        (() => {
+  const { individual, batched } = organizeNotifications(notifications);
+  const allNotifications = [...individual, ...batched];
+  
+  return allNotifications.map((notification) => {
+    const priorityColors = {
+      critical: 'bg-red-100 text-red-800 border-red-200',
+      high: 'bg-yellow-100 text-yellow-800 border-yellow-200', 
+      medium: 'bg-blue-100 text-blue-800 border-blue-200',
+      low: 'bg-gray-100 text-gray-800 border-gray-200'
+    };
+    
+    const isBatch = notification.type === 'batch';
+    
+    return (
+      <button
+        key={notification.id}
+        onClick={() => isBatch ? navigate('/dashboard') : handleNotificationClick(notification)}
+        className={`w-full p-4 text-left hover:bg-gray-50 transition-colors border-b border-gray-100 ${
+          !notification.read && !isBatch ? 'bg-blue-50/30' : ''
+        }`}
+      >
+        <div className="flex items-start space-x-3">
+          {/* Priority indicator */}
+          <div className={`mt-0.5 px-2 py-1 rounded-full text-xs font-medium ${
+            priorityColors[notification.priority] || priorityColors.low
+          }`}>
+            {isBatch ? 
+              `${notification.count}` : 
+              (notification.priority?.toUpperCase() || 'LOW')
+            }
+          </div>
+          
+          {/* Content */}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center justify-between">
+              <p className={`text-sm ${!notification.read && !isBatch ? 'font-semibold' : 'font-medium'} text-gray-900`}>
+                {notification.title}
+              </p>
+              <div className="flex items-center space-x-2 ml-2">
+                {!notification.read && !isBatch && (
+                  <div className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0" />
+                )}
+                {!isBatch && (
+                  <button
+                    onClick={(e) => dismissNotification(e, notification.id)}
+                    className="p-1 rounded hover:bg-gray-200 transition-colors group"
+                    aria-label="Dismiss notification"
+                  >
+                    <X className="w-3 h-3 text-gray-400 group-hover:text-gray-600" />
+                  </button>
+                )}
+              </div>
+            </div>
+            
+            <p className="text-sm text-gray-600 mt-0.5 line-clamp-2">
+              {notification.message}
+            </p>
+            
+            {!isBatch && notification.leads && (
+              <div className="mt-2 flex items-center text-xs text-gray-500">
+                <span className="font-medium">
+                  {notification.leads.name || 'Unknown Lead'}
+                </span>
+                <span className="mx-1">•</span>
+                <span>{notification.leads.campaigns?.name || 'No Campaign'}</span>
+              </div>
+            )}
+            
+            <p className="text-xs text-gray-400 mt-1">
+              {new Date(notification.created_at).toLocaleString()}
+            </p>
+          </div>
+        </div>
+      </button>
+    );
+  });
+})()
                       )}
                     </div>
                     
