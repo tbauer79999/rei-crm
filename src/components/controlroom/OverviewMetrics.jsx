@@ -1936,7 +1936,7 @@ export default function OverviewMetrics({ userId = null }) {
     
     try {
       console.log(`🔍 Fetching detailed data for ${metricType}`);
-      const data = await fetchDetailedMetrics(user.tenant_id, metricType, selectedPeriod);
+      const data = await fetchDetailedMetrics(user.tenant_id, null, metricType, selectedPeriod);
       console.log(`📊 Detailed data returned for ${metricType}:`, data);
       setModalData(data);
       
