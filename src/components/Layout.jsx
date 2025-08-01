@@ -327,6 +327,7 @@ export default function Layout({ children }) {
   // Refs for keyboard navigation and click outside
   const searchInputRef = useRef(null);
   const sidebarRef = useRef(null);
+  const prevUnreadCountRef = useRef(0);
 
   // Custom notification hook
   const {
@@ -339,29 +340,8 @@ export default function Layout({ children }) {
     retryCount
   } = useNotifications(user, role);
 
-  // Online/Offline detection
-  useEffect(() => {
-    const handleOnline = () => setIsOnline(true);
-    const handleOffline = () => setIsOnline(false);
-
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-    };
-  }, []);
-
-  // Auto-collapse sidebar on mobile after navigation
-  useEffect(() => {
-    setMobileOpen(false);
-  }, [location.pathname]);
-
   // Get page-specific messaging based on current route
   const getPageMessages = useCallback(() => {
-    const companyName = companyInfo.name;
-    
     switch (location.pathname) {
       case '/control-room':
         return {
@@ -497,11 +477,195 @@ export default function Layout({ children }) {
     }
   }, [navigate]);
 
+  // Enhanced search functionality with history
+  const performSearch = useCallback(async (query) => {
+    if (!query.trim() || query.length < 2) {
+      setSearchResults(null);
+      setShowSearchResults(false);
+      return;
+    }
+
+    console.log('🔍 Searching for:', query);
+    setIsSearching(true);
+    setShowSearchResults(true);
+
+    try {
+      const [leadsResult, campaignsResult] = await Promise.all([
+        supabase
+          .from('leads')
+          .select('id, name, email, phone, status, ai_status, ai_score')
+          .or(`name.ilike.%${query}%,email.ilike.%${query}%,phone.ilike.%${query}%`)
+          .limit(5),
+        
+        supabase
+          .from('campaigns')
+          .select('id, name, description, is_active, ai_on, start_date, end_date')
+          .or(`name.ilike.%${query}%,description.ilike.%${query}%`)
+          .eq('archived', false)
+          .limit(5)
+      ]);
+
+      const { data: leads, error: leadsError } = leadsResult;
+      const { data: campaigns, error: campaignsError } = campaignsResult;
+
+      if (leadsError) console.error('Error searching leads:', leadsError);
+      if (campaignsError) console.error('Error searching campaigns:', campaignsError);
+
+      setSearchResults({
+        leads: leads || [],
+        campaigns: campaigns || []
+      });
+
+      // Add to search history
+      setSearchHistory(prev => {
+        const filtered = prev.filter(item => item.query !== query);
+        return [{ query, timestamp: Date.now() }, ...filtered].slice(0, 10);
+      });
+
+    } catch (error) {
+      console.error('Search error:', error);
+      setSearchResults(null);
+    } finally {
+      setIsSearching(false);
+    }
+  }, [setSearchHistory]);
+
+  // Enhanced notification actions
+  const markAsRead = useCallback(async (notificationId) => {
+    try {
+      await supabase
+        .from('notifications')
+        .update({ read: true })
+        .eq('id', notificationId);
+
+      setNotifications(prev => 
+        prev.map(n => n.id === notificationId ? { ...n, read: true } : n)
+      );
+      setUnreadCount(prev => Math.max(0, prev - 1));
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
+    }
+  }, [setNotifications, setUnreadCount]);
+
+  const handleNotificationClick = useCallback((notification) => {
+    markAsRead(notification.id);
+    navigate(`/lead/${notification.lead_id}`);
+    setShowNotifications(false);
+  }, [markAsRead, navigate]);
+
+  const dismissNotification = useCallback(async (e, notificationId) => {
+    e.stopPropagation();
+    
+    try {
+      await supabase
+        .from('notifications')
+        .delete()
+        .eq('id', notificationId);
+
+      setNotifications(prev => prev.filter(n => n.id !== notificationId));
+      
+      const notification = notifications.find(n => n.id === notificationId);
+      if (notification && !notification.read) {
+        setUnreadCount(prev => Math.max(0, prev - 1));
+      }
+    } catch (error) {
+      console.error('Error dismissing notification:', error);
+    }
+  }, [notifications, setNotifications, setUnreadCount]);
+
+  const markAllAsRead = useCallback(async () => {
+    try {
+      const unreadIds = notifications.filter(n => !n.read).map(n => n.id);
+      
+      if (unreadIds.length > 0) {
+        await supabase
+          .from('notifications')
+          .update({ read: true })
+          .in('id', unreadIds);
+
+        setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+        setUnreadCount(0);
+      }
+    } catch (error) {
+      console.error('Error marking all as read:', error);
+    }
+  }, [notifications, setNotifications, setUnreadCount]);
+
+  const handleSearchResultClick = useCallback((type, item) => {
+    if (type === 'lead') {
+      navigate(`/lead/${item.id}`);
+    } else if (type === 'campaign') {
+      navigate(`/campaign/${item.id}`);
+    }
+    
+    setSearchQuery('');
+    setShowSearchResults(false);
+    setSearchResults(null);
+  }, [navigate]);
+
+  // Toggle favorite page
+  const toggleFavorite = useCallback((path, title) => {
+    setFavorites(prev => {
+      const exists = prev.find(fav => fav.path === path);
+      if (exists) {
+        return prev.filter(fav => fav.path !== path);
+      } else {
+        return [...prev, { path, title, timestamp: Date.now() }].slice(0, 10);
+      }
+    });
+  }, [setFavorites]);
+
+  const isFavorite = useCallback((path) => {
+    return favorites.some(fav => fav.path === path);
+  }, [favorites]);
+
+  // Sound notification system
+  const playNotificationSound = useCallback(() => {
+    if (!soundEnabled || !notificationPreferences.sound) return;
+    
+    try {
+      const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+LyxmwhBSKNyOrcjykGJHfI8N2QQAoUXrTp66hVFApGn+LyxmwhBSKNyOrcjykGJHfI8N2QQAoUXrTp66hVFApGn+LyxmwhBSKNyOrcjykGJHfI8N2QQAoUXrTp66hVFApGn+LyxmwhBSKNyOrcjykGJHfI8N2QQAoUXrTp66hVFApGn+LyxmwhBSKNyOrcjykGJHfI8N2QQAoUXrTp66hVFApGn+LyxmwhBSKNyOrcjykGJHfI8N2QQAoUXrTp66hVFApGn+LyxmwhBSKNyOrcjykGJHfI8N2QQAoUXrTp66hVFApGn+LyxmwhBSKNyOrcjykGJHfI8N2QQAoUXrTp66hVFApGn+LyxmwhBSKNyOrcjykGJHfI8N2QQAoUXrTp66hVFApGn+LyxmwhBSKNyOrcjykGJHfI8N2QQAoUXrTp66hVFApGn+LyxmwhBSKNyOrcjykGJHfI8N2QQAoUXrTp66hVFApGn+LyxmwhBSKNyOrcjykGJHfI8N2QQAoUXrTp66hVFApGn+LyxmwhBSKNyOrcjykGJHfI8N2QQAoUXrTp66hVFApGn+LyxmwhBSKNyOrcjykGJHfI8N2QQAoUXrTp66hVFApGn+LyxmwhBSKNyOrcjykGJHfI8N2QQAoUXrTp66hVFApGn+LyxmwhBSKNyOrcjykGJHfI8N2QQAoUXrTp66hVFApGn+LyxmwhBSKNyOrcjykGJHfI8N2QQAoUXrTp66hVFApGn+LyxmwhBSKNyOrcjykGJHfI8N2QQAoUXrTp66hVFApGn+LyxmwhBSKNyOrcjykGJHfI8N2QQAoUXrTp66hVFApGn+LyxmwhBSKNyOrcjykGJHfI8N2QQAoUXrTp66hVFApGn+LyxmwhBSKNyOrcjykGJHfI8N2QQAoUXrTp66hVFApGn+LyxmwhBSKNyOrcjykGJHfI8N2QQAoUXrTp66hVFApGn+LyxmwhBSKNyOrcjykGJHfI8N2QQAoUXrTp66hVFApGn+LyxmwhBSKNyOrcjykG');
+      audio.volume = 0.3;
+      audio.play().catch(e => console.log('Sound play failed:', e));
+    } catch (error) {
+      console.log('Sound not available:', error);
+    }
+  }, [soundEnabled, notificationPreferences.sound]);
+
+  // Memoized computations for performance
+  const navItems = useMemo(() => getNavItems(), [getNavItems]);
+  const companyInitials = useMemo(() => getCompanyInitials(), [getCompanyInitials]);
+  const pageMessages = useMemo(() => getPageMessages(), [getPageMessages]);
+  const filteredNotifications = useMemo(() => {
+    if (notificationFilter === 'all') return notifications;
+    if (notificationFilter === 'unread') return notifications.filter(n => !n.read);
+    return notifications.filter(n => n.priority === notificationFilter);
+  }, [notifications, notificationFilter]);
+
+  // Online/Offline detection
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  // Auto-collapse sidebar on mobile after navigation
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [location.pathname]);
+
   // Track recent pages
   useEffect(() => {
     const currentPage = {
       path: location.pathname,
-      title: getPageMessages().title,
+      title: pageMessages.title,
       timestamp: Date.now()
     };
 
@@ -509,7 +673,7 @@ export default function Layout({ children }) {
       const filtered = prev.filter(page => page.path !== currentPage.path);
       return [currentPage, ...filtered].slice(0, 5);
     });
-  }, [location.pathname, getPageMessages]);
+  }, [location.pathname, pageMessages]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -566,18 +730,14 @@ export default function Layout({ children }) {
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [navigate]);
 
-  // Sound notification system
-  const playNotificationSound = useCallback(() => {
-    if (!soundEnabled || !notificationPreferences.sound) return;
-    
-    try {
-      const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+LyxmwhBSKNyOrcjykGJHfI8N2QQAoUXrTp66hVFApGn+LyxmwhBSKNyOrcjykGJHfI8N2QQAoUXrTp66hVFApGn+LyxmwhBSKNyOrcjykGJHfI8N2QQAoUXrTp66hVFApGn+LyxmwhBSKNyOrcjykGJHfI8N2QQAoUXrTp66hVFApGn+LyxmwhBSKNyOrcjykGJHfI8N2QQAoUXrTp66hVFApGn+LyxmwhBSKNyOrcjykGJHfI8N2QQAoUXrTp66hVFApGn+LyxmwhBSKNyOrcjykGJHfI8N2QQAoUXrTp66hVFApGn+LyxmwhBSKNyOrcjykGJHfI8N2QQAoUXrTp66hVFApGn+LyxmwhBSKNyOrcjykGJHfI8N2QQAoUXrTp66hVFApGn+LyxmwhBSKNyOrcjykGJHfI8N2QQAoUXrTp66hVFApGn+LyxmwhBSKNyOrcjykGJHfI8N2QQAoUXrTp66hVFApGn+LyxmwhBSKNyOrcjykGJHfI8N2QQAoUXrTp66hVFApGn+LyxmwhBSKNyOrcjykGJHfI8N2QQAoUXrTp66hVFApGn+LyxmwhBSKNyOrcjykGJHfI8N2QQAoUXrTp66hVFApGn+LyxmwhBSKNyOrcjykGJHfI8N2QQAoUXrTp66hVFApGn+LyxmwhBSKNyOrcjykGJHfI8N2QQAoUXrTp66hVFApGn+LyxmwhBSKNyOrcjykGJHfI8N2QQAoUXrTp66hVFApGn+LyxmwhBSKNyOrcjykGJHfI8N2QQAoUXrTp66hVFApGn+LyxmwhBSKNyOrcjykGJHfI8N2QQAoUXrTp66hVFApGn+LyxmwhBSKNyOrcjykGJHfI8N2QQAoUXrTp66hVFApGn+LyxmwhBSKNyOrcjykGJHfI8N2QQAoUXrTp66hVFApGn+LyxmwhBSKNyOrcjykGJHfI8N2QQAoUXrTp66hVFApGn+LyxmwhBSKNyOrcjykGJHfI8N2QQAoUXrTp66hVFApGn+LyxmwhBSKNyOrcjykGJHfI8N2QQAoUXrTp66hVFApGn+LyxmwhBSKNyOrcjykGJHfI8N2QQAoUXrTp66hVFApGn+LyxmwhBSKNyOrcjykGJHfI8N2QQAoUXrTp66hVFApGn+LyxmwhBSKNyOrcjykGJHfI8N2QQAoUXrTp66hVFApGn+LyxmwhBSKNyOrcjykGJHfI8N2QQAoUXrTp66hVFApGn+LyxmwhBSKNyOrcjykGJHfI8N2QQAoUXrTp66hVFApGn+LyxmwhBSKNyOrcjykGJHfI8N2QQAoUXrTp66hVFApGn+LyxmwhBSKNyOrcjykGJHfI8N2QQAoUXrTp66hVFApGn+LyxmwhBSKNyOrcjykGJHfI8N2QQAoUXrTp66hVFApGn+LyxmwhBSKNyOrcjykGJHfI8N2QQAoUXrTp66hVFApGn+LyxmwhBSKNyOrcjykG');
-      audio.volume = 0.3;
-      audio.play().catch(e => console.log('Sound play failed:', e));
-    } catch (error) {
-      console.log('Sound not available:', error);
+  // Play sound for new notifications
+  useEffect(() => {
+    if (unreadCount > prevUnreadCountRef.current && prevUnreadCountRef.current !== 0) {
+      playNotificationSound();
     }
-  }, [soundEnabled, notificationPreferences.sound]);
+    
+    prevUnreadCountRef.current = unreadCount;
+  }, [unreadCount, playNotificationSound]);
 
   // Enhanced notification fetching with retry and sound
   useEffect(() => {
@@ -591,17 +751,6 @@ export default function Layout({ children }) {
 
     return () => clearInterval(pollInterval);
   }, [fetchNotifications]);
-
-  // Play sound for new notifications
-  const prevUnreadCountRef = useRef(unreadCount);
-  
-  useEffect(() => {
-    if (unreadCount > prevUnreadCountRef.current && prevUnreadCountRef.current !== 0) {
-      playNotificationSound();
-    }
-    
-    prevUnreadCountRef.current = unreadCount;
-  }, [unreadCount, playNotificationSound]);
 
   // Fetch company information with retry logic
   useEffect(() => {
@@ -748,170 +897,6 @@ export default function Layout({ children }) {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showTopUserMenu, showUserMenu, showSearchResults, showNotifications, showHelp]);
 
-  // Get page-specific messaging based on current route
-  const getPageMessages = useCallback(() => {
-    const companyName = companyInfo.name;
-    
-    switch (location.pathname) {
-      case '/control-room':
-        return {
-          title: companyInfo.industry === 'staffing' ? 'Candidate Pipeline Control Room' :
-                 companyInfo.industry === 'real estate' ? 'Lead Pipeline Control Room' :
-                 'SurFox Control Room',
-          subtitle: companyInfo.industry === 'staffing' ? 'Monitor and optimize your candidate pipeline' :
-                   companyInfo.industry === 'real estate' ? 'Monitor and optimize your lead pipeline' :
-                   'Monitor and optimize your business pipeline'
-        };
-        
-      case '/dashboard':
-        return {
-          title: 'Dashboard',
-          subtitle: companyInfo.industry === 'staffing' ? 'Overview of your recruitment metrics and performance' :
-                   companyInfo.industry === 'real estate' ? 'Overview of your real estate business performance' :
-                   'Overview of your business performance and key metrics'
-        };
-      case '/business-analytics':
-        return {
-          title: 'AI Strategy Hub',
-          subtitle: companyInfo.industry === 'staffing' ? 'Deep insights into your recruitment and staffing data' :
-                   companyInfo.industry === 'real estate' ? 'Deep insights into your real estate business data' :
-                   'Deep insights into your business data and trends'
-        };
-      case '/enterprise-analytics':
-        return {
-          title: 'Enterprise Analytics',
-          subtitle: 'Enterprise-level analytics and cross-business insights'
-        };
-      case '/campaign-management':
-        return {
-          title: 'Campaign Management',
-          subtitle: companyInfo.industry === 'staffing' ? 'Create and manage recruitment campaigns' :
-                   companyInfo.industry === 'real estate' ? 'Create and manage lead generation campaigns' :
-                   'Create and manage marketing campaigns'
-        };
-      case '/settings':
-        return {
-          title: 'Settings',
-          subtitle: 'Configure your account, team, and system preferences'
-        };
-      default:
-        return {
-          title: location.pathname.slice(1).split('-').map(word => 
-            word.charAt(0).toUpperCase() + word.slice(1)
-          ).join(' ') || 'Home',
-          subtitle: companyInfo.industry === 'staffing' ? 'Manage your staffing and recruitment operations' :
-                   companyInfo.industry === 'real estate' ? 'Manage your real estate business' :
-                   'Manage your business operations'
-        };
-    }
-  }, [location.pathname, companyInfo]);
-
-  // Dynamic navigation items based on user role
-  const getNavItems = useCallback(() => {
-    const baseItems = [
-      { path: '/control-room', label: 'Intelligence Center', icon: BarChart2, tourClass: 'tour-controlroom', shortcut: 'Alt+1' },
-      { path: '/dashboard', label: 'Pipeline', icon: Home, tourClass: 'tour-dashboard', shortcut: 'Alt+2' },
-    ];
-
-    const analyticsItems = [];
-    
-    if (canAccessEnterprise) {
-      analyticsItems.push({
-        path: '/enterprise-analytics', 
-        label: 'Enterprise Analytics', 
-        icon: TrendingUp,
-        tourClass: 'tour-enterprise'
-      });
-    }
-    
-    if (['global_admin', 'business_admin'].includes(role)) {
-      analyticsItems.push({
-        path: '/business-analytics', 
-        label: 'AI Strategy Hub', 
-        icon: Brain,
-        tourClass: 'tour-strategy',
-        shortcut: 'Alt+3'
-      });
-    }
-
-    analyticsItems.push({
-      path: '/campaign-management',
-      label: 'Campaign Management',
-      icon: Megaphone,
-      tourClass: 'tour-campaigns',
-      shortcut: 'Alt+4'
-    });
-
-    const endItems = [
-      { path: '/settings', label: 'Settings', icon: Settings, tourClass: 'tour-settings', shortcut: 'Alt+5' },
-    ];
-
-    return [...baseItems, ...analyticsItems, ...endItems];
-  }, [role, canAccessEnterprise]);
-
-  // Memoized computations for performance
-  const navItems = useMemo(() => getNavItems(), [getNavItems]);
-  const companyInitials = useMemo(() => getCompanyInitials(), [companyInfo]);
-  const pageMessages = useMemo(() => getPageMessages(), [getPageMessages]);
-  const filteredNotifications = useMemo(() => {
-    if (notificationFilter === 'all') return notifications;
-    if (notificationFilter === 'unread') return notifications.filter(n => !n.read);
-    return notifications.filter(n => n.priority === notificationFilter);
-  }, [notifications, notificationFilter]);
-
-  // Enhanced search functionality with history
-  const performSearch = useCallback(async (query) => {
-    if (!query.trim() || query.length < 2) {
-      setSearchResults(null);
-      setShowSearchResults(false);
-      return;
-    }
-
-    console.log('🔍 Searching for:', query);
-    setIsSearching(true);
-    setShowSearchResults(true);
-
-    try {
-      const [leadsResult, campaignsResult] = await Promise.all([
-        supabase
-          .from('leads')
-          .select('id, name, email, phone, status, ai_status, ai_score')
-          .or(`name.ilike.%${query}%,email.ilike.%${query}%,phone.ilike.%${query}%`)
-          .limit(5),
-        
-        supabase
-          .from('campaigns')
-          .select('id, name, description, is_active, ai_on, start_date, end_date')
-          .or(`name.ilike.%${query}%,description.ilike.%${query}%`)
-          .eq('archived', false)
-          .limit(5)
-      ]);
-
-      const { data: leads, error: leadsError } = leadsResult;
-      const { data: campaigns, error: campaignsError } = campaignsResult;
-
-      if (leadsError) console.error('Error searching leads:', leadsError);
-      if (campaignsError) console.error('Error searching campaigns:', campaignsError);
-
-      setSearchResults({
-        leads: leads || [],
-        campaigns: campaigns || []
-      });
-
-      // Add to search history
-      setSearchHistory(prev => {
-        const filtered = prev.filter(item => item.query !== query);
-        return [{ query, timestamp: Date.now() }, ...filtered].slice(0, 10);
-      });
-
-    } catch (error) {
-      console.error('Search error:', error);
-      setSearchResults(null);
-    } finally {
-      setIsSearching(false);
-    }
-  }, [setSearchHistory]);
-
   // Debounced search
   useEffect(() => {
     const delayDebounceFn = setTimeout(() => {
@@ -920,95 +905,6 @@ export default function Layout({ children }) {
 
     return () => clearTimeout(delayDebounceFn);
   }, [searchQuery, performSearch]);
-
-  // Enhanced notification actions
-  const markAsRead = useCallback(async (notificationId) => {
-    try {
-      await supabase
-        .from('notifications')
-        .update({ read: true })
-        .eq('id', notificationId);
-
-      setNotifications(prev => 
-        prev.map(n => n.id === notificationId ? { ...n, read: true } : n)
-      );
-      setUnreadCount(prev => Math.max(0, prev - 1));
-    } catch (error) {
-      console.error('Error marking notification as read:', error);
-    }
-  }, [setNotifications, setUnreadCount]);
-
-  const handleNotificationClick = useCallback((notification) => {
-    markAsRead(notification.id);
-    navigate(`/lead/${notification.lead_id}`);
-    setShowNotifications(false);
-  }, [markAsRead, navigate]);
-
-  const dismissNotification = useCallback(async (e, notificationId) => {
-    e.stopPropagation();
-    
-    try {
-      await supabase
-        .from('notifications')
-        .delete()
-        .eq('id', notificationId);
-
-      setNotifications(prev => prev.filter(n => n.id !== notificationId));
-      
-      const notification = notifications.find(n => n.id === notificationId);
-      if (notification && !notification.read) {
-        setUnreadCount(prev => Math.max(0, prev - 1));
-      }
-    } catch (error) {
-      console.error('Error dismissing notification:', error);
-    }
-  }, [notifications, setNotifications, setUnreadCount]);
-
-  const markAllAsRead = useCallback(async () => {
-    try {
-      const unreadIds = notifications.filter(n => !n.read).map(n => n.id);
-      
-      if (unreadIds.length > 0) {
-        await supabase
-          .from('notifications')
-          .update({ read: true })
-          .in('id', unreadIds);
-
-        setNotifications(prev => prev.map(n => ({ ...n, read: true })));
-        setUnreadCount(0);
-      }
-    } catch (error) {
-      console.error('Error marking all as read:', error);
-    }
-  }, [notifications, setNotifications, setUnreadCount]);
-
-  const handleSearchResultClick = useCallback((type, item) => {
-    if (type === 'lead') {
-      navigate(`/lead/${item.id}`);
-    } else if (type === 'campaign') {
-      navigate(`/campaign/${item.id}`);
-    }
-    
-    setSearchQuery('');
-    setShowSearchResults(false);
-    setSearchResults(null);
-  }, [navigate]);
-
-  // Toggle favorite page
-  const toggleFavorite = useCallback((path, title) => {
-    setFavorites(prev => {
-      const exists = prev.find(fav => fav.path === path);
-      if (exists) {
-        return prev.filter(fav => fav.path !== path);
-      } else {
-        return [...prev, { path, title, timestamp: Date.now() }].slice(0, 10);
-      }
-    });
-  }, [setFavorites]);
-
-  const isFavorite = useCallback((path) => {
-    return favorites.some(fav => fav.path === path);
-  }, [favorites]);
 
   // Dark mode effect
   useEffect(() => {
@@ -1745,7 +1641,7 @@ export default function Layout({ children }) {
                       <div className="inline-flex items-center">
                         <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-indigo-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 714 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                         </svg>
                         Searching...
                       </div>
@@ -1793,7 +1689,7 @@ export default function Layout({ children }) {
                                   </span>
                                 </div>
                               </div>
-                            </button>console.log("hello")
+                            </button>
                           ))}
                         </div>
                       )}
