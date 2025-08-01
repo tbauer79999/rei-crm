@@ -1793,7 +1793,7 @@ export default function Layout({ children }) {
                                   </span>
                                 </div>
                               </div>
-                            </button>
+                            </button>console.log("hello")
                           ))}
                         </div>
                       )}
