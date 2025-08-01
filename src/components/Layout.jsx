@@ -454,14 +454,14 @@ export default function Layout({ children }) {
   }, [fetchNotifications]);
 
   // Play sound for new notifications
+  const prevUnreadCountRef = useRef(unreadCount);
+  
   useEffect(() => {
-    const prevUnreadCount = useRef(unreadCount);
-    
-    if (unreadCount > prevUnreadCount.current && prevUnreadCount.current !== 0) {
+    if (unreadCount > prevUnreadCountRef.current && prevUnreadCountRef.current !== 0) {
       playNotificationSound();
     }
     
-    prevUnreadCount.current = unreadCount;
+    prevUnreadCountRef.current = unreadCount;
   }, [unreadCount, playNotificationSound]);
 
   // Fetch company information with retry logic
