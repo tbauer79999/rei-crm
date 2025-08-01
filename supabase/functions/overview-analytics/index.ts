@@ -1,995 +1,841 @@
-// supabase/functions/overview-analytics/index.ts
-import { createClient } from 'npm:@supabase/supabase-js';
-import { serve } from 'https://deno.land/std@0.178.0/http/server.ts';
-import { corsHeaders } from '../_shared/cors.ts';
 
-// Supabase Client Initialization for Edge Functions
-const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
-const supabaseServiceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+import React, { useEffect, useState } from 'react';
+import { useAuth } from '../../context/AuthContext';
+import { getFeatureValue } from '../../lib/plans';
+import { callEdgeFunction } from '../../lib/edgeFunctionAuth';
+import { 
+  X, TrendingUp, Users, Calendar, Mail, BarChart3, Target, 
+  MessageSquare, Activity, Clock, CheckCircle, Send, Inbox,
+  AlertTriangle, Lock
+} from 'lucide-react';
 
-serve(async (req: Request) => {
-  const authHeader = req.headers.get('Authorization') || '';
-  const jwt = authHeader.replace('Bearer ', '');
+// Updated Edge Function URL - Now points to sync_sales_metrics
+const BASE_EDGE_FUNCTION_URL = 'https://wuuqrdlfgkasnwydyvgk.supabase.co/functions/v1/sync_sales_metrics';
 
-  const supabase = createClient(supabaseUrl, supabaseAnonKey);
-  const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
-    global: {
-      headers: {
-        Authorization: `Bearer ${jwt}`,
-      },
-    },
-  });
+// Helper function to build API URL
+const buildApiUrl = (component, tenantId, period = '30days') => {
+  return `${BASE_EDGE_FUNCTION_URL}?action=fetch&component=${component}&tenant_id=${tenantId}&period=${period}`;
+};
 
-  interface UserProfileData {
-    tenant_id: string | null;
-    role: string;
-    email: string;
+// Modal configuration for each metric
+const MODAL_CONFIG = {
+  totalLeads: {
+    title: 'Total Leads Overview & Trends',
+    subtitle: 'Comprehensive insights into your lead generation performance',
+    icon: BarChart3,
+    iconColor: 'text-blue-600',
+    features: ['trend', 'sources', 'topSales', 'recentSignups']
+  },
+  weeklyLeads: {
+    title: 'Weekly Leads Performance & Trends',
+    subtitle: 'Week-over-week performance analysis and patterns',
+    icon: TrendingUp,
+    iconColor: 'text-green-600',
+    features: ['weeklyTrend', 'weeklySourceBreakdown', 'hotLeadCorrelation', 'weeklyInsights']
+  },
+  hotLeadRate: {
+    title: 'Hot Lead Conversion Performance & Optimization',
+    subtitle: 'Analyze and optimize your lead qualification rates',
+    icon: Target,
+    iconColor: 'text-orange-600',
+    features: ['hotRateTrend', 'hotRateByChannel', 'hotRateByTopic', 'timeToHot', 'hotLeadFunnel', 'optimizationTips']
+  },
+  replyRate: {
+    title: 'Reply Rate Insights',
+    subtitle: 'Message engagement and response analytics',
+    icon: MessageSquare,
+    iconColor: 'text-purple-600',
+    features: ['trend', 'responseTime', 'messageBreakdown']
+  },
+  activeLeads: {
+    title: 'Active Leads Management & Distribution',
+    subtitle: 'Current leads in your sales pipeline',
+    icon: Activity,
+    iconColor: 'text-cyan-600',
+    features: ['activeTrend', 'stageDistribution', 'stagnantLeads', 'ownerDistribution']
+  },
+  completedLeads: {
+    title: 'Completed Leads Analysis & Outcomes',
+    subtitle: 'Successfully closed leads and conversion insights',
+    icon: CheckCircle,
+    iconColor: 'text-green-600',
+    features: ['completedTrend', 'outcomeDistribution', 'disqualificationReasons', 'avgCompletionTime']
+  },
+  messagesSent: {
+    title: 'Outbound Message Performance',
+    subtitle: 'AI and system message analytics',
+    icon: Send,
+    iconColor: 'text-blue-600',
+    features: ['messageTrend', 'messageTypeDistribution', 'deliveryStats', 'engagementByType']
+  },
+  messagesReceived: {
+    title: 'Inbound Message & Intent Analysis',
+    subtitle: 'Customer communication insights',
+    icon: Inbox,
+    iconColor: 'text-purple-600',
+    features: ['messageTrend', 'sourceDistribution', 'topIntents', 'sentimentAnalysis', 'unhandledMessages']
   }
+};
 
-  async function getUserProfile(userId: string): Promise<UserProfileData> {
-    const { data, error } = await supabaseAdmin
-      .from('users_profile')
-      .select('tenant_id, role, email')
-      .eq('id', userId)
-      .single();
-
-    if (error || !data) {
-      console.error('Error fetching user profile:', error?.message || 'No data');
-      throw new Error('Unable to fetch user profile');
-    }
-    return data;
-  }
-
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
-  }
-
-  if (req.method !== 'GET') {
-    return new Response(JSON.stringify({ error: 'Method Not Allowed' }), {
-      status: 405,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
-  }
-
-  let user: { id: string; email: string; role: string; tenant_id: string | null } | null = null;
-
-  try {
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return new Response(JSON.stringify({
-        error: 'Authentication required',
-        hint: 'Include a valid Supabase token in Authorization header'
-      }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-    }
-
-    const token = authHeader.slice(7);
-    const { data: { user: supabaseUser }, error: authError } = await supabaseAdmin.auth.getUser(token);
-
-    if (authError || !supabaseUser) {
-      return new Response(JSON.stringify({ error: 'Invalid or expired token' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    const profile = await getUserProfile(supabaseUser.id);
-
-    user = {
-      id: supabaseUser.id,
-      email: supabaseUser.email || '',
-      role: profile.role,
-      tenant_id: profile.tenant_id
+// Shared Modal Wrapper Component
+const ModalWrapper = ({ isOpen, onClose, title, subtitle, children }) => {
+  useEffect(() => {
+    const handleEsc = (e) => {
+      if (e.key === 'Escape' && isOpen) {
+        onClose();
+      }
     };
-
-    if (!user.tenant_id && user.role !== 'global_admin') {
-      return new Response(JSON.stringify({ error: 'No tenant access configured' }), {
-        status: 403,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-  } catch (error: any) {
-    return new Response(JSON.stringify({
-      error: 'Authentication failed',
-      details: error.message
-    }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-  }
-
-  const url = new URL(req.url);
-  const fullPath = url.pathname;
-  const functionName = 'overview-analytics';
-  const basePathRegex = new RegExp(`^(\/functions\/v1)?\/${functionName}`);
-  const path = fullPath.replace(basePathRegex, '');
-  const { role, tenant_id } = user;
-
-  // Helper function to apply tenant filter
-  const applyTenantFilter = (query: any) => {
-    if (role !== 'global_admin') {
-      return query.eq('tenant_id', tenant_id);
-    }
-    return query;
-  };
-
-  try {
-    switch (path) {
-      case '/':
-      case '':
-        // Use COUNT queries to avoid 1000 limit - MINIMAL CHANGE
-        const now = new Date();
-        const weekAgo = new Date();
-        weekAgo.setDate(now.getDate() - 7);
-
-        // Get total leads count
-        let totalLeadsCountQuery = supabaseAdmin
-          .from('leads')
-          .select('*', { count: 'exact', head: true });
-        if (role !== 'global_admin') {
-          totalLeadsCountQuery = totalLeadsCountQuery.eq('tenant_id', tenant_id);
-        }
-        const { count: totalLeads } = await totalLeadsCountQuery;
-
-        // Get weekly leads count
-        let weeklyLeadsCountQuery = supabaseAdmin
-          .from('leads')
-          .select('*', { count: 'exact', head: true })
-          .gte('created_at', weekAgo.toISOString());
-        if (role !== 'global_admin') {
-          weeklyLeadsCountQuery = weeklyLeadsCountQuery.eq('tenant_id', tenant_id);
-        }
-        const { count: weeklyLeads } = await weeklyLeadsCountQuery;
-
-        // Get hot leads count
-        let hotLeadsCountQuery = supabaseAdmin
-          .from('leads')
-          .select('*', { count: 'exact', head: true })
-          .eq('status', 'Hot Lead');
-        if (role !== 'global_admin') {
-          hotLeadsCountQuery = hotLeadsCountQuery.eq('tenant_id', tenant_id);
-        }
-        const { count: hotLeads } = await hotLeadsCountQuery;
-
-        // Get active leads count
-        let activeLeadsCountQuery = supabaseAdmin
-          .from('leads')
-          .select('*', { count: 'exact', head: true })
-          .in('status', ['Engaging', 'Responding']);
-        if (role !== 'global_admin') {
-          activeLeadsCountQuery = activeLeadsCountQuery.eq('tenant_id', tenant_id);
-        }
-        const { count: activeLeads } = await activeLeadsCountQuery;
-
-        // Get completed leads count
-        let completedLeadsCountQuery = supabaseAdmin
-          .from('leads')
-          .select('*', { count: 'exact', head: true })
-          .in('status', ['Hot Lead', 'Opted Out', 'Unsubscribed', 'Disqualified']);
-        if (role !== 'global_admin') {
-          completedLeadsCountQuery = completedLeadsCountQuery.eq('tenant_id', tenant_id);
-        }
-        const { count: completedLeads } = await completedLeadsCountQuery;
-
-        // Get messages counts
-        let messagesSentCountQuery = supabaseAdmin
-          .from('messages')
-          .select('*', { count: 'exact', head: true })
-          .eq('direction', 'outbound');
-        if (role !== 'global_admin') {
-          messagesSentCountQuery = messagesSentCountQuery.eq('tenant_id', tenant_id);
-        }
-        const { count: messagesSent } = await messagesSentCountQuery;
-
-        let messagesReceivedCountQuery = supabaseAdmin
-          .from('messages')
-          .select('*', { count: 'exact', head: true })
-          .eq('direction', 'inbound');
-        if (role !== 'global_admin') {
-          messagesReceivedCountQuery = messagesReceivedCountQuery.eq('tenant_id', tenant_id);
-        }
-        const { count: messagesReceived } = await messagesReceivedCountQuery;
-
-        // For reply rate, we still need to fetch lead_ids (but this is much smaller dataset)
-        let repliedLeadsQuery = supabaseAdmin
-          .from('messages')
-          .select('lead_id')
-          .eq('direction', 'inbound')
-          .not('lead_id', 'is', null);
-        if (role !== 'global_admin') {
-          repliedLeadsQuery = repliedLeadsQuery.eq('tenant_id', tenant_id);
-        }
-        const { data: repliedLeadsData } = await repliedLeadsQuery;
-
-        const repliedLeadIds = new Set(repliedLeadsData?.map(m => m.lead_id) || []);
-        const replyRate = totalLeads && totalLeads > 0 ? (repliedLeadIds.size / totalLeads) * 100 : 0;
-        const hotLeadRate = totalLeads && totalLeads > 0 ? ((hotLeads || 0) / totalLeads) * 100 : 0;
-
-        const result = {
-          totalLeads: totalLeads || 0,
-          weeklyLeads: weeklyLeads || 0,
-          hotLeadRate: Number(hotLeadRate.toFixed(1)),
-          replyRate: Number(replyRate.toFixed(1)),
-          activeLeads: activeLeads || 0,
-          completedLeads: completedLeads || 0,
-          messagesSent: messagesSent || 0,
-          messagesReceived: messagesReceived || 0,
-          meta: { role, tenant_id }
-        };
-
-        return new Response(JSON.stringify(result), {
-          status: 200,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-
-      // DETAILED ANALYTICS ENDPOINTS
-      case '/details/total-leads':
-        const totalPeriod = parseInt(url.searchParams.get('period') || '30');
-        const startDate = new Date();
-        startDate.setDate(startDate.getDate() - totalPeriod);
-
-        // Get all leads for the period
-        let totalLeadsDetailQuery = applyTenantFilter(
-          supabaseAdmin
-            .from('leads')
-            .select('id, name, email, status, created_at, campaign')
-            .gte('created_at', startDate.toISOString())
-            .order('created_at', { ascending: false })
-        );
-
-        const { data: totalLeadsData, error: totalLeadsError } = await totalLeadsDetailQuery;
-        if (totalLeadsError) throw totalLeadsError;
-
-        // Generate trend data
-        const trendData: { date: string; count: number }[] = [];
-        const dateMap = new Map<string, number>();
-
-        totalLeadsData.forEach((lead: any) => {
-          const date = new Date(lead.created_at).toISOString().split('T')[0];
-          dateMap.set(date, (dateMap.get(date) || 0) + 1);
-        });
-
-        // Fill in missing dates with 0
-        for (let d = new Date(startDate); d <= new Date(); d.setDate(d.getDate() + 1)) {
-          const dateStr = d.toISOString().split('T')[0];
-          trendData.push({
-            date: dateStr,
-            count: dateMap.get(dateStr) || 0
-          });
-        }
-
-        // Campaign/source distribution
-        const campaignCounts = new Map<string, number>();
-        totalLeadsData.forEach((lead: any) => {
-          const campaign = lead.campaign || 'Direct';
-          campaignCounts.set(campaign, (campaignCounts.get(campaign) || 0) + 1);
-        });
-
-        const sourceData = Array.from(campaignCounts.entries())
-          .map(([source, count]) => ({
-            source,
-            count,
-            color: getColorForSource(source)
-          }))
-          .sort((a, b) => b.count - a.count)
-          .slice(0, 5);
-
-        // Recent signups
-        const recentSignups = totalLeadsData.slice(0, 10).map((lead: any) => ({
-          id: lead.id,
-          name: lead.name || 'Anonymous',
-          email: lead.email || 'No email',
-          signupDate: new Date(lead.created_at).toISOString().split('T')[0],
-          source: lead.campaign || 'Direct'
-        }));
-
-        return new Response(JSON.stringify({
-          trendData,
-          sourceData,
-          recentSignups,
-          totalCount: totalLeadsData.length,
-          meta: { role, tenant_id }
-        }), {
-          status: 200,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-
-      case '/details/weekly-leads':
-        const weeks = parseInt(url.searchParams.get('weeks') || '8');
-        const weeklyStartDate = new Date();
-        weeklyStartDate.setDate(weeklyStartDate.getDate() - (weeks * 7));
-
-        let weeklyLeadsQuery = applyTenantFilter(
-          supabaseAdmin
-            .from('leads')
-            .select('id, created_at, status, campaign')
-            .gte('created_at', weeklyStartDate.toISOString())
-        );
-
-        const { data: weeklyLeadsData, error: weeklyError } = await weeklyLeadsQuery;
-        if (weeklyError) throw weeklyError;
-
-        // Group by week
-        const weeklyData: any[] = [];
-        const weekMap = new Map<string, any>();
-
-        weeklyLeadsData.forEach((lead: any) => {
-          const date = new Date(lead.created_at);
-          const weekStart = new Date(date);
-          weekStart.setDate(date.getDate() - date.getDay());
-          const weekKey = weekStart.toISOString().split('T')[0];
-
-          if (!weekMap.has(weekKey)) {
-            weekMap.set(weekKey, {
-              weekStartDate: weekKey,
-              leads: [],
-              sources: new Map<string, number>()
-            });
-          }
-
-          const week = weekMap.get(weekKey);
-          week.leads.push(lead);
-          const source = lead.campaign || 'Direct';
-          week.sources.set(source, (week.sources.get(source) || 0) + 1);
-        });
-
-        // Convert to array and calculate metrics
-        const sortedWeeks = Array.from(weekMap.entries())
-          .sort((a, b) => a[0].localeCompare(b[0]))
-          .slice(-weeks);
-
-        const weeklyTrendData = sortedWeeks.map(([weekKey, weekData], index) => {
-          const currentWeekLeads = weekData.leads.length;
-          const previousWeekLeads = index > 0 ? sortedWeeks[index - 1][1].leads.length : currentWeekLeads;
-          const growthPercentage = previousWeekLeads > 0 
-            ? Math.round(((currentWeekLeads - previousWeekLeads) / previousWeekLeads) * 100)
-            : 0;
-
-          return {
-            weekStartDate: weekKey,
-            currentWeekLeads,
-            previousWeekLeads: index > 0 ? previousWeekLeads : null,
-            growthPercentage
-          };
-        });
-
-        // Source breakdown by week
-        const weeklySourceData = sortedWeeks.map(([weekKey, weekData]) => ({
-          weekStartDate: weekKey,
-          sources: Array.from(weekData.sources.entries()).map(([name, count]) => ({
-            name,
-            count
-          }))
-        }));
-
-        // Calculate hot lead correlation
-        const hotLeadsInPeriod = weeklyLeadsData.filter((l: any) => l.status === 'Hot Lead').length;
-        const avgHotRate = weeklyLeadsData.length > 0 
-          ? ((hotLeadsInPeriod / weeklyLeadsData.length) * 100).toFixed(1)
-          : '0';
-
-        return new Response(JSON.stringify({
-          weeklyTrendData,
-          weeklySourceData,
-          avgHotRate,
-          totalHotLeads: hotLeadsInPeriod,
-          bestWeek: weeklyTrendData.reduce((best, week) => 
-            week.currentWeekLeads > (best?.currentWeekLeads || 0) ? week : best
-          )?.weekStartDate || 'N/A',
-          weeklyInsights: generateWeeklyInsights(weeklyTrendData),
-          meta: { role, tenant_id }
-        }), {
-          status: 200,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-
-      case '/details/hot-lead-rate':
-        const hotPeriod = parseInt(url.searchParams.get('period') || '30');
-        const hotStartDate = new Date();
-        hotStartDate.setDate(hotStartDate.getDate() - hotPeriod);
-
-        let hotLeadsDetailQuery = applyTenantFilter(
-          supabaseAdmin
-            .from('leads')
-            .select('id, status, created_at, marked_hot_at, campaign, status_history')
-            .gte('created_at', hotStartDate.toISOString())
-        );
-
-        const { data: hotLeadsData, error: hotError } = await hotLeadsDetailQuery;
-        if (hotError) throw hotError;
-
-        // Calculate hot rate trend
-        const hotRateTrendData: { date: string; hotRate: number }[] = [];
-        const dailyStats = new Map<string, { total: number; hot: number }>();
-
-        hotLeadsData.forEach((lead: any) => {
-          const date = new Date(lead.created_at).toISOString().split('T')[0];
-          const stats = dailyStats.get(date) || { total: 0, hot: 0 };
-          stats.total++;
-          if (lead.status === 'Hot Lead') stats.hot++;
-          dailyStats.set(date, stats);
-        });
-
-        for (let d = new Date(hotStartDate); d <= new Date(); d.setDate(d.getDate() + 1)) {
-          const dateStr = d.toISOString().split('T')[0];
-          const stats = dailyStats.get(dateStr) || { total: 0, hot: 0 };
-          hotRateTrendData.push({
-            date: dateStr,
-            hotRate: stats.total > 0 ? (stats.hot / stats.total) * 100 : 0
-          });
-        }
-
-        // Hot rate by channel
-        const channelStats = new Map<string, { total: number; hot: number }>();
-        hotLeadsData.forEach((lead: any) => {
-          const channel = lead.campaign || 'Direct';
-          const stats = channelStats.get(channel) || { total: 0, hot: 0 };
-          stats.total++;
-          if (lead.status === 'Hot Lead') stats.hot++;
-          channelStats.set(channel, stats);
-        });
-
-        const hotRateByChannelData = Array.from(channelStats.entries())
-          .map(([channel, stats]) => ({
-            channel,
-            hotRate: stats.total > 0 ? stats.hot / stats.total : 0
-          }))
-          .sort((a, b) => b.hotRate - a.hotRate);
-
-        // Time to hot conversion
-        const conversionTimes: number[] = [];
-        hotLeadsData.forEach((lead: any) => {
-          if (lead.status === 'Hot Lead' && lead.marked_hot_at) {
-            const createdTime = new Date(lead.created_at).getTime();
-            const hotTime = new Date(lead.marked_hot_at).getTime();
-            const minutes = (hotTime - createdTime) / (1000 * 60);
-            if (minutes > 0) conversionTimes.push(minutes);
-          }
-        });
-
-        const timeToHotData = {
-          avgMinutes: conversionTimes.length > 0 
-            ? Math.round(conversionTimes.reduce((a, b) => a + b) / conversionTimes.length)
-            : 0,
-          medianMinutes: conversionTimes.length > 0
-            ? Math.round(conversionTimes.sort((a, b) => a - b)[Math.floor(conversionTimes.length / 2)])
-            : 0,
-          distribution: calculateTimeDistribution(conversionTimes)
-        };
-
-        // Funnel data
-        const funnelData = [
-          { 
-            stage: 'Initial Contact', 
-            count: hotLeadsData.length,
-            conversionToNext: hotLeadsData.filter((l: any) => 
-              ['Warm Lead', 'Engaging', 'Responding', 'Hot Lead'].includes(l.status)
-            ).length / hotLeadsData.length * 100
-          },
-          { 
-            stage: 'Qualified Response', 
-            count: hotLeadsData.filter((l: any) => 
-              ['Warm Lead', 'Engaging', 'Responding', 'Hot Lead'].includes(l.status)
-            ).length,
-            conversionToNext: hotLeadsData.filter((l: any) => 
-              ['Engaging', 'Responding', 'Hot Lead'].includes(l.status)
-            ).length / hotLeadsData.filter((l: any) => 
-              ['Warm Lead', 'Engaging', 'Responding', 'Hot Lead'].includes(l.status)
-            ).length * 100
-          },
-          { 
-            stage: 'Strong Interest', 
-            count: hotLeadsData.filter((l: any) => 
-              ['Engaging', 'Responding', 'Hot Lead'].includes(l.status)
-            ).length,
-            conversionToNext: hotLeadsData.filter((l: any) => l.status === 'Hot Lead').length / 
-              hotLeadsData.filter((l: any) => ['Engaging', 'Responding', 'Hot Lead'].includes(l.status)).length * 100
-          },
-          { 
-            stage: 'Hot Lead', 
-            count: hotLeadsData.filter((l: any) => l.status === 'Hot Lead').length
-          }
-        ];
-
-        return new Response(JSON.stringify({
-          hotRateTrendData,
-          targetHotRate: 15,
-          hotRateByChannelData,
-          timeToHotData,
-          funnelData,
-          optimizationTips: generateOptimizationTips(hotRateByChannelData, timeToHotData),
-          meta: { role, tenant_id }
-        }), {
-          status: 200,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-
-      case '/details/active-leads':
-        let activeLeadsQuery = applyTenantFilter(
-          supabaseAdmin
-            .from('leads')
-            .select('id, status, created_at, campaign')
-            .in('status', ['New Lead', 'Cold Lead', 'Warm Lead', 'Engaging', 'Responding'])
-        );
-
-        const { data: activeLeadsData, error: activeError } = await activeLeadsQuery;
-        if (activeError) throw activeError;
-
-        // Trend data (last 30 days)
-        const activeTrendData: { date: string; count: number }[] = [];
-        const last30Days = new Date();
-        last30Days.setDate(last30Days.getDate() - 30);
-
-        for (let d = new Date(last30Days); d <= new Date(); d.setDate(d.getDate() + 1)) {
-          const dateStr = d.toISOString().split('T')[0];
-          const count = activeLeadsData.filter((lead: any) => 
-            new Date(lead.created_at) <= d
-          ).length;
-          activeTrendData.push({ date: dateStr, count });
-        }
-
-        // Stage distribution
-        const stageColors: { [key: string]: string } = {
-          'New Lead': '#3B82F6',
-          'Cold Lead': '#6B7280',
-          'Warm Lead': '#F59E0B',
-          'Engaging': '#10B981',
-          'Responding': '#8B5CF6'
-        };
-
-        const stageCounts = new Map<string, number>();
-        activeLeadsData.forEach((lead: any) => {
-          stageCounts.set(lead.status, (stageCounts.get(lead.status) || 0) + 1);
-        });
-
-        const stageData = Array.from(stageCounts.entries()).map(([source, count]) => ({
-          source,
-          count,
-          color: stageColors[source] || '#6B7280'
-        }));
-
-        // For now, simulate owner distribution (since we don't have owner data)
-        const ownerData = [
-          { source: 'AI Bot', count: Math.floor(activeLeadsData.length * 0.6), color: '#3B82F6' },
-          { source: 'Unassigned', count: Math.floor(activeLeadsData.length * 0.4), color: '#6B7280' }
-        ];
-
-        // Identify stagnant leads (no activity in 7+ days)
-        // Since we don't have last_interaction, we'll use created_at as proxy
-        const sevenDaysAgo = new Date();
-        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-
-        const stagnantLeads = activeLeadsData
-          .filter((lead: any) => new Date(lead.created_at) < sevenDaysAgo)
-          .slice(0, 10)
-          .map((lead: any) => ({
-            leadId: lead.id,
-            name: lead.name || 'Anonymous Lead',
-            currentStatus: lead.status,
-            assignedTo: 'AI Bot',
-            lastInteraction: new Date(lead.created_at).toISOString().split('T')[0],
-            daysStagnant: Math.floor((new Date().getTime() - new Date(lead.created_at).getTime()) / (1000 * 60 * 60 * 24))
-          }));
-
-        return new Response(JSON.stringify({
-          trendData: activeTrendData,
-          stageData,
-          ownerData,
-          stagnantLeads,
-          totalActive: activeLeadsData.length,
-          meta: { role, tenant_id }
-        }), {
-          status: 200,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-
-      case '/details/completed-leads':
-        const completedPeriod = parseInt(url.searchParams.get('period') || '30');
-        const completedStartDate = new Date();
-        completedStartDate.setDate(completedStartDate.getDate() - completedPeriod);
-
-        let completedLeadsQuery = applyTenantFilter(
-          supabaseAdmin
-            .from('leads')
-            .select('id, status, created_at, marked_hot_at, opt_out_reason')
-            .in('status', ['Hot Lead', 'Opted Out', 'Unsubscribed', 'Disqualified'])
-            .gte('created_at', completedStartDate.toISOString())
-        );
-
-        const { data: completedLeadsData, error: completedError } = await completedLeadsQuery;
-        if (completedError) throw completedError;
-
-        // Trend data
-        const completedTrendData: { date: string; count: number }[] = [];
-        const completedDateMap = new Map<string, number>();
-
-        completedLeadsData.forEach((lead: any) => {
-          const date = new Date(lead.created_at).toISOString().split('T')[0];
-          completedDateMap.set(date, (completedDateMap.get(date) || 0) + 1);
-        });
-
-        for (let d = new Date(completedStartDate); d <= new Date(); d.setDate(d.getDate() + 1)) {
-          const dateStr = d.toISOString().split('T')[0];
-          completedTrendData.push({
-            date: dateStr,
-            count: completedDateMap.get(dateStr) || 0
-          });
-        }
-
-        // Outcome distribution
-        const outcomeCounts = new Map<string, number>();
-        completedLeadsData.forEach((lead: any) => {
-          const status = lead.status === 'Hot Lead' ? 'Converted to Customer' : lead.status;
-          outcomeCounts.set(status, (outcomeCounts.get(status) || 0) + 1);
-        });
-
-        const outcomeData = Array.from(outcomeCounts.entries()).map(([status, count]) => ({
-          status,
-          count
-        }));
-
-        // Disqualification reasons (from opt_out_reason field)
-        const reasonCounts = new Map<string, number>();
-        completedLeadsData
-          .filter((lead: any) => lead.opt_out_reason)
-          .forEach((lead: any) => {
-            reasonCounts.set(lead.opt_out_reason, (reasonCounts.get(lead.opt_out_reason) || 0) + 1);
-          });
-
-        const disqualificationReasons = Array.from(reasonCounts.entries())
-          .map(([reason, count]) => ({ reason, count }))
-          .sort((a, b) => b.count - a.count)
-          .slice(0, 5);
-
-        // Average completion time
-        const completionTimes: number[] = [];
-        completedLeadsData.forEach((lead: any) => {
-          if (lead.marked_hot_at) {
-            const days = Math.floor(
-              (new Date(lead.marked_hot_at).getTime() - new Date(lead.created_at).getTime()) / 
-              (1000 * 60 * 60 * 24)
-            );
-            if (days > 0) completionTimes.push(days);
-          }
-        });
-
-        const avgCompletionTime = completionTimes.length > 0
-          ? (completionTimes.reduce((a, b) => a + b) / completionTimes.length).toFixed(1)
-          : '0';
-
-        return new Response(JSON.stringify({
-          trendData: completedTrendData,
-          outcomeData,
-          disqualificationReasons,
-          avgCompletionTime,
-          totalCompleted: completedLeadsData.length,
-          meta: { role, tenant_id }
-        }), {
-          status: 200,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-
-      case '/details/messages':
-        const messageType = url.searchParams.get('type') || 'sent';
-        const messagePeriod = parseInt(url.searchParams.get('period') || '30');
-        const messageStartDate = new Date();
-        messageStartDate.setDate(messageStartDate.getDate() - messagePeriod);
-
-        let messagesDetailQuery = applyTenantFilter(
-          supabaseAdmin
-            .from('messages')
-            .select('id, direction, timestamp, lead_id, message_body')
-            .gte('timestamp', messageStartDate.toISOString())
-        );
-
-        if (messageType === 'sent') {
-          messagesDetailQuery = messagesDetailQuery.eq('direction', 'outbound');
-        } else {
-          messagesDetailQuery = messagesDetailQuery.eq('direction', 'inbound');
-        }
-
-        const { data: messagesData, error: messagesError } = await messagesDetailQuery;
-        if (messagesError) throw messagesError;
-
-        // Trend data
-        const messageTrendData: { date: string; count: number }[] = [];
-        const messageDateMap = new Map<string, number>();
-
-        messagesData.forEach((msg: any) => {
-          const date = new Date(msg.timestamp).toISOString().split('T')[0];
-          messageDateMap.set(date, (messageDateMap.get(date) || 0) + 1);
-        });
-
-        for (let d = new Date(messageStartDate); d <= new Date(); d.setDate(d.getDate() + 1)) {
-          const dateStr = d.toISOString().split('T')[0];
-          messageTrendData.push({
-            date: dateStr,
-            count: messageDateMap.get(dateStr) || 0
-          });
-        }
-
-        if (messageType === 'sent') {
-          // For sent messages, simulate message type distribution
-          const messageTypeData = [
-            { source: 'Initial Outreach', count: Math.floor(messagesData.length * 0.4), color: '#3B82F6' },
-            { source: 'Follow-up', count: Math.floor(messagesData.length * 0.3), color: '#10B981' },
-            { source: 'Qualification', count: Math.floor(messagesData.length * 0.2), color: '#F59E0B' },
-            { source: 'Nurture', count: Math.floor(messagesData.length * 0.1), color: '#8B5CF6' }
-          ];
-
-          // Simulate delivery stats
-          const deliveryStats = [
-            { label: 'Total Sent', value: messagesData.length.toString() },
-            { label: 'Delivered', value: Math.floor(messagesData.length * 0.96).toString(), percentage: 96 },
-            { label: 'Failed', value: Math.floor(messagesData.length * 0.04).toString(), percentage: 4 },
-            { label: 'Opened', value: Math.floor(messagesData.length * 0.40).toString(), percentage: 40 }
-          ];
-
-          // Simulate engagement data
-          const engagementData = [
-            { type: 'Initial Outreach', rate: 0.35 },
-            { type: 'Follow-up', rate: 0.42 },
-            { type: 'Qualification', rate: 0.58 },
-            { type: 'Nurture', rate: 0.28 }
-          ];
-
-          return new Response(JSON.stringify({
-            trendData: messageTrendData,
-            messageTypeData,
-            deliveryStats,
-            engagementData,
-            totalCount: messagesData.length,
-            meta: { role, tenant_id }
-          }), {
-            status: 200,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          });
-        } else {
-          // For received messages
-          const sourceData = [
-            { source: 'Web Chat', count: Math.floor(messagesData.length * 0.4), color: '#3B82F6' },
-            { source: 'Email', count: Math.floor(messagesData.length * 0.3), color: '#10B981' },
-            { source: 'SMS', count: Math.floor(messagesData.length * 0.2), color: '#F59E0B' },
-            { source: 'Phone', count: Math.floor(messagesData.length * 0.1), color: '#8B5CF6' }
-          ];
-
-          // Simulate top intents
-          const topIntents = [
-            { intent: 'Pricing Inquiry', count: Math.floor(messagesData.length * 0.25) },
-            { intent: 'Demo Request', count: Math.floor(messagesData.length * 0.20) },
-            { intent: 'Technical Support', count: Math.floor(messagesData.length * 0.15) },
-            { intent: 'Feature Question', count: Math.floor(messagesData.length * 0.10) },
-            { intent: 'General Info', count: Math.floor(messagesData.length * 0.08) }
-          ];
-
-          // Simulate sentiment
-          const sentimentData = [
-            { sentiment: 'Positive', count: Math.floor(messagesData.length * 0.55) },
-            { sentiment: 'Neutral', count: Math.floor(messagesData.length * 0.37) },
-            { sentiment: 'Negative', count: Math.floor(messagesData.length * 0.08) }
-          ];
-
-          // Simulate unhandled messages
-          const unhandledMessages = messagesData.slice(0, 3).map((msg: any) => ({
-            messageId: msg.id,
-            content: (msg.message_body || '').substring(0, 50),
-            date: new Date(msg.timestamp).toISOString().split('T')[0],
-            confidence: Math.random() * 0.5
-          }));
-
-          return new Response(JSON.stringify({
-            trendData: messageTrendData,
-            sourceData,
-            topIntents,
-            sentimentData,
-            unhandledMessages,
-            totalCount: messagesData.length,
-            meta: { role, tenant_id }
-          }), {
-            status: 200,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          });
-        }
-
-      case '/analytics-trend-cost':
-        const nowTrend = new Date();
-        const thisWeekStart = new Date(nowTrend);
-        thisWeekStart.setDate(nowTrend.getDate() - 7);
-        const lastWeekStart = new Date(nowTrend);
-        lastWeekStart.setDate(nowTrend.getDate() - 14);
-
-        let leadsTrendQuery = supabaseAdmin
-          .from('leads')
-          .select('id, created_at, status');
-
-        if (role !== 'global_admin') {
-          leadsTrendQuery = leadsTrendQuery.eq('tenant_id', tenant_id);
-        }
-
-        const { data: leadsTrend, error: leadTrendError } = await leadsTrendQuery;
-
-        if (leadTrendError) throw leadTrendError;
-
-        const grouped: { [key: string]: { total: number; hot: number } } = {};
-        let totalHotLeads = 0;
-        let previousHotLeads = 0;
-
-        (leadsTrend || []).forEach((lead: any) => {
-          const created = new Date(lead.created_at);
-          const dateKey = created.toISOString().slice(0, 10);
-          if (!grouped[dateKey]) grouped[dateKey] = { total: 0, hot: 0 };
-          grouped[dateKey].total++;
-          if (lead.status === 'Hot Lead') {
-            grouped[dateKey].hot++;
-            totalHotLeads++;
-            if (created > lastWeekStart && created <= thisWeekStart) {
-              previousHotLeads++;
-            }
-          }
-        });
-
-        const trend = Object.entries(grouped).map(([date, data]) => ({
-          date,
-          hotRate: data.total ? ((data.hot / data.total) * 100).toFixed(1) : 0,
-        }));
-        let messagesTrendQuery = supabaseAdmin
-          .from('messages')
-          .select('timestamp, direction');
-
-        if (role !== 'global_admin') {
-          messagesTrendQuery = messagesTrendQuery.eq('tenant_id', tenant_id);
-        }
-
-        const { data: messagesTrend, error: msgTrendError } = await messagesTrendQuery;
-
-        if (msgTrendError) throw msgTrendError;
-
-        let totalMessagesSent = 0;
-        let previousMessagesSent = 0;
-
-        (messagesTrend || []).forEach((msg: any) => {
-          const ts = new Date(msg.timestamp);
-          if (msg.direction === 'outbound') {
-            totalMessagesSent++;
-            if (ts > lastWeekStart && ts <= thisWeekStart) {
-              previousMessagesSent++;
-            }
-          }
-        });
-
-        const trendResult = {
-          trend,
-          totalMessagesSent,
-          totalHotLeads,
-          previousMessagesSent,
-          previousHotLeads,
-          meta: { role, tenant_id }
-        };
-
-        return new Response(JSON.stringify(trendResult), {
-          status: 200,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-
-      case '/debug-data':
-        let leadsDebugQuery = supabaseAdmin
-          .from('leads')
-          .select('tenant_id, id, status, created_at')
-          .limit(20);
-
-        if (role !== 'global_admin') {
-          leadsDebugQuery = leadsDebugQuery.eq('tenant_id', tenant_id);
-        }
-
-        const { data: allLeadsDebug, error: allLeadsDebugError } = await leadsDebugQuery;
-
-        let messagesDebugQuery = supabaseAdmin
-          .from('messages')
-          .select('tenant_id, id, direction')
-          .limit(20);
-
-        if (role !== 'global_admin') {
-          messagesDebugQuery = messagesDebugQuery.eq('tenant_id', tenant_id);
-        }
-
-        const { data: allMessagesDebug, error: allMsgDebugError } = await messagesDebugQuery;
-
-        const debugResult = {
-          userRole: role,
-          userTenantId: tenant_id,
-          leadsFound: allLeadsDebug ? allLeadsDebug.length : 0,
-          messagesFound: allMessagesDebug ? allMessagesDebug.length : 0,
-          sampleLeads: allLeadsDebug ? allLeadsDebug.slice(0, 3) : [],
-          sampleMessages: allMessagesDebug ? allMessagesDebug.slice(0, 3) : [],
-          meta: { role, tenant_id }
-        };
-
-        return new Response(JSON.stringify(debugResult), {
-          status: 200,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-
-      default:
-        return new Response(JSON.stringify({ error: 'Not Found' }), {
-          status: 404,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-    }
-  } catch (err: any) {
-    return new Response(JSON.stringify({
-      error: 'Server error',
-      details: err.message
-    }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
-  }
-});
-
-// Helper functions
-function getColorForSource(source: string): string {
-  const colors: { [key: string]: string } = {
-    'Website': '#3B82F6',
-    'Paid Ads': '#10B981',
-    'Referral': '#F59E0B',
-    'Cold Outreach': '#8B5CF6',
-    'Social Media': '#EF4444',
-    'Direct': '#6B7280'
-  };
-  return colors[source] || '#6B7280';
-}
-
-function calculateTimeDistribution(times: number[]): any[] {
-  if (times.length === 0) return [];
-  
-  const ranges = [
-    { range: '< 1 hour', min: 0, max: 60 },
-    { range: '1-2 hours', min: 60, max: 120 },
-    { range: '2-4 hours', min: 120, max: 240 },
-    { range: '> 4 hours', min: 240, max: Infinity }
+    window.addEventListener('keydown', handleEsc);
+    return () => window.removeEventListener('keydown', handleEsc);
+  }, [isOpen, onClose]);
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div 
+        className="absolute inset-0 bg-black bg-opacity-50 backdrop-blur-sm"
+        onClick={onClose}
+      />
+      
+      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-6xl max-h-[90vh] m-2 lg:m-4 overflow-hidden">
+        <div className="border-b border-gray-200 px-4 lg:px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div className="min-w-0 flex-1">
+              <h2 className="text-lg lg:text-2xl font-bold text-gray-900 truncate">{title}</h2>
+              <p className="text-sm text-gray-500 mt-1 truncate">{subtitle}</p>
+            </div>
+            <button
+              onClick={onClose}
+              className="p-2 hover:bg-gray-100 rounded-lg transition-colors flex-shrink-0 ml-2"
+              aria-label="Close modal"
+            >
+              <X className="w-5 h-5 text-gray-500" />
+            </button>
+          </div>
+        </div>
+
+        <div className="overflow-y-auto max-h-[calc(90vh-80px)]">
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Shared Time Period Selector
+const TimePeriodSelector = ({ selectedPeriod, onPeriodChange, periods }) => {
+  const defaultPeriods = [
+    { value: '7days', label: 'Last 7 Days' },
+    { value: '30days', label: 'Last 30 Days' },
+    { value: '90days', label: 'Last 90 Days' },
+    { value: 'custom', label: 'Custom Range' }
   ];
 
-  return ranges.map(r => ({
-    range: r.range,
-    percentage: Math.round((times.filter(t => t >= r.min && t < r.max).length / times.length) * 100)
-  }));
-}
+  const periodsToShow = periods || defaultPeriods;
 
-function generateWeeklyInsights(weeklyData: any[]): string {
-  if (weeklyData.length < 2) return "Not enough data for insights.";
-  
-  const lastWeek = weeklyData[weeklyData.length - 1];
-  const prevWeek = weeklyData[weeklyData.length - 2];
-  
-  if (lastWeek.growthPercentage > 10) {
-    return `Strong momentum! Last week saw a ${lastWeek.growthPercentage}% increase in leads. Keep pushing on current strategies.`;
-  } else if (lastWeek.growthPercentage < -10) {
-    return `Lead generation dropped ${Math.abs(lastWeek.growthPercentage)}% last week. Consider reviewing campaign performance and adjusting strategies.`;
-  } else {
-    return `Steady performance with ${lastWeek.currentWeekLeads} leads last week. Consider testing new channels for growth.`;
-  }
-}
+  return (
+    <div className="border-b border-gray-200 px-4 lg:px-6 py-3 bg-gray-50">
+      <div className="flex flex-col lg:flex-row lg:items-center space-y-2 lg:space-y-0 lg:space-x-4">
+        <span className="text-sm font-medium text-gray-700">Time Period:</span>
+        <div className="flex flex-wrap gap-2">
+          {periodsToShow.map(period => (
+            <button
+              key={period.value}
+              onClick={() => onPeriodChange(period.value)}
+              className={`px-3 lg:px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                selectedPeriod === period.value
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-white text-gray-700 hover:bg-gray-100'
+              }`}
+            >
+              {period.label}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
 
-function generateOptimizationTips(channelData: any[], timeData: any): string[] {
-  const tips: string[] = [];
+// Reusable Chart Components
+const TrendChart = ({ data, title, icon: Icon, iconColor }) => {
+  if (!data || data.length === 0) return null;
   
-  // Find underperforming channels
-  const avgHotRate = channelData.reduce((sum, ch) => sum + ch.hotRate, 0) / channelData.length;
-  const underperforming = channelData.filter(ch => ch.hotRate < avgHotRate * 0.5);
+  const maxValue = Math.max(...data.map(d => d.count));
   
-  if (underperforming.length > 0) {
-    tips.push(`${underperforming[0].channel} channel shows ${Math.round(underperforming[0].hotRate * 100)}% hot rate - consider campaign optimization`);
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-4 lg:p-6 w-full min-w-0">
+      <h3 className="text-base lg:text-lg font-semibold text-gray-900 mb-4 flex items-center">
+        <Icon className={`w-4 lg:w-5 h-4 lg:h-5 mr-2 ${iconColor}`} />
+        <span className="truncate">{title}</span>
+      </h3>
+      <div className="h-48 lg:h-64 relative w-full min-w-0">
+        <svg className="w-full h-full" viewBox="0 0 800 200">
+          {[0, 1, 2, 3, 4].map(i => (
+            <line
+              key={i}
+              x1="40"
+              y1={40 + i * 30}
+              x2="760"
+              y2={40 + i * 30}
+              stroke="#E5E7EB"
+              strokeWidth="1"
+            />
+          ))}
+          
+          <path
+            d={`M ${data.map((d, i) => 
+              `${40 + (i * 720 / (data.length - 1))},${160 - (d.count / maxValue) * 120}`
+            ).join(' L ')}`}
+            fill="none"
+            stroke="#3B82F6"
+            strokeWidth="2"
+          />
+          
+          {data.map((d, i) => (
+            <circle
+              key={i}
+              cx={40 + (i * 720 / (data.length - 1))}
+              cy={160 - (d.count / maxValue) * 120}
+              r="3"
+              fill="#3B82F6"
+            >
+              <title>{`${d.date}: ${d.count}`}</title>
+            </circle>
+          ))}
+        </svg>
+      </div>
+    </div>
+  );
+};
+
+const SourceDistribution = ({ data, title = "Lead Sources" }) => {
+  if (!data || data.length === 0) return null;
+  
+  const total = data.reduce((sum, item) => sum + item.count, 0);
+  
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-4 lg:p-6 w-full min-w-0">
+      <h3 className="text-base lg:text-lg font-semibold text-gray-900 mb-4 truncate">{title}</h3>
+      <div className="space-y-3">
+        {data.map((source, i) => (
+          <div key={i} className="flex items-center justify-between min-w-0">
+            <div className="flex items-center space-x-2 lg:space-x-3 min-w-0 flex-1">
+              <div 
+                className="w-3 h-3 rounded-full flex-shrink-0"
+                style={{ backgroundColor: source.color }}
+              />
+              <span className="text-sm font-medium text-gray-700 truncate">{source.source || source.name}</span>
+            </div>
+            <div className="flex items-center space-x-2 flex-shrink-0">
+              <div className="w-20 lg:w-32 bg-gray-200 rounded-full h-2">
+                <div
+                  className="h-2 rounded-full transition-all duration-500"
+                  style={{
+                    width: `${(source.count / total) * 100}%`,
+                    backgroundColor: source.color
+                  }}
+                />
+              </div>
+              <span className="text-sm text-gray-600 w-8 lg:w-12 text-right">{source.count}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="mt-4 pt-4 border-t border-gray-200">
+        <div className="flex justify-between">
+          <span className="text-sm font-semibold text-gray-700">Total</span>
+          <span className="text-sm font-bold text-gray-900">{total}</span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Modal Content Components
+const MetricModalContent = ({ metricType, data, selectedPeriod, onPeriodChange }) => {
+  const config = MODAL_CONFIG[metricType];
+  if (!config) return null;
+
+  return (
+    <>
+      <TimePeriodSelector 
+        selectedPeriod={selectedPeriod} 
+        onPeriodChange={onPeriodChange}
+      />
+      
+      <div className="p-4 lg:p-6 space-y-4 lg:space-y-6 w-full min-w-0">
+        {data.trendData && (
+          <TrendChart 
+            data={data.trendData} 
+            title="Trend Analysis" 
+            icon={config.icon} 
+            iconColor={config.iconColor} 
+          />
+        )}
+        
+        {data.sourceData && (
+          <SourceDistribution data={data.sourceData} />
+        )}
+        
+        <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
+          <h3 className="font-semibold text-gray-900 mb-2">Raw Data (Debug)</h3>
+          <pre className="text-xs text-gray-600 overflow-auto">{JSON.stringify(data, null, 2)}</pre>
+        </div>
+      </div>
+    </>
+  );
+};
+
+// Updated MetricCard Component
+const MetricCard = ({ title, value, subtext, trend, onClick, isClickable = false, canAccessDetailed = true }) => {
+  return (
+    <div 
+      className={`bg-white p-3 lg:p-4 rounded-xl shadow border text-center relative w-full min-w-0 ${
+        isClickable ? 'cursor-pointer hover:shadow-lg transition-shadow' : ''
+      } ${!canAccessDetailed ? 'opacity-90' : ''}`}
+      onClick={onClick}
+    >
+      <h3 className="text-xs lg:text-sm text-gray-500 mb-1 truncate">{title}</h3>
+      <p className="text-lg lg:text-2xl font-bold text-gray-800 truncate">{value}</p>
+      {subtext && <p className="text-xs text-gray-400 mt-1 truncate">{subtext}</p>}
+      {trend && (
+        <p
+          className={`text-xs mt-1 font-medium ${
+            trend.startsWith('+') ? 'text-green-600' : 'text-red-500'
+          }`}
+        >
+          {trend.startsWith('+') ? '▲' : '▼'} {trend.replace(/^[+-]/, '')}
+        </p>
+      )}
+      {!canAccessDetailed && (
+        <div className="absolute top-2 right-2">
+          <Lock className="w-4 h-4 text-gray-400" />
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Mobile Metric Card Component
+const MobileMetricCard = ({ title, value, subtext, trend, onClick, isClickable = false, canAccessDetailed = true, icon: Icon }) => {
+  return (
+    <div 
+      className={`bg-white p-3 rounded-xl shadow border relative w-full min-w-0 ${
+        isClickable ? 'cursor-pointer hover:shadow-lg transition-shadow' : ''
+      } ${!canAccessDetailed ? 'opacity-90' : ''}`}
+      onClick={onClick}
+    >
+      <div className="flex items-center justify-between mb-2">
+        {Icon && <Icon className="w-4 h-4 text-blue-600 flex-shrink-0" />}
+        {trend && (
+          <div className={`flex items-center text-xs ${
+            trend.startsWith('+') ? 'text-green-600' : 'text-red-500'
+          }`}>
+            <span className="mr-1">
+              {trend.startsWith('+') ? '▲' : '▼'}
+            </span>
+            <span className="truncate">{trend.replace(/^[+-]/, '')}</span>
+          </div>
+        )}
+      </div>
+      
+      <div className="space-y-1">
+        <h3 className="text-xs text-gray-500 font-medium truncate">{title}</h3>
+        <p className="text-lg font-bold text-gray-800 truncate">{value}</p>
+        {subtext && <p className="text-xs text-gray-400 truncate">{subtext}</p>}
+      </div>
+      
+      {!canAccessDetailed && (
+        <div className="absolute top-2 right-2">
+          <Lock className="w-3 h-3 text-gray-400" />
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Upgrade Prompt Component
+const UpgradePrompt = ({ metricName, onClose }) => (
+  <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div 
+      className="absolute inset-0 bg-black bg-opacity-50 backdrop-blur-sm"
+      onClick={onClose}
+    />
+    
+    <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md m-4 overflow-hidden">
+      <div className="p-6 text-center">
+        <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <Lock className="w-8 h-8 text-blue-600" />
+        </div>
+        <h3 className="text-xl font-semibold text-gray-900 mb-2">
+          Detailed {metricName} Analytics
+        </h3>
+        <p className="text-gray-600 mb-6">
+          Unlock detailed breakdowns, interactive charts, and drill-down capabilities with a plan upgrade.
+        </p>
+        <div className="space-y-2 text-sm text-gray-500 mb-6">
+          <p>✓ Interactive metric cards</p>
+          <p>✓ Detailed trend analysis</p>
+          <p>✓ Historical comparisons</p>
+          <p>✓ Advanced filtering</p>
+        </div>
+        <button 
+          onClick={onClose}
+          className="w-full bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium transition-colors mb-3"
+        >
+          Upgrade to Growth Plan
+        </button>
+        <p className="text-xs text-gray-500">
+          Starting at $397/month
+        </p>
+        <button 
+          onClick={onClose}
+          className="absolute top-4 right-4 p-2 hover:bg-gray-100 rounded-lg transition-colors"
+        >
+          <X className="w-5 h-5 text-gray-500" />
+        </button>
+      </div>
+    </div>
+  </div>
+);
+
+// Mock data generator
+const generateMockData = (metricType) => {
+  return {
+    trendData: Array.from({ length: 30 }, (_, i) => {
+      const date = new Date();
+      date.setDate(date.getDate() - (29 - i));
+      return {
+        date: date.toISOString().split('T')[0],
+        count: Math.floor(Math.random() * 20) + 30 + i
+      };
+    }),
+    sourceData: [
+      { source: 'Website', count: 145, color: '#3B82F6' },
+      { source: 'Paid Ads', count: 89, color: '#10B981' },
+      { source: 'Referral', count: 67, color: '#F59E0B' },
+      { source: 'Cold Outreach', count: 43, color: '#8B5CF6' },
+      { source: 'Social Media', count: 31, color: '#EF4444' }
+    ]
+  };
+};
+
+// Main Component
+export default function OverviewMetrics() {
+  const { user, currentPlan } = useAuth();
+  
+  const controlRoomAccess = getFeatureValue(currentPlan, 'aiControlRoomAccess');
+  const canAccessDetailedAnalytics = controlRoomAccess === 'full' || controlRoomAccess === 'team_metrics';
+
+  console.log('📊 OverviewMetrics Access:', {
+    currentPlan,
+    controlRoomAccess,
+    canAccessDetailedAnalytics
+  });
+  
+  const [activeModal, setActiveModal] = useState(null);
+  const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
+  const [upgradePromptMetric, setUpgradePromptMetric] = useState('');
+  const [selectedPeriod, setSelectedPeriod] = useState('30days');
+  const [modalData, setModalData] = useState(null);
+  const [loadingModal, setLoadingModal] = useState(false);
+
+  const [metrics, setMetrics] = useState({
+    totalLeads: 0,
+    weeklyLeads: 0,
+    hotLeadRate: '0%',
+    replyRate: '0%',
+    activeLeads: 0,
+    completedLeads: 0,
+    messagesSent: 0,
+    messagesReceived: 0,
+    trends: {},
+  });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  const handleMetricClick = (metricType, metricName) => {
+    if (!canAccessDetailedAnalytics) {
+      setUpgradePromptMetric(metricName);
+      setShowUpgradePrompt(true);
+      return;
+    }
+    
+    openModal(metricType);
+  };
+
+  const openModal = async (metricType) => {
+    setActiveModal(metricType);
+    setLoadingModal(true);
+    setModalData(null);
+    
+    try {
+      const detailUrl = buildApiUrl('overview', user.tenant_id, selectedPeriod);
+      console.log(`🔍 Calling detailed endpoint: ${detailUrl}`);
+      
+      const data = await callEdgeFunction(detailUrl);
+      console.log(`📊 Detailed data returned for ${metricType}:`, data);
+      
+      if (data.error) {
+        console.error('API Error:', data.error);
+        throw new Error(data.error.details || data.error || 'API returned an error');
+      }
+      
+      setModalData(data);
+      
+    } catch (error) {
+      console.error('Error fetching modal data:', error);
+      setModalData(generateMockData(metricType));
+    } finally {
+      setLoadingModal(false);
+    }
+  };
+
+  const handlePeriodChange = async (newPeriod) => {
+    setSelectedPeriod(newPeriod);
+    
+    if (activeModal) {
+      setLoadingModal(true);
+      
+      try {
+        const detailUrl = buildApiUrl('overview', user.tenant_id, newPeriod);
+        const data = await callEdgeFunction(detailUrl);
+        setModalData(data);
+        
+      } catch (error) {
+        console.error('Error fetching modal data:', error);
+        setModalData(generateMockData(activeModal));
+      } finally {
+        setLoadingModal(false);
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (!user || !user.tenant_id) { 
+      console.log('No active user or tenant_id found, skipping fetch for OverviewMetrics.');
+      setLoading(false);
+      return;
+    }
+
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        const apiUrl = buildApiUrl('overview', user.tenant_id, '30days');
+        console.log('🔍 Fetching overview metrics from:', apiUrl);
+        
+        const data = await callEdgeFunction(apiUrl);
+        console.log('📊 Raw API Response:', data);
+
+        if (!data || typeof data !== 'object') {
+          throw new Error('Invalid API response format');
+        }
+
+        if (data.error) {
+          throw new Error(data.error.details || data.error || 'API returned an error');
+        }
+
+        const safeGetNumber = (value) => {
+          const num = Number(value);
+          return isNaN(num) ? 0 : num;
+        };
+
+        const safeGetPercentage = (value) => {
+          const num = Number(value);
+          return isNaN(num) ? '0%' : `${num.toFixed(1)}%`;
+        };
+
+        const weeklyChange = (curr, prev) => {
+          const currentNum = safeGetNumber(curr);
+          const prevNum = safeGetNumber(prev);
+          
+          if (prevNum === 0) return currentNum > 0 ? '+100%' : '+0%';
+          const change = ((currentNum - prevNum) / prevNum) * 100;
+          const sign = change >= 0 ? '+' : '';
+          return `${sign}${change.toFixed(1)}%`;
+        };
+
+        const newMetrics = {
+          totalLeads: safeGetNumber(data.totalLeads),
+          weeklyLeads: safeGetNumber(data.weeklyLeads),
+          hotLeadRate: safeGetPercentage(data.hotLeadRate),
+          replyRate: safeGetPercentage(data.replyRate),
+          activeLeads: safeGetNumber(data.activeLeads),
+          completedLeads: safeGetNumber(data.completedLeads),
+          messagesSent: safeGetNumber(data.messagesSent),
+          messagesReceived: safeGetNumber(data.messagesReceived),
+          trends: {
+            weeklyLeads: weeklyChange(data.weeklyLeads, 25),
+            hotLeadRate: weeklyChange(data.hotLeadRate, 12.0),
+            replyRate: weeklyChange(data.replyRate, 35.0),
+            completedLeads: weeklyChange(data.completedLeads, 7),
+            messagesSent: weeklyChange(data.messagesSent, 210),
+            messagesReceived: weeklyChange(data.messagesReceived, 110),
+          },
+        };
+
+        console.log('✅ Processed metrics:', newMetrics);
+        setMetrics(newMetrics);
+        
+      } catch (error) {
+        console.error('❌ Error fetching overview metrics:', error);
+        setError(error.message);
+        
+        setMetrics({
+          totalLeads: 0,
+          weeklyLeads: 0,
+          hotLeadRate: '0%',
+          replyRate: '0%',
+          activeLeads: 0,
+          completedLeads: 0,
+          messagesSent: 0,
+          messagesReceived: 0,
+          trends: {},
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [user]);
+
+  if (loading) {
+    return (
+      <div className="w-full min-w-0 space-y-4">
+        <div className="lg:hidden grid grid-cols-2 gap-2">
+          {[1, 2, 3, 4, 5, 6, 7, 8].map(i => (
+            <div key={i} className="bg-white p-3 rounded-xl shadow border min-w-0">
+              <div className="animate-pulse">
+                <div className="h-3 bg-gray-200 rounded w-1/2 mb-2"></div>
+                <div className="h-6 bg-gray-200 rounded w-3/4 mb-1"></div>
+                <div className="h-2 bg-gray-200 rounded w-2/3"></div>
+              </div>
+            </div>
+          ))}
+        </div>
+        
+        <div className="hidden lg:block space-y-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+            {[1, 2, 3, 4, 5, 6, 7, 8].map(i => (
+              <div key={i} className="bg-white p-4 rounded-xl shadow border">
+                <div className="animate-pulse">
+                  <div className="h-4 bg-gray-200 rounded w-1/2 mb-2"></div>
+                  <div className="h-8 bg-gray-200 rounded w-3/4 mb-2"></div>
+                  <div className="h-3 bg-gray-200 rounded w-2/3"></div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
   }
-  
-  if (timeData.avgMinutes > 240) {
-    tips.push("Average time to hot lead exceeds 4 hours - consider more aggressive follow-up sequences");
+
+  if (error) {
+    return (
+      <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-center w-full min-w-0">
+        <p className="text-red-600 font-medium">Failed to load metrics</p>
+        <p className="text-red-500 text-sm mt-1 break-words">{error}</p>
+        <button 
+          onClick={() => window.location.reload()} 
+          className="mt-2 text-sm text-red-600 underline hover:text-red-700"
+        >
+          Retry
+        </button>
+      </div>
+    );
   }
-  
-  if (channelData.length > 0) {
-    const bestChannel = channelData[0];
-    tips.push(`${bestChannel.channel} is your best performing channel at ${Math.round(bestChannel.hotRate * 100)}% - consider increasing investment`);
-  }
-  
-  return tips.slice(0, 3);
+
+  const t = metrics.trends;
+
+  const metricData = [
+    {
+      key: 'totalLeads',
+      title: 'Total Leads',
+      value: metrics.totalLeads,
+      icon: BarChart3,
+      trend: null
+    },
+    {
+      key: 'weeklyLeads',
+      title: 'Leads This Week',
+      value: metrics.weeklyLeads,
+      icon: TrendingUp,
+      trend: t.weeklyLeads
+    },
+    {
+      key: 'hotLeadRate',
+      title: 'Hot Lead Rate',
+      value: metrics.hotLeadRate,
+      icon: Target,
+      trend: t.hotLeadRate
+    },
+    {
+      key: 'replyRate',
+      title: 'Reply Rate',
+      value: metrics.replyRate,
+      icon: MessageSquare,
+      trend: t.replyRate
+    },
+    {
+      key: 'activeLeads',
+      title: 'Active Leads',
+      value: metrics.activeLeads,
+      icon: Activity,
+      trend: null
+    },
+    {
+      key: 'completedLeads',
+      title: 'Completed Leads',
+      value: metrics.completedLeads,
+      icon: CheckCircle,
+      trend: t.completedLeads
+    },
+    {
+      key: 'messagesSent',
+      title: 'Messages Sent',
+      value: metrics.messagesSent,
+      icon: Send,
+      trend: t.messagesSent
+    },
+    {
+      key: 'messagesReceived',
+      title: 'Messages Received',
+      value: metrics.messagesReceived,
+      icon: Inbox,
+      trend: t.messagesReceived
+    }
+  ];
+
+  return (
+    <div className="w-full min-w-0">
+      <div className="lg:hidden w-full min-w-0">
+        <div className="grid grid-cols-2 gap-2 w-full">
+          {metricData.map((metric) => (
+            <MobileMetricCard
+              key={metric.key}
+              title={metric.title}
+              value={metric.value}
+              trend={metric.trend}
+              icon={metric.icon}
+              onClick={() => handleMetricClick(metric.key, metric.title)}
+              isClickable={true}
+              canAccessDetailed={canAccessDetailedAnalytics}
+            />
+          ))}
+        </div>
+      </div>
+
+      <div className="hidden lg:block w-full">
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+            <MetricCard 
+              title="Total Leads" 
+              value={metrics.totalLeads} 
+              onClick={() => handleMetricClick('totalLeads', 'Total Leads')}
+              isClickable={true}
+              canAccessDetailed={canAccessDetailedAnalytics}
+            />
+            <MetricCard 
+              title="Leads This Week" 
+              value={metrics.weeklyLeads} 
+              trend={t.weeklyLeads}
+              onClick={() => handleMetricClick('weeklyLeads', 'Weekly Leads')}
+              isClickable={true}
+              canAccessDetailed={canAccessDetailedAnalytics}
+            />
+            <MetricCard 
+              title="Hot Lead Conversion Rate" 
+              value={metrics.hotLeadRate} 
+              trend={t.hotLeadRate}
+              onClick={() => handleMetricClick('hotLeadRate', 'Hot Lead Rate')}
+              isClickable={true}
+              canAccessDetailed={canAccessDetailedAnalytics}
+            />
+            <MetricCard 
+              title="Reply Rate" 
+              value={metrics.replyRate} 
+              trend={t.replyRate}
+              onClick={() => handleMetricClick('replyRate', 'Reply Rate')}
+              isClickable={true}
+              canAccessDetailed={canAccessDetailedAnalytics}
+            />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+            <MetricCard 
+              title="Active Leads" 
+              value={metrics.activeLeads}
+              onClick={() => handleMetricClick('activeLeads', 'Active Leads')}
+              isClickable={true}
+              canAccessDetailed={canAccessDetailedAnalytics}
+            />
+            <MetricCard 
+              title="Completed Leads" 
+              value={metrics.completedLeads} 
+              trend={t.completedLeads}
+              onClick={() => handleMetricClick('completedLeads', 'Completed Leads')}
+              isClickable={true}
+              canAccessDetailed={canAccessDetailedAnalytics}
+            />
+            <MetricCard 
+              title="Messages Sent" 
+              value={metrics.messagesSent} 
+              trend={t.messagesSent}
+              onClick={() => handleMetricClick('messagesSent', 'Messages Sent')}
+              isClickable={true}
+              canAccessDetailed={canAccessDetailedAnalytics}
+            />
+            <MetricCard 
+              title="Messages Received" 
+              value={metrics.messagesReceived} 
+              trend={t.messagesReceived}
+              onClick={() => handleMetricClick('messagesReceived', 'Messages Received')}
+              isClickable={true}
+              canAccessDetailed={canAccessDetailedAnalytics}
+            />
+          </div>
+        </div>
+      </div>
+
+      {showUpgradePrompt && (
+        <UpgradePrompt 
+          metricName={upgradePromptMetric}
+          onClose={() => setShowUpgradePrompt(false)}
+        />
+      )}
+
+      <ModalWrapper 
+        isOpen={!!activeModal}
+        onClose={() => {
+          setActiveModal(null);
+          setModalData(null);
+        }}
+        title={MODAL_CONFIG[activeModal]?.title || ''}
+        subtitle={MODAL_CONFIG[activeModal]?.subtitle || ''}
+      >
+        {loadingModal ? (
+          <div className="flex items-center justify-center h-64">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+          </div>
+        ) : modalData ? (
+          <MetricModalContent 
+            metricType={activeModal}
+            data={modalData}
+            selectedPeriod={selectedPeriod}
+            onPeriodChange={handlePeriodChange}
+          />
+        ) : (
+          <div className="flex items-center justify-center h-64 text-gray-500">
+            <p>No data available</p>
+          </div>
+        )}
+      </ModalWrapper>
+    </div>
+  );
 }

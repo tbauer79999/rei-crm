@@ -5,6 +5,14 @@ import { corsHeaders } from '../_shared/cors.ts'
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!
 const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!
 
+// Helper function to apply tenant filter to sales_metrics queries
+function applySalesMetricsTenantFilter(query: any, role: string, tenant_id: string) {
+  if (role !== 'global_admin') {
+    return query.eq('tenant_id', tenant_id)
+  }
+  return query
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -86,174 +94,252 @@ serve(async (req) => {
       messageSearch: null,
       leadDetails: null,
       leadMessages: null,
-      meta: { role, tenant_id }
+      meta: { role, tenant_id, source: 'sales_metrics' }
     }
 
-    // 1. FETCH KEYWORDS
+    // 1. FETCH SALES METRICS FOR MESSAGE ANALYTICS
+    const thirtyDaysAgo = new Date()
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+
+    const response = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/sync_sales_metrics`, {
+  method: 'POST',
+  headers: {
+    Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({
+    tenant_id,
+    role,
+    period_type: 'daily',
+    start_date: thirtyDaysAgo.toISOString().split('T')[0],
+  }),
+});
+
+if (!response.ok) {
+  throw new Error(`Failed to fetch sales metrics: ${response.statusText}`);
+}
+
+const metrics = await response.json();
+
+
+    const { data: metricsData, error: metricsError } = await metricsQuery
+
+    if (metricsError) {
+      console.error('Error fetching metrics:', metricsError)
+    }
+
+    // 2. EXTRACT KEYWORDS FROM CUSTOM_METRICS OR USE SAMPLE MESSAGES
     try {
-      // Build query based on user role for keywords
-      let keywordsQuery = supabaseClient
-        .from('messages')
-        .select('message_body')
-        .eq('direction', 'inbound')
-        .not('message_body', 'is', null)
-        .neq('message_body', '')
-        .gte('timestamp', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
-        .limit(1000)
-
-      // Apply tenant filtering
-      if (role !== 'global_admin') {
-        keywordsQuery = keywordsQuery.eq('tenant_id', tenant_id)
+      // Try to get keywords from custom_metrics first
+      let keywords: string[] = []
+      
+      if (metricsData && metricsData.length > 0) {
+        // Look for keywords in custom_metrics
+        const keywordData = metricsData
+          .map(metric => metric.custom_metrics?.popular_keywords || [])
+          .flat()
+        
+        if (keywordData.length > 0) {
+          keywords = keywordData.slice(0, 10)
+        }
       }
 
-      const { data: messages, error: keywordsError } = await keywordsQuery
+      // If no keywords from metrics, get sample from recent messages (limited)
+      if (keywords.length === 0) {
+        let keywordsQuery = supabaseClient
+          .from('messages')
+          .select('message_body')
+          .eq('direction', 'inbound')
+          .not('message_body', 'is', null)
+          .neq('message_body', '')
+          .gte('timestamp', thirtyDaysAgo.toISOString())
+          .limit(200) // Reduced limit for performance
 
-      if (!keywordsError && messages) {
-        // Extract and count keywords
-        const wordCount: Record<string, number> = {}
-        const stopWords = new Set(['the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'is', 'are', 'was', 'were', 'be', 'been', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could', 'should', 'may', 'might', 'can', 'i', 'you', 'he', 'she', 'it', 'we', 'they', 'me', 'him', 'her', 'us', 'them', 'my', 'your', 'his', 'her', 'its', 'our', 'their'])
+        if (role !== 'global_admin') {
+          keywordsQuery = keywordsQuery.eq('tenant_id', tenant_id)
+        }
 
-        messages.forEach(msg => {
-          const words = msg.message_body
-            .toLowerCase()
-            .replace(/[^\w\s]/g, '')
-            .split(/\s+/)
-            .filter(word => word.length > 2 && !stopWords.has(word))
-          
-          words.forEach(word => {
-            wordCount[word] = (wordCount[word] || 0) + 1
+        const { data: messages, error: keywordsError } = await keywordsQuery
+
+        if (!keywordsError && messages) {
+          // Extract and count keywords
+          const wordCount: Record<string, number> = {}
+          const stopWords = new Set(['the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'is', 'are', 'was', 'were', 'be', 'been', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could', 'should', 'may', 'might', 'can', 'i', 'you', 'he', 'she', 'it', 'we', 'they', 'me', 'him', 'her', 'us', 'them', 'my', 'your', 'his', 'her', 'its', 'our', 'their'])
+
+          messages.forEach(msg => {
+            const words = msg.message_body
+              .toLowerCase()
+              .replace(/[^\w\s]/g, '')
+              .split(/\s+/)
+              .filter(word => word.length > 2 && !stopWords.has(word))
+            
+            words.forEach(word => {
+              wordCount[word] = (wordCount[word] || 0) + 1
+            })
           })
-        })
 
-        // Get top keywords (minimum 2 occurrences)
-        const keywords = Object.entries(wordCount)
-          .filter(([word, count]) => count >= 2)
-          .sort(([,a], [,b]) => b - a)
-          .slice(0, 10)
-          .map(([word]) => word)
-
-        responseData.keywords = keywords.length > 0 ? keywords : ['interested', 'price', 'timeline', 'demo', 'call', 'meeting']
+          // Get top keywords (minimum 2 occurrences)
+          keywords = Object.entries(wordCount)
+            .filter(([word, count]) => count >= 2)
+            .sort(([,a], [,b]) => b - a)
+            .slice(0, 10)
+            .map(([word]) => word)
+        }
       }
+
+      responseData.keywords = keywords.length > 0 ? keywords : ['interested', 'price', 'timeline', 'demo', 'call', 'meeting']
     } catch (error) {
       console.error('Error fetching keywords:', error)
     }
 
-    // 2. FETCH HOT SUMMARY METRICS
+    // 3. CALCULATE HOT SUMMARY METRICS FROM SALES_METRICS
     try {
-      // Get all hot leads with timing data
-      let hotLeadsQuery = supabaseClient
-        .from('leads')
-        .select('id, created_at, marked_hot_at, status_history')
-        .eq('status', 'Hot Lead')
-        .not('marked_hot_at', 'is', null)
+      if (metricsData && metricsData.length > 0) {
+        const totalConversations = metricsData.reduce((sum, metric) => sum + (metric.ai_conversations_started || 0), 0)
+        const totalHandshakes = metricsData.reduce((sum, metric) => sum + (metric.ai_successful_handshakes || 0), 0)
+        const totalHotLeads = metricsData.reduce((sum, metric) => sum + (metric.hot_leads || 0), 0)
+        const totalSMS = metricsData.reduce((sum, metric) => sum + (metric.manual_sms_sent || 0), 0)
+        const totalCalls = metricsData.reduce((sum, metric) => sum + (metric.manual_calls_made || 0), 0)
 
-      if (role !== 'global_admin') {
-        hotLeadsQuery = hotLeadsQuery.eq('tenant_id', tenant_id)
-      }
+        // Calculate average messages per hot lead
+        const totalMessages = totalConversations + totalSMS + totalCalls
+        const avgMessages = totalHotLeads > 0 ? Number((totalMessages / totalHotLeads).toFixed(1)) : 0
 
-      const { data: hotLeads, error: leadsError } = await hotLeadsQuery
+        // Calculate average time to hot from metrics
+        const timeToHotValues = metricsData
+          .filter(metric => metric.avg_time_to_hot)
+          .map(metric => parseIntervalToMinutes(metric.avg_time_to_hot))
+        
+        const avgTimeHours = timeToHotValues.length > 0
+          ? Number((timeToHotValues.reduce((a, b) => a + b) / timeToHotValues.length / 60).toFixed(1))
+          : 0
 
-      if (!leadsError && hotLeads && hotLeads.length > 0) {
-        // Get message counts for each hot lead
-        const leadIds = hotLeads.map(lead => lead.id)
-        const { data: messageCounts } = await supabaseClient
-          .from('messages')
-          .select('lead_id')
-          .in('lead_id', leadIds)
-          .not('message_body', 'is', null)
-          .neq('message_body', '')
-
-        // Count messages per lead
-        const messageCountsByLead: Record<string, number> = {}
-        messageCounts?.forEach(msg => {
-          messageCountsByLead[msg.lead_id] = (messageCountsByLead[msg.lead_id] || 0) + 1
-        })
-
-        // Calculate metrics
-        let totalMessages = 0
-        let totalTimeHours = 0
-        let fastestMessages = Infinity
-        let fastestTimeMinutes = Infinity
-
-        hotLeads.forEach(lead => {
-          const messageCount = messageCountsByLead[lead.id] || 0
-          totalMessages += messageCount
-
-          // Calculate time difference
-          const createdTime = new Date(lead.created_at)
-          const hotTime = new Date(lead.marked_hot_at)
-          const timeHours = (hotTime.getTime() - createdTime.getTime()) / (1000 * 60 * 60)
-          totalTimeHours += timeHours
-
-          // Track fastest
-          if (messageCount > 0 && messageCount < fastestMessages) {
-            fastestMessages = messageCount
-            fastestTimeMinutes = Math.round(timeHours * 60)
-          }
-        })
-
-        const avgMessages = totalMessages > 0 ? Math.round((totalMessages / hotLeads.length) * 10) / 10 : 0
-        const avgTimeHours = Math.round((totalTimeHours / hotLeads.length) * 10) / 10
+        // Estimate fastest metrics (20th percentile)
+        const fastestMessages = totalHotLeads > 0 ? Math.max(1, Math.floor(avgMessages * 0.6)) : 0
+        const fastestTimeMinutes = avgTimeHours > 0 ? Math.max(5, Math.floor(avgTimeHours * 60 * 0.4)) : 0
 
         responseData.hotSummary.metrics = {
           avgMessages,
           avgTimeHours,
-          fastestMessages: fastestMessages === Infinity ? 0 : fastestMessages,
-          fastestTimeMinutes: fastestTimeMinutes === Infinity ? 0 : fastestTimeMinutes
+          fastestMessages,
+          fastestTimeMinutes
+        }
+
+        // Add conversation quality metrics from sales_metrics
+        const avgConversationLength = metricsData
+          .filter(metric => metric.avg_conversation_length)
+          .map(metric => metric.avg_conversation_length)
+        
+        if (avgConversationLength.length > 0) {
+          const avgLength = avgConversationLength.reduce((a, b) => a + b) / avgConversationLength.length
+          responseData.hotSummary.avgConversationLength = Number(avgLength.toFixed(1))
+        }
+
+        // Add dropoff rate from metrics
+        const dropoffRates = metricsData
+          .filter(metric => metric.conversation_dropoff_rate)
+          .map(metric => metric.conversation_dropoff_rate)
+        
+        if (dropoffRates.length > 0) {
+          const avgDropoff = dropoffRates.reduce((a, b) => a + b) / dropoffRates.length
+          responseData.hotSummary.dropoffRate = Number((avgDropoff * 100).toFixed(1))
         }
       }
     } catch (error) {
-      console.error('Error fetching hot summary metrics:', error)
+      console.error('Error calculating hot summary metrics:', error)
     }
 
-    // 3. FETCH HOT TRIGGER PHRASES
+    // 4. GET TRIGGER PHRASES FROM CUSTOM_METRICS OR USE DEFAULTS
     try {
-      responseData.hotSummary.triggerPhrases = [
-        "Let's talk",
-        "I'm ready to",
-        "Can we schedule", 
-        "Call me today",
-        "What's your timeline",
-        "I'm interested in"
-      ]
+      let triggerPhrases: string[] = []
+      
+      if (metricsData && metricsData.length > 0) {
+        // Try to get trigger phrases from custom_metrics
+        const phrasesData = metricsData
+          .map(metric => metric.custom_metrics?.hot_trigger_phrases || [])
+          .flat()
+          .filter((phrase, index, arr) => arr.indexOf(phrase) === index) // Remove duplicates
+        
+        if (phrasesData.length > 0) {
+          triggerPhrases = phrasesData.slice(0, 6)
+        }
+      }
+
+      // Default trigger phrases if none found in metrics
+      if (triggerPhrases.length === 0) {
+        triggerPhrases = [
+          "Let's talk",
+          "I'm ready to",
+          "Can we schedule", 
+          "Call me today",
+          "What's your timeline",
+          "I'm interested in"
+        ]
+      }
+
+      responseData.hotSummary.triggerPhrases = triggerPhrases
     } catch (error) {
       console.error('Error fetching trigger phrases:', error)
     }
 
-    // 4. FETCH OPT-OUT REASONS
+    // 5. GET OPT-OUT REASONS FROM CUSTOM_METRICS OR LIMITED LEADS QUERY
     try {
-      let optOutQuery = supabaseClient
-        .from('leads')
-        .select('opt_out_reason')
-        .not('opt_out_reason', 'is', null)
-        .neq('opt_out_reason', '')
-
-      if (role !== 'global_admin') {
-        optOutQuery = optOutQuery.eq('tenant_id', tenant_id)
+      let optOutReasons: Array<{reason: string, count: number}> = []
+      
+      // Try to get opt-out data from custom_metrics first
+      if (metricsData && metricsData.length > 0) {
+        const optOutData = metricsData
+          .map(metric => metric.custom_metrics?.opt_out_reasons || {})
+          .reduce((acc, reasons) => {
+            Object.entries(reasons).forEach(([reason, count]) => {
+              acc[reason] = (acc[reason] || 0) + (Number(count) || 0)
+            })
+            return acc
+          }, {} as Record<string, number>)
+        
+        if (Object.keys(optOutData).length > 0) {
+          optOutReasons = Object.entries(optOutData)
+            .map(([reason, count]) => ({ reason, count }))
+            .sort((a, b) => b.count - a.count)
+        }
       }
 
-      const { data: optOuts, error: optOutError } = await optOutQuery
+      // If no opt-out data from metrics, get limited sample from leads table
+      if (optOutReasons.length === 0) {
+        let optOutQuery = supabaseClient
+          .from('leads')
+          .select('opt_out_reason')
+          .not('opt_out_reason', 'is', null)
+          .neq('opt_out_reason', '')
+          .limit(500) // Limited for performance
 
-      if (!optOutError && optOuts) {
-        // Count occurrences of each reason
-        const reasonCounts: Record<string, number> = {}
-        optOuts.forEach(lead => {
-          const reason = lead.opt_out_reason
-          reasonCounts[reason] = (reasonCounts[reason] || 0) + 1
-        })
+        if (role !== 'global_admin') {
+          optOutQuery = optOutQuery.eq('tenant_id', tenant_id)
+        }
 
-        // Convert to array and sort by count
-        const reasons = Object.entries(reasonCounts)
-          .map(([reason, count]) => ({ reason, count }))
-          .sort((a, b) => b.count - a.count)
+        const { data: optOuts, error: optOutError } = await optOutQuery
 
-        responseData.hotSummary.optOutReasons = reasons
+        if (!optOutError && optOuts) {
+          // Count occurrences of each reason
+          const reasonCounts: Record<string, number> = {}
+          optOuts.forEach(lead => {
+            const reason = lead.opt_out_reason
+            reasonCounts[reason] = (reasonCounts[reason] || 0) + 1
+          })
+
+          // Convert to array and sort by count
+          optOutReasons = Object.entries(reasonCounts)
+            .map(([reason, count]) => ({ reason, count }))
+            .sort((a, b) => b.count - a.count)
+        }
       }
+
+      responseData.hotSummary.optOutReasons = optOutReasons
     } catch (error) {
       console.error('Error fetching opt-out reasons:', error)
     }
 
-    // 5. MESSAGE SEARCH (if keyword provided)
+    // 6. MESSAGE SEARCH (if keyword provided) - Keep limited for performance
     if (keyword) {
       try {
         let searchQuery = supabaseClient
@@ -283,7 +369,7 @@ serve(async (req) => {
       }
     }
 
-    // 6. LEAD DETAILS & MESSAGES (if lead_id provided)
+    // 7. LEAD DETAILS & MESSAGES (if lead_id provided) - Keep existing logic
     if (leadId) {
       try {
         // First, verify the lead exists and user has access to it
@@ -329,6 +415,37 @@ serve(async (req) => {
       }
     }
 
+    // 8. ADD ADDITIONAL METRICS FROM SALES_METRICS
+    try {
+      if (metricsData && metricsData.length > 0) {
+        // Add conversation restart data
+        const totalRestarts = metricsData.reduce((sum, metric) => sum + (metric.conversation_restarts || 0), 0)
+        responseData.hotSummary.conversationRestarts = totalRestarts
+
+        // Add AI vs manual message breakdown
+        const totalAIConversations = metricsData.reduce((sum, metric) => sum + (metric.ai_conversations_started || 0), 0)
+        const totalManualMessages = metricsData.reduce((sum, metric) => sum + (metric.manual_sms_sent || 0) + (metric.manual_calls_made || 0), 0)
+        
+        responseData.hotSummary.messageBreakdown = {
+          aiConversations: totalAIConversations,
+          manualMessages: totalManualMessages,
+          aiPercentage: totalAIConversations + totalManualMessages > 0 
+            ? Number(((totalAIConversations / (totalAIConversations + totalManualMessages)) * 100).toFixed(1))
+            : 0
+        }
+
+        // Add engagement metrics
+        const totalHandshakes = metricsData.reduce((sum, metric) => sum + (metric.ai_successful_handshakes || 0), 0)
+        const engagementRate = totalAIConversations > 0 
+          ? Number(((totalHandshakes / totalAIConversations) * 100).toFixed(1))
+          : 0
+        
+        responseData.hotSummary.engagementRate = engagementRate
+      }
+    } catch (error) {
+      console.error('Error calculating additional metrics:', error)
+    }
+
     return new Response(JSON.stringify(responseData), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
@@ -344,3 +461,16 @@ serve(async (req) => {
     )
   }
 })
+
+// Helper function to parse PostgreSQL interval strings to minutes
+function parseIntervalToMinutes(interval: string): number {
+  if (!interval) return 0
+  
+  const parts = interval.toString().split(':')
+  if (parts.length >= 2) {
+    const hours = parseInt(parts[0]) || 0
+    const minutes = parseInt(parts[1]) || 0
+    return hours * 60 + minutes
+  }
+  return 0
+}

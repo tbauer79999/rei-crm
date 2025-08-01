@@ -324,60 +324,154 @@ const getFeatureValue = (plan: string, feature: string) => {
  return PLAN_FEATURES[plan]?.[feature] || 0;
 };
 
-const getOptimizedTone = async (supabase: any, tenantId: string) => {
- try {
-   // Get tenant's plan
-   const tenantPlan = await getTenantPlan(supabase, tenantId);
-   
-   // Get conversation memory limit from plan
-   const conversationLimit = getFeatureValue(tenantPlan, 'conversationMemory');
-   
-   // If starter plan (limit = 0), return default tone
-   if (conversationLimit === 0) {
-     console.log(`🎯 Tenant ${tenantId} on ${tenantPlan} plan - no AI learning, using default tone`);
-     return 'Friendly & Casual';
-   }
-   
-   // Build query with plan-based limit
-   let query = supabase
-     .from('lead_scores')
-     .select('motivation_score, hesitation_score, urgency_score, interest_level_score')
-     .eq('tenant_id', tenantId)
-     .order('updated_at', { ascending: false });
-   
-   // Apply limit based on plan (unless unlimited)
-   if (conversationLimit !== -1) {
-     query = query.limit(conversationLimit);
-   }
-   
-   const { data: recentScores, error } = await query;
+const getOptimizedApproach = async (supabase: any, tenantId: string, leadPsychProfile?: any) => {
+  try {
+    // Get tenant's plan
+    const tenantPlan = await getTenantPlan(supabase, tenantId);
+    
+    // Get conversation memory limit from plan
+    const conversationLimit = getFeatureValue(tenantPlan, 'conversationMemory');
+    
+    // If starter plan (limit = 0), return default approach
+    if (conversationLimit === 0) {
+      console.log(`🎯 Tenant ${tenantId} on ${tenantPlan} plan - no AI learning, using default approach`);
+      return {
+        tone: 'Friendly & Casual',
+        psychologicalTechniques: [],
+        messageLength: 120,
+        confidence: 0
+      };
+    }
 
-   console.log(`🎯 AI Learning: ${tenantPlan} plan analyzing ${recentScores?.length || 0} conversations (limit: ${conversationLimit === -1 ? 'unlimited' : conversationLimit})`);
+    console.log(`🎯 AI Learning: ${tenantPlan} plan (limit: ${conversationLimit === -1 ? 'unlimited' : conversationLimit})`);
 
-   if (error || !recentScores || recentScores.length === 0) {
-     console.warn('No lead_scores data found or error occurred:', error);
-     return 'Friendly & Casual';
-   }
+    // 1. Get personality-based optimization if we have lead's psychological profile
+    let personalityOptimization = null;
+    if (leadPsychProfile) {
+      const { data: personalityPatterns } = await supabase
+        .from('personality_response_patterns')
+        .select('best_tone_approach, best_psychological_approach, optimal_message_length, avg_conversion_rate')
+        .eq('tenant_id', tenantId)
+        .eq('decisiveness_range', categorizeScore(leadPsychProfile.personality_decisiveness_score))
+        .eq('skepticism_range', categorizeScore(leadPsychProfile.personality_skepticism_score))
+        .eq('motivation_range', categorizeScore(leadPsychProfile.motivation_score))
+        .order('avg_conversion_rate', { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
-   const highPerformers = recentScores.filter(
-     (row: any) =>
-       row.interest_level_score >= 7 &&
-       row.motivation_score >= 70 &&
-       row.hesitation_score <= 50
-   );
+      if (personalityPatterns) {
+        personalityOptimization = personalityPatterns;
+        console.log(`🎯 Found personality-based optimization: ${personalityPatterns.best_tone_approach}`);
+      }
+    }
 
-   if (highPerformers.length === 0) return 'Friendly & Casual';
+    // 2. Get most effective message patterns for this tenant
+    let query = supabase
+      .from('message_psychology_analytics')
+      .select('tone_approach, psychological_technique, emotional_appeal_type, psychological_effectiveness_score, response_rate')
+      .eq('tenant_id', tenantId)
+      .order('psychological_effectiveness_score', { ascending: false });
 
-   const avgUrgency = highPerformers.reduce((sum: number, r: any) => sum + (r.urgency_score || 0), 0) / highPerformers.length;
-   const avgHesitation = highPerformers.reduce((sum: number, r: any) => sum + (r.hesitation_score || 0), 0) / highPerformers.length;
+    // Apply plan-based limit
+    if (conversationLimit !== -1) {
+      query = query.limit(conversationLimit);
+    }
 
-   if (avgUrgency > 75 && avgHesitation < 30) return 'Direct Closer';
-   if (avgHesitation > 60) return 'Soft & Trust-Building';
-   return 'Friendly & Casual';
- } catch (error) {
-   console.error('Error getting optimized tone:', error);
-   return 'Friendly & Casual';
- }
+    const { data: messagePatterns, error } = await query;
+
+    if (error || !messagePatterns || messagePatterns.length === 0) {
+      console.warn('No message psychology analytics found, falling back to personality optimization or default');
+      
+      if (personalityOptimization) {
+        return {
+          tone: personalityOptimization.best_tone_approach || 'Friendly & Casual',
+          psychologicalTechniques: personalityOptimization.best_psychological_approach?.split(',') || [],
+          messageLength: personalityOptimization.optimal_message_length || 120,
+          confidence: 0.7
+        };
+      }
+      
+      return {
+        tone: 'Friendly & Casual',
+        psychologicalTechniques: [],
+        messageLength: 120,
+        confidence: 0
+      };
+    }
+
+    // 3. Analyze top performing patterns
+    const topPatterns = messagePatterns.slice(0, Math.min(10, messagePatterns.length));
+    
+    // Get most effective tone
+    const toneEffectiveness = {};
+    topPatterns.forEach(pattern => {
+      if (pattern.tone_approach) {
+        if (!toneEffectiveness[pattern.tone_approach]) {
+          toneEffectiveness[pattern.tone_approach] = [];
+        }
+        toneEffectiveness[pattern.tone_approach].push(pattern.psychological_effectiveness_score || 0);
+      }
+    });
+
+    let bestTone = 'Friendly & Casual';
+    let bestToneScore = 0;
+    
+    Object.keys(toneEffectiveness).forEach(tone => {
+      const avgScore = toneEffectiveness[tone].reduce((sum, score) => sum + score, 0) / toneEffectiveness[tone].length;
+      if (avgScore > bestToneScore) {
+        bestToneScore = avgScore;
+        bestTone = tone;
+      }
+    });
+
+    // Get most effective psychological techniques
+    const techniqueMap = {};
+    topPatterns.forEach(pattern => {
+      if (pattern.psychological_technique && pattern.psychological_technique !== 'none') {
+        const techniques = pattern.psychological_technique.split(',');
+        techniques.forEach(tech => {
+          if (!techniqueMap[tech]) techniqueMap[tech] = [];
+          techniqueMap[tech].push(pattern.psychological_effectiveness_score || 0);
+        });
+      }
+    });
+
+    const topTechniques = Object.keys(techniqueMap)
+      .map(tech => ({
+        technique: tech,
+        avgScore: techniqueMap[tech].reduce((sum, score) => sum + score, 0) / techniqueMap[tech].length
+      }))
+      .sort((a, b) => b.avgScore - a.avgScore)
+      .slice(0, 3)
+      .map(t => t.technique);
+
+    // 4. Combine personality and pattern insights
+    const finalApproach = {
+      tone: personalityOptimization?.best_tone_approach || bestTone,
+      psychologicalTechniques: topTechniques,
+      messageLength: personalityOptimization?.optimal_message_length || 120,
+      confidence: messagePatterns.length >= 10 ? 0.9 : 0.6
+    };
+
+    console.log(`🎯 Optimized approach selected:`, finalApproach);
+    return finalApproach;
+
+  } catch (error) {
+    console.error('Error getting optimized approach:', error);
+    return {
+      tone: 'Friendly & Casual',
+      psychologicalTechniques: [],
+      messageLength: 120,
+      confidence: 0
+    };
+  }
+};
+
+// Helper function to categorize scores into ranges
+const categorizeScore = (score: number): string => {
+  if (score < 30) return 'low_0-30';
+  if (score < 70) return 'medium_30-70';
+  return 'high_70-100';
 };
 
 // ==========================================
@@ -401,19 +495,19 @@ async function analyzeMessagePsychology(supabase: any, tenantId: string, message
     if (!message || message.direction !== 'outbound') return;
 
     // Get before/after psychological scores
-    const { data: beforeScores } = await supabase
-      .from('lead_scores')
-      .select('*')
-      .eq('lead_id', message.lead_id)
-      .order('updated_at', { ascending: false })
-      .limit(2);
+const { data: beforeScores } = await supabase
+  .from('lead_scores')
+  .select('*')
+  .eq('lead_id', message.lead_id)
+  .order('created_at', { ascending: false })  // Use created_at instead
+  .limit(2);
 
     if (!beforeScores || beforeScores.length < 2) return;
 
     const [current, previous] = beforeScores;
 
     // Extract message components
-    const messageComponents = extractMessageComponents(message.message_body);
+    const messageComponents = extractAdvancedMessageComponents(message.message_body, current);
 
     // Calculate psychological impact
     const psychologicalImpact = {
@@ -583,6 +677,8 @@ function extractMessageComponents(messageBody: string) {
   };
 }
 
+// ✅ NEW: Enhanced message component extraction with psychological analysis
+
 function detectOpeningType(message: string): string {
   const lowerMessage = message.toLowerCase();
   
@@ -711,6 +807,477 @@ function hashMessage(components: any): string {
 }
 
 // ==========================================
+// 🧠 ENHANCED PSYCHOLOGICAL DETECTION FUNCTIONS
+// ==========================================
+
+/**
+ * Enhanced message component extraction with psychological analysis
+ */
+function extractAdvancedMessageComponents(messageBody: string, leadPsychProfile: any = {}) {
+  const basicComponents = extractMessageComponents(messageBody);
+  
+  return {
+    ...basicComponents,
+    
+    // Advanced psychological detection
+    psychological_technique: detectPsychologicalTechniques(messageBody),
+    emotional_appeal_type: detectEmotionalAppeals(messageBody),
+    cognitive_bias_leverage: detectCognitiveBiases(messageBody),
+    objection_preemption_style: detectObjectionPreemption(messageBody),
+    trust_building_method: detectTrustBuilding(messageBody),
+    urgency_creation_type: detectUrgencyCreation(messageBody),
+    social_proof_style: detectSocialProof(messageBody),
+    authority_positioning: detectAuthorityPositioning(messageBody),
+    reciprocity_trigger: detectReciprocityTriggers(messageBody),
+    commitment_escalation: detectCommitmentEscalation(messageBody),
+    
+    // Context-aware analysis
+    personality_match_score: calculatePersonalityAlignment(messageBody, leadPsychProfile),
+    emotional_intelligence_score: calculateEmotionalIntelligence(messageBody),
+    persuasion_technique_density: calculatePersuasionDensity(messageBody)
+  };
+}
+
+/**
+ * Detect psychological techniques in messages
+ */
+function detectPsychologicalTechniques(message: string): string {
+  const techniques = [];
+  
+  // Cialdini's 6 Principles of Persuasion
+  if (/help.*you|assist.*with|support.*your|do.*for you/i.test(message)) {
+    techniques.push('reciprocity');
+  }
+  if (/you mentioned|as you said|you agreed|makes sense.*right/i.test(message)) {
+    techniques.push('commitment_consistency');
+  }
+  if (/others.*like you|clients.*similar|companies.*your size|most.*choose/i.test(message)) {
+    techniques.push('social_proof');
+  }
+  if (/experts.*say|proven.*results|certified|award.*winning/i.test(message)) {
+    techniques.push('authority');
+  }
+  if (/I understand|similar.*situation|appreciate.*your|respect.*that/i.test(message)) {
+    techniques.push('liking_rapport');
+  }
+  if (/limited.*time|only.*few|exclusive|before.*deadline/i.test(message)) {
+    techniques.push('scarcity');
+  }
+  
+  // Advanced psychological techniques
+  if (/missing.*out|cost.*of.*waiting|losing.*opportunity/i.test(message)) {
+    techniques.push('loss_aversion');
+  }
+  if (/imagine.*when|think.*about.*future|picture.*yourself/i.test(message)) {
+    techniques.push('future_pacing');
+  }
+  if (/compared.*to|versus|instead.*of|rather.*than/i.test(message)) {
+    techniques.push('contrast_principle');
+  }
+  if (/typically.*costs|most.*pay|usually.*around|starting.*at/i.test(message)) {
+    techniques.push('anchoring');
+  }
+  if (/because|reason.*why|here's.*why|the.*truth.*is/i.test(message)) {
+    techniques.push('reason_why');
+  }
+  if (/what.*if|suppose|consider.*this|imagine.*if/i.test(message)) {
+    techniques.push('hypothetical_scenario');
+  }
+  
+  return techniques.length > 0 ? techniques.join(',') : 'none';
+}
+
+/**
+ * Detect emotional appeals in messages
+ */
+function detectEmotionalAppeals(message: string): string {
+  const appeals = [];
+  
+  if (/risk|danger|threat|problem|issue|concern|worry/i.test(message)) {
+    appeals.push('fear');
+  }
+  if (/save|profit|gain|benefit|advantage|opportunity|win/i.test(message)) {
+    appeals.push('greed');
+  }
+  if (/successful|leader|achievement|recognition|status|elite/i.test(message)) {
+    appeals.push('pride');
+  }
+  if (/team|community|group|others|together|belong/i.test(message)) {
+    appeals.push('belonging');
+  }
+  if (/safe|secure|protected|guaranteed|reliable|certain/i.test(message)) {
+    appeals.push('security');
+  }
+  if (/discover|learn|find out|reveal|secret|inside/i.test(message)) {
+    appeals.push('curiosity');
+  }
+  if (/now|today|quickly|immediate|soon|deadline|urgent/i.test(message)) {
+    appeals.push('urgency');
+  }
+  if (/easy|simple|stress-free|effortless|smooth|comfortable/i.test(message)) {
+    appeals.push('relief');
+  }
+  
+  return appeals.length > 0 ? appeals.join(',') : 'none';
+}
+
+/**
+ * Detect cognitive biases being leveraged
+ */
+function detectCognitiveBiases(message: string): string {
+  const biases = [];
+  
+  if (/first|initial|original|starting/i.test(message)) {
+    biases.push('anchoring_bias');
+  }
+  if (/available|limited|few|running out/i.test(message)) {
+    biases.push('availability_heuristic');
+  }
+  if (/others|most|everyone|typically|usually/i.test(message)) {
+    biases.push('bandwagon_effect');
+  }
+  if (/free|bonus|extra|included|no.*cost/i.test(message)) {
+    biases.push('zero_price_effect');
+  }
+  if (/lose|miss|gone|last.*chance/i.test(message)) {
+    biases.push('loss_aversion');
+  }
+  if (/because|reason|proven|research|studies/i.test(message)) {
+    biases.push('authority_bias');
+  }
+  
+  return biases.length > 0 ? biases.join(',') : 'none';
+}
+
+/**
+ * Detect objection preemption styles
+ */
+function detectObjectionPreemption(message: string): string {
+  if (/I know.*thinking|probably.*wondering|might.*be.*concerned/i.test(message)) {
+    return 'anticipatory_addressing';
+  }
+  if (/common.*question|others.*ask|frequently.*hear/i.test(message)) {
+    return 'social_normalization';
+  }
+  if (/understand.*if|makes.*sense.*if|natural.*to/i.test(message)) {
+    return 'validation_preemption';
+  }
+  if (/before.*you.*say|let.*me.*address|want.*to.*clarify/i.test(message)) {
+    return 'direct_preemption';
+  }
+  
+  return 'none';
+}
+
+/**
+ * Detect trust building methods
+ */
+function detectTrustBuilding(message: string): string {
+  const methods = [];
+  
+  if (/client|customer|helped|worked.*with/i.test(message)) {
+    methods.push('case_study');
+  }
+  if (/guarantee|promise|ensure|committed/i.test(message)) {
+    methods.push('guarantee');
+  }
+  if (/transparent|honest|upfront|directly/i.test(message)) {
+    methods.push('transparency');
+  }
+  if (/understand|appreciate|respect|realize/i.test(message)) {
+    methods.push('empathy');
+  }
+  if (/experience|years|expertise|specialized/i.test(message)) {
+    methods.push('credibility');
+  }
+  if (/testimonial|review|feedback|recommendation/i.test(message)) {
+    methods.push('social_proof');
+  }
+  
+  return methods.length > 0 ? methods.join(',') : 'none';
+}
+
+/**
+ * Detect urgency creation types
+ */
+function detectUrgencyCreation(message: string): string {
+  if (/deadline|expires|ends|closing/i.test(message)) {
+    return 'time_deadline';
+  }
+  if (/limited|only.*left|few.*remaining/i.test(message)) {
+    return 'quantity_scarcity';
+  }
+  if (/price.*going.*up|increasing|won't.*last/i.test(message)) {
+    return 'price_increase';
+  }
+  if (/opportunity|window|chance.*now/i.test(message)) {
+    return 'opportunity_window';
+  }
+  if (/others.*interested|competition|moving.*fast/i.test(message)) {
+    return 'competitive_pressure';
+  }
+  
+  return 'none';
+}
+
+/**
+ * Detect social proof styles
+ */
+function detectSocialProof(message: string): string {
+  if (/client|customer|helped|worked.*with/i.test(message)) {
+    return 'case_study';
+  }
+  if (/testimonial|review|rating|feedback/i.test(message)) {
+    return 'testimonials';
+  }
+  if (/others|most|everyone|many/i.test(message)) {
+    return 'wisdom_of_crowds';
+  }
+  if (/expert|celebrity|influencer|known/i.test(message)) {
+    return 'celebrity';
+  }
+  
+  return 'none';
+}
+
+/**
+ * Detect authority positioning
+ */
+function detectAuthorityPositioning(message: string): string {
+  if (/expert|specialist|authority|leader/i.test(message)) {
+    return 'expertise';
+  }
+  if (/certified|licensed|accredited|qualified/i.test(message)) {
+    return 'credentials';
+  }
+  if (/years|experience|decades|established/i.test(message)) {
+    return 'experience';
+  }
+  if (/award|recognition|featured|published/i.test(message)) {
+    return 'recognition';
+  }
+  
+  return 'none';
+}
+
+/**
+ * Detect reciprocity triggers
+ */
+function detectReciprocityTriggers(message: string): string {
+  if (/help.*you|assist.*with|support.*your/i.test(message)) {
+    return 'help_offer';
+  }
+  if (/free|complimentary|no.*charge|gift/i.test(message)) {
+    return 'free_value';
+  }
+  if (/share|provide|give.*you|offer/i.test(message)) {
+    return 'information_sharing';
+  }
+  if (/save.*you|benefit.*you|advantage/i.test(message)) {
+    return 'benefit_focus';
+  }
+  
+  return 'none';
+}
+
+/**
+ * Detect commitment escalation
+ */
+function detectCommitmentEscalation(message: string): string {
+  if (/agree|confirm|commit|promise/i.test(message)) {
+    return 'direct_commitment';
+  }
+  if (/makes sense|sound good|fair|reasonable/i.test(message)) {
+    return 'agreement_seeking';
+  }
+  if (/next step|move forward|proceed|continue/i.test(message)) {
+    return 'progression_request';
+  }
+  if (/ready|prepared|willing|interested/i.test(message)) {
+    return 'readiness_confirmation';
+  }
+  
+  return 'none';
+}
+
+/**
+ * Calculate personality alignment score
+ */
+function calculatePersonalityAlignment(messageBody: string, leadPsychProfile: any): number {
+  if (!leadPsychProfile) return 0.5;
+  
+  const techniques = detectPsychologicalTechniques(messageBody);
+  const appeals = detectEmotionalAppeals(messageBody);
+  
+  // High skepticism needs social proof and authority
+  if ((leadPsychProfile.personality_skepticism_score || 0) > 60) {
+    if (techniques.includes('social_proof') || techniques.includes('authority')) {
+      return 0.85;
+    }
+  }
+  
+  // High decisiveness responds to urgency and scarcity
+  if ((leadPsychProfile.personality_decisiveness_score || 0) > 70) {
+    if (appeals.includes('urgency') || techniques.includes('scarcity')) {
+      return 0.90;
+    }
+  }
+  
+  // Low motivation needs emotional appeals
+  if ((leadPsychProfile.motivation_score || 0) < 40) {
+    if (appeals.includes('fear') || appeals.includes('greed')) {
+      return 0.80;
+    }
+  }
+  
+  return 0.60; // Default moderate alignment
+}
+
+/**
+ * Calculate emotional intelligence score
+ */
+function calculateEmotionalIntelligence(messageBody: string): number {
+  const empathyWords = /understand|feel|appreciate|realize|respect|acknowledge/gi;
+  const matches = (messageBody.match(empathyWords) || []).length;
+  return Math.min(matches * 0.25, 1.0);
+}
+
+/**
+ * Calculate persuasion technique density
+ */
+function calculatePersuasionDensity(messageBody: string): number {
+  const techniques = detectPsychologicalTechniques(messageBody);
+  const appeals = detectEmotionalAppeals(messageBody);
+  const totalTechniques = (techniques !== 'none' ? techniques.split(',').length : 0) +
+                         (appeals !== 'none' ? appeals.split(',').length : 0);
+  return Math.min(totalTechniques / (messageBody.length / 100), 1.0);
+}
+
+/**
+ * Detect objections in incoming messages
+ */
+function detectObjection(message: string): any {
+  const lowerMessage = message.toLowerCase();
+  
+  if (/too.*expensive|cost.*too.*much|budget|price/i.test(message)) {
+    return { type: 'price', emotional_tone: 'concerned' };
+  }
+  if (/not.*right.*time|busy|later|timing/i.test(message)) {
+    return { type: 'timing', emotional_tone: 'hesitant' };
+  }
+  if (/need.*to.*think|discuss.*with|talk.*to/i.test(message)) {
+    return { type: 'authority', emotional_tone: 'cautious' };
+  }
+  if (/don't.*need|already.*have|satisfied.*with/i.test(message)) {
+    return { type: 'need', emotional_tone: 'dismissive' };
+  }
+  if (/not.*sure|uncertain|doubt|skeptical/i.test(message)) {
+    return { type: 'trust', emotional_tone: 'skeptical' };
+  }
+  
+  return null;
+}
+
+/**
+ * Enhanced personality categorization with psychological depth
+ */
+function categorizeAdvancedPersonality(leadScore: any, messages: any[] = []): any {
+  const basicPersonality = categorizePersonality(leadScore);
+  
+  return {
+    ...basicPersonality,
+    decision_style: categorizeDecisionStyle(leadScore),
+    trust_building_speed: categorizeTrustSpeed(leadScore),
+    information_processing: categorizeInfoProcessing(leadScore, messages),
+    emotional_responsiveness: categorizeEmotionalResponse(leadScore),
+    objection_style: categorizeObjectionStyle(messages),
+    engagement_preference: categorizeEngagementStyle(messages)
+  };
+}
+
+/**
+ * Categorize decision-making style
+ */
+function categorizeDecisionStyle(leadScore: any): string {
+  const decisiveness = leadScore.personality_decisiveness_score || 50;
+  const skepticism = leadScore.personality_skepticism_score || 50;
+  
+  if (decisiveness > 70 && skepticism < 40) return 'quick_decisive';
+  if (decisiveness > 70 && skepticism > 60) return 'decisive_but_cautious';
+  if (decisiveness < 40 && skepticism < 40) return 'trusting_but_slow';
+  if (decisiveness < 40 && skepticism > 60) return 'analytical_skeptical';
+  if (decisiveness > 50 && skepticism < 60) return 'confident_moderate';
+  return 'balanced_moderate';
+}
+
+/**
+ * Categorize trust building speed
+ */
+function categorizeTrustSpeed(leadScore: any): string {
+  const skepticism = leadScore.personality_skepticism_score || 50;
+  const engagement = leadScore.engagement_curve || 50;
+  
+  if (skepticism < 30 && engagement > 60) return 'fast_trusting';
+  if (skepticism < 50 && engagement > 40) return 'moderate_trusting';
+  if (skepticism > 70 || engagement < 30) return 'slow_cautious';
+  return 'average_trust_building';
+}
+
+/**
+ * Categorize information processing style
+ */
+function categorizeInfoProcessing(leadScore: any, messages: any[]): string {
+  if (!messages || messages.length === 0) return 'balanced_processing';
+  
+  const inboundMessages = messages.filter((m: any) => m.direction === 'inbound');
+  if (inboundMessages.length === 0) return 'balanced_processing';
+  
+  const avgMessageLength = inboundMessages
+    .reduce((sum: number, m: any) => sum + (m.message_body?.length || 0), 0) / inboundMessages.length;
+  
+  const questionCount = inboundMessages
+    .reduce((sum: number, m: any) => sum + ((m.message_body?.match(/\?/g) || []).length), 0);
+  
+  if (avgMessageLength > 100 && questionCount > 3) return 'detail_oriented_analytical';
+  if (avgMessageLength < 50 && questionCount < 2) return 'quick_overview_preferred';
+  if (questionCount > 2) return 'inquisitive_thorough';
+  return 'balanced_processing';
+}
+
+/**
+ * Categorize emotional responsiveness
+ */
+function categorizeEmotionalResponse(leadScore: any): string {
+  const sentiment = leadScore.sentiment_score || 0;
+  const engagement = leadScore.engagement_curve || 50;
+  const motivation = leadScore.motivation_score || 50;
+  
+  const emotionalIndex = (sentiment * 50) + engagement + motivation;
+  
+  if (emotionalIndex > 120) return 'highly_emotional_responsive';
+  if (emotionalIndex > 80) return 'moderately_emotional';
+  if (emotionalIndex < 40) return 'logic_focused_low_emotion';
+  return 'balanced_emotional_logical';
+}
+
+/**
+ * Categorize objection style (simplified for now)
+ */
+function categorizeObjectionStyle(messages: any[]): string {
+  return 'moderate_objections';
+}
+
+/**
+ * Categorize engagement style (simplified for now)  
+ */
+function categorizeEngagementStyle(messages: any[]): string {
+  return 'moderate_engagement';
+}
+
+
+
+
+// ==========================================
 // 🚀 MAIN SERVE FUNCTION
 // ==========================================
 
@@ -718,6 +1285,13 @@ serve(async (req) => {
  if (req.method === 'OPTIONS') {
    return new Response('ok', { headers: corsHeaders });
  }
+
+ const requestStartTime = Date.now();
+ let timingMetrics = {
+   openai_response_time_ms: null,
+   vector_search_time_ms: null,
+   total_request_time_ms: null
+ };
 
  try {
    const supabaseUrl = Deno.env.get('SUPABASE_URL');
@@ -908,30 +1482,60 @@ serve(async (req) => {
 
    // ✅ NEW: Get optimized tone based on plan and learning
    console.log('🎯 Getting optimized tone based on plan and learning...');
-   const optimizedTone = await getOptimizedTone(supabase, tenant_id);
-   console.log(`🎯 Optimized tone selected: ${optimizedTone}`);
+   // Get the current lead's psychological profile for personalization
+const { data: currentLeadScore } = await supabase
+  .from('lead_scores')
+  .select('personality_decisiveness_score, personality_skepticism_score, motivation_score, hesitation_score, urgency_score')
+  .eq('lead_id', lead_id)
+  .order('updated_at', { ascending: false })
+  .limit(1)
+  .maybeSingle();
 
-   // ✅ NEW: Apply optimized tone to system instructions
-   if (optimizedTone !== 'Friendly & Casual') {
-     let toneDescription = '';
-     if (optimizedTone === 'Direct Closer') {
-       toneDescription = "You are selling. Be firm and clear. Use bold action language like Let's make this happen today or This is your best shot. Eliminate hesitation.";
-     } else if (optimizedTone === 'Soft & Trust-Building') {
-       toneDescription = "Use a gentle, trust-building approach. Ask questions, listen actively, and build rapport before making any suggestions. Prioritize relationship over immediate conversion.";
-     }
+const optimizedApproach = await getOptimizedApproach(supabase, tenant_id, currentLeadScore);
+console.log(`🎯 Optimized approach selected:`, optimizedApproach);
 
-     // Inject the optimized tone into system instructions
-     const toneBlock = `TONE: ${optimizedTone}\n${toneDescription}`;
-     
-     // Replace existing tone section or add it
-     if (systemInstructions.includes('TONE:')) {
-       systemInstructions = systemInstructions.replace(/TONE:.*?(?=\n\n|\n[A-Z]|$)/s, toneBlock);
-     } else {
-       systemInstructions = `${toneBlock}\n\n${systemInstructions}`;
-     }
-     
-     console.log('✅ System instructions updated with optimized tone');
-   }
+// ✅ ENHANCED: Apply optimized approach to system instructions
+if (optimizedApproach.tone !== 'Friendly & Casual' || optimizedApproach.psychologicalTechniques.length > 0) {
+  let toneDescription = '';
+  
+  // Build tone description
+  if (optimizedApproach.tone === 'Direct Closer') {
+    toneDescription = "You are selling. Be firm and clear. Use bold action language like Let's make this happen today or This is your best shot. Eliminate hesitation.";
+  } else if (optimizedApproach.tone === 'Soft & Trust-Building') {
+    toneDescription = "Use a gentle, trust-building approach. Ask questions, listen actively, and build rapport before making any suggestions. Prioritize relationship over immediate conversion.";
+  }
+
+  // Add psychological techniques if learned
+  if (optimizedApproach.psychologicalTechniques.length > 0) {
+    const techniqueDescriptions = optimizedApproach.psychologicalTechniques.map(technique => {
+      switch(technique) {
+        case 'social_proof': return 'Use social proof (others like you, clients similar to you)';
+        case 'scarcity': return 'Create urgency with scarcity (limited time, few spots left)';
+        case 'authority': return 'Reference expertise and credentials';
+        case 'reciprocity': return 'Offer value first, then ask';
+        case 'loss_aversion': return 'Highlight what they might miss out on';
+        default: return `Use ${technique} technique`;
+      }
+    });
+    
+    toneDescription += `\n\nPSYCHOLOGICAL TECHNIQUES: Based on learning from ${optimizedApproach.confidence * 100}% confidence, use these approaches:\n- ${techniqueDescriptions.join('\n- ')}`;
+  }
+
+  // Inject the optimized approach into system instructions
+  const toneBlock = `TONE: ${optimizedApproach.tone}\n${toneDescription}`;
+  
+  // Replace existing tone section or add it
+  if (systemInstructions.includes('TONE:')) {
+    systemInstructions = systemInstructions.replace(/TONE:.*?(?=\n\n|\n[A-Z]|$)/s, toneBlock);
+  } else {
+    systemInstructions = `${toneBlock}\n\n${systemInstructions}`;
+  }
+  
+  console.log('✅ System instructions updated with optimized approach and psychological techniques');
+}
+
+// Keep the optimizedTone variable for backward compatibility
+const optimizedTone = optimizedApproach.tone;
 
    // ✅ NEW: Generate campaign strategy based on metadata
    const campaignStrategy = getCampaignStrategy(tenantIndustry, campaignMetadata);
@@ -955,6 +1559,7 @@ serve(async (req) => {
    console.log('🔍 Searching for relevant knowledge chunks...');
 
    let knowledgeContext = '';
+   const vectorSearchStartTime = Date.now();
    try {
      const vectorSearchUrl = `${supabaseUrl}/functions/v1/vector-search`;
      const vectorResponse = await fetch(vectorSearchUrl, {
@@ -997,6 +1602,7 @@ serve(async (req) => {
      console.error('❌ Error calling vector search:', vectorError);
      // Continue without knowledge context rather than failing
    }
+   timingMetrics.vector_search_time_ms = Date.now() - vectorSearchStartTime;
 
    // Inject knowledge into system instructions if found
    if (knowledgeContext) {
@@ -1042,6 +1648,7 @@ CURRENT MESSAGE: ${message_body}`;
    console.log('📋 System message length:', systemMessage.length, 'characters');
    console.log('📋 User message length:', userMessage.length, 'characters');
    
+   const openaiStartTime = Date.now();
    const openaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
      method: 'POST',
      headers: {
@@ -1063,6 +1670,7 @@ CURRENT MESSAGE: ${message_body}`;
        temperature: 0.3,
      }),
    });
+   timingMetrics.openai_response_time_ms = Date.now() - openaiStartTime;
 
    if (!openaiRes.ok) {
        const errorText = await openaiRes.text();
@@ -1247,37 +1855,46 @@ try {
      const tenantPlan = await getTenantPlan(supabase, tenant_id);
      const conversationLimit = getFeatureValue(tenantPlan, 'conversationMemory');
 
-   // 🧠 TRIGGER LEARNING ANALYTICS (NEW)
-   console.log('🧠 Triggering learning analytics...');
-   try {
-     // Check if we should analyze this message for learning
+  // 🧠 TRIGGER AI LEARNING ENGINE (FIXED)
+console.log('🧠 Triggering ai-learning-engine...');
+try {
+  if (conversationLimit > 0) { // Only learn if not on starter plan
+    console.log('🧠 Plan allows learning - calling ai-learning-engine...');
+    
+    const learningUrl = `${supabaseUrl}/functions/v1/ai-learning-engine`;
+    const learningResponse = await fetch(learningUrl, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${supabaseKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        action: 'full_analysis',
+        message_id: insertedMessageId,
+        lead_id: lead_id,
+        tenant_id: tenant_id,
+        response_data: {
+          responded: true,
+          sentiment: sentiment.score
+        }
+      })
+    });
 
-     
-     if (conversationLimit > 0) { // Only learn if not on starter plan
-       console.log('🧠 Plan allows learning - analyzing message psychology...');
-       
-       // Analyze message psychology
-       await analyzeMessagePsychology(supabase, tenant_id, insertedMessageId, {
-         responded: true, // They responded to trigger this analysis
-         sentiment: sentiment.score
-       });
-       
-       // Learn personality patterns
-       await learnPersonalityPatterns(supabase, tenant_id, lead_id);
-       
-       // Analyze conversation flow if conversation has enough messages
-       if (messageHistory.length >= 3) {
-         await analyzeConversationFlow(supabase, tenant_id, lead_id);
-       }
-       
-       console.log('✅ Learning analytics completed');
-     } else {
-       console.log('⚠️ Starter plan - skipping learning analytics');
-     }
-   } catch (learningError) {
-     console.error('❌ Error in learning analytics:', learningError);
-     // Don't fail the main request if learning fails
-   }
+    if (learningResponse.ok) {
+      const learningResult = await learningResponse.json();
+      console.log('✅ AI learning engine completed:', learningResult);
+    } else {
+      console.error('❌ AI learning engine failed:', learningResponse.status);
+    }
+    
+    console.log('✅ Learning analytics completed');
+  } else {
+    console.log('⚠️ Starter plan - skipping learning analytics');
+  }
+} catch (learningError) {
+  console.error('❌ Error in learning analytics:', learningError);
+  // Don't fail the main request if learning fails
+}
 
    // ✅ TRIGGER LEAD SCORING
    console.log('📊 Triggering lead scoring...');
@@ -1433,6 +2050,27 @@ const twilioResponse = await fetch(`https://api.twilio.com/2010-04-01/Accounts/$
    console.log('✅ AI analysis complete, response sent with optimized tone:', optimizedTone);
    console.log('🧠 Learning system active:', conversationLimit > 0 ? 'YES' : 'NO (Starter Plan)');
    
+   // Log timing metrics
+   timingMetrics.total_request_time_ms = Date.now() - requestStartTime;
+   
+   try {
+     await supabase.from('ai_timing_metrics').insert({
+       tenant_id,
+       lead_id,
+       message_id: insertedMessageId,
+       request_start_time: new Date(requestStartTime).toISOString(),
+       openai_response_time_ms: timingMetrics.openai_response_time_ms,
+       vector_search_time_ms: timingMetrics.vector_search_time_ms,
+       total_request_time_ms: timingMetrics.total_request_time_ms,
+       request_type: 'conversation',
+       ai_model_used: 'gpt-4o',
+       success: true
+     });
+     console.log('✅ Timing metrics logged:', timingMetrics);
+   } catch (timingError) {
+     console.error('❌ Failed to log timing metrics:', timingError);
+   }
+
    return new Response(
      JSON.stringify({
        success: true,
