@@ -1008,193 +1008,79 @@ const fetchLeads = async () => {
           </div>
 
           {/* Table Content */}
-          <div className="overflow-x-auto">
+         {/* Table Content */}
+<div className="overflow-hidden">
   {currentLeads.length === 0 ? (
-    <table className="w-full">
-      <thead className="bg-gray-50 border-b border-gray-200">
-        <tr>
-          {/* Alert Column */}
-          <th 
-            className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
-            onClick={() => handleSort('requires_immediate_attention')}
-          >
-            <div className="flex items-center gap-2">
-              Alert
-              {getSortIcon('requires_immediate_attention')}
-            </div>
-          </th>
-          
-          {/* Dynamic headers based on configured fields */}
-          {displayFields.map((field) => (
-            <th 
-              key={field.field_name}
-              className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
-              onClick={() => handleSort(field.field_name)}
-            >
-              <div className="flex items-center gap-2">
-                {field.field_label}
-                {getSortIcon(field.field_name)}
-              </div>
-            </th>
-          ))}
-          
-          {/* Hot Score Column */}
-          <th 
-            className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
-            onClick={() => handleSort('hot_score')}
-          >
-            <div className="flex items-center gap-2">
-              Hot Score
-              {getSortIcon('hot_score')}
-            </div>
-          </th>
-          
-          {/* Status Column */}
-          <th 
-            className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
-            onClick={() => handleSort('status')}
-          >
-            <div className="flex items-center gap-2">
-              Status
-              {getSortIcon('status')}
-            </div>
-          </th>
-          
-          {/* Campaign Column */}
-          <th 
-            className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
-            onClick={() => handleSort('campaign')}
-          >
-            <div className="flex items-center gap-2">
-              Campaign
-              {getSortIcon('campaign')}
-            </div>
-          </th>
-          
-          {/* Created Column */}
-          <th 
-            className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
-            onClick={() => handleSort('created_at')}
-          >
-            <div className="flex items-center gap-2">
-              Created
-              {getSortIcon('created_at')}
-            </div>
-          </th>
-          
-          {/* Actions Column (No sorting) */}
-          <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-            Actions
-          </th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td colSpan={displayFields.length + 6} className="px-6 py-12 text-center">
-            <div className="flex flex-col items-center">
-              <Users size={48} className="text-gray-300 mb-4" />
-              <p className="text-lg font-medium text-gray-900">No leads found</p>
-              <p className="text-gray-500">
-                {leads.length === 0 
-                  ? 'Get started by adding your first lead' 
-                  : 'Try adjusting your filters or search term'
-                }
-              </p>
-            </div>
-          </td>
-        </tr>
-      </tbody>
-    </table>
+    <div className="px-6 py-12 text-center">
+      <div className="flex flex-col items-center">
+        <Users size={48} className="text-gray-300 mb-4" />
+        <p className="text-lg font-medium text-gray-900">No leads found</p>
+        <p className="text-gray-500">
+          {leads.length === 0 
+            ? 'Get started by adding your first lead' 
+            : 'Try adjusting your filters or search term'
+          }
+        </p>
+      </div>
+    </div>
   ) : (
     <div>
-      {/* Fixed header */}
-      <table className="w-full">
-        <thead className="bg-gray-50 border-b border-gray-200">
-          <tr>
-            {/* Alert Column */}
-            <th 
-              className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
-              onClick={() => handleSort('requires_immediate_attention')}
-            >
-              <div className="flex items-center gap-2">
-                Alert
-                {getSortIcon('requires_immediate_attention')}
-              </div>
-            </th>
-            
-            {/* Dynamic headers based on configured fields */}
-            {displayFields.map((field) => (
-              <th 
-                key={field.field_name}
-                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
-                onClick={() => handleSort(field.field_name)}
-              >
-                <div className="flex items-center gap-2">
-                  {field.field_label}
-                  {getSortIcon(field.field_name)}
-                </div>
-              </th>
-            ))}
-            
-            {/* Hot Score Column */}
-            <th 
-              className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
-              onClick={() => handleSort('hot_score')}
-            >
-              <div className="flex items-center gap-2">
-                Hot Score
-                {getSortIcon('hot_score')}
-              </div>
-            </th>
-            
-            {/* Status Column */}
-            <th 
-              className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
-              onClick={() => handleSort('status')}
-            >
-              <div className="flex items-center gap-2">
-                Status
-                {getSortIcon('status')}
-              </div>
-            </th>
-            
-            {/* Campaign Column */}
-            <th 
-              className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
-              onClick={() => handleSort('campaign')}
-            >
-              <div className="flex items-center gap-2">
-                Campaign
-                {getSortIcon('campaign')}
-              </div>
-            </th>
-            
-            {/* Created Column */}
-            <th 
-              className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
-              onClick={() => handleSort('created_at')}
-            >
-              <div className="flex items-center gap-2">
-                Created
-                {getSortIcon('created_at')}
-              </div>
-            </th>
-            
-            {/* Actions Column (No sorting) */}
-            <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Actions
-            </th>
-          </tr>
-        </thead>
-      </table>
+      {/* Fixed Header - CSS Grid */}
+      <div className="grid grid-cols-[80px_1fr_1fr_1fr_120px_120px_120px_120px_80px] gap-4 px-6 py-3 bg-gray-50 border-b border-gray-200 text-xs font-medium text-gray-500 uppercase tracking-wider">
+        <div 
+          className="cursor-pointer hover:bg-gray-100 transition-colors flex items-center gap-2"
+          onClick={() => handleSort('requires_immediate_attention')}
+        >
+          Alert {getSortIcon('requires_immediate_attention')}
+        </div>
+        
+        {displayFields.map((field) => (
+          <div 
+            key={field.field_name}
+            className="cursor-pointer hover:bg-gray-100 transition-colors flex items-center gap-2"
+            onClick={() => handleSort(field.field_name)}
+          >
+            {field.field_label} {getSortIcon(field.field_name)}
+          </div>
+        ))}
+        
+        <div 
+          className="cursor-pointer hover:bg-gray-100 transition-colors flex items-center gap-2"
+          onClick={() => handleSort('hot_score')}
+        >
+          Hot Score {getSortIcon('hot_score')}
+        </div>
+        
+        <div 
+          className="cursor-pointer hover:bg-gray-100 transition-colors flex items-center gap-2"
+          onClick={() => handleSort('status')}
+        >
+          Status {getSortIcon('status')}
+        </div>
+        
+        <div 
+          className="cursor-pointer hover:bg-gray-100 transition-colors flex items-center gap-2"
+          onClick={() => handleSort('campaign')}
+        >
+          Campaign {getSortIcon('campaign')}
+        </div>
+        
+        <div 
+          className="cursor-pointer hover:bg-gray-100 transition-colors flex items-center gap-2"
+          onClick={() => handleSort('created_at')}
+        >
+          Created {getSortIcon('created_at')}
+        </div>
+        
+        <div className="text-right">Actions</div>
+      </div>
       
-      {/* Virtualized rows */}
+      {/* Virtualized Rows - CSS Grid */}
       <List
         height={600}
         itemCount={currentLeads.length}
         itemSize={65}
         itemData={currentLeads}
-        className="border-b border-gray-200"
       >
         {({ index, style, data }) => {
           const lead = data[index];
@@ -1205,104 +1091,94 @@ const fetchLeads = async () => {
           return (
             <div 
               style={style} 
-              className={`hover:bg-gray-50 cursor-pointer transition-colors ${rowStyling}`}
+              className={`grid grid-cols-[80px_1fr_1fr_1fr_120px_120px_120px_120px_80px] gap-4 px-6 py-4 hover:bg-gray-50 cursor-pointer transition-colors border-b border-gray-100 ${rowStyling}`}
               onClick={() => handleRowClick(lead.id)}
             >
-              <table className="w-full h-full">
-                <tbody>
-                  <tr className="h-full">
-                    {/* Alert Indicator */}
-                    <td className="px-6 py-4">
-                      {lead.requires_immediate_attention && !(lead.status === 'Hot Lead' && lead.assigned_to_sales_team_id) ? (
-                        <div className="flex items-center gap-2">
-                          <span className="flex h-2 w-2">
-                            <span className={`${shouldAnimateAlerts ? 'animate-ping' : ''} absolute inline-flex h-2 w-2 rounded-full bg-red-400 opacity-75`}></span>
-                            <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
-                          </span>
-                          {lead.alert_priority === 'critical' && (
-                            <span className="text-xs text-red-600 font-medium">!</span>
-                          )}
-                        </div>
-                      ) : (
-                        <span className="text-gray-300">—</span>
-                      )}
-                    </td>
-                    
-                    {/* Dynamic columns based on configured fields */}
-                    {displayFields.map((field) => (
-                      <td key={field.field_name} className="px-6 py-4">
-                        {renderFieldValue(lead, field)}
-                      </td>
-                    ))}
-                    
-                    {/* Hot Score */}
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium">{lead.hot_score || 0}</span>
-                        <div className="w-16 bg-gray-200 rounded-full h-2">
-                          <div 
-                            className={`h-2 rounded-full transition-all ${
-                              lead.hot_score >= 80 ? 'bg-red-500' :
-                              lead.hot_score >= 60 ? 'bg-orange-500' :
-                              lead.hot_score >= 40 ? 'bg-yellow-500' : 'bg-blue-500'
-                            }`}
-                            style={{ width: `${Math.min(lead.hot_score || 0, 100)}%` }}
-                          />
-                        </div>
-                      </div>
-                    </td>
-                    
-                    {/* Status */}
-                    <td className="px-6 py-4">
-                      <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium border ${statusConfig.bgColor} ${statusConfig.textColor} ${statusConfig.borderColor}`}>
-                        <span>{statusConfig.icon}</span>
-                        {displayStatus}
-                      </span>
-                    </td>
-                    
-                    {/* Campaign */}
-                    <td className="px-6 py-4">
-                      <span className="text-sm text-gray-900">
-                        {lead.campaign || '—'}
-                      </span>
-                    </td>
-                    
-                    {/* Created */}
-                    <td className="px-6 py-4">
-                      <span className="text-sm text-gray-500">
-                        {lead.created_at ? new Date(lead.created_at).toLocaleDateString() : '—'}
-                      </span>
-                    </td>
-                    
-                    {/* Actions */}
-                    <td className="px-6 py-4 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        {lead.requires_immediate_attention && !(lead.status === 'Hot Lead' && lead.assigned_to_sales_team_id) && lead.phone && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              window.location.href = `tel:${lead.phone}`;
-                            }}
-                            className="p-1 bg-green-100 text-green-600 rounded hover:bg-green-200"
-                            title="Call Now"
-                          >
-                            <Phone size={14} />
-                          </button>
-                        )}
-                        <button 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleRowClick(lead.id);
-                          }}
-                          className="text-gray-400 hover:text-gray-600"
-                        >
-                          <Eye size={16} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
+              {/* Alert Indicator */}
+              <div className="flex items-center">
+                {lead.requires_immediate_attention && !(lead.status === 'Hot Lead' && lead.assigned_to_sales_team_id) ? (
+                  <div className="flex items-center gap-2">
+                    <span className="flex h-2 w-2">
+                      <span className={`${shouldAnimateAlerts ? 'animate-ping' : ''} absolute inline-flex h-2 w-2 rounded-full bg-red-400 opacity-75`}></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                    </span>
+                    {lead.alert_priority === 'critical' && (
+                      <span className="text-xs text-red-600 font-medium">!</span>
+                    )}
+                  </div>
+                ) : (
+                  <span className="text-gray-300">—</span>
+                )}
+              </div>
+              
+              {/* Dynamic columns based on configured fields */}
+              {displayFields.map((field) => (
+                <div key={field.field_name} className="flex items-center truncate">
+                  {renderFieldValue(lead, field)}
+                </div>
+              ))}
+              
+              {/* Hot Score */}
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium">{lead.hot_score || 0}</span>
+                <div className="w-16 bg-gray-200 rounded-full h-2">
+                  <div 
+                    className={`h-2 rounded-full transition-all ${
+                      lead.hot_score >= 80 ? 'bg-red-500' :
+                      lead.hot_score >= 60 ? 'bg-orange-500' :
+                      lead.hot_score >= 40 ? 'bg-yellow-500' : 'bg-blue-500'
+                    }`}
+                    style={{ width: `${Math.min(lead.hot_score || 0, 100)}%` }}
+                  />
+                </div>
+              </div>
+              
+              {/* Status */}
+              <div className="flex items-center">
+                <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium border ${statusConfig.bgColor} ${statusConfig.textColor} ${statusConfig.borderColor}`}>
+                  <span>{statusConfig.icon}</span>
+                  {displayStatus}
+                </span>
+              </div>
+              
+              {/* Campaign */}
+              <div className="flex items-center truncate">
+                <span className="text-sm text-gray-900">
+                  {lead.campaign || '—'}
+                </span>
+              </div>
+              
+              {/* Created */}
+              <div className="flex items-center">
+                <span className="text-sm text-gray-500">
+                  {lead.created_at ? new Date(lead.created_at).toLocaleDateString() : '—'}
+                </span>
+              </div>
+              
+              {/* Actions */}
+              <div className="flex items-center justify-end gap-2">
+                {lead.requires_immediate_attention && !(lead.status === 'Hot Lead' && lead.assigned_to_sales_team_id) && lead.phone && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      window.location.href = `tel:${lead.phone}`;
+                    }}
+                    className="p-1 bg-green-100 text-green-600 rounded hover:bg-green-200"
+                    title="Call Now"
+                  >
+                    <Phone size={14} />
+                  </button>
+                )}
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleRowClick(lead.id);
+                  }}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <Eye size={16} />
+                </button>
+              </div>
             </div>
           );
         }}
