@@ -1014,23 +1014,26 @@ const updateCampaignDynamicField = async (campaignId, field, value) => {
       // Fetch additional campaign details
       const campaignIds = data.map(c => c.id);
       if (campaignIds.length > 0) {
-        const { data: campaignDetails, error: detailError } = await supabase
-          .from('campaigns')
-          .select(`
-            id, 
-            assigned_to_sales_team_id,
-            phone_number_id,
-            talk_track,
-            talk_track_type,
-            talk_track_specialty,
-            service_type,
-            vehicle_type,
-            phone_numbers (
-              id,
-              phone_number
-            )
-          `)
-          .in('id', campaignIds);
+      const { data: campaignDetails, error: detailError } = await supabase
+        .from('campaigns')
+        .select(`
+          id, 
+          assigned_to_sales_team_id,
+          phone_number_id,
+          talk_track,
+          talk_track_type,
+          talk_track_specialty,
+          service_type,
+          vehicle_type,
+          hot_lead_distribution_mode,
+          hot_lead_single_assignee_id,
+          hot_lead_round_robin_team,
+          phone_numbers (
+            id,
+            phone_number
+          )
+        `)
+        .in('id', campaignIds);
         
         if (!detailError && campaignDetails) {
           const salesTeamIds = campaignDetails
