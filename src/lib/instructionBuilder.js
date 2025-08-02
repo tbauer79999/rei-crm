@@ -82,20 +82,23 @@ function getCampaignStrategy({ industry, service_type, talk_track, vehicle_type,
     }
   }
 
-  // Real Estate and other industries (unchanged)
+// Real Estate and other industries
   if (industry === 'Real Estate') {
-    if (talk_track === 'Retail-seller_leads') {
+    if (talk_track === 'seller_leads') {
       return "This campaign targets homeowners looking to sell. Focus on market conditions, home value, and making the selling process feel simple and profitable.";
     }
-    if (talk_track === 'Retail-buyer_leads') {
+    if (talk_track === 'buyer_leads') {
       return "This campaign targets potential home buyers. Emphasize available inventory, financing options, and helping them find their perfect home quickly.";
     }
     if (talk_track === 'traditional_sales') {
       return "This campaign is for traditional real estate sales. Focus on market expertise, full-service representation, and maximizing home value through proper marketing.";
     }
+    if (talk_track === 'investment_buying') {
+      return "This campaign targets distressed property owners and motivated sellers for investment purchases. Focus on quick cash transactions, no repair requirements, and closing in 7-14 days. Emphasize solving their problems (foreclosure, inherited property, relocation, financial hardship) with a hassle-free process. Position as a cash buyer/investor.";
+    }
     if (talk_track === 'investment_wholesale') {
-    return "This campaign targets distressed property owners and motivated sellers for wholesale deals. Focus on quick cash transactions, no repair requirements, and closing in 7-14 days. Emphasize solving their problems (foreclosure, inherited property, relocation, financial hardship) with a hassle-free process. Avoid mentioning you're a wholesaler - position as a cash buyer/investor.";
-  }
+      return "This campaign targets distressed property owners and motivated sellers for wholesale deals. Focus on quick cash transactions, no repair requirements, and closing in 7-14 days. Emphasize solving their problems (foreclosure, inherited property, relocation, financial hardship) with a hassle-free process. Avoid mentioning you're a wholesaler - position as a cash buyer/investor.";
+    }
     if (talk_track === 'expired_listings') {
       return "This campaign targets expired listings. Acknowledge their previous experience and offer a fresh approach with better marketing and pricing strategy.";
     }

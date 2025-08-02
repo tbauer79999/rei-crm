@@ -610,18 +610,27 @@ const EnterpriseAIStrategyHub = () => {
       throw new Error('Authentication required');
     }
 
-    console.log('Debug: strategyConfig.businessName =', strategyConfig.businessName);
+    // ✅ BUILD CAMPAIGN METADATA FROM SELECTED CAMPAIGN
+    const campaignMetadata = selectedCampaign ? {
+      talk_track: selectedCampaign.talk_track,
+      talk_track_type: selectedCampaign.talk_track_type,
+      talk_track_specialty: selectedCampaign.talk_track_specialty,
+      service_type: selectedCampaign.service_type,
+      vehicle_type: selectedCampaign.vehicle_type
+    } : {};
 
-    // Build instruction bundles (without platformSettings for now)
+    console.log('🎯 Campaign Metadata being passed:', campaignMetadata);
+
+    // Build instruction bundles WITH CAMPAIGN METADATA
     const initialBundle = buildInitialInstruction({
       tone: strategyConfig.initialTone,
       persona: strategyConfig.initialPersona,
       industry: strategyConfig.industry,
       role: strategyConfig.role,
-      leadDetails: strategyConfig.leadDetails || {},
+      leadDetails: {},
       knowledgeBase: strategyConfig.knowledgeBase || '',
-      campaignMetadata: strategyConfig.campaignMetadata || {},
-      platformSettings: { ai_representative_name: { value: strategyConfig.businessName } }  // ← ADD THIS
+      campaignMetadata: campaignMetadata, // ← PASS REAL CAMPAIGN DATA
+      platformSettings: { ai_representative_name: { value: strategyConfig.businessName } }
     });
 
     const engagementBundle = buildInstructionBundle({
@@ -629,10 +638,10 @@ const EnterpriseAIStrategyHub = () => {
       persona: strategyConfig.engagementPersona,
       industry: strategyConfig.industry,
       role: strategyConfig.role,
-      leadDetails: strategyConfig.leadDetails || {},
+      leadDetails: {},
       knowledgeBase: strategyConfig.knowledgeBase || '',
-      campaignMetadata: strategyConfig.campaignMetadata || {},
-      platformSettings: { ai_representative_name: { value: strategyConfig.businessName } }  // ← ADD THIS
+      campaignMetadata: campaignMetadata, // ← PASS REAL CAMPAIGN DATA
+      platformSettings: { ai_representative_name: { value: strategyConfig.businessName } }
     });
 
     // Build follow-up bundles
@@ -642,15 +651,15 @@ const EnterpriseAIStrategyHub = () => {
         persona: followup.persona,
         industry: strategyConfig.industry,
         role: strategyConfig.role,
-        leadDetails: strategyConfig.leadDetails || {},
+        leadDetails: {},
         knowledgeBase: strategyConfig.knowledgeBase || '',
-        campaignMetadata: strategyConfig.campaignMetadata || {},
+        campaignMetadata: campaignMetadata, // ← PASS REAL CAMPAIGN DATA
         followupStage: index + 1,
-        platformSettings: { ai_representative_name: { value: strategyConfig.businessName } }  // ← ADD THIS
+        platformSettings: { ai_representative_name: { value: strategyConfig.businessName } }
       })
     );
 
-    // Now create settings payload with the name
+    // Rest of the save logic...
     const settingsPayload = {
       ai_instruction_initial: { value: initialBundle },
       aiinstruction_bundle: { value: engagementBundle },
@@ -661,10 +670,9 @@ const EnterpriseAIStrategyHub = () => {
       followup_delay_2: { value: strategyConfig.followups[1]?.day.toString() || '7' },
       followup_delay_3: { value: strategyConfig.followups[2]?.day.toString() || '14' },
       industry: { value: strategyConfig.industry },
-      ai_representative_name: { value: strategyConfig.businessName }  // ← NAME SAVED HERE
+      ai_representative_name: { value: strategyConfig.businessName }
     };
 
-    // Save to platform_settings
     await callAPI('/settings', {
       method: 'PUT',
       body: JSON.stringify({ 
@@ -683,7 +691,7 @@ const EnterpriseAIStrategyHub = () => {
   } finally {
     setSaving(false);
   }
-}; // ← MISSING CLOSING BRACE ADDED
+}; 
 
     return (
       <div className="space-y-8">

@@ -732,15 +732,15 @@ const getDynamicDropdownOptions = () => {
           { value: 'executive', label: 'Executive Search' }
         ]
       };
-    case 'Real Estate':
-      return [
-        { value: 'seller_leads', label: 'Seller Leads' },
-        { value: 'buyer_leads', label: 'Buyer Leads' },
-        { value: 'traditional_sales', label: 'Traditional Sales' },
-        { value: 'investment_buying', label: 'Investment/Wholesale Buying' },
-        { value: 'expired_listings', label: 'Expired Listings' },
-        { value: 'fsbo_leads', label: 'FSBO (For Sale By Owner)' }
-      ];
+case 'Real Estate':
+  return [
+    { value: 'seller_leads', label: 'Seller Leads' },
+    { value: 'buyer_leads', label: 'Buyer Leads' },
+    { value: 'traditional_sales', label: 'Traditional Sales' },
+    { value: 'investment_buying', label: 'Investment/Wholesale Buying' }, // ← Fixed this line
+    { value: 'expired_listings', label: 'Expired Listings' },
+    { value: 'fsbo_leads', label: 'FSBO (For Sale By Owner)' }
+  ];
     case 'Home Services':
       return [
         { value: 'hvac', label: 'HVAC' },
