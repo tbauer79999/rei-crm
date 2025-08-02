@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { PERMISSIONS } from '../../lib/permissions';
 import supabase from '../../lib/supabaseClient.js';
@@ -600,15 +600,15 @@ const EnterpriseAIStrategyHub = () => {
       setUnsavedChanges(true);
     };
 
-    const handleBusinessNameChange = (e) => {
+   const handleBusinessNameChange = useCallback((e) => {
   setLocalBusinessName(e.target.value);
-};
+}, []);
 
-const handleBusinessNameBlur = () => {
+const handleBusinessNameBlur = useCallback(() => {
   if (localBusinessName !== strategyConfig.businessName) {
     updateStrategyConfig('businessName', localBusinessName);
   }
-};
+}, [localBusinessName, strategyConfig.businessName, updateStrategyConfig]);
 
     const saveStrategy = async () => {
       if (!canRebuildBundle) {
