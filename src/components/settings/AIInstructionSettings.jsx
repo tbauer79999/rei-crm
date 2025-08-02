@@ -620,7 +620,8 @@ const EnterpriseAIStrategyHub = () => {
       role: strategyConfig.role,
       leadDetails: strategyConfig.leadDetails || {},
       knowledgeBase: strategyConfig.knowledgeBase || '',
-      campaignMetadata: strategyConfig.campaignMetadata || {}
+      campaignMetadata: strategyConfig.campaignMetadata || {},
+      platformSettings: { ai_representative_name: { value: strategyConfig.businessName } }  // ← ADD THIS
     });
 
     const engagementBundle = buildInstructionBundle({
@@ -630,7 +631,8 @@ const EnterpriseAIStrategyHub = () => {
       role: strategyConfig.role,
       leadDetails: strategyConfig.leadDetails || {},
       knowledgeBase: strategyConfig.knowledgeBase || '',
-      campaignMetadata: strategyConfig.campaignMetadata || {}
+      campaignMetadata: strategyConfig.campaignMetadata || {},
+      platformSettings: { ai_representative_name: { value: strategyConfig.businessName } }  // ← ADD THIS
     });
 
     // Build follow-up bundles
@@ -643,7 +645,8 @@ const EnterpriseAIStrategyHub = () => {
         leadDetails: strategyConfig.leadDetails || {},
         knowledgeBase: strategyConfig.knowledgeBase || '',
         campaignMetadata: strategyConfig.campaignMetadata || {},
-        followupStage: index + 1
+        followupStage: index + 1,
+        platformSettings: { ai_representative_name: { value: strategyConfig.businessName } }  // ← ADD THIS
       })
     );
 
