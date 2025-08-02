@@ -78,7 +78,7 @@ app.use('/api/campaigns', campaignsRouter);
 app.use('/api/team', teamRoutes);
 app.use('/api/invitations', invitationsRoutes);
 app.use('/api/user', userRoutes); // ADD THIS LINE
-app.use('/api/settings/stripe', stripeRoutes);
+app.use('/api/stripe', stripeRoutes);
 app.post('/api/settings/instructions', async (req, res) => {
   const { tone, persona, industry, role } = req.body;
 
