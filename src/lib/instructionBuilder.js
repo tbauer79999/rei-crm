@@ -83,29 +83,29 @@ function getCampaignStrategy({ industry, service_type, talk_track, vehicle_type,
   }
 
 // Real Estate and other industries
-  if (industry === 'Real Estate') {
-    if (talk_track === 'seller_leads') {
-      return "This campaign targets homeowners looking to sell. Focus on market conditions, home value, and making the selling process feel simple and profitable.";
-    }
-    if (talk_track === 'buyer_leads') {
-      return "This campaign targets potential home buyers. Emphasize available inventory, financing options, and helping them find their perfect home quickly.";
-    }
-    if (talk_track === 'traditional_sales') {
-      return "This campaign is for traditional real estate sales. Focus on market expertise, full-service representation, and maximizing home value through proper marketing.";
-    }
-    if (talk_track === 'investment_buying') {
-      return "This campaign targets distressed property owners and motivated sellers for investment purchases. Focus on quick cash transactions, no repair requirements, and closing in 7-14 days. Emphasize solving their problems (foreclosure, inherited property, relocation, financial hardship) with a hassle-free process. Position as a cash buyer/investor.";
-    }
-    if (talk_track === 'investment_wholesale') {
-      return "This campaign targets distressed property owners and motivated sellers for wholesale deals. Focus on quick cash transactions, no repair requirements, and closing in 7-14 days. Emphasize solving their problems (foreclosure, inherited property, relocation, financial hardship) with a hassle-free process. Avoid mentioning you're a wholesaler - position as a cash buyer/investor.";
-    }
-    if (talk_track === 'expired_listings') {
-      return "This campaign targets expired listings. Acknowledge their previous experience and offer a fresh approach with better marketing and pricing strategy.";
-    }
-    if (talk_track === 'fsbo_leads') {
-      return "This campaign targets For Sale By Owner properties. Focus on the complexity they're facing and how professional help can save time and maximize profit.";
-    }
+if (industry === 'Real Estate') {
+  if (talk_track === 'seller_leads') {
+    return "This campaign reaches out to property owners who may or may not be interested in selling. Introduce yourself as a local real estate professional who can help IF they ever need to sell. Build awareness and relationships, don't assume immediate need.";
   }
+  if (talk_track === 'buyer_leads') {
+    return "This campaign reaches out to potential home buyers. Introduce yourself as a local real estate professional who can help them find properties when they're ready. Focus on building relationships, not assuming immediate buying intent.";
+  }
+  if (talk_track === 'traditional_sales') {
+    return "This campaign introduces you as a local real estate agent to property owners. Focus on building awareness of your services and establishing yourself as a helpful resource for when they may need real estate assistance.";
+  }
+  if (talk_track === 'investment_buying') {
+    return "This campaign introduces you as a local real estate investor to property owners. Let them know you buy houses with cash and can close quickly IF they ever need to sell fast. Focus on being a helpful resource, not assuming they want to sell.";
+  }
+  if (talk_track === 'investment_wholesale') {
+    return "This campaign introduces you as a local real estate investor to property owners. Let them know you buy houses with cash and can close quickly IF they ever need to sell fast. Focus on being a helpful resource, not assuming they want to sell. Position as a cash buyer/investor.";
+  }
+  if (talk_track === 'expired_listings') {
+    return "This campaign reaches out to property owners whose listings recently expired. Introduce yourself as a local agent who may be able to help with a fresh approach IF they're still interested in selling.";
+  }
+  if (talk_track === 'fsbo_leads') {
+    return "This campaign reaches out to property owners trying to sell by owner. Introduce yourself as a local real estate professional who can potentially help or provide resources IF they need assistance.";
+  }
+}
 
   if (industry === 'Home Services' && service_type) {
     return `This campaign is for ${service_type} services. Help the lead feel it's fast and easy to get a quote or inspection.`;
@@ -381,13 +381,24 @@ You should introduce yourself as ${aiName} when reaching out. Use this name natu
 - DO sound like a real neighbor, not a salesperson
 
 === FIRST MESSAGE STRATEGY ===
-- Open with a simple, direct introduction
-- Introduce yourself as ${aiName} 
-- Briefly explain what you do (without jargon)
-- Either offer direct value OR ask if they know anyone who needs help
+IMPORTANT: These are COLD LEADS with no prior contact or expressed interest.
+
+- Open casually, like a real person texting
+- Introduce yourself as Tom
+- NEVER assume they want your services or have any "situation"
+- NEVER reference their "interest" - they haven't expressed any
+- Briefly explain what you do in the local area
+- Either offer direct value OR ask if they know someone who needs help
+- Sound like a friendly neighbor, not a salesperson
 - Keep it short, natural, and low-pressure
-- Include your location/area to build local credibility
 - If you have specific services in your knowledge base, mention them naturally
+
+COLD OUTREACH PRINCIPLES:
+❌ NEVER: "I heard you might be interested in..."
+❌ NEVER: "I noticed your situation..."
+❌ NEVER: "Based on what I saw..."
+✅ ALWAYS: Simple intro + what you do + local area + value or referral ask
+✅ ALWAYS: Sound like a real person reaching out in their neighborhood
 
 ${knowledgeInstructions}
 
