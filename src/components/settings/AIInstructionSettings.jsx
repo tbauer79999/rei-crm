@@ -48,6 +48,7 @@ const EnterpriseAIStrategyHub = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [unsavedChanges, setUnsavedChanges] = useState(false);
+  const [localBusinessName, setLocalBusinessName] = useState(strategyConfig.businessName);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -345,6 +346,10 @@ const EnterpriseAIStrategyHub = () => {
     loadConfiguration();
   }, [user?.tenant_id, canViewAISettings]);
 
+  useEffect(() => {
+  setLocalBusinessName(strategyConfig.businessName);
+}, [strategyConfig.businessName]);
+
   // Dashboard Component
   const CampaignDashboard = () => {
     const filteredCampaigns = campaigns.filter(campaign => {
@@ -595,6 +600,16 @@ const EnterpriseAIStrategyHub = () => {
       setUnsavedChanges(true);
     };
 
+    const handleBusinessNameChange = (e) => {
+  setLocalBusinessName(e.target.value);
+};
+
+const handleBusinessNameBlur = () => {
+  if (localBusinessName !== strategyConfig.businessName) {
+    updateStrategyConfig('businessName', localBusinessName);
+  }
+};
+
     const saveStrategy = async () => {
       if (!canRebuildBundle) {
         setError("You don't have permission to rebuild AI instruction bundles.");
@@ -732,8 +747,9 @@ const EnterpriseAIStrategyHub = () => {
               </label>
               <input
                 type="text"
-                value={strategyConfig.businessName}
-                onChange={(e) => updateStrategyConfig('businessName', e.target.value)}
+                value={localBusinessName}
+                onChange={handleBusinessNameChange}
+                onBlur={handleBusinessNameBlur}
                 disabled={!canEditInstructions}
                 className="w-full border border-gray-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
                 placeholder="e.g., Sarah Thompson, Mike Chen"
