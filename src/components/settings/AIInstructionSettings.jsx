@@ -596,97 +596,91 @@ const EnterpriseAIStrategyHub = () => {
     };
 
     const saveStrategy = async () => {
-      if (!canRebuildBundle) {
-        setError("You don't have permission to rebuild AI instruction bundles.");
-        return;
-      }
+  if (!canRebuildBundle) {
+    setError("You don't have permission to rebuild AI instruction bundles.");
+    return;
+  }
 
-      setSaving(true);
-      setError('');
-      setSuccess('');
+  setSaving(true);
+  setError('');
+  setSuccess('');
 
-      try {
-        if (!user?.tenant_id) {
-          throw new Error('Authentication required');
-        }
-          console.log('Debug: strategyConfig.businessName =', strategyConfig.businessName);
-          const initialBundle = buildInitialInstruction({
-            tone: strategyConfig.initialTone,
-            persona: strategyConfig.initialPersona,
-            industry: strategyConfig.industry,
-            role: strategyConfig.role,
-            leadDetails: strategyConfig.leadDetails || {},
-            knowledgeBase: strategyConfig.knowledgeBase || '',
-            campaignMetadata: strategyConfig.campaignMetadata || {},
-            platformSettings: settingsPayload  // ← ADD THIS LINE
-          });
+  try {
+    if (!user?.tenant_id) {
+      throw new Error('Authentication required');
+    }
 
-          const engagementBundle = buildInstructionBundle({
-            tone: strategyConfig.engagementTone,
-            persona: strategyConfig.engagementPersona,
-            industry: strategyConfig.industry,
-            role: strategyConfig.role,
-            leadDetails: strategyConfig.leadDetails || {},
-            knowledgeBase: strategyConfig.knowledgeBase || '',
-            campaignMetadata: strategyConfig.campaignMetadata || {},
-            platformSettings: settingsPayload  // ← ADD THIS LINE
-          });
+    console.log('Debug: strategyConfig.businessName =', strategyConfig.businessName);
 
-        // Build follow-up bundles
-        const followupBundles = strategyConfig.followups.map((followup, index) => 
-          buildFollowupInstruction({
-            tone: followup.tone || strategyConfig.engagementTone,
-            persona: followup.persona,
-            industry: strategyConfig.industry,
-            role: strategyConfig.role,
-            leadDetails: strategyConfig.leadDetails || {},
-            knowledgeBase: strategyConfig.knowledgeBase || '',
-            campaignMetadata: strategyConfig.campaignMetadata || {},
-            followupStage: index + 1,
-            platformSettings: settingsPayload  // ← ADD THIS LINE
-          })
-        );
+    // Build instruction bundles (without platformSettings for now)
+    const initialBundle = buildInitialInstruction({
+      tone: strategyConfig.initialTone,
+      persona: strategyConfig.initialPersona,
+      industry: strategyConfig.industry,
+      role: strategyConfig.role,
+      leadDetails: strategyConfig.leadDetails || {},
+      knowledgeBase: strategyConfig.knowledgeBase || '',
+      campaignMetadata: strategyConfig.campaignMetadata || {}
+    });
 
-            const settingsPayload = {
-              ai_instruction_initial: { value: initialBundle },
-              aiinstruction_bundle: { value: engagementBundle },
-              ai_instruction_followup_1: { value: followupBundles[0] || '' },
-              ai_instruction_followup_2: { value: followupBundles[1] || '' },
-              ai_instruction_followup_3: { value: followupBundles[2] || '' },
-              followup_delay_1: { value: strategyConfig.followups[0]?.day.toString() || '3' },
-              followup_delay_2: { value: strategyConfig.followups[1]?.day.toString() || '7' },
-              followup_delay_3: { value: strategyConfig.followups[2]?.day.toString() || '14' },
-              ai_representative_name: { value: strategyConfig.businessName }  // ← ADD THIS LINE
-              };
+    const engagementBundle = buildInstructionBundle({
+      tone: strategyConfig.engagementTone,
+      persona: strategyConfig.engagementPersona,
+      industry: strategyConfig.industry,
+      role: strategyConfig.role,
+      leadDetails: strategyConfig.leadDetails || {},
+      knowledgeBase: strategyConfig.knowledgeBase || '',
+      campaignMetadata: strategyConfig.campaignMetadata || {}
+    });
 
-// Updated to use the correct endpoint format
-await callAPI('/settings', {
-  method: 'PUT',
-  body: JSON.stringify({ 
-    settings: settingsPayload, 
-    tenant_id: user.tenant_id 
-  })
-});
+    // Build follow-up bundles
+    const followupBundles = strategyConfig.followups.map((followup, index) => 
+      buildFollowupInstruction({
+        tone: followup.tone || strategyConfig.engagementTone,
+        persona: followup.persona,
+        industry: strategyConfig.industry,
+        role: strategyConfig.role,
+        leadDetails: strategyConfig.leadDetails || {},
+        knowledgeBase: strategyConfig.knowledgeBase || '',
+        campaignMetadata: strategyConfig.campaignMetadata || {},
+        followupStage: index + 1
+      })
+    );
 
-// ADD THIS - Save AI Representative Name to platform_settings
-await callAPI('/platform_settings', {
-  method: 'PUT',
-  body: JSON.stringify({ 
-    ai_representative_name: strategyConfig.businessName,
-    tenant_id: user.tenant_id 
-  })
-});
+    // Now create settings payload with the name
+    const settingsPayload = {
+      ai_instruction_initial: { value: initialBundle },
+      aiinstruction_bundle: { value: engagementBundle },
+      ai_instruction_followup_1: { value: followupBundles[0] || '' },
+      ai_instruction_followup_2: { value: followupBundles[1] || '' },
+      ai_instruction_followup_3: { value: followupBundles[2] || '' },
+      followup_delay_1: { value: strategyConfig.followups[0]?.day.toString() || '3' },
+      followup_delay_2: { value: strategyConfig.followups[1]?.day.toString() || '7' },
+      followup_delay_3: { value: strategyConfig.followups[2]?.day.toString() || '14' },
+      industry: { value: strategyConfig.industry },
+      ai_representative_name: { value: strategyConfig.businessName }  // ← NAME SAVED HERE
+    };
 
-setSuccess('AI strategy saved successfully!');
-setUnsavedChanges(false);
-setTimeout(() => setSuccess(''), 3000);
+    // Save to platform_settings
+    await callAPI('/settings', {
+      method: 'PUT',
+      body: JSON.stringify({ 
+        settings: settingsPayload, 
+        tenant_id: user.tenant_id 
+      })
+    });
 
-} catch (err) {
-  console.error('Failed to save strategy:', err);
-  setError(`Save failed: ${err.message}`);
-} finally {
-  setSaving(false);
-}
+    setSuccess('AI strategy saved successfully!');
+    setUnsavedChanges(false);
+    setTimeout(() => setSuccess(''), 3000);
+
+  } catch (err) {
+    console.error('Failed to save strategy:', err);
+    setError(`Save failed: ${err.message}`);
+  } finally {
+    setSaving(false);
+  }
+}; // ← MISSING CLOSING BRACE ADDED
 
     return (
       <div className="space-y-8">
