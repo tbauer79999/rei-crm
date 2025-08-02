@@ -629,9 +629,12 @@ const EnterpriseAIStrategyHub = () => {
       role: strategyConfig.role,
       leadDetails: {},
       knowledgeBase: strategyConfig.knowledgeBase || '',
-      campaignMetadata: campaignMetadata, // ← PASS REAL CAMPAIGN DATA
+      campaignMetadata: campaignMetadata,
       platformSettings: { ai_representative_name: { value: strategyConfig.businessName } }
     });
+
+    console.log('🎯 Generated Initial Bundle:', initialBundle.substring(0, 200));
+    console.log('🎯 Contains cold lead rules?', initialBundle.includes('COLD LEAD RULES'));
 
     const engagementBundle = buildInstructionBundle({
       tone: strategyConfig.engagementTone,
