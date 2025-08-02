@@ -609,10 +609,17 @@ useEffect(() => {
 }, []);
 
 const handleBusinessNameBlur = useCallback(() => {
-  if (localBusinessName !== strategyConfig.businessName) {
-    updateStrategyConfig('businessName', localBusinessName);
+  if (
+    localBusinessName.trim() &&
+    localBusinessName !== strategyConfig.businessName
+  ) {
+    // Delay to ensure blur does not interfere with focus
+    setTimeout(() => {
+      updateStrategyConfig('businessName', localBusinessName);
+    }, 100); // Small delay to avoid immediate re-renders while typing
   }
-}, [localBusinessName, strategyConfig.businessName, updateStrategyConfig]);
+}, [localBusinessName, strategyConfig.businessName]);
+
 
     const saveStrategy = async () => {
       if (!canRebuildBundle) {
@@ -754,10 +761,12 @@ const handleBusinessNameBlur = useCallback(() => {
                 value={localBusinessName}
                 onChange={handleBusinessNameChange}
                 onBlur={handleBusinessNameBlur}
+                onFocus={(e) => e.target.select()} // optional: improves UX
                 disabled={!canEditInstructions}
                 className="w-full border border-gray-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
                 placeholder="e.g., Sarah Thompson, Mike Chen"
               />
+
             </div>
 
             <div>
