@@ -48,7 +48,7 @@ const EnterpriseAIStrategyHub = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [unsavedChanges, setUnsavedChanges] = useState(false);
-  const [localBusinessName, setLocalBusinessName] = useState(strategyConfig.businessName);
+  const [localBusinessName, setLocalBusinessName] = useState('');
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
