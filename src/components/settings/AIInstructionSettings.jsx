@@ -659,26 +659,34 @@ const EnterpriseAIStrategyHub = () => {
               ai_representative_name: { value: strategyConfig.businessName }  // ← ADD THIS LINE
               };
 
-        // Updated to use the correct endpoint format
-        await callAPI('/settings', {
-          method: 'PUT',
-          body: JSON.stringify({ 
-            settings: settingsPayload, 
-            tenant_id: user.tenant_id 
-          })
-        });
+// Updated to use the correct endpoint format
+await callAPI('/settings', {
+  method: 'PUT',
+  body: JSON.stringify({ 
+    settings: settingsPayload, 
+    tenant_id: user.tenant_id 
+  })
+});
 
-        setSuccess('AI strategy saved successfully!');
-        setUnsavedChanges(false);
-        setTimeout(() => setSuccess(''), 3000);
+// ADD THIS - Save AI Representative Name to platform_settings
+await callAPI('/platform_settings', {
+  method: 'PUT',
+  body: JSON.stringify({ 
+    ai_representative_name: strategyConfig.businessName,
+    tenant_id: user.tenant_id 
+  })
+});
 
-      } catch (err) {
-        console.error('Failed to save strategy:', err);
-        setError(`Save failed: ${err.message}`);
-      } finally {
-        setSaving(false);
-      }
-    };
+setSuccess('AI strategy saved successfully!');
+setUnsavedChanges(false);
+setTimeout(() => setSuccess(''), 3000);
+
+} catch (err) {
+  console.error('Failed to save strategy:', err);
+  setError(`Save failed: ${err.message}`);
+} finally {
+  setSaving(false);
+}
 
     return (
       <div className="space-y-8">
