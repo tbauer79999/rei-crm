@@ -609,36 +609,41 @@ const EnterpriseAIStrategyHub = () => {
         if (!user?.tenant_id) {
           throw new Error('Authentication required');
         }
+          console.log('Debug: strategyConfig.businessName =', strategyConfig.businessName);
+          const initialBundle = buildInitialInstruction({
+            tone: strategyConfig.initialTone,
+            persona: strategyConfig.initialPersona,
+            industry: strategyConfig.industry,
+            role: strategyConfig.role,
+            leadDetails: strategyConfig.leadDetails || {},
+            knowledgeBase: strategyConfig.knowledgeBase || '',
+            campaignMetadata: strategyConfig.campaignMetadata || {},
+            platformSettings: settingsPayload  // ← ADD THIS LINE
+          });
 
-        // Build instruction bundles
-        const initialBundle = buildInitialInstruction({
-          tone: strategyConfig.initialTone,
-          persona: strategyConfig.initialPersona,
-          industry: strategyConfig.industry,
-          role: strategyConfig.role,
-          businessName: strategyConfig.businessName,  // ← ADD THIS LINE
-          leadDetails: strategyConfig.leadDetails || {},
-          knowledgeBase: strategyConfig.knowledgeBase || '',
-          campaignMetadata: strategyConfig.campaignMetadata || {}
-        });
-
-        const engagementBundle = buildInstructionBundle({
-          tone: strategyConfig.engagementTone,
-          persona: strategyConfig.engagementPersona,
-          industry: strategyConfig.industry,
-          role: strategyConfig.role,
-          businessName: strategyConfig.businessName
-        });
+          const engagementBundle = buildInstructionBundle({
+            tone: strategyConfig.engagementTone,
+            persona: strategyConfig.engagementPersona,
+            industry: strategyConfig.industry,
+            role: strategyConfig.role,
+            leadDetails: strategyConfig.leadDetails || {},
+            knowledgeBase: strategyConfig.knowledgeBase || '',
+            campaignMetadata: strategyConfig.campaignMetadata || {},
+            platformSettings: settingsPayload  // ← ADD THIS LINE
+          });
 
         // Build follow-up bundles
-          const followupBundles = strategyConfig.followups.map((followup, index) => 
-            buildFollowupInstruction({  // ← Use the new function
-              tone: followup.tone || strategyConfig.engagementTone,
-              persona: followup.persona,
-              industry: strategyConfig.industry,
-              role: strategyConfig.role,
-              businessName: strategyConfig.businessName,
-              followupStage: index + 1  // Add stage number
+        const followupBundles = strategyConfig.followups.map((followup, index) => 
+          buildFollowupInstruction({
+            tone: followup.tone || strategyConfig.engagementTone,
+            persona: followup.persona,
+            industry: strategyConfig.industry,
+            role: strategyConfig.role,
+            leadDetails: strategyConfig.leadDetails || {},
+            knowledgeBase: strategyConfig.knowledgeBase || '',
+            campaignMetadata: strategyConfig.campaignMetadata || {},
+            followupStage: index + 1,
+            platformSettings: settingsPayload  // ← ADD THIS LINE
           })
         );
 
@@ -651,8 +656,8 @@ const EnterpriseAIStrategyHub = () => {
               followup_delay_1: { value: strategyConfig.followups[0]?.day.toString() || '3' },
               followup_delay_2: { value: strategyConfig.followups[1]?.day.toString() || '7' },
               followup_delay_3: { value: strategyConfig.followups[2]?.day.toString() || '14' },
-              industry: { value: strategyConfig.industry }  // <- ADD THIS LINE
-            };
+              ai_representative_name: { value: strategyConfig.businessName }  // ← ADD THIS LINE
+              };
 
         // Updated to use the correct endpoint format
         await callAPI('/settings', {

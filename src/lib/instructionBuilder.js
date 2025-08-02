@@ -156,10 +156,13 @@ function buildInstructionBundle({
   leadDetails,
   knowledgeBase,
   campaignMetadata = {},
-  dynamicTone = null
+  dynamicTone = null,
+  platformSettings = {}  // ← Add this parameter
 }) {
-
   const finalTone = dynamicTone || tone;
+  
+  // Get AI representative name from platform settings
+  const aiName = platformSettings.ai_representative_name?.value || 'AI Assistant';
 
   const toneBlock = `TONE: ${finalTone}
 ${getToneDescription(finalTone)}`;
@@ -185,6 +188,9 @@ ${personaBlock}
 ${industryBlock}
 
 ${roleBlock}
+
+NAME: ${aiName}
+You should introduce yourself as ${aiName} when interacting with leads.
 `.trim();
 
   return `=== PRIMARY GOAL ===
@@ -242,10 +248,13 @@ function buildFollowupInstruction({
   knowledgeBase,
   campaignMetadata = {},
   followupStage,
-  dynamicTone = null
+  dynamicTone = null,
+  platformSettings = {}  // ← Add this parameter
 }) {
-
   const finalTone = dynamicTone || tone;
+  
+  // Get AI representative name from platform settings
+  const aiName = platformSettings.ai_representative_name?.value || 'AI Assistant';
 
   const toneBlock = `TONE: ${finalTone}
 ${getToneDescription(finalTone)}`;
@@ -271,6 +280,9 @@ ${personaBlock}
 ${industryBlock}
 
 ${roleBlock}
+
+NAME: ${aiName}
+You should identify yourself as ${aiName} when appropriate in follow-up messages.
 `.trim();
 
   return `=== PRIMARY GOAL ===
@@ -306,13 +318,16 @@ function buildInitialInstruction({
   persona,
   industry,
   role,
-  businessName,
   leadDetails,
   knowledgeBase,
-  campaignMetadata = {}
+  campaignMetadata = {},
+  platformSettings = {}  // ← Add this parameter
 }) {
   console.log('🚨 buildInitialInstruction was called');
   console.log('🧠 Runtime campaign metadata:', campaignMetadata);
+  
+  // Get AI representative name from platform settings
+  const aiName = platformSettings.ai_representative_name?.value || 'AI Assistant';
   
   const toneBlock = `TONE: ${tone}
 ${getToneDescription(tone)}`;
@@ -339,8 +354,8 @@ ${industryBlock}
 
 ${roleBlock}
 
-NAME: ${businessName}
-You should introduce yourself as ${businessName} when reaching out. Use this name naturally in your introduction.
+NAME: ${aiName}
+You should introduce yourself as ${aiName} when reaching out. Use this name naturally in your introduction.
 `.trim();
 
   return `You are writing SMS messages on behalf of a business. Your job is to sound like a real human — warm, conversational, and respectful.
@@ -349,7 +364,7 @@ Before writing your first message, understand the context of this lead. Think cr
 
 === FIRST MESSAGE STRATEGY ===
 - Open casually, like a real person texting
-- Introduce yourself as ${businessName}
+- Introduce yourself as ${aiName}
 - Reference their situation or possible interest
 - Mention timing, location, or reason you're reaching out
 - Do not hard sell — your job is to start a conversation
