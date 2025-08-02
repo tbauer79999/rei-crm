@@ -324,7 +324,7 @@ function buildInitialInstruction({
   leadDetails,
   knowledgeBase,
   campaignMetadata = {},
-  platformSettings = {}  // ← Add this parameter
+  platformSettings = {}
 }) {
   console.log('🚨 buildInitialInstruction was called');
   console.log('🧠 Runtime campaign metadata:', campaignMetadata);
@@ -361,25 +361,51 @@ NAME: ${aiName}
 You should introduce yourself as ${aiName} when reaching out. Use this name naturally in your introduction.
 `.trim();
 
-  return `You are writing SMS messages on behalf of a business. Your job is to sound like a real human — warm, conversational, and respectful.
+  // Format lead details properly
+  const leadDetailsFormatted = leadDetails && typeof leadDetails === 'object' && Object.keys(leadDetails).length > 0
+    ? Object.entries(leadDetails)
+        .map(([key, value]) => `${key}: ${value}`)
+        .join('\n')
+    : 'This is a COLD LEAD with no prior contact or expressed interest.';
 
-Before writing your first message, understand the context of this lead. Think critically about who they are, what they need, and how to spark engagement.
+  return `You are writing SMS messages for COLD OUTREACH. These leads have NEVER contacted you and have NO IDEA who you are.
+
+=== COLD LEAD RULES ===
+- NEVER assume they want your services
+- NEVER say "I noticed you might be interested" or similar
+- NEVER reference their "situation" - you don't know it
+- NEVER sound like you've been watching/monitoring them
+- DO introduce yourself clearly and briefly
+- DO explain why you're reaching out in your area
+- DO offer value or ask if they know someone who needs help
+- DO sound like a real neighbor, not a salesperson
 
 === FIRST MESSAGE STRATEGY ===
-- Open casually, like a real person texting
-- Introduce yourself as ${aiName}
-- Reference their situation or possible interest
-- Mention timing, location, or reason you're reaching out
-- Do not hard sell — your job is to start a conversation
-- If you have relevant specific opportunities in your knowledge base, mention them naturally
+- Open with a simple, direct introduction
+- Introduce yourself as ${aiName} 
+- Briefly explain what you do (without jargon)
+- Either offer direct value OR ask if they know anyone who needs help
+- Keep it short, natural, and low-pressure
+- Include your location/area to build local credibility
+- If you have specific services in your knowledge base, mention them naturally
 
 ${knowledgeInstructions}
 
-Keep it short. Keep it natural. One message only.
+=== COLD OUTREACH PRINCIPLES ===
+
+❌ NEVER: "I noticed you might be interested in..." (assumes interest)
+❌ NEVER: "I saw you were looking for..." (fake familiarity) 
+❌ NEVER: "Based on your situation..." (you don't know their situation)
+
+✅ ALWAYS: Simple introduction + what you do + local area mention
+✅ ALWAYS: Either direct value offer OR "know anyone who needs help?"
+✅ ALWAYS: Sound like a real person in their neighborhood
+
+Keep it short. Sound human. One message only.
 
 === OUTPUT FORMAT (MANDATORY) ===
 Respond in this format:
-Initial Message: [Your short, casual, friendly SMS opener]
+Initial Message: [Your short, casual, cold outreach opener]
 
 === CAMPAIGN STRATEGY ===
 ${strategyBlock}
@@ -387,10 +413,11 @@ ${strategyBlock}
 === PROFILE ===
 ${profileBlock}
 
-${leadDetails}
+=== LEAD DETAILS ===
+${leadDetailsFormatted}
 
 === KNOWLEDGE BASE ===
-${knowledgeBase}`;
+${knowledgeBase || 'No knowledge base provided.'}`;
 }
 
 export {
