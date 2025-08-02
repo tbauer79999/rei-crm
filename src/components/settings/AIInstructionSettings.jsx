@@ -347,11 +347,10 @@ const EnterpriseAIStrategyHub = () => {
   }, [user?.tenant_id, canViewAISettings]);
 
 useEffect(() => {
-  if (strategyConfig.businessName && localBusinessName !== strategyConfig.businessName) {
+  if (strategyConfig.businessName) {
     setLocalBusinessName(strategyConfig.businessName);
   }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-}, [strategyConfig.businessName]);
+}, []); // empty dependency array = run only once on mount
 
 
   // Dashboard Component
