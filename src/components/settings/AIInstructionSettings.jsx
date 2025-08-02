@@ -616,6 +616,7 @@ const EnterpriseAIStrategyHub = () => {
           persona: strategyConfig.initialPersona,
           industry: strategyConfig.industry,
           role: strategyConfig.role,
+          businessName: strategyConfig.businessName,  // ← ADD THIS LINE
           leadDetails: strategyConfig.leadDetails || {},
           knowledgeBase: strategyConfig.knowledgeBase || '',
           campaignMetadata: strategyConfig.campaignMetadata || {}
