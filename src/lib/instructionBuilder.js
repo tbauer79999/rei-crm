@@ -306,6 +306,7 @@ function buildInitialInstruction({
   persona,
   industry,
   role,
+  businessName,
   leadDetails,
   knowledgeBase,
   campaignMetadata = {}
@@ -337,6 +338,9 @@ ${personaBlock}
 ${industryBlock}
 
 ${roleBlock}
+
+NAME: ${businessName}
+You should introduce yourself as ${businessName} when reaching out. Use this name naturally in your introduction.
 `.trim();
 
   return `You are writing SMS messages on behalf of a business. Your job is to sound like a real human — warm, conversational, and respectful.
@@ -345,6 +349,7 @@ Before writing your first message, understand the context of this lead. Think cr
 
 === FIRST MESSAGE STRATEGY ===
 - Open casually, like a real person texting
+- Introduce yourself as ${businessName}
 - Reference their situation or possible interest
 - Mention timing, location, or reason you're reaching out
 - Do not hard sell — your job is to start a conversation
