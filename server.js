@@ -36,6 +36,7 @@ const campaignsRouter = require('./src/api_routes/campaigns');
 const teamRoutes = require('./src/api_routes/team');
 const invitationsRoutes = require('./src/api_routes/invitations');
 const userRoutes = require('./src/api_routes/user'); // ADD THIS LINE
+const stripeRoutes = require('./src/api_routes/stripe');
 
 const app = express();
 
@@ -77,7 +78,7 @@ app.use('/api/campaigns', campaignsRouter);
 app.use('/api/team', teamRoutes);
 app.use('/api/invitations', invitationsRoutes);
 app.use('/api/user', userRoutes); // ADD THIS LINE
-
+app.use('/api/settings/stripe', stripeRoutes);
 app.post('/api/settings/instructions', async (req, res) => {
   const { tone, persona, industry, role } = req.body;
 
