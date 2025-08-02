@@ -346,9 +346,13 @@ const EnterpriseAIStrategyHub = () => {
     loadConfiguration();
   }, [user?.tenant_id, canViewAISettings]);
 
-  useEffect(() => {
-  setLocalBusinessName(strategyConfig.businessName);
+useEffect(() => {
+  if (strategyConfig.businessName && localBusinessName !== strategyConfig.businessName) {
+    setLocalBusinessName(strategyConfig.businessName);
+  }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
 }, [strategyConfig.businessName]);
+
 
   // Dashboard Component
   const CampaignDashboard = () => {
